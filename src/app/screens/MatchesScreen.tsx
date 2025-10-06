@@ -38,8 +38,8 @@ interface Fixture {
 }
 
 interface Favorites {
-    leagues?: { [key: number]: any };
-    teams?: { [key: number]: any };
+    leagues?: { [key: string]: any };
+    teams?: { [key:string]: any };
 }
 
 interface GroupedFixtures {
@@ -61,72 +61,13 @@ const getDayLabel = (dateString: string) => {
 const START_DATE_LIMIT = subDays(new Date(), 180);
 const END_DATE_LIMIT = addDays(new Date(), 180);
 
-function useInfiniteFixtures() {
-  const [fixtures, setFixtures] = useState<GroupedFixtures>({});
-  const [isLoadingNext, setIsLoadingNext] = useState(false);
-  const [isLoadingPrev, setIsLoadingPrev] = useState(false);
-  const [earliestDate, setEarliestDate] = useState(new Date());
-  const [latestDate, setLatestDate] = useState(new Date());
-
-  const hasMorePrev = useMemo(() => earliestDate > START_DATE_LIMIT, [earliestDate]);
-  const hasMoreNext = useMemo(() => latestDate < END_DATE_LIMIT, [latestDate]);
-
-  const fetchFixturesByDate = useCallback(async (date: Date): Promise<boolean> => {
-    const dateString = format(date, 'yyyy-MM-dd');
-    if (fixtures[dateString]) return true;
-
-    try {
-      const response = await fetch(`/api/football/fixtures?date=${dateString}`);
-      const data = await response.json();
-      const newFixtures = data.response || [];
-
-      setFixtures(prev => ({
-          ...prev,
-          [dateString]: newFixtures
-      }));
-      return true;
-    } catch (error) {
-      console.error(`Failed to fetch fixtures for ${dateString}:`, error);
-      setFixtures(prev => ({ ...prev, [dateString]: [] }));
-      return false;
-    }
-  }, [fixtures]);
-  
-  useEffect(() => {
-    const today = new Date();
-    setIsLoadingNext(true);
-    fetchFixturesByDate(today).finally(() => setIsLoadingNext(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadNextDay = useCallback(async () => {
-    if (isLoadingNext || !hasMoreNext) return;
-    setIsLoadingNext(true);
-    const nextDay = addDays(latestDate, 1);
-    await fetchFixturesByDate(nextDay);
-    setLatestDate(nextDay);
-    setIsLoadingNext(false);
-  }, [isLoadingNext, hasMoreNext, latestDate, fetchFixturesByDate]);
-
-  const loadPreviousDay = useCallback(async () => {
-      if (isLoadingPrev || !hasMorePrev) return;
-      setIsLoadingPrev(true);
-      const prevDay = subDays(earliestDate, 1);
-      await fetchFixturesByDate(prevDay);
-      setEarliestDate(prevDay);
-      setIsLoadingPrev(false); 
-  }, [isLoadingPrev, hasMorePrev, earliestDate, fetchFixturesByDate]);
-
-  const sortedDates = useMemo(() => Object.keys(fixtures).sort((a, b) => new Date(a).getTime() - new Date(b).getTime()), [fixtures]);
-
-  return { fixtures, sortedDates, isLoadingNext, isLoadingPrev, loadNextDay, loadPreviousDay, hasMoreNext, hasMorePrev };
-}
 
 function InfiniteScrollTrigger({ onVisible, isLoading, hasMore }: { onVisible: () => void, isLoading: boolean, hasMore: boolean }) {
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!hasMore) return;
+        const currentRef = ref.current;
+        if (!currentRef || !hasMore) return;
         
         const observer = new IntersectionObserver(
             (entries) => {
@@ -138,15 +79,10 @@ function InfiniteScrollTrigger({ onVisible, isLoading, hasMore }: { onVisible: (
             { threshold: 0.1 }
         );
 
-        const currentRef = ref.current;
-        if (currentRef) {
-            observer.observe(currentRef);
-        }
+        observer.observe(currentRef);
 
         return () => {
-            if (currentRef) {
-                observer.unobserve(currentRef);
-            }
+            observer.unobserve(currentRef);
         };
     }, [onVisible, isLoading, hasMore]);
 
@@ -157,69 +93,115 @@ function InfiniteScrollTrigger({ onVisible, isLoading, hasMore }: { onVisible: (
     );
 }
 
-export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
-  const { user } = useFirebase();
-  const [favorites, setFavorites] = useState<Favorites>({});
-  
-  const allMatchesFixtures = useInfiniteFixtures();
-  const favoriteMatchesFixtures = useInfiniteFixtures();
+function FixturesList({ filter, favorites }: { filter?: 'favorites', favorites: Favorites }) {
+    const [fixtures, setFixtures] = useState<GroupedFixtures>({});
+    const [isLoadingNext, setIsLoadingNext] = useState(false);
+    const [isLoadingPrev, setIsLoadingPrev] = useState(false);
+    const [earliestDate, setEarliestDate] = useState(new Date());
+    const [latestDate, setLatestDate] = useState(new Date());
 
-  useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
-      setFavorites(doc.data() as Favorites || {});
-    });
-    return () => unsub();
-  }, [user]);
-  
-  const renderFixture = (fixture: Fixture) => (
-    <div key={fixture.fixture.id} className="rounded-lg border bg-card p-3 text-sm">
-       <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
-            <div className="flex items-center gap-2">
-                <Avatar className="h-4 w-4">
-                    <AvatarImage src={fixture.league.logo} alt={fixture.league.name} />
-                    <AvatarFallback>{fixture.league.name.substring(0,1)}</AvatarFallback>
-                </Avatar>
-                <span className="truncate">{fixture.league.name}</span>
-            </div>
-            <span>{fixture.fixture.status.short === 'TBD' ? 'لم تحدد' : fixture.fixture.status.long}</span>
-       </div>
-       <div className="flex items-center justify-between gap-2">
-           <div className="flex items-center gap-2 flex-1 justify-end truncate">
-               <span className="font-semibold truncate">{fixture.teams.home.name}</span>
-               <Avatar className="h-8 w-8">
-                   <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
-                   <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
-               </Avatar>
-           </div>
-           <div className="font-bold text-lg px-2 bg-muted rounded-md">
-               {fixture.fixture.status.short === 'FT' || fixture.fixture.status.short === 'AET' || fixture.fixture.status.short === 'PEN'
-                 ? `${fixture.goals.home} - ${fixture.goals.away}`
-                 : new Date(fixture.fixture.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
-           </div>
-           <div className="flex items-center gap-2 flex-1 truncate">
-                <Avatar className="h-8 w-8">
-                   <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
-                   <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
-               </Avatar>
-               <span className="font-semibold truncate">{fixture.teams.away.name}</span>
-           </div>
-       </div>
-    </div>
-  );
-  
-  const renderEmptyState = (title: string, description: string) => (
-     <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
-        <p className="font-bold text-lg">{title}</p>
-        <p className="text-sm">{description}</p>
-    </div>
-  )
+    const hasMorePrev = useMemo(() => earliestDate > START_DATE_LIMIT, [earliestDate]);
+    const hasMoreNext = useMemo(() => latestDate < END_DATE_LIMIT, [latestDate]);
+    
+    // Using refs to hold the latest state for callbacks without causing re-renders
+    const fixturesRef = useRef(fixtures);
+    fixturesRef.current = fixtures;
 
-  const FixturesList = ({ filter }: { filter?: 'favorites' }) => {
-    const { fixtures, sortedDates, isLoadingNext, isLoadingPrev, loadNextDay, loadPreviousDay, hasMoreNext, hasMorePrev } = 
-        filter === 'favorites' ? favoriteMatchesFixtures : allMatchesFixtures;
+    const fetchFixturesByDate = useCallback(async (date: Date): Promise<boolean> => {
+        const dateString = format(date, 'yyyy-MM-dd');
+        if (fixturesRef.current[dateString]) return true;
 
-    const hasFavorites = (favorites?.teams && Object.keys(favorites.teams).length > 0) || (favorites?.leagues && Object.keys(favorites.leagues).length > 0);
+        try {
+            const response = await fetch(`/api/football/fixtures?date=${dateString}`);
+            const data = await response.json();
+            const newFixtures = data.response || [];
+
+            setFixtures(prev => ({
+                ...prev,
+                [dateString]: newFixtures
+            }));
+            return true;
+        } catch (error) {
+            console.error(`Failed to fetch fixtures for ${dateString}:`, error);
+            setFixtures(prev => ({ ...prev, [dateString]: [] }));
+            return false;
+        }
+    }, []);
+
+    useEffect(() => {
+        const today = new Date();
+        setIsLoadingNext(true);
+        fetchFixturesByDate(today).finally(() => setIsLoadingNext(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fetchFixturesByDate]);
+
+    const loadNextDay = useCallback(async () => {
+        if (isLoadingNext || !hasMoreNext) return;
+        setIsLoadingNext(true);
+        const nextDay = addDays(latestDate, 1);
+        await fetchFixturesByDate(nextDay);
+        setLatestDate(nextDay);
+        setIsLoadingNext(false);
+    }, [isLoadingNext, hasMoreNext, latestDate, fetchFixturesByDate]);
+
+    const loadPreviousDay = useCallback(async () => {
+        if (isLoadingPrev || !hasMorePrev) return;
+        setIsLoadingPrev(true);
+        const prevDay = subDays(earliestDate, 1);
+        await fetchFixturesByDate(prevDay);
+        setEarliestDate(prevDay);
+        setIsLoadingPrev(false);
+    }, [isLoadingPrev, hasMorePrev, earliestDate, fetchFixturesByDate]);
+
+    const sortedDates = useMemo(() => Object.keys(fixtures).sort((a, b) => new Date(a).getTime() - new Date(b).getTime()), [fixtures]);
+
+    const renderFixture = (fixture: Fixture) => (
+      <div key={fixture.fixture.id} className="rounded-lg border bg-card p-3 text-sm">
+         <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
+              <div className="flex items-center gap-2">
+                  <Avatar className="h-4 w-4">
+                      <AvatarImage src={fixture.league.logo} alt={fixture.league.name} />
+                      <AvatarFallback>{fixture.league.name.substring(0,1)}</AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{fixture.league.name}</span>
+              </div>
+              <span>{fixture.fixture.status.short === 'TBD' ? 'لم تحدد' : fixture.fixture.status.long}</span>
+         </div>
+         <div className="flex items-center justify-between gap-2">
+             <div className="flex items-center gap-2 flex-1 justify-end truncate">
+                 <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+                 <Avatar className="h-8 w-8">
+                     <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
+                     <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
+                 </Avatar>
+             </div>
+             <div className="font-bold text-lg px-2 bg-muted rounded-md">
+                 {fixture.fixture.status.short === 'FT' || fixture.fixture.status.short === 'AET' || fixture.fixture.status.short === 'PEN'
+                   ? `${fixture.goals.home} - ${fixture.goals.away}`
+                   : new Date(fixture.fixture.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+             </div>
+             <div className="flex items-center gap-2 flex-1 truncate">
+                  <Avatar className="h-8 w-8">
+                     <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
+                     <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
+                 </Avatar>
+                 <span className="font-semibold truncate">{fixture.teams.away.name}</span>
+             </div>
+         </div>
+      </div>
+    );
+    
+    const renderEmptyState = (title: string, description: string) => (
+       <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
+          <p className="font-bold text-lg">{title}</p>
+          <p className="text-sm">{description}</p>
+      </div>
+    )
+
+    const hasFavorites = useMemo(() => 
+        (favorites?.teams && Object.keys(favorites.teams).length > 0) || (favorites?.leagues && Object.keys(favorites.leagues).length > 0),
+    [favorites]);
+
 
     if (filter === 'favorites' && !hasFavorites) {
         return renderEmptyState("لا توجد مباريات في مفضلتك", "أضف فرقا أو بطولات للمفضلة لترى مبارياتها هنا.");
@@ -236,9 +218,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           const favoritedLeagueIds = favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [];
           
           fixturesToRender = fixturesForDate.filter(f =>
-              favoritedTeamIds.includes(f.teams.home.id) || 
+              (favoritedTeamIds.includes(f.teams.home.id) || 
               favoritedTeamIds.includes(f.teams.away.id) ||
-              favoritedLeagueIds.includes(f.league.id)
+              favoritedLeagueIds.includes(f.league.id))
           );
       }
       
@@ -258,10 +240,18 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     }).filter(Boolean);
 
     if (renderedContent.length === 0 && !isLoadingPrev && !isLoadingNext) {
-        return renderEmptyState(
-            filter === 'favorites' ? "لا توجد مباريات مفضلة في هذه الفترة" : "لا توجد مباريات متاحة.",
-            "جرّب التمرير لأعلى أو لأسفل لعرض أيام أخرى."
-        );
+         if (filter === 'favorites' && hasFavorites) {
+            return renderEmptyState(
+                "لا توجد مباريات مفضلة في هذه الفترة",
+                "جرّب التمرير لأعلى أو لأسفل لعرض أيام أخرى."
+            );
+        }
+        if (filter !== 'favorites') {
+             return renderEmptyState(
+                "لا توجد مباريات متاحة.",
+                "جرّب التمرير لأعلى أو لأسفل لعرض أيام أخرى."
+            );
+        }
     }
 
     return (
@@ -279,9 +269,21 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             />
         </div>
     );
-  };
+};
 
 
+export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+  const { user } = useFirebase();
+  const [favorites, setFavorites] = useState<Favorites>({});
+  
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
+      setFavorites(doc.data() as Favorites || { leagues: {}, teams: {} });
+    });
+    return () => unsub();
+  }, [user]);
+  
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="المباريات" onBack={goBack} canGoBack={canGoBack} />
@@ -297,13 +299,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             value="my-results" 
             className="mt-0 flex-1 overflow-y-auto"
           >
-             <FixturesList filter="favorites" />
+             <FixturesList filter="favorites" favorites={favorites}/>
           </TabsContent>
           <TabsContent 
             value="all-matches" 
             className="mt-0 flex-1 overflow-y-auto"
           >
-            <FixturesList />
+            <FixturesList favorites={favorites} />
           </TabsContent>
         </Tabs>
       </div>
