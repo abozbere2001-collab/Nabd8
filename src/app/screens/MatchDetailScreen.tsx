@@ -176,12 +176,16 @@ const PlayerIcon = ({ player }: { player: LineupPlayer }) => {
             top: `${topPercentage}%`, 
             left: `${leftPercentage}%`,
             transform: 'translate(-50%, -50%)',
+            width: '60px'
           }}
         >
             <div className="relative">
-                <Avatar className="w-10 h-10 border-2 bg-background border-white shadow-md">
-                    <AvatarImage src={player.player.photo} alt={player.player.name} />
+                 <Avatar className="w-10 h-10 border-2 bg-slate-800 border-white/50 shadow-md text-white font-bold">
                     <AvatarFallback>{player.player.pos || 'P'}</AvatarFallback>
+                </Avatar>
+                <Avatar className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8">
+                     <AvatarImage src={player.player.photo} alt={player.player.name} />
+                     <AvatarFallback>{player.player.pos || 'P'}</AvatarFallback>
                 </Avatar>
                 <span className={cn(
                   "absolute -top-1 -right-1 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background bg-red-600"
@@ -189,7 +193,7 @@ const PlayerIcon = ({ player }: { player: LineupPlayer }) => {
                     {player.player.number}
                 </span>
             </div>
-            <span className="text-[10px] font-semibold bg-black/50 text-white rounded-sm px-1 py-0.5 mt-1 whitespace-nowrap shadow-lg">
+            <span className="text-[10px] font-semibold bg-black/50 text-white rounded-sm px-1 py-0.5 mt-1 whitespace-nowrap shadow-lg truncate w-full">
                 {player.player.name}
             </span>
         </div>
