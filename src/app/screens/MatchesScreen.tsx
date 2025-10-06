@@ -267,12 +267,12 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   
   const renderMyResults = () => {
       let hasFavorites = false;
-      if (!favorites || !favorites.teams || !favorites.leagues) {
+      if (!favorites || (!favorites.teams && !favorites.leagues)) {
         return renderEmptyState("لا توجد مباريات في مفضلتك", "أضف فرقا أو بطولات للمفضلة لترى مبارياتها هنا. اسحب للأسفل أو الأعلى لعرض أيام أخرى.");
       }
       
-      const favoritedTeamIds = Object.keys(favorites.teams).map(Number);
-      const favoritedLeagueIds = Object.keys(favorites.leagues).map(Number);
+      const favoritedTeamIds = favorites.teams ? Object.keys(favorites.teams).map(Number) : [];
+      const favoritedLeagueIds = favorites.leagues ? Object.keys(favorites.leagues).map(Number) : [];
 
       const content = sortedDates.map(dateString => {
         const fixturesForDate = groupedFixtures[dateString] || [];
@@ -372,3 +372,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
