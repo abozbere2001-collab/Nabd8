@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Share2, Star, Clock, User, ArrowLeftRight, RectangleVertical, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
 import Image from 'next/image';
 
 // --- TYPE DEFINITIONS ---
@@ -164,18 +163,18 @@ const PlayerIcon = ({ player, pos, grid, homeAway }: { player: { name: string, n
     if (!grid) return null;
     const [row, col] = grid.split(':').map(Number);
     
-    // Total rows are dynamic but usually 4 or 5. Let's use 5 as a base.
-    // Total columns are also dynamic, can be up to 5.
-    const topPercentage = (row - 1) * (100 / 5) + 10;
+    const maxRows = 5; 
+    const maxCols = 5;
+
+    const topPercentage = (row -1) * (100 / maxRows) + 10;
     let leftPercentage;
+
     if (homeAway === 'home') {
-        leftPercentage = (col - 1) * (100 / 5) + 10;
+        leftPercentage = (col-1) * (100 / maxCols) + 10;
     } else {
-        // Reverse the column for the away team to mirror the pitch
-        leftPercentage = 100 - ((col - 1) * (100 / 5) + 10);
+        leftPercentage = 100 - ((col - 1) * (100 / maxCols) + 10);
     }
-
-
+    
     return (
         <div 
           className="absolute text-center flex flex-col items-center" 
@@ -200,12 +199,13 @@ const PlayerIcon = ({ player, pos, grid, homeAway }: { player: { name: string, n
     );
 };
 
+
 const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, loading: boolean, fixture: Fixture }) => {
   if (loading) {
     return <Skeleton className="w-full h-[600px] rounded-lg m-4" />;
   }
 
-  if (!lineups || lineups.length === 0) {
+  if (!lineups || lineups.length < 2) {
     return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة.</p>;
   }
 
@@ -219,10 +219,9 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
 
   return (
     <div className="p-4 space-y-8">
-      {/* Pitch View */}
       <div>
         <h3 className="font-bold text-center mb-4">
-          خطة اللعب
+          خطة اللعب: {homeLineup.formation} مقابل {awayLineup.formation}
         </h3>
         <div 
             className="relative w-full max-w-md mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-500/50" 
@@ -237,36 +236,36 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
         </div>
       </div>
       
-      {/* Substitutes & Coaches */}
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        {([homeLineup, awayLineup]).map(lineup => (
-          <div key={lineup.team.id} className="space-y-4">
-            <div className="p-2 rounded-lg bg-card border">
-              <h4 className="font-bold mb-2 flex items-center gap-2">
-                <Avatar className="w-5 h-5"><AvatarImage src={lineup.team.logo} /></Avatar>
-                البدلاء
-              </h4>
-              <div className="space-y-1">
-                {lineup.substitutes.map(s => (
-                  <div key={s.player.id} className="flex items-center gap-2">
-                    <span className="text-muted-foreground w-6 text-center">{s.player.number}</span>
-                    <span className="font-medium">{s.player.name}</span>
-                  </div>
-                ))}
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+         {[homeLineup, awayLineup].map(lineup => (
+            <div key={lineup.team.id} className="p-2 rounded-lg bg-card border">
+                <h4 className="font-bold mb-2 flex items-center gap-2">
+                    <Avatar className="w-5 h-5"><AvatarImage src={lineup.team.logo} /></Avatar>
+                    البدلاء والمدرب ({lineup.team.name})
+                </h4>
+                <div className="space-y-2">
+                    <div className="flex items-center gap-3 p-2 rounded-md bg-muted/50">
+                        <Avatar className="w-8 h-8">
+                        <AvatarImage src={lineup.coach.photo} alt={lineup.coach.name} />
+                        <AvatarFallback>{lineup.coach.name.substring(0,1)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <p className="font-medium">{lineup.coach.name}</p>
+                            <p className="text-xs text-muted-foreground">المدرب</p>
+                        </div>
+                    </div>
+                    <div className="space-y-1 pt-2">
+                        {lineup.substitutes.map(s => (
+                        <div key={s.player.id} className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground w-6 text-center">{s.player.number}</span>
+                            <span className="font-medium">{s.player.name}</span>
+                            <span className="text-muted-foreground">({s.player.pos})</span>
+                        </div>
+                        ))}
+                    </div>
+                </div>
             </div>
-            <div className="p-2 rounded-lg bg-card border">
-              <h4 className="font-bold mb-2">المدرب</h4>
-              <div className="flex items-center gap-3">
-                <Avatar className="w-8 h-8">
-                  <AvatarImage src={lineup.coach.photo} alt={lineup.coach.name} />
-                  <AvatarFallback>{lineup.coach.name.substring(0,1)}</AvatarFallback>
-                </Avatar>
-                <span className="font-medium">{lineup.coach.name}</span>
-              </div>
-            </div>
-          </div>
-        ))}
+          ))}
       </div>
     </div>
   );
@@ -378,7 +377,7 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
     if (loading) return <Skeleton className="w-full h-96 m-4" />;
     if (!events || events.length === 0) return <p className="text-center p-8">لا توجد أحداث رئيسية.</p>;
 
-    const filteredEvents = events.slice().reverse().filter(event => {
+    const filteredEvents = events.filter(event => {
         if (filter === 'highlights') {
             return event.type === 'Goal' || event.detail === 'Red Card';
         }
@@ -393,52 +392,57 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
     const getEventIcon = (event: Event) => {
         switch (event.type) {
             case 'Goal':
-                return <User className="text-green-500" size={16} />; // Placeholder
+                return <User className="text-green-500" size={14} />; // Placeholder
             case 'Card':
-                if (event.detail === 'Yellow Card') return <RectangleVertical className="text-yellow-400 fill-yellow-400" size={16} />;
-                return <RectangleVertical className="text-red-500 fill-red-500" size={16} />;
+                if (event.detail === 'Yellow Card') return <RectangleVertical className="text-yellow-400 fill-yellow-400" size={14} />;
+                return <RectangleVertical className="text-red-500 fill-red-500" size={14} />;
             case 'subst':
-                return <ArrowLeftRight className="text-blue-500" size={16} />;
+                return <ArrowLeftRight className="text-blue-500" size={14} />;
             case 'Var':
-                return <ShieldAlert className="text-gray-500" size={16} />;
+                return <ShieldAlert className="text-gray-500" size={14} />;
             default:
-                return <Clock size={16} />;
+                return <Clock size={14} />;
         }
     };
     
     return (
       <div className="p-4">
-        <div className="relative flex flex-col-reverse">
+        <div className="relative flex flex-col">
           {/* Timeline */}
           <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
           
           {filteredEvents.map((event, index) => {
             const isHomeTeam = event.team.id === fixture.teams.home.id;
+            
             const content = (
               <div className={cn("flex items-center gap-2", isHomeTeam ? "flex-row-reverse text-right" : "flex-row text-left")}>
                  <span className="font-bold text-xs w-6">{event.time.elapsed}'</span>
                  {getEventIcon(event)}
                  <div className="text-xs">
                     <p className="font-semibold">{event.player.name}</p>
-                    <p className="text-muted-foreground">
-                      {event.type === 'subst' ? `IN: ${event.player.name} / OUT: ${event.assist.name || ''}` : event.detail}
-                    </p>
+                    {event.type === 'subst' ? 
+                     <p className="text-muted-foreground text-[10px]">
+                        <span className="text-green-500">دخول:</span> {event.player.name} / <span className="text-red-500">خروج:</span> {event.assist.name || ''}
+                     </p>
+                    :
+                     <p className="text-muted-foreground">{event.detail}</p>
+                    }
                  </div>
               </div>
             );
 
             return (
-              <div key={index} className="relative flex justify-center items-start my-3">
-                 <div className={cn("w-[calc(50%-1.25rem)]", isHomeTeam ? 'mr-auto' : 'hidden')}>
-                    {isHomeTeam ? content : null}
+              <div key={index} className="relative flex justify-center items-start my-4">
+                 <div className={cn("w-[calc(50%-1rem)]", !isHomeTeam ? 'mr-auto' : 'hidden')}>
+                    {!isHomeTeam ? content : null}
                  </div>
                  <div className="z-10 h-full">
                     <div className="sticky top-1/2">
-                      <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground border-2 border-background"></div>
+                      <div className="h-2 w-2 rounded-full bg-muted-foreground border-2 border-background"></div>
                     </div>
                  </div>
-                 <div className={cn("w-[calc(50%-1.25rem)]", !isHomeTeam ? 'ml-auto' : 'hidden')}>
-                    {!isHomeTeam ? content : null}
+                 <div className={cn("w-[calc(50%-1rem)]", isHomeTeam ? 'ml-auto' : 'hidden')}>
+                    {isHomeTeam ? content : null}
                  </div>
               </div>
             );
