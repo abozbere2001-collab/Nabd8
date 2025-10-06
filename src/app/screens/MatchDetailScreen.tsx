@@ -159,14 +159,14 @@ const MatchHeader = ({ fixture, onBack }: { fixture: Fixture; onBack: () => void
   </header>
 );
 
-const PlayerIcon = ({ player, homeAway }: { player: LineupPlayer, homeAway: 'home' | 'away' }) => {
+const PlayerIcon = ({ player }: { player: LineupPlayer }) => {
     if (!player.player.grid) return null;
     const [row, col] = player.player.grid.split(':').map(Number);
     
-    // Reverse the row positioning: higher row number should be higher on the screen
-    const topPercentage = 100 - (row * 9); 
+    // Reverse the row positioning: higher row number should be higher on the screen (e.g. row 11 is top, row 1 is bottom)
+    const topPercentage = (11 - row) * (100 / 11.5) + 4; 
     
-    // Position columns from the center
+    // Position columns from the center, with more spacing
     const leftPercentage = 50 + (col - 3) * 18;
 
     return (
@@ -179,13 +179,12 @@ const PlayerIcon = ({ player, homeAway }: { player: LineupPlayer, homeAway: 'hom
           }}
         >
             <div className="relative">
-                <Avatar className="w-10 h-10 border-2 bg-gray-200 border-white shadow-md">
+                <Avatar className="w-10 h-10 border-2 bg-background border-white shadow-md">
                     <AvatarImage src={player.player.photo} alt={player.player.name} />
-                    <AvatarFallback>{player.player.name.substring(0,1)}</AvatarFallback>
+                    <AvatarFallback>{player.player.pos || 'P'}</AvatarFallback>
                 </Avatar>
                 <span className={cn(
-                  "absolute -top-1 -right-1 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center border border-white",
-                  homeAway === 'home' ? 'bg-blue-600' : 'bg-red-600'
+                  "absolute -top-1 -right-1 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background bg-red-600"
                   )}>
                     {player.player.number}
                 </span>
@@ -204,7 +203,7 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
     return <Skeleton className="w-full h-[600px] rounded-lg m-4" />;
   }
 
-  if (!lineups || lineups.length === 0) {
+  if (!lineups || lineups.length < 2) {
     return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة.</p>;
   }
 
@@ -212,9 +211,8 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
   const awayLineup = lineups.find(l => l.team.id === fixture.teams.away.id);
 
   const selectedLineup = selectedTeamId === fixture.teams.home.id ? homeLineup : awayLineup;
-  const homeAway = selectedTeamId === fixture.teams.home.id ? 'home' : 'away';
 
-  if (!selectedLineup) {
+  if (!homeLineup || !awayLineup || !selectedLineup) {
       return <p className="text-center text-muted-foreground p-8">تشكيلة الفريق المحدد غير متاحة.</p>;
   }
 
@@ -222,18 +220,20 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
     <div className="p-4 space-y-6">
       <div className="flex justify-center items-center gap-2">
         <Button
-            variant={selectedTeamId === homeLineup?.team.id ? "default" : "outline"}
-            className="w-32"
-            onClick={() => setSelectedTeamId(homeLineup?.team.id || null)}
+            variant={selectedTeamId === homeLineup.team.id ? "default" : "outline"}
+            className="w-40 flex items-center gap-2"
+            onClick={() => setSelectedTeamId(homeLineup.team.id)}
         >
-            {homeLineup?.team.name || "المضيف"}
+            <Avatar className="w-6 h-6"><AvatarImage src={homeLineup.team.logo} /></Avatar>
+            <span>{homeLineup.team.name}</span>
         </Button>
         <Button
-            variant={selectedTeamId === awayLineup?.team.id ? "default" : "outline"}
-            className="w-32"
-            onClick={() => setSelectedTeamId(awayLineup?.team.id || null)}
+            variant={selectedTeamId === awayLineup.team.id ? "default" : "outline"}
+            className="w-40 flex items-center gap-2"
+            onClick={() => setSelectedTeamId(awayLineup.team.id)}
         >
-            {awayLineup?.team.name || "الضيف"}
+            <Avatar className="w-6 h-6"><AvatarImage src={awayLineup.team.logo} /></Avatar>
+            <span>{awayLineup.team.name}</span>
         </Button>
       </div>
 
@@ -246,7 +246,7 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
             }}
         >
           {selectedLineup.startXI.map(p => (
-              <PlayerIcon key={p.player.id} player={p} homeAway={homeAway} />
+              <PlayerIcon key={p.player.id} player={p} />
           ))}
           <div className="absolute bottom-2 right-2 bg-black/50 text-white text-sm font-bold px-2 py-1 rounded">
              {selectedLineup.formation}
@@ -272,10 +272,14 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
 
       <div className="p-2 rounded-lg bg-card border">
          <h4 className="font-bold mb-2 text-base px-2">البدلاء</h4>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
             {selectedLineup.substitutes.map(s => (
             <div key={s.player.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted">
                 <span className="text-muted-foreground w-6 text-center font-mono">{s.player.number}</span>
+                <Avatar className="w-6 h-6">
+                    <AvatarImage src={s.player.photo} />
+                    <AvatarFallback>{s.player.name.substring(0,1)}</AvatarFallback>
+                </Avatar>
                 <span className="font-medium truncate">{s.player.name}</span>
             </div>
             ))}
