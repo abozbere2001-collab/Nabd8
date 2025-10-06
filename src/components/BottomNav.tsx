@@ -3,7 +3,7 @@ import { Goal, Trophy, Map, Newspaper, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ScreenKey } from '@/app/page';
 
-const navItems = [
+const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
   { key: 'Matches', label: 'المباريات', icon: Goal },
   { key: 'Competitions', label: 'البطولات', icon: Trophy },
   { key: 'Iraq', label: 'العراق', icon: Map },
@@ -11,13 +11,13 @@ const navItems = [
   { key: 'Settings', label: 'الإعدادات', icon: Settings2 },
 ];
 
+
 interface BottomNavProps {
   activeScreen: ScreenKey;
   onNavigate: (screen: ScreenKey) => void;
-  screens: Record<ScreenKey, React.ComponentType<any>>;
 }
 
-export function BottomNav({ activeScreen, onNavigate, screens }: BottomNavProps) {
+export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
   const handleNavigation = (key: ScreenKey) => {
     // Only navigate if the screen is a main tab screen
     if (navItems.some(item => item.key === key)) {

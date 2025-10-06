@@ -12,7 +12,6 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
-import { Toaster } from '@/components/ui/toaster';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails';
 export type ScreenProps = {
@@ -145,7 +144,7 @@ export default function Home() {
             })}
           </div>
           
-          {user && activeScreenKey && <BottomNav activeScreen={activeScreenKey} onNavigate={navigate} screens={screens} />}
+          {user && activeScreenKey && <BottomNav activeScreen={activeScreenKey} onNavigate={navigate} />}
         </div>
       </div>
        <p className="text-white/50 text-xs mt-4">Goal Stack - Mobile Simulation</p>
