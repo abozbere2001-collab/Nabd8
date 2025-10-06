@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Share2, Star } from 'lucide-react';
+import { ArrowLeft, Share2, Star, Clock, User, ArrowRight, ArrowLeftRight, RectangleVertical, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
@@ -351,29 +351,70 @@ const StandingsTab = ({ standings, loading, fixture }: { standings: Standing[][]
     );
 };
 
-const EventsTab = ({ events, loading }: { events: Event[] | null, loading: boolean }) => {
+const EventsTab = ({ events, fixture, loading }: { events: Event[] | null, fixture: Fixture, loading: boolean }) => {
     if (loading) return <Skeleton className="w-full h-96" />;
     if (!events || events.length === 0) return <p className="text-center p-8">لا توجد أحداث رئيسية.</p>;
+
+    const getEventIcon = (event: Event) => {
+        switch (event.type) {
+            case 'Goal':
+                return <User className="text-green-500" size={18} />; // Should be a soccer ball
+            case 'Card':
+                if (event.detail === 'Yellow Card') return <RectangleVertical className="text-yellow-400 fill-yellow-400" size={18} />;
+                return <RectangleVertical className="text-red-500 fill-red-500" size={18} />;
+            case 'subst':
+                return <ArrowLeftRight className="text-blue-500" size={18} />;
+            case 'Var':
+                return <ShieldAlert className="text-gray-500" size={18} />;
+            default:
+                return <Clock size={18} />;
+        }
+    };
     
     return (
-      <div className="p-4 space-y-4">
-        {events.map((event, index) => (
-          <div key={index} className="flex items-center gap-4">
-            <div className="font-bold text-sm">{event.time.elapsed}'</div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 bg-card p-3 rounded-lg">
-                <Avatar className="w-6 h-6">
-                  <AvatarImage src={event.team.logo} />
-                  <AvatarFallback>{event.team.name.substring(0,1)}</AvatarFallback>
-                </Avatar>
-                <div>
-                    <p className="font-semibold text-sm">{event.player.name}</p>
-                    <p className="text-xs text-muted-foreground">{event.type} - {event.detail}</p>
-                </div>
+      <div className="p-4">
+        <div className="relative flex flex-col items-center">
+          {/* Timeline */}
+          <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
+          
+          {events.map((event, index) => {
+            const isHomeTeam = event.team.id === fixture.teams.home.id;
+            const content = (
+              <div className="flex-1">
+                <p className="font-semibold text-sm">{event.player.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {event.type === 'subst' ? `${event.assist.name || 'خروج'} / ${event.player.name || 'دخول'}` : event.detail}
+                </p>
               </div>
-            </div>
-          </div>
-        ))}
+            );
+
+            return (
+              <div key={index} className="relative w-full flex items-center my-3">
+                {/* Timeline Dot */}
+                <div className="absolute left-1/2 h-3 w-3 rounded-full bg-muted-foreground -translate-x-1/2 z-10"></div>
+                
+                {/* Event Content */}
+                <div className={cn("w-1/2 p-2 flex gap-3 items-center", isHomeTeam ? "pr-8 flex-row-reverse text-right" : "pl-8 text-left")}>
+                  {isHomeTeam ? (
+                    <>
+                      {content}
+                      {getEventIcon(event)}
+                      <span className="font-bold text-sm w-8">{event.time.elapsed}'</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-bold text-sm w-8">{event.time.elapsed}'</span>
+                      {getEventIcon(event)}
+                      {content}
+                    </>
+                  )}
+                </div>
+                {/* The other half is empty */}
+                <div className="w-1/2 p-2"></div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
 };
@@ -387,17 +428,17 @@ export function MatchDetailScreen({ goBack, fixtureId, fixture }: ScreenProps & 
     <div className="flex h-full flex-col bg-background">
       <MatchHeader fixture={fixture} onBack={goBack} />
       <div className="flex-1 overflow-y-auto">
-        <Tabs defaultValue="lineups" className="w-full">
+        <Tabs defaultValue="details" className="w-full">
           <div className="p-4 pb-0 sticky top-0 bg-background z-10 border-b">
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="events">المباراة</TabsTrigger>
+              <TabsTrigger value="details">التفاصيل</TabsTrigger>
               <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
               <TabsTrigger value="stats">الإحصائيات</TabsTrigger>
               <TabsTrigger value="standings">الترتيب</TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="events">
-            <EventsTab events={events} loading={loading} />
+          <TabsContent value="details">
+            <EventsTab events={events} fixture={fixture} loading={loading} />
           </TabsContent>
           <TabsContent value="lineups">
             <LineupsTab lineups={lineups} loading={loading} />
