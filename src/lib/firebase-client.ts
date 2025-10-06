@@ -1,6 +1,6 @@
 "use client";
 
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, onAuthStateChanged, type User, type Auth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut as firebaseSignOut, onAuthStateChanged, type User, type Auth } from "firebase/auth";
 import { initializeFirebase } from './firebase';
 
 const app = initializeFirebase();
@@ -26,7 +26,11 @@ try {
 const provider = new GoogleAuthProvider();
 
 export const signInWithGoogle = () => {
-  return signInWithPopup(auth, provider);
+  return signInWithRedirect(auth, provider);
+};
+
+export const getGoogleRedirectResult = () => {
+  return getRedirectResult(auth);
 };
 
 export const signOut = () => {
