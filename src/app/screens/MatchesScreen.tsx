@@ -315,7 +315,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="المباريات" onBack={goBack} canGoBack={canGoBack} />
       <div className="flex-1 flex flex-col min-h-0">
-        <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col">
+        <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
           <div className="px-4 pt-4 border-b">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="my-results">نتائجي</TabsTrigger>
@@ -326,7 +326,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
           
           <div className="flex-1 overflow-y-auto">
-            <h2 className="text-sm font-bold text-center text-muted-foreground pt-4 pb-2">{getFullDayLabel(selectedDateKey)}</h2>
+            <h2 className="text-sm font-bold text-center text-muted-foreground pt-4 pb-2 sticky top-0 bg-background z-10">{getFullDayLabel(selectedDateKey)}</h2>
             <FixturesList 
                 fixtures={fixtures}
                 loading={loading}
