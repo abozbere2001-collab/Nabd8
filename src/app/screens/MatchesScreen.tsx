@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
-import { format, parseISO, addDays, subDays, isToday, isYesterday, isTomorrow } from 'date-fns';
+import { format, parseISO, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useFirebase } from '@/firebase/provider';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -314,7 +314,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="المباريات" onBack={goBack} canGoBack={canGoBack} />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col">
           <div className="px-4 pt-4 border-b">
             <TabsList className="grid w-full grid-cols-2">
