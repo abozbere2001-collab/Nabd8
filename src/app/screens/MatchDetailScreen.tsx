@@ -70,6 +70,8 @@ interface Standing {
   all: { played: number; win: number; draw: number; lose: number; goals: { for: number; against: number; }; };
 }
 
+type EventFilter = "all" | "highlights";
+
 const CURRENT_SEASON = new Date().getFullYear();
 
 // --- API FETCH HOOK ---
@@ -165,7 +167,14 @@ const PlayerIcon = ({ player, pos, grid, homeAway }: { player: { name: string, n
     // Total rows are dynamic but usually 4 or 5. Let's use 5 as a base.
     // Total columns are also dynamic, can be up to 5.
     const topPercentage = (row - 1) * (100 / 5) + 10;
-    const leftPercentage = (col - 1) * (100 / 5) + 10;
+    let leftPercentage;
+    if (homeAway === 'home') {
+        leftPercentage = (col - 1) * (100 / 5) + 10;
+    } else {
+        // Reverse the column for the away team to mirror the pitch
+        leftPercentage = 100 - ((col - 1) * (100 / 5) + 10);
+    }
+
 
     return (
         <div 
@@ -191,17 +200,22 @@ const PlayerIcon = ({ player, pos, grid, homeAway }: { player: { name: string, n
     );
 };
 
-const LineupsTab = ({ lineups, loading }: { lineups: Lineup[] | null, loading: boolean }) => {
+const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, loading: boolean, fixture: Fixture }) => {
   if (loading) {
     return <Skeleton className="w-full h-[600px] rounded-lg m-4" />;
   }
 
-  if (!lineups || lineups.length < 2) {
+  if (!lineups || lineups.length === 0) {
     return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة.</p>;
   }
 
-  const homeLineup = lineups[0];
-  const awayLineup = lineups[1];
+  const homeLineup = lineups.find(l => l.team.id === fixture.teams.home.id);
+  const awayLineup = lineups.find(l => l.team.id === fixture.teams.away.id);
+  
+  if (!homeLineup || !awayLineup) {
+      return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
+  }
+
 
   return (
     <div className="p-4 space-y-8">
@@ -259,12 +273,16 @@ const LineupsTab = ({ lineups, loading }: { lineups: Lineup[] | null, loading: b
 };
 
 
-const StatsTab = ({ stats, loading }: { stats: MatchStats[] | null, loading: boolean }) => {
+const StatsTab = ({ stats, loading, fixture }: { stats: MatchStats[] | null, loading: boolean, fixture: Fixture }) => {
     if (loading) return <Skeleton className="w-full h-96 m-4" />;
-    if (!stats || stats.length < 2) return <p className="text-center p-8">الإحصائيات غير متاحة.</p>;
+    
+    const homeStatsData = stats?.find(s => s.team.id === fixture.teams.home.id);
+    const awayStatsData = stats?.find(s => s.team.id === fixture.teams.away.id);
+    
+    if (!stats || !homeStatsData || !awayStatsData) return <p className="text-center p-8">الإحصائيات غير متاحة.</p>;
 
-    const homeStats = stats.find(s => s.team.id === stats[0].team.id)?.statistics || [];
-    const awayStats = stats.find(s => s.team.id !== stats[0].team.id)?.statistics || [];
+    const homeStats = homeStatsData.statistics;
+    const awayStats = awayStatsData.statistics;
 
     const statTypes = [
         "Ball Possession", "Total Shots", "Shots on Goal", "Shots off Goal", "Blocked Shots", "Shots insidebox", "Shots outsidebox",
@@ -280,7 +298,7 @@ const StatsTab = ({ stats, loading }: { stats: MatchStats[] | null, loading: boo
             homeValue: homeStat?.value ?? 0,
             awayValue: awayStat?.value ?? 0,
         };
-    });
+    }).filter(s => s.homeValue !== null || s.awayValue !== null);
 
     return (
         <div className="p-4 space-y-4">
@@ -356,58 +374,70 @@ const StandingsTab = ({ standings, loading, fixture }: { standings: Standing[][]
     );
 };
 
-const EventsTab = ({ events, fixture, loading }: { events: Event[] | null, fixture: Fixture, loading: boolean }) => {
+const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | null, fixture: Fixture, loading: boolean, filter: EventFilter }) => {
     if (loading) return <Skeleton className="w-full h-96 m-4" />;
     if (!events || events.length === 0) return <p className="text-center p-8">لا توجد أحداث رئيسية.</p>;
+
+    const filteredEvents = events.slice().reverse().filter(event => {
+        if (filter === 'highlights') {
+            return event.type === 'Goal' || event.detail === 'Red Card';
+        }
+        return true;
+    });
+
+    if (filteredEvents.length === 0) {
+        return <p className="text-center p-8">لا توجد أحداث بارزة.</p>;
+    }
+
 
     const getEventIcon = (event: Event) => {
         switch (event.type) {
             case 'Goal':
-                return <User className="text-green-500" size={18} />; // Placeholder for a soccer ball icon
+                return <User className="text-green-500" size={16} />; // Placeholder
             case 'Card':
-                if (event.detail === 'Yellow Card') return <RectangleVertical className="text-yellow-400 fill-yellow-400" size={18} />;
-                return <RectangleVertical className="text-red-500 fill-red-500" size={18} />;
+                if (event.detail === 'Yellow Card') return <RectangleVertical className="text-yellow-400 fill-yellow-400" size={16} />;
+                return <RectangleVertical className="text-red-500 fill-red-500" size={16} />;
             case 'subst':
-                return <ArrowLeftRight className="text-blue-500" size={18} />;
+                return <ArrowLeftRight className="text-blue-500" size={16} />;
             case 'Var':
-                return <ShieldAlert className="text-gray-500" size={18} />;
+                return <ShieldAlert className="text-gray-500" size={16} />;
             default:
-                return <Clock size={18} />;
+                return <Clock size={16} />;
         }
     };
     
     return (
       <div className="p-4">
-        <div className="relative">
+        <div className="relative flex flex-col-reverse">
           {/* Timeline */}
           <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
           
-          {events.map((event, index) => {
+          {filteredEvents.map((event, index) => {
             const isHomeTeam = event.team.id === fixture.teams.home.id;
             const content = (
-              <div className={cn("flex items-center gap-3", isHomeTeam ? "flex-row-reverse" : "flex-row")}>
-                 <span className="font-bold text-sm w-8">{event.time.elapsed}'</span>
+              <div className={cn("flex items-center gap-2", isHomeTeam ? "flex-row-reverse text-right" : "flex-row text-left")}>
+                 <span className="font-bold text-xs w-6">{event.time.elapsed}'</span>
                  {getEventIcon(event)}
-                 <div>
-                    <p className="font-semibold text-sm">{event.player.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {event.type === 'subst' ? `دخول: ${event.player.name} / خروج: ${event.assist.name || ''}` : event.detail}
+                 <div className="text-xs">
+                    <p className="font-semibold">{event.player.name}</p>
+                    <p className="text-muted-foreground">
+                      {event.type === 'subst' ? `IN: ${event.player.name} / OUT: ${event.assist.name || ''}` : event.detail}
                     </p>
                  </div>
               </div>
             );
 
             return (
-              <div key={index} className="relative flex justify-center items-center my-4">
-                 {/* Timeline Dot */}
-                 <div className="absolute left-1/2 h-3 w-3 rounded-full bg-muted-foreground -translate-x-1/2 z-10 border-2 border-background"></div>
-                
-                 {/* Event Content */}
-                 <div className={cn("w-[calc(50%-1.5rem)]", isHomeTeam ? 'text-right mr-auto' : 'text-left ml-auto')}>
+              <div key={index} className="relative flex justify-center items-start my-3">
+                 <div className={cn("w-[calc(50%-1.25rem)]", isHomeTeam ? 'mr-auto' : 'hidden')}>
                     {isHomeTeam ? content : null}
                  </div>
-                 <div className="w-[3rem]"></div>
-                 <div className={cn("w-[calc(50%-1.5rem)]", !isHomeTeam ? 'text-left ml-auto' : 'text-right mr-auto')}>
+                 <div className="z-10 h-full">
+                    <div className="sticky top-1/2">
+                      <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground border-2 border-background"></div>
+                    </div>
+                 </div>
+                 <div className={cn("w-[calc(50%-1.25rem)]", !isHomeTeam ? 'ml-auto' : 'hidden')}>
                     {!isHomeTeam ? content : null}
                  </div>
               </div>
@@ -422,6 +452,7 @@ const EventsTab = ({ events, fixture, loading }: { events: Event[] | null, fixtu
 // --- MAIN SCREEN COMPONENT ---
 export function MatchDetailScreen({ goBack, fixtureId, fixture }: ScreenProps & { fixtureId: number; fixture: Fixture }) {
   const { lineups, events, stats, standings, loading } = useMatchData(fixtureId, fixture.league.id);
+  const [eventFilter, setEventFilter] = useState<EventFilter>("highlights");
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -437,13 +468,26 @@ export function MatchDetailScreen({ goBack, fixtureId, fixture }: ScreenProps & 
             </TabsList>
           </div>
           <TabsContent value="details">
-            <EventsTab events={events} fixture={fixture} loading={loading} />
+            <Tabs defaultValue={eventFilter} onValueChange={(val) => setEventFilter(val as EventFilter)} className="w-full">
+                 <div className="px-4 pt-4">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="highlights">الأبرز</TabsTrigger>
+                        <TabsTrigger value="all">جميع التفاصيل</TabsTrigger>
+                    </TabsList>
+                </div>
+                <TabsContent value="highlights">
+                    <EventsTab events={events} fixture={fixture} loading={loading} filter="highlights" />
+                </TabsContent>
+                <TabsContent value="all">
+                    <EventsTab events={events} fixture={fixture} loading={loading} filter="all" />
+                </TabsContent>
+            </Tabs>
           </TabsContent>
           <TabsContent value="lineups">
-            <LineupsTab lineups={lineups} loading={loading} />
+            <LineupsTab lineups={lineups} loading={loading} fixture={fixture} />
           </TabsContent>
           <TabsContent value="stats">
-            <StatsTab stats={stats} loading={loading} />
+            <StatsTab stats={stats} loading={loading} fixture={fixture} />
           </TabsContent>
           <TabsContent value="standings">
             <StandingsTab standings={standings} loading={loading} fixture={fixture} />
