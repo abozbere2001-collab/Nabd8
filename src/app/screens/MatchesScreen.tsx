@@ -9,7 +9,7 @@ import type { ScreenProps } from '@/app/page';
 import { format, isToday, isYesterday, isTomorrow, parseISO, addDays, subDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useFirebase } from '@/firebase/provider';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase-client';
 
 
@@ -38,6 +38,11 @@ interface Fixture {
   };
 }
 
+interface Favorites {
+    leagues: { [key: number]: any };
+    teams: { [key: number]: any };
+}
+
 interface GroupedFixtures {
     [date: string]: Fixture[];
 }
@@ -53,8 +58,7 @@ const getDayLabel = (dateString: string) => {
 
 export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { user } = useFirebase();
-  const [favoriteTeams, setFavoriteTeams] = useState<Set<number>>(new Set());
-  const [favoriteLeagues, setFavoriteLeagues] = useState<Set<number>>(new Set());
+  const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
 
   const [groupedFixtures, setGroupedFixtures] = useState<GroupedFixtures>({});
   const [isLoadingNext, setIsLoadingNext] = useState(false);
@@ -65,32 +69,17 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const allMatchesContainerRef = useRef<HTMLDivElement>(null);
   const myResultsContainerRef = useRef<HTMLDivElement>(null);
   
-  const scrollPositions = useRef({ all: 0, my: 0 }).current;
-  const scrollHeights = useRef({ all: 0, my: 0 }).current;
-
+  const scrollPositions = useRef<{ all: { top: number, height: number}, my: {top: number, height: number} }>({
+    all: { top: 0, height: 0 },
+    my: { top: 0, height: 0 },
+  }).current;
 
   useEffect(() => {
     if (!user) return;
-    const teamsUnsub = onSnapshot(collection(db, `users/${user.uid}/favoriteTeams`), (snapshot) => {
-      const teams = new Set<number>();
-      snapshot.forEach((doc) => {
-        teams.add(doc.data().teamId);
-      });
-      setFavoriteTeams(teams);
+    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
+      setFavorites(doc.data() as Favorites || { leagues: {}, teams: {} });
     });
-
-    const leaguesUnsub = onSnapshot(collection(db, `users/${user.uid}/favoriteLeagues`), (snapshot) => {
-      const leagues = new Set<number>();
-      snapshot.forEach((doc) => {
-        leagues.add(doc.data().leagueId);
-      });
-      setFavoriteLeagues(leagues);
-    });
-
-    return () => {
-      teamsUnsub();
-      leaguesUnsub();
-    };
+    return () => unsub();
   }, [user]);
 
   const fetchFixtures = useCallback(async (date: Date) => {
@@ -121,8 +110,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       if (!container) return;
 
       const { scrollTop, scrollHeight, clientHeight } = container;
-      scrollPositions[type] = scrollTop;
-      scrollHeights[type] = scrollHeight;
+      scrollPositions[type].top = scrollTop;
 
       const loadNextDay = async () => {
           if (isLoadingNext) return;
@@ -143,15 +131,16 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           await fetchFixtures(prevDay);
           setEarliestDate(prevDay);
           
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             if (container) {
                 const newScrollHeight = container.scrollHeight;
                 const addedHeight = newScrollHeight - oldScrollHeight;
-                container.scrollTop = scrollTop + addedHeight;
-                scrollPositions[type] += addedHeight;
+                if (addedHeight > 0 && scrollTop < 500) { // Check if we are near the top
+                  container.scrollTop = scrollTop + addedHeight;
+                }
             }
             setIsLoadingPrev(false);
-          }, 100);
+          });
       };
 
       if (scrollTop + clientHeight >= scrollHeight - 300 && !isLoadingNext) {
@@ -160,34 +149,33 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       if (scrollTop <= 300 && !isLoadingPrev) {
           loadPreviousDay();
       }
-  }, [isLoadingNext, isLoadingPrev, latestDate, earliestDate, fetchFixtures, scrollPositions, scrollHeights]);
+  }, [isLoadingNext, isLoadingPrev, latestDate, earliestDate, fetchFixtures, scrollPositions]);
 
+  const setupScrollListener = useCallback((ref: React.RefObject<HTMLDivElement>, type: 'all' | 'my') => {
+    const container = ref.current;
+    if (!container) return;
 
-  useEffect(() => {
-    const allMatchesContainer = allMatchesContainerRef.current;
-    const myResultsContainer = myResultsContainerRef.current;
+    const scrollHandler = () => handleScroll(container, type);
+    container.addEventListener('scroll', scrollHandler);
 
-    const allMatchesScrollHandler = () => handleScroll(allMatchesContainer, 'all');
-    const myResultsScrollHandler = () => handleScroll(myResultsContainer, 'my');
-
-    if (allMatchesContainer) {
-        allMatchesContainer.addEventListener('scroll', allMatchesScrollHandler);
-        allMatchesContainer.scrollTop = scrollPositions.all;
-    }
-    if (myResultsContainer) {
-        myResultsContainer.addEventListener('scroll', myResultsScrollHandler);
-        myResultsContainer.scrollTop = scrollPositions.my;
+    // Restore scroll position
+    if (scrollPositions[type].top > 0) {
+      container.scrollTop = scrollPositions[type].top;
     }
     
     return () => {
-        if (allMatchesContainer) {
-            allMatchesContainer.removeEventListener('scroll', allMatchesScrollHandler);
-        }
-        if (myResultsContainer) {
-            myResultsContainer.removeEventListener('scroll', myResultsScrollHandler);
-        }
+        container.removeEventListener('scroll', scrollHandler);
     };
   }, [handleScroll, scrollPositions]);
+  
+  useEffect(() => {
+    return setupScrollListener(allMatchesContainerRef, 'all');
+  }, [setupScrollListener]);
+
+  useEffect(() => {
+    return setupScrollListener(myResultsContainerRef, 'my');
+  }, [setupScrollListener]);
+
 
   const sortedDates = useMemo(() => Object.keys(groupedFixtures).sort((a, b) => new Date(a).getTime() - new Date(b).getTime()), [groupedFixtures]);
 
@@ -228,7 +216,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   );
   
   const renderEmptyState = (title: string, description: string) => (
-     <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64">
+     <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
         <p className="font-bold text-lg">{title}</p>
         <p className="text-sm">{description}</p>
     </div>
@@ -264,16 +252,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   }
   
   const renderAllMatches = () => {
-    if (sortedDates.length === 0 && (isLoadingPrev || isLoadingNext)) {
-        return (
-            <div className="px-4 space-y-3 pt-4">
-                <Skeleton className="h-6 w-1/2 mb-4" />
-                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
-            </div>
-        );
-    }
-    
-    if (sortedDates.every(date => (groupedFixtures[date] || []).length === 0)) {
+    if (sortedDates.length === 0 && !isLoadingPrev && !isLoadingNext) {
         return renderEmptyState("لا توجد مباريات متاحة.", "حاول مرة أخرى في وقت لاحق أو تأكد من اتصالك بالإنترنت.");
     }
     
@@ -288,17 +267,19 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   
   const renderMyResults = () => {
       let hasFavorites = false;
+      const favoritedTeamIds = Object.keys(favorites.teams).map(Number);
+      const favoritedLeagueIds = Object.keys(favorites.leagues).map(Number);
 
       const content = sortedDates.map(dateString => {
         const fixturesForDate = groupedFixtures[dateString] || [];
         if (fixturesForDate.length === 0) return null;
 
         const favoriteTeamFixtures = fixturesForDate.filter(f =>
-            favoriteTeams.has(f.teams.home.id) || favoriteTeams.has(f.teams.away.id)
+            favoritedTeamIds.includes(f.teams.home.id) || favoritedTeamIds.includes(f.teams.away.id)
         );
 
         const favoriteLeagueFixtures = fixturesForDate.filter(f =>
-            favoriteLeagues.has(f.league.id) && !favoriteTeamFixtures.some(fav => fav.fixture.id === f.fixture.id)
+            favoritedLeagueIds.includes(f.league.id) && !favoriteTeamFixtures.some(fav => fav.fixture.id === f.fixture.id)
         );
 
         if (favoriteTeamFixtures.length === 0 && favoriteLeagueFixtures.length === 0) {

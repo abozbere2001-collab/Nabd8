@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin } from '@/firebase/provider';
 import { useFirebase } from '@/firebase/provider';
 import { db } from '@/lib/firebase-client';
-import { doc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
 
 
 interface Competition {
@@ -23,6 +23,11 @@ interface Competition {
     name: string;
     flag: string | null;
   };
+}
+
+interface Favorites {
+    leagues: { [key: number]: any };
+    teams: { [key: number]: any };
 }
 
 interface LeaguesByCountry {
@@ -81,16 +86,12 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
   const [loading, setLoading] = useState(true);
   const { isAdmin } = useAdmin();
   const { user } = useFirebase();
-  const [favoritedLeagues, setFavoritedLeagues] = useState<Set<number>>(new Set());
+  const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
 
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(collection(db, `users/${user.uid}/favoriteLeagues`), (snapshot) => {
-        const leagues = new Set<number>();
-        snapshot.forEach((doc) => {
-            leagues.add(doc.data().leagueId);
-        });
-        setFavoritedLeagues(leagues);
+    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
+        setFavorites(doc.data() as Favorites || { leagues: {}, teams: {} });
     });
     return () => unsub();
   }, [user]);
@@ -99,16 +100,22 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
   const toggleLeagueFavorite = async (comp: Competition) => {
     if (!user) return;
     const leagueId = comp.league.id;
-    const leagueRef = doc(db, `users/${user.uid}/favoriteLeagues`, String(leagueId));
+    const favRef = doc(db, 'favorites', user.uid);
+    const fieldPath = `leagues.${leagueId}`;
+    const isFavorited = favorites.leagues[leagueId];
 
-    if (favoritedLeagues.has(leagueId)) {
-        await deleteDoc(leagueRef);
+    if (isFavorited) {
+        await updateDoc(favRef, { [fieldPath]: deleteField() });
     } else {
-        await setDoc(leagueRef, {
-            leagueId: comp.league.id,
-            name: comp.league.name,
-            logo: comp.league.logo,
-        });
+        await setDoc(favRef, { 
+            leagues: { 
+                [leagueId]: {
+                    leagueId: comp.league.id,
+                    name: comp.league.name,
+                    logo: comp.league.logo,
+                }
+            } 
+        }, { merge: true });
     }
   };
 
@@ -192,7 +199,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     <li key={comp.league.id}>
       <div
         className="flex w-full items-center justify-between p-3 hover:bg-accent transition-colors rounded-md cursor-pointer"
-        onClick={() => navigate('CompetitionDetails', { title: comp.league.name, leagueId: comp.league.id })}
+        onClick={() => navigate('CompetitionDetails', { title: comp.league.name, leagueId: comp.league.id, logo: comp.league.logo })}
       >
         <div className="flex items-center gap-3">
           <img src={comp.league.logo} alt={comp.league.name} className="h-6 w-6 object-contain" />
@@ -221,7 +228,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                   toggleLeagueFavorite(comp);
                 }}
             >
-              <Star className={favoritedLeagues.has(comp.league.id) ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+              <Star className={favorites.leagues[comp.league.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
             </Button>
         </div>
       </div>

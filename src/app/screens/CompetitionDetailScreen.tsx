@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useFirebase } from '@/firebase/provider';
 import { db } from '@/lib/firebase-client';
-import { doc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
 
 
 // Interfaces for API data
@@ -80,15 +80,18 @@ interface Team {
   };
 }
 
+interface Favorites {
+    leagues: { [key: number]: any };
+    teams: { [key: number]: any };
+}
 
 const CURRENT_SEASON = 2024;
 
-export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, leagueId }: ScreenProps & { title?: string, leagueId?: number }) {
+export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, leagueId, logo }: ScreenProps & { title?: string, leagueId?: number, logo?: string }) {
   const { isAdmin } = useAdmin();
   const { user } = useFirebase();
 
-  const [isFavorited, setIsFavorited] = useState(false);
-  const [favoritedTeams, setFavoritedTeams] = useState<Set<number>>(new Set());
+  const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
 
   const [loading, setLoading] = useState(true);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
@@ -96,25 +99,16 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   
-  useEffect(() => {
-    if (!user || !leagueId) return;
-    const unsub = onSnapshot(doc(db, `users/${user.uid}/favoriteLeagues`, String(leagueId)), (doc) => {
-        setIsFavorited(doc.exists());
-    });
-    return () => unsub();
-  }, [user, leagueId]);
+  const isFavorited = leagueId ? favorites.leagues[leagueId] : false;
 
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(collection(db, `users/${user.uid}/favoriteTeams`), (snapshot) => {
-        const teams = new Set<number>();
-        snapshot.forEach((doc) => {
-            teams.add(doc.data().teamId);
-        });
-        setFavoritedTeams(teams);
+    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
+        setFavorites(doc.data() as Favorites || { leagues: {}, teams: {} });
     });
     return () => unsub();
   }, [user]);
+
 
   useEffect(() => {
     async function fetchData() {
@@ -152,29 +146,42 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
 
   const handleFavoriteLeague = async () => {
     if (!user || !leagueId) return;
-    const leagueRef = doc(db, `users/${user.uid}/favoriteLeagues`, String(leagueId));
+    const favRef = doc(db, 'favorites', user.uid);
+    const fieldPath = `leagues.${leagueId}`;
+
     if (isFavorited) {
-        await deleteDoc(leagueRef);
+        await updateDoc(favRef, { [fieldPath]: deleteField() });
     } else {
-        await setDoc(leagueRef, {
-            leagueId: leagueId,
-            name: title,
-            logo: teams[0]?.team?.logo, // Placeholder for logo
-        });
+        await setDoc(favRef, { 
+            leagues: { 
+                [leagueId]: { 
+                    leagueId: leagueId, 
+                    name: title, 
+                    logo: logo || teams[0]?.team?.logo
+                } 
+            } 
+        }, { merge: true });
     }
   };
   
   const toggleTeamFavorite = async (team: {id: number, name: string, logo: string}) => {
     if (!user) return;
-    const teamRef = doc(db, `users/${user.uid}/favoriteTeams`, String(team.id));
-    if (favoritedTeams.has(team.id)) {
-        await deleteDoc(teamRef);
+    const favRef = doc(db, 'favorites', user.uid);
+    const fieldPath = `teams.${team.id}`;
+    const isTeamFavorited = favorites.teams[team.id];
+
+    if (isTeamFavorited) {
+        await updateDoc(favRef, { [fieldPath]: deleteField() });
     } else {
-        await setDoc(teamRef, {
-            teamId: team.id,
-            name: team.name,
-            logo: team.logo,
-        });
+        await setDoc(favRef, {
+             teams: { 
+                [team.id]: {
+                    teamId: team.id,
+                    name: team.name,
+                    logo: team.logo,
+                } 
+            }
+        }, { merge: true });
     }
   };
   
@@ -281,7 +288,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
                                             toggleTeamFavorite(s.team);
                                         }}
                                     >
-                                        <Star className={favoritedTeams.has(s.team.id) ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                        <Star className={favorites.teams[s.team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                     </Button>
                                 </TableCell>
                                 <TableCell className="font-medium">
@@ -369,7 +376,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
                                         toggleTeamFavorite(team);
                                     }}
                                 >
-                                    <Star className={favoritedTeams.has(team.id) ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                    <Star className={favorites.teams[team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                 </Button>
                             </div>
                         </div>

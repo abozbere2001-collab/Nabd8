@@ -22,47 +22,38 @@
       },
       "required": ["displayName", "email"]
     },
-    "FavoriteLeague": {
-      "title": "Favorite League",
-      "description": "Represents a user's favorite league.",
-      "type": "object",
-      "properties": {
-        "leagueId": {
-          "type": "number",
-          "description": "The unique identifier for the league."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the league."
-        },
-        "logo": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL of the league's logo."
+    "UserFavorites": {
+        "title": "User Favorites",
+        "description": "Represents a user's favorite leagues and teams.",
+        "type": "object",
+        "properties": {
+            "leagues": {
+                "type": "object",
+                "description": "A map of favorite league IDs to league data.",
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "leagueId": { "type": "number" },
+                        "name": { "type": "string" },
+                        "logo": { "type": "string", "format": "uri" }
+                    },
+                    "required": ["leagueId", "name", "logo"]
+                }
+            },
+            "teams": {
+                "type": "object",
+                "description": "A map of favorite team IDs to team data.",
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "teamId": { "type": "number" },
+                        "name": { "type": "string" },
+                        "logo": { "type": "string", "format": "uri" }
+                    },
+                    "required": ["teamId", "name", "logo"]
+                }
+            }
         }
-      },
-      "required": ["leagueId", "name", "logo"]
-    },
-    "FavoriteTeam": {
-      "title": "Favorite Team",
-      "description": "Represents a user's favorite team.",
-      "type": "object",
-      "properties": {
-        "teamId": {
-          "type": "number",
-          "description": "The unique identifier for the team."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the team."
-        },
-        "logo": {
-          "type": "string",
-          "format": "uri",
-          "description": "URL of the team's logo."
-        }
-      },
-      "required": ["teamId", "name", "logo"]
     }
   },
   "auth": {
@@ -75,17 +66,11 @@
       },
       "description": "Stores public profile information for each user."
     },
-    "/users/{userId}/favoriteLeagues/{leagueId}": {
+    "/favorites/{userId}": {
       "schema": {
-        "$ref": "#/entities/FavoriteLeague"
+        "$ref": "#/entities/UserFavorites"
       },
-      "description": "A collection of a user's favorite leagues."
-    },
-    "/users/{userId}/favoriteTeams/{teamId}": {
-      "schema": {
-        "$ref": "#/entities/FavoriteTeam"
-      },
-      "description": "A collection of a user's favorite teams."
+      "description": "A single document containing all favorites (leagues and teams) for a user."
     }
   }
 }
