@@ -17,26 +17,26 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { toast } = useToast();
 
   const handleGoogleLogin = async () => {
+    if (loading) return; // Prevent re-triggering if already loading
     setLoading(true);
     setError(null);
     try {
       await signInWithGoogle();
-      // Navigation will be handled by the effect in Home component
+      // On successful sign-in, the AuthProvider will change the user state,
+      // and the main AppContent component will navigate to the 'Matches' screen.
+      // We don't need to set loading to false here as the component will unmount.
     } catch (e: any) {
       console.error("Login Error:", e);
-      const errorMessage = e.code === 'auth/popup-closed-by-user' 
-        ? 'تم إلغاء عملية تسجيل الدخول.'
-        : 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
+      let errorMessage = 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
+      if (e.code === 'auth/popup-closed-by-user') {
+        // This can happen if the user closes the popup or if the screen resizes.
+        // We can show a less scary message or just reset the state.
+        errorMessage = 'تم إلغاء عملية تسجيل الدخول.';
+      }
       
       setError(errorMessage);
-      toast({
-        variant: "destructive",
-        title: "فشل تسجيل الدخول",
-        description: errorMessage,
-      });
-      setLoading(false);
+      setLoading(false); // Allow the user to try again
     }
-    // No need to setLoading(false) on success because the component will unmount
   };
 
   return (
