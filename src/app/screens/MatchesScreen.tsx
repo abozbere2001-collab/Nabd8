@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,6 +41,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log("MatchesScreen: init");
     async function fetchFixtures() {
       setLoading(true);
       try {
@@ -59,13 +60,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     fetchFixtures();
   }, []);
 
-  const favoriteTeamFixtures = fixtures.filter(f =>
+  const favoriteTeamFixtures = useMemo(() => fixtures.filter(f =>
     TEMP_FAVORITE_TEAMS.has(f.teams.home.id) || TEMP_FAVORITE_TEAMS.has(f.teams.away.id)
-  );
+  ), [fixtures]);
 
-  const favoriteLeagueFixtures = fixtures.filter(f =>
+  const favoriteLeagueFixtures = useMemo(() => fixtures.filter(f =>
     TEMP_FAVORITE_LEAGUES.has(f.league.id) && !favoriteTeamFixtures.some(fav => fav.fixture.id === f.fixture.id)
-  );
+  ), [fixtures, favoriteTeamFixtures]);
   
   const todayString = new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -90,7 +91,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                </Avatar>
            </div>
            <div className="font-bold text-lg px-2 bg-muted rounded-md">
-               {fixture.goals.home !== null ? `${fixture.goals.home} - ${fixture.goals.away}` : new Date(fixture.fixture.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+               {fixture.goals.home !== null && fixture.goals.away !== null ? `${fixture.goals.home} - ${fixture.goals.away}` : new Date(fixture.fixture.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
            </div>
            <div className="flex items-center gap-2 flex-1 truncate">
                 <Avatar className="h-8 w-8">
@@ -102,6 +103,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
        </div>
     </div>
   );
+  
+  const renderEmptyState = (title: string, description: string) => (
+     <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64">
+        <p className="font-bold text-lg">{title}</p>
+        <p className="text-sm">{description}</p>
+    </div>
+  )
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -118,10 +126,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
              {loading ? (
                 Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
              ) : favoriteTeamFixtures.length === 0 && favoriteLeagueFixtures.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64">
-                    <p className="font-bold text-lg">لا توجد مباريات في مفضلتك اليوم</p>
-                    <p className="text-sm">أضف فرقا أو بطولات للمفضلة لترى مبارياتها هنا.</p>
-                </div>
+                renderEmptyState("لا توجد مباريات في مفضلتك اليوم", "أضف فرقا أو بطولات للمفضلة لترى مبارياتها هنا.")
              ) : (
                 <>
                   {favoriteTeamFixtures.length > 0 && (
@@ -152,7 +157,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                     {fixtures.map(renderFixture)}
                 </div>
             ) : (
-                <p className="text-center text-muted-foreground pt-10">لا توجد مباريات متاحة لهذا اليوم.</p>
+                renderEmptyState("لا توجد مباريات متاحة لهذا اليوم.", "حاول مرة أخرى في وقت لاحق أو تأكد من اتصالك بالإنترنت.")
             )}
           </TabsContent>
         </Tabs>
