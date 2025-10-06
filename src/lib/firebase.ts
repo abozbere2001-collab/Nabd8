@@ -1,12 +1,14 @@
 import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
 
+// NOTE: This config is hardcoded based on user's request to fix a persistent API key issue.
 export const firebaseConfig: FirebaseOptions = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyCSTuscXA3VzGr18ADaDVGj33XGks_DY4g",
+  authDomain: "studio-3417145591-24d0a.firebaseapp.com",
+  projectId: "studio-3417145591-24d0a",
+  storageBucket: "studio-3417145591-24d0a.appspot.com",
+  messagingSenderId: "731644651563",
+  appId: "1:731644651563:web:c545fe9730675b9e5f626e",
+  measurementId: "G-JLPD1C0BFH"
 };
 
 // Initialize Firebase
@@ -16,8 +18,8 @@ export function initializeFirebase() {
     }
     
     if (!firebaseConfig.apiKey) {
-      // This will be caught by the client-side check, but as a safeguard
-      throw new Error("Firebase API Key is missing in the environment variables.");
+      // This should not happen with a hardcoded config, but as a safeguard.
+      throw new Error("Firebase API Key is missing in the configuration.");
     }
 
     return initializeApp(firebaseConfig);
