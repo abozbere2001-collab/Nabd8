@@ -8,9 +8,12 @@ import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertTriangle } from 'lucide-react';
 
 export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -20,6 +23,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    setError(null);
     try {
       const auth = getClientAuth();
       const provider = new GoogleAuthProvider();
@@ -27,13 +31,14 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       toast({ title: "تم تسجيل الدخول بنجاح" });
       // The main page component will detect the auth change and switch the stack
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: "خطأ في تسجيل الدخول",
-        description: error.code === 'auth/popup-closed-by-user' 
-          ? 'تم إغلاق نافذة تسجيل الدخول.' 
-          : error.message,
-      });
+      console.error("Login Error:", error);
+      let errorMessage = error.message;
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'تم إغلاق نافذة تسجيل الدخول قبل إتمام العملية.';
+      } else if (error.code === 'auth/invalid-api-key') {
+        errorMessage = 'مفتاح Firebase API غير صالح. يرجى التأكد من صحة الإعدادات.';
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -43,6 +48,14 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="تسجيل الدخول" onBack={goBack} canGoBack={canGoBack} />
       <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>خطأ في تسجيل الدخول</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
         <GoalStackLogo className="h-24 w-24 mb-8" />
         <h1 className="text-2xl font-bold mb-2">مرحباً بك في Goal Stack</h1>
         <p className="text-muted-foreground mb-8">سجل دخولك باستخدام جوجل للمتابعة.</p>

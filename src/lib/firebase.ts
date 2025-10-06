@@ -1,9 +1,7 @@
 "use client";
 
-import { initializeApp, getApps, getApp, FirebaseOptions } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,21 +12,28 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-const getClientSideApp = () => {
+// Initialize Firebase for client side
+function getClientSideApp() {
     if (getApps().length) {
         return getApp();
     }
-    return initializeApp(firebaseConfig);
+    const app = initializeApp(firebaseConfig);
+    return app;
 }
 
-// Lazy initialization for Auth
-let authInstance: ReturnType<typeof getAuth> | null = null;
-const getClientAuth = () => {
-    if (!authInstance) {
-        authInstance = getAuth(getClientSideApp());
+// Singleton for Auth
+let auth: Auth | null = null;
+export function getClientAuth() {
+    if (auth) {
+        return auth;
     }
-    return authInstance;
+    // Check if firebaseConfig.apiKey is valid before initializing
+    if (!firebaseConfig.apiKey) {
+        console.error("Firebase API Key is missing. Authentication will not work.");
+        // Return a mock auth object or throw an error to prevent the app from crashing
+        // For now, we will let it fail to make the error visible.
+    }
+    const app = getClientSideApp();
+    auth = getAuth(app);
+    return auth;
 }
-
-export { getClientSideApp, getClientAuth };
