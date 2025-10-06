@@ -12,7 +12,7 @@ import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
-import { AdminProvider } from '@/hooks/useAdmin';
+import { FirebaseProvider } from '@/firebase/provider';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails';
 export type ScreenProps = {
@@ -181,8 +181,8 @@ export default function Home() {
   }
 
   return (
-    <AdminProvider user={user}>
+    <FirebaseProvider user={user}>
       <AppContent user={user} />
-    </AdminProvider>
+    </FirebaseProvider>
   );
 }

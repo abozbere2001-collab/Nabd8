@@ -4,12 +4,16 @@ import React, { useEffect, useState } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
-import { useAdmin } from '@/hooks/useAdmin';
+import { useAdmin } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { Star, Pencil, Shield, Users, Trophy, BarChart2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useFirebase } from '@/firebase/provider';
+import { db } from '@/lib/firebase-client';
+import { doc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
+
 
 // Interfaces for API data
 interface Fixture {
@@ -81,13 +85,36 @@ const CURRENT_SEASON = 2024;
 
 export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, leagueId }: ScreenProps & { title?: string, leagueId?: number }) {
   const { isAdmin } = useAdmin();
+  const { user } = useFirebase();
+
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoritedTeams, setFavoritedTeams] = useState<Set<number>>(new Set());
+
   const [loading, setLoading] = useState(true);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  
+  useEffect(() => {
+    if (!user || !leagueId) return;
+    const unsub = onSnapshot(doc(db, `users/${user.uid}/favoriteLeagues`, String(leagueId)), (doc) => {
+        setIsFavorited(doc.exists());
+    });
+    return () => unsub();
+  }, [user, leagueId]);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(collection(db, `users/${user.uid}/favoriteTeams`), (snapshot) => {
+        const teams = new Set<number>();
+        snapshot.forEach((doc) => {
+            teams.add(doc.data().teamId);
+        });
+        setFavoritedTeams(teams);
+    });
+    return () => unsub();
+  }, [user]);
 
   useEffect(() => {
     async function fetchData() {
@@ -123,22 +150,32 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
     fetchData();
   }, [leagueId]);
 
-  const handleFavorite = () => {
-    setIsFavorited(!isFavorited);
-    // In the future, this will also update Firebase
+  const handleFavoriteLeague = async () => {
+    if (!user || !leagueId) return;
+    const leagueRef = doc(db, `users/${user.uid}/favoriteLeagues`, String(leagueId));
+    if (isFavorited) {
+        await deleteDoc(leagueRef);
+    } else {
+        await setDoc(leagueRef, {
+            leagueId: leagueId,
+            name: title,
+            logo: teams[0]?.team?.logo, // Placeholder for logo
+        });
+    }
   };
   
-  const toggleTeamFavorite = (teamId: number) => {
-    setFavoritedTeams(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(teamId)) {
-            newSet.delete(teamId);
-        } else {
-            newSet.add(teamId);
-        }
-        return newSet;
-    });
-     // In the future, this will also update Firebase
+  const toggleTeamFavorite = async (team: {id: number, name: string, logo: string}) => {
+    if (!user) return;
+    const teamRef = doc(db, `users/${user.uid}/favoriteTeams`, String(team.id));
+    if (favoritedTeams.has(team.id)) {
+        await deleteDoc(teamRef);
+    } else {
+        await setDoc(teamRef, {
+            teamId: team.id,
+            name: team.name,
+            logo: team.logo,
+        });
+    }
   };
   
   const headerActions = (
@@ -155,7 +192,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
       <Button
         variant="ghost"
         size="icon"
-        onClick={handleFavorite}
+        onClick={handleFavoriteLeague}
       >
         <Star className={isFavorited ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/80"} />
       </Button>
@@ -241,7 +278,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
                                         className="h-8 w-8"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            toggleTeamFavorite(s.team.id);
+                                            toggleTeamFavorite(s.team);
                                         }}
                                     >
                                         <Star className={favoritedTeams.has(s.team.id) ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
@@ -329,7 +366,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
                                     className="h-8 w-8"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        toggleTeamFavorite(team.id);
+                                        toggleTeamFavorite(team);
                                     }}
                                 >
                                     <Star className={favoritedTeams.has(team.id) ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />

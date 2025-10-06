@@ -8,6 +8,10 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
 import { format, isToday, isYesterday, isTomorrow, parseISO, addDays, subDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { useFirebase } from '@/firebase/provider';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase-client';
+
 
 interface Fixture {
   fixture: {
@@ -38,8 +42,6 @@ interface GroupedFixtures {
     [date: string]: Fixture[];
 }
 
-const TEMP_FAVORITE_TEAMS = new Set([50, 529]);
-const TEMP_FAVORITE_LEAGUES = new Set([39, 140]); 
 
 const getDayLabel = (dateString: string) => {
     const date = parseISO(dateString);
@@ -50,6 +52,10 @@ const getDayLabel = (dateString: string) => {
 }
 
 export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+  const { user } = useFirebase();
+  const [favoriteTeams, setFavoriteTeams] = useState<Set<number>>(new Set());
+  const [favoriteLeagues, setFavoriteLeagues] = useState<Set<number>>(new Set());
+
   const [groupedFixtures, setGroupedFixtures] = useState<GroupedFixtures>({});
   const [isLoadingNext, setIsLoadingNext] = useState(false);
   const [isLoadingPrev, setIsLoadingPrev] = useState(false);
@@ -58,8 +64,34 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
   const allMatchesContainerRef = useRef<HTMLDivElement>(null);
   const myResultsContainerRef = useRef<HTMLDivElement>(null);
+  
   const scrollPositions = useRef({ all: 0, my: 0 }).current;
+  const scrollHeights = useRef({ all: 0, my: 0 }).current;
 
+
+  useEffect(() => {
+    if (!user) return;
+    const teamsUnsub = onSnapshot(collection(db, `users/${user.uid}/favoriteTeams`), (snapshot) => {
+      const teams = new Set<number>();
+      snapshot.forEach((doc) => {
+        teams.add(doc.data().teamId);
+      });
+      setFavoriteTeams(teams);
+    });
+
+    const leaguesUnsub = onSnapshot(collection(db, `users/${user.uid}/favoriteLeagues`), (snapshot) => {
+      const leagues = new Set<number>();
+      snapshot.forEach((doc) => {
+        leagues.add(doc.data().leagueId);
+      });
+      setFavoriteLeagues(leagues);
+    });
+
+    return () => {
+      teamsUnsub();
+      leaguesUnsub();
+    };
+  }, [user]);
 
   const fetchFixtures = useCallback(async (date: Date) => {
     const dateString = format(date, 'yyyy-MM-dd');
@@ -90,6 +122,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
       const { scrollTop, scrollHeight, clientHeight } = container;
       scrollPositions[type] = scrollTop;
+      scrollHeights[type] = scrollHeight;
 
       const loadNextDay = async () => {
           if (isLoadingNext) return;
@@ -110,15 +143,15 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           await fetchFixtures(prevDay);
           setEarliestDate(prevDay);
           
-          // Use a short timeout to allow the DOM to update
           setTimeout(() => {
             if (container) {
                 const newScrollHeight = container.scrollHeight;
                 const addedHeight = newScrollHeight - oldScrollHeight;
                 container.scrollTop = scrollTop + addedHeight;
+                scrollPositions[type] += addedHeight;
             }
             setIsLoadingPrev(false);
-          }, 50);
+          }, 100);
       };
 
       if (scrollTop + clientHeight >= scrollHeight - 300 && !isLoadingNext) {
@@ -127,7 +160,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       if (scrollTop <= 300 && !isLoadingPrev) {
           loadPreviousDay();
       }
-  }, [isLoadingNext, isLoadingPrev, latestDate, earliestDate, fetchFixtures, scrollPositions]);
+  }, [isLoadingNext, isLoadingPrev, latestDate, earliestDate, fetchFixtures, scrollPositions, scrollHeights]);
+
 
   useEffect(() => {
     const allMatchesContainer = allMatchesContainerRef.current;
@@ -138,9 +172,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
     if (allMatchesContainer) {
         allMatchesContainer.addEventListener('scroll', allMatchesScrollHandler);
+        allMatchesContainer.scrollTop = scrollPositions.all;
     }
     if (myResultsContainer) {
         myResultsContainer.addEventListener('scroll', myResultsScrollHandler);
+        myResultsContainer.scrollTop = scrollPositions.my;
     }
     
     return () => {
@@ -151,17 +187,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             myResultsContainer.removeEventListener('scroll', myResultsScrollHandler);
         }
     };
-  }, [handleScroll]);
-
-  // Restore scroll position when switching tabs
-  useEffect(() => {
-    if (allMatchesContainerRef.current) {
-        allMatchesContainerRef.current.scrollTop = scrollPositions.all;
-    }
-    if (myResultsContainerRef.current) {
-        myResultsContainerRef.current.scrollTop = scrollPositions.my;
-    }
-  }, []); // Run only on mount to set initial scroll
+  }, [handleScroll, scrollPositions]);
 
   const sortedDates = useMemo(() => Object.keys(groupedFixtures).sort((a, b) => new Date(a).getTime() - new Date(b).getTime()), [groupedFixtures]);
 
@@ -213,8 +239,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     if (!fixturesForDate) {
         return (
             <div key={`${dateString}-loading`} className="p-4">
-                <Skeleton className="h-6 w-1/2 mb-4" />
-                <div className="space-y-3">
+                <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b -mx-4">
+                  <Skeleton className="h-6 w-1/2" />
+                </h2>
+                <div className="space-y-3 pt-4">
                     {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
                 </div>
             </div>
@@ -224,11 +252,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         
      return (
         <div key={dateString}>
-            <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b">
+            <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b -mx-4">
               {getDayLabel(dateString)}
               <span className="text-sm font-normal text-muted-foreground ml-2">{format(parseISO(dateString), "d MMMM yyyy", { locale: ar })}</span>
             </h2>
-            <div className="space-y-3 p-4">
+            <div className="space-y-3 pt-4">
                 {fixturesForDate.map(renderFixture)}
             </div>
         </div>
@@ -250,11 +278,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     }
     
     return (
-        <>
-            {isLoadingPrev && <div className="p-4"><Skeleton className="h-24 w-full" /></div>}
+        <div className="p-4">
+            {isLoadingPrev && <div className="py-4"><Skeleton className="h-24 w-full" /></div>}
             {sortedDates.map(renderFixturesForDate)}
-            {isLoadingNext && <div className="p-4"><Skeleton className="h-24 w-full" /></div>}
-        </>
+            {isLoadingNext && <div className="py-4"><Skeleton className="h-24 w-full" /></div>}
+        </div>
     );
   }
   
@@ -266,11 +294,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         if (fixturesForDate.length === 0) return null;
 
         const favoriteTeamFixtures = fixturesForDate.filter(f =>
-            TEMP_FAVORITE_TEAMS.has(f.teams.home.id) || TEMP_FAVORITE_TEAMS.has(f.teams.away.id)
+            favoriteTeams.has(f.teams.home.id) || favoriteTeams.has(f.teams.away.id)
         );
 
         const favoriteLeagueFixtures = fixturesForDate.filter(f =>
-            TEMP_FAVORITE_LEAGUES.has(f.league.id) && !favoriteTeamFixtures.some(fav => fav.fixture.id === f.fixture.id)
+            favoriteLeagues.has(f.league.id) && !favoriteTeamFixtures.some(fav => fav.fixture.id === f.fixture.id)
         );
 
         if (favoriteTeamFixtures.length === 0 && favoriteLeagueFixtures.length === 0) {
@@ -281,11 +309,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
         return (
             <div key={dateString}>
-                 <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b">
+                 <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b -mx-4">
                   {getDayLabel(dateString)}
                   <span className="text-sm font-normal text-muted-foreground ml-2">{format(parseISO(dateString), "d MMMM yyyy", { locale: ar })}</span>
                 </h2>
-                <div className="p-4 space-y-4">
+                <div className="pt-4 space-y-4">
                    {favoriteTeamFixtures.length > 0 && (
                         <div>
                             <h3 className="font-bold text-base my-2">الفرق المفضلة</h3>
@@ -321,11 +349,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     }
     
     return (
-        <>
-            {isLoadingPrev && <div className="p-4"><Skeleton className="h-24 w-full" /></div>}
+        <div className="p-4">
+            {isLoadingPrev && <div className="py-4"><Skeleton className="h-24 w-full" /></div>}
             {content}
-            {isLoadingNext && <div className="p-4"><Skeleton className="h-24 w-full" /></div>}
-        </>
+            {isLoadingNext && <div className="py-4"><Skeleton className="h-24 w-full" /></div>}
+        </div>
     );
   }
 

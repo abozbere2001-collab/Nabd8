@@ -7,7 +7,11 @@ import { Star, Pencil } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAdmin } from '@/hooks/useAdmin';
+import { useAdmin } from '@/firebase/provider';
+import { useFirebase } from '@/firebase/provider';
+import { db } from '@/lib/firebase-client';
+import { doc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
+
 
 interface Competition {
   league: {
@@ -76,19 +80,36 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
   const [competitions, setCompetitions] = useState<GroupedCompetitions | null>(null);
   const [loading, setLoading] = useState(true);
   const { isAdmin } = useAdmin();
+  const { user } = useFirebase();
   const [favoritedLeagues, setFavoritedLeagues] = useState<Set<number>>(new Set());
 
-  const toggleLeagueFavorite = (leagueId: number) => {
-    setFavoritedLeagues(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(leagueId)) {
-            newSet.delete(leagueId);
-        } else {
-            newSet.add(leagueId);
-        }
-        return newSet;
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(collection(db, `users/${user.uid}/favoriteLeagues`), (snapshot) => {
+        const leagues = new Set<number>();
+        snapshot.forEach((doc) => {
+            leagues.add(doc.data().leagueId);
+        });
+        setFavoritedLeagues(leagues);
     });
-    // In the future, this will also update Firebase
+    return () => unsub();
+  }, [user]);
+
+
+  const toggleLeagueFavorite = async (comp: Competition) => {
+    if (!user) return;
+    const leagueId = comp.league.id;
+    const leagueRef = doc(db, `users/${user.uid}/favoriteLeagues`, String(leagueId));
+
+    if (favoritedLeagues.has(leagueId)) {
+        await deleteDoc(leagueRef);
+    } else {
+        await setDoc(leagueRef, {
+            leagueId: comp.league.id,
+            name: comp.league.name,
+            logo: comp.league.logo,
+        });
+    }
   };
 
   useEffect(() => {
@@ -197,7 +218,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 className="h-8 w-8"
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleLeagueFavorite(comp.league.id);
+                  toggleLeagueFavorite(comp);
                 }}
             >
               <Star className={favoritedLeagues.has(comp.league.id) ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
