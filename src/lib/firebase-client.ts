@@ -19,5 +19,10 @@ export function getClientAuth() {
 
     const app = initializeFirebase();
     auth = getAuth(app);
+    // This is a workaround for development environments where the domain is not yet authorized.
+    // In a production environment, you should add your app's domain to the Firebase console.
+    auth.tenantId = null;
+    auth.settings.authDomain = "localhost";
+    
     return auth;
 }
