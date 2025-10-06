@@ -18,29 +18,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChange((user) => {
-      setUser(user);
-      setLoadingAuth(false);
-    });
-
-    // Check for redirect result on initial load
-    getGoogleRedirectResult()
-      .then((result) => {
+    // This function will be called to handle the auth state.
+    const handleAuth = async () => {
+      setLoadingAuth(true);
+      try {
+        // First, check if there's a redirect result.
+        const result = await getGoogleRedirectResult();
         if (result) {
-          // User successfully signed in.
-          // The onAuthStateChange listener will handle setting the user.
-          console.log('Redirect sign-in successful');
+          // If there's a result, onAuthStateChanged will soon fire with the new user.
+          // We can wait for it.
+          console.log('Redirect sign-in successful, waiting for auth state change.');
         }
-      })
-      .catch((error) => {
-        console.error('Error getting redirect result:', error);
-      })
-      .finally(() => {
-        // This is a good place to hide any global loading indicators
-        // related to the redirect sign-in check.
-      });
+      } catch (error) {
+        // Handle potential errors from getRedirectResult, e.g., credential already in use.
+        console.error("Error processing redirect result:", error);
+      }
 
-    return () => unsubscribe();
+      // Set up the listener for real-time auth state changes.
+      // This will also catch the user from the redirect result.
+      const unsubscribe = onAuthStateChange((user) => {
+        setUser(user);
+        setLoadingAuth(false);
+      });
+      
+      return unsubscribe;
+    };
+    
+    const unsubscribePromise = handleAuth();
+
+    // Cleanup function
+    return () => {
+      unsubscribePromise.then(unsubscribe => {
+        if (unsubscribe) {
+          unsubscribe();
+        }
+      });
+    };
   }, []);
 
   const signInWithGoogle = async () => {
@@ -51,14 +64,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // getRedirectResult will handle it on the return.
     } catch(error) {
        console.error("Error with redirect sign-in:", error);
-       setLoadingAuth(false);
+       setLoadingAuth(false); // Re-enable button if redirect fails
        throw error;
     }
   };
 
   const signOut = async () => {
     await firebaseSignOut();
-    // onAuthStateChange will handle setting user to null
+    // onAuthStateChange will handle setting user to null and loading state
   };
 
   return (
