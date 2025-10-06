@@ -10,26 +10,18 @@ import { AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
-  const { signInWithGoogle } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const { signInWithGoogle, loadingAuth } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   const handleGoogleLogin = async () => {
-    if (loading) return;
-    setLoading(true);
+    if (loadingAuth) return;
     setError(null);
     try {
       await signInWithGoogle();
-      // On success, the AuthProvider's onAuthStateChanged listener
-      // will handle the user state update, and the app will navigate away.
+      // After this call, the page will redirect. We don't need to handle success here.
     } catch (e: any) {
       console.error("Login Error:", e);
-      let errorMessage = 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
-      if (e.message) {
-        errorMessage = e.message;
-      }
-      setError(errorMessage);
-      setLoading(false); // Ensure loading is always false after an error.
+      setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
     }
   };
 
@@ -52,11 +44,11 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         <Button 
           onClick={handleGoogleLogin} 
           className="w-full max-w-xs" 
-          disabled={loading}
+          disabled={loadingAuth}
           size="lg"
         >
-          {loading ? (
-            'جاري المصادقة...'
+          {loadingAuth ? (
+            'جاري التحميل...'
           ) : (
             <>
               <GoogleIcon className="h-5 w-5 mr-2" />

@@ -3,7 +3,8 @@
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut as firebaseSignOut, 
   onAuthStateChanged, 
   type User, 
@@ -27,14 +28,13 @@ try {
 
 const provider = new GoogleAuthProvider();
 
-export const signInWithGoogle = (): Promise<UserCredential> => {
-  return signInWithPopup(auth, provider);
+export const signInWithGoogle = (): Promise<void> => {
+  return signInWithRedirect(auth, provider);
 };
 
-// This function is no longer needed with signInWithPopup
-// export const getGoogleRedirectResult = (): Promise<UserCredential | null> => {
-//   return getRedirectResult(auth);
-// };
+export const getGoogleRedirectResult = (): Promise<UserCredential | null> => {
+   return getRedirectResult(auth);
+};
 
 export const signOut = (): Promise<void> => {
   return firebaseSignOut(auth);
