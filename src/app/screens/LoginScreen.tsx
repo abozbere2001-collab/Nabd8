@@ -19,8 +19,9 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setError(null);
     try {
       await signInWithGoogle();
-      // With redirect, the page will navigate away, so we don't need to do anything else.
-      // The auth state will be updated when the user is redirected back.
+      // With redirect, the page will navigate away. The auth state will be updated
+      // by the onAuthStateChanged listener in the root component when the user is redirected back.
+      // We don't need to do anything else here. The loading state will be reset on page reload.
     } catch (e: any) {
       console.error("Redirect Login Error:", e);
       setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
