@@ -57,7 +57,9 @@ function AppContent({ user }: { user: User }) {
       setTimeout(() => {
         setStack(prev => {
             const newStack = prev.slice(0, -1);
-            delete screenInstances.current[lastItemKey];
+            if (screenInstances.current[lastItemKey]) {
+              delete screenInstances.current[lastItemKey];
+            }
             return newStack;
         });
         setIsAnimatingOut(null);
@@ -97,8 +99,16 @@ function AppContent({ user }: { user: User }) {
     });
   }, [stack, navigate, goBack]);
 
-  const activeScreenKey = stack.length > 0 ? stack[stack.length - 1].screen : null;
-  const showBottomNav = user && activeScreenKey && mainTabs.includes(activeScreenKey);
+  if (!stack || stack.length === 0) {
+    return (
+        <div className="flex items-center justify-center h-screen bg-background">
+          <p>جاري التحميل...</p>
+        </div>
+    );
+  }
+
+  const activeScreenKey = stack[stack.length - 1].screen;
+  const showBottomNav = user && mainTabs.includes(activeScreenKey);
 
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
@@ -128,7 +138,7 @@ function AppContent({ user }: { user: User }) {
         })}
       </div>
       
-      {showBottomNav && activeScreenKey && <BottomNav activeScreen={activeScreenKey} onNavigate={navigate} />}
+      {showBottomNav && <BottomNav activeScreen={activeScreenKey} onNavigate={navigate} />}
     </main>
   );
 }
@@ -154,8 +164,6 @@ export default function Home() {
   }
 
   if (!user) {
-    // Pass a dummy navigate function as it won't be used, but LoginScreen expects it.
-    // Real navigation is handled by the user state change.
     return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
   }
 
