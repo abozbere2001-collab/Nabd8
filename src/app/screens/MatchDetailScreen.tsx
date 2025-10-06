@@ -163,11 +163,9 @@ const PlayerIcon = ({ player }: { player: LineupPlayer }) => {
     if (!player.player.grid) return null;
     const [row, col] = player.player.grid.split(':').map(Number);
     
-    // Reverse the row positioning: higher row number should be higher on the screen (e.g. row 11 is top, row 1 is bottom)
-    const topPercentage = (11 - row) * (100 / 11.5) + 4; 
-    
-    // Position columns from the center, with more spacing
+    const topPercentage = (11 - row) * (100 / 11.5) + 4;
     const leftPercentage = 50 + (col - 3) * 18;
+
 
     return (
         <div 
@@ -180,12 +178,12 @@ const PlayerIcon = ({ player }: { player: LineupPlayer }) => {
           }}
         >
             <div className="relative">
-                 <Avatar className="w-10 h-10 border-2 bg-slate-800 border-white/50 shadow-md text-white font-bold">
-                    <AvatarFallback>{player.player.pos || 'P'}</AvatarFallback>
+                 <Avatar className="w-10 h-10 border-2 bg-slate-800 border-white/50 shadow-md text-white font-bold flex items-center justify-center">
+                    <AvatarFallback>{player.player.pos ? player.player.pos.charAt(0) : 'P'}</AvatarFallback>
                 </Avatar>
                 <Avatar className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8">
                      <AvatarImage src={player.player.photo} alt={player.player.name} />
-                     <AvatarFallback>{player.player.pos || 'P'}</AvatarFallback>
+                     <AvatarFallback>{player.player.name.substring(0, 1)}</AvatarFallback>
                 </Avatar>
                 <span className={cn(
                   "absolute -top-1 -right-1 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background bg-red-600"
