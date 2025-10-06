@@ -20,15 +20,12 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     try {
       await signInWithGoogle();
       // After this call, the onAuthStateChanged listener in `Home` component will handle the user state.
-      // No need to set loading to false here, as the component will unmount.
     } catch (e: any) {
       console.error("Login Error:", e);
-      // Smartly handle the popup closed error
+      // Smartly handle the popup closed error which happens on screen resize.
       if (e.code === 'auth/popup-closed-by-user') {
-        // This error happens when resizing the screen. It's not a "real" error.
-        // We just reset the state to allow the user to try again.
         setLoading(false);
-        return; 
+        return; // This is not a "real" error in our case, so we just reset state.
       }
       setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
       setLoading(false);
