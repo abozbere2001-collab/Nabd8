@@ -19,15 +19,16 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setError(null);
     try {
       await signInWithGoogle();
-      // After this call, the onAuthStateChanged listener in `Home` component will handle the user state.
+      // onAuthStateChanged in Home/page.tsx will handle the successful login.
+      // We don't need to setLoading(false) here because the component will unmount.
     } catch (e: any) {
       console.error("Login Error:", e);
-      // Smartly handle the popup closed error which happens on screen resize.
-      if (e.code === 'auth/popup-closed-by-user') {
-        setLoading(false);
-        return; // This is not a "real" error in our case, so we just reset state.
+      // For ANY error, just reset the loading state so the user can try again.
+      // We won't show the 'popup-closed-by-user' error to the user as it's a side-effect
+      // of the dev environment resizing.
+      if (e.code !== 'auth/popup-closed-by-user') {
+          setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
       }
-      setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
       setLoading(false);
     }
   };
