@@ -143,17 +143,8 @@ export default function Home() {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
-    // Check for redirect result first. This captures the user from Google's redirect.
-    checkRedirectResult().catch(error => {
-      // This might happen if the user closes the login window, etc.
-      // We can log it, but we don't want to show a scary error.
-      // The onAuthStateChange listener will handle the final state.
-      console.error("Error processing redirect result:", error);
-    });
-
     // onAuthStateChange is the single source of truth.
     // It runs on initial load and whenever the auth state changes.
-    // After getRedirectResult runs, onAuthStateChange will fire with the new user.
     const unsubscribe = onAuthStateChange((currentUser) => {
       setUser(currentUser);
       setLoadingAuth(false);

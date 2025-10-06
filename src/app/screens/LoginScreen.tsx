@@ -19,12 +19,14 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setError(null);
     try {
       await signInWithGoogle();
-      // With redirect, the page will navigate away. The auth state will be updated
-      // by the onAuthStateChanged listener in the root component when the user is redirected back.
-      // We don't need to do anything else here. The loading state will be reset on page reload.
+      // onAuthStateChanged in Home component will handle the navigation
     } catch (e: any) {
-      console.error("Redirect Login Error:", e);
-      setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+      console.error("Login Error:", e);
+      // Silently handle the popup closed by user error, as it's common
+      // in this dev environment when resizing. For other errors, show a message.
+      if (e.code !== 'auth/popup-closed-by-user') {
+          setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+      }
       setLoading(false);
     }
   };
@@ -52,7 +54,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           size="lg"
         >
           {loading ? (
-            'جاري توجيهك...'
+            'جاري المصادقة...'
           ) : (
             <>
               <GoogleIcon className="h-5 w-5 mr-2" />
