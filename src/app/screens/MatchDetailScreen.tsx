@@ -161,11 +161,14 @@ const MatchHeader = ({ fixture, onBack }: { fixture: Fixture; onBack: () => void
 
 const PlayerIcon = ({ player }: { player: LineupPlayer }) => {
     if (!player.player.grid) return null;
+
     const [row, col] = player.player.grid.split(':').map(Number);
     
-    // Correct positioning logic
-    const topPercentage = (row / 12) * 100;
-    const leftPercentage = (col / 6) * 100;
+    // Normalize column (1-5) to a 0-1 range for left percentage
+    const leftPercentage = ((col - 1) / 4) * 100;
+    
+    // Normalize row (1-11) to a 0-1 range for top percentage
+    const topPercentage = ((row - 1) / 10) * 100;
 
     return (
         <div 
@@ -246,7 +249,7 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
 
       <div className="space-y-4">
         <div 
-            className="relative w-full max-w-md mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-500/30 shadow-2xl" 
+            className="relative w-full max-w-md mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-500/30 shadow-2xl p-4" 
             style={{
                 backgroundImage: "url(/football-pitch-3d.svg)",
                 backgroundSize: '100% 100%',
