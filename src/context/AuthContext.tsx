@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from 'firebase/auth';
-import { onAuthStateChange, signInWithGoogle as firebaseSignIn, signOut as firebaseSignOut } from '../lib/firebase-client';
+import { onAuthStateChange, signInWithGoogle as firebaseSignIn, signOut as firebaseSignOut, getGoogleRedirectResult } from '../lib/firebase-client';
 
 interface AuthContextType {
   user: User | null;
@@ -23,24 +23,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoadingAuth(false);
     });
 
+    // Check for redirect result on initial load
+    getGoogleRedirectResult()
+      .then((result) => {
+        if (result) {
+          // User successfully signed in.
+          // The onAuthStateChange listener will handle setting the user.
+          console.log('Redirect sign-in successful');
+        }
+      })
+      .catch((error) => {
+        console.error('Error getting redirect result:', error);
+      })
+      .finally(() => {
+        // This is a good place to hide any global loading indicators
+        // related to the redirect sign-in check.
+      });
+
     return () => unsubscribe();
   }, []);
 
   const signInWithGoogle = async () => {
+    setLoadingAuth(true); // Show loader while redirecting
     try {
         await firebaseSignIn();
+        // The page will redirect, so no need to handle success here.
+        // getRedirectResult will handle it on the return.
     } catch(error) {
-       console.error("Error with popup sign-in:", error);
-       // The error will be surfaced to the user in the calling component
+       console.error("Error with redirect sign-in:", error);
+       setLoadingAuth(false);
        throw error;
     }
   };
 
   const signOut = async () => {
-    setLoadingAuth(true);
     await firebaseSignOut();
-    setUser(null);
-    setLoadingAuth(false);
+    // onAuthStateChange will handle setting user to null
   };
 
   return (

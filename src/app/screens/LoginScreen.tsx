@@ -20,21 +20,13 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setError(null);
     try {
       await signInWithGoogle();
-      // On successful sign-in, AuthProvider handles navigation.
-      // The component will unmount, so no need to setLoading(false).
+      // Page will redirect, so we don't need to do anything here.
+      // The loading state will be reset when the user navigates back or the component unmounts.
     } catch (e: any) {
       console.error("Login Error:", e);
-      // This specific error code can happen when the popup is closed by browser/environment events
-      // like resizing the window. It's often not a "real" user cancellation.
-      // We'll ignore it to prevent showing a disruptive error message on resize.
-      if (e.code === 'auth/popup-closed-by-user') {
-        setLoading(false); // Reset the button to be clickable again
-        return; // Exit without setting an error message
-      }
-
       let errorMessage = 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
       setError(errorMessage);
-      setLoading(false); // Allow the user to try again
+      setLoading(false);
     }
   };
 
@@ -61,7 +53,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           size="lg"
         >
           {loading ? (
-            'جاري تسجيل الدخول...'
+            'جاري توجيهك...'
           ) : (
             <>
               <GoogleIcon className="h-5 w-5 mr-2" />
