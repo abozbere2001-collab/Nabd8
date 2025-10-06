@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,6 +11,8 @@ import { ar } from 'date-fns/locale';
 import { useFirebase } from '@/firebase/provider';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase-client';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 // Interfaces
 interface Fixture {
@@ -44,27 +46,14 @@ interface Favorites {
     teams?: { [key:string]: any };
 }
 
-interface FixturesByDate {
-    [date: string]: Fixture[];
-}
-
-// Constants
-const PAST_DAYS_LIMIT = 180;
-const FUTURE_DAYS_LIMIT = 180;
-
 // Helper functions
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
 
-const getDayLabel = (dateString: string) => {
-    try {
-        const date = parseISO(dateString);
-        if (isToday(date)) return "اليوم";
-        if (isYesterday(date)) return "الأمس";
-        if (isTomorrow(date)) return "غداً";
-        return format(date, "EEEE", { locale: ar });
-    } catch (e) {
-        return dateString;
-    }
+const getDayLabel = (date: Date) => {
+    if (isToday(date)) return "اليوم";
+    if (isYesterday(date)) return "الأمس";
+    if (isTomorrow(date)) return "غداً";
+    return format(date, "EEEE", { locale: ar });
 }
 
 // Live Timer Component
@@ -75,7 +64,8 @@ const LiveTimer = ({ startTime }: { startTime: number }) => {
         const calculateElapsed = () => {
             const now = Math.floor(Date.now() / 1000);
             const difference = now - startTime;
-            return Math.floor(difference / 60);
+            // Handle potential time sync issues where elapsed might be negative
+            return Math.max(0, Math.floor(difference / 60));
         };
         
         setElapsed(calculateElapsed());
@@ -89,9 +79,12 @@ const LiveTimer = ({ startTime }: { startTime: number }) => {
 
     if (elapsed === null) return null;
 
+    // Display '45+' for halftime, etc.
+    const displayTime = elapsed > 45 && elapsed < 60 ? "45+" : `'${elapsed}`;
+
     return (
         <span className="text-red-600 font-bold text-xs animate-pulse">
-            {`'${elapsed}`}
+            {displayTime}
         </span>
     );
 };
@@ -109,7 +102,9 @@ const FixtureItem = ({ fixture }: { fixture: Fixture }) => {
                   </Avatar>
                   <span className="truncate">{fixture.league.name}</span>
               </div>
-              {fixture.fixture.status.short === 'LIVE' ? (
+              {fixture.fixture.status.short === 'HT' ? (
+                 <span className="text-red-600 font-bold text-xs">نصف الوقت</span>
+              ) : fixture.fixture.status.short === 'LIVE' ? (
                 <LiveTimer startTime={fixture.fixture.timestamp} />
               ) : (
                 <span>{fixture.fixture.status.long}</span>
@@ -123,8 +118,8 @@ const FixtureItem = ({ fixture }: { fixture: Fixture }) => {
                      <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
                  </Avatar>
              </div>
-             <div className="font-bold text-lg px-2 bg-muted rounded-md">
-                 {(fixture.fixture.status.short === 'FT' || fixture.fixture.status.short === 'AET' || fixture.fixture.status.short === 'PEN' || fixture.fixture.status.short === 'LIVE')
+             <div className="font-bold text-lg px-2 bg-muted rounded-md min-w-[80px] text-center">
+                 {(['FT', 'AET', 'PEN', 'LIVE', 'HT'].includes(fixture.fixture.status.short))
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
                    : format(new Date(fixture.fixture.date), "HH:mm")}
              </div>
@@ -141,141 +136,50 @@ const FixtureItem = ({ fixture }: { fixture: Fixture }) => {
 };
 
 
-// Reusable Fixtures List with Infinite Scroll
-function FixturesList({ filter, favorites }: { filter?: 'favorites', favorites: Favorites }) {
-    const [fixtures, setFixtures] = useState<FixturesByDate>({});
-    
-    // State for managing loading and data availability
-    const [isLoadingPrev, setIsLoadingPrev] = useState(false);
-    const [isLoadingNext, setIsLoadingNext] = useState(false);
-    
-    const oldestDateLoaded = useRef(new Date());
-    const newestDateLoaded = useRef(new Date());
+function FixturesList({ filter, favorites, selectedDate }: { filter?: 'favorites', favorites: Favorites, selectedDate: Date }) {
+    const [fixtures, setFixtures] = useState<Fixture[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const startDateLimit = useMemo(() => subDays(new Date(), PAST_DAYS_LIMIT), []);
-    const endDateLimit = useMemo(() => addDays(new Date(), FUTURE_DAYS_LIMIT), []);
+    const dateKey = useMemo(() => formatDateKey(selectedDate), [selectedDate]);
 
-    const hasMorePrev = useMemo(() => oldestDateLoaded.current > startDateLimit, [startDateLimit]);
-    const hasMoreNext = useMemo(() => newestDateLoaded.current < endDateLimit, [endDateLimit]);
-    
-    // Refs to track intersection observers
-    const topObserver = useRef<IntersectionObserver | null>(null);
-    const bottomObserver = useRef<IntersectionObserver | null>(null);
-
-    const topTriggerRef = useRef<HTMLDivElement>(null);
-    const bottomTriggerRef = useRef<HTMLDivElement>(null);
-
-    const fetchFixtures = useCallback(async (dateToFetch: Date) => {
-        const dateKey = formatDateKey(dateToFetch);
-        if (fixtures[dateKey]) return; // Don't fetch if already loaded
-
-        try {
-            const response = await fetch(`/api/football/fixtures?date=${dateKey}`);
-            const data = await response.json();
-            const newFixtures = data.response || [];
-            
-            setFixtures(prev => ({
-                ...prev,
-                [dateKey]: newFixtures
-            }));
-        } catch (error) {
-            console.error(`Failed to fetch fixtures for ${dateKey}:`, error);
-        }
-    }, [fixtures]);
-
-    const loadPreviousDay = useCallback(async () => {
-        if (isLoadingPrev || !hasMorePrev) return;
-        setIsLoadingPrev(true);
-        const prevDate = subDays(oldestDateLoaded.current, 1);
-        await fetchFixtures(prevDate);
-        oldestDateLoaded.current = prevDate;
-        setIsLoadingPrev(false);
-    }, [isLoadingPrev, hasMorePrev, fetchFixtures]);
-
-    const loadNextDay = useCallback(async () => {
-        if (isLoadingNext || !hasMoreNext) return;
-        setIsLoadingNext(true);
-        const nextDate = addDays(newestDateLoaded.current, 1);
-        await fetchFixtures(nextDate);
-        newestDateLoaded.current = nextDate;
-        setIsLoadingNext(false);
-    }, [isLoadingNext, hasMoreNext, fetchFixtures]);
-
-    // Initial load
     useEffect(() => {
-        const today = new Date();
-        oldestDateLoaded.current = today;
-        newestDateLoaded.current = today;
-        setIsLoadingNext(true);
-        fetchFixtures(today).finally(() => setIsLoadingNext(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // Intersection Observer setup
-    useEffect(() => {
-        const topElement = topTriggerRef.current;
-        const bottomElement = bottomTriggerRef.current;
-
-        const handleIntersect = (entries: IntersectionObserverEntry[], observer: IntersectionObserver) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    if (entry.target === topElement) {
-                        loadPreviousDay();
-                    } else if (entry.target === bottomElement) {
-                        loadNextDay();
-                    }
+        const fetchFixtures = async () => {
+            setIsLoading(true);
+            try {
+                const response = await fetch(`/api/football/fixtures?date=${dateKey}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data');
                 }
-            });
+                const data = await response.json();
+                setFixtures(data.response || []);
+            } catch (error) {
+                console.error(`Failed to fetch fixtures for ${dateKey}:`, error);
+                setFixtures([]);
+            } finally {
+                setIsLoading(false);
+            }
         };
-        
-        topObserver.current = new IntersectionObserver(handleIntersect, { threshold: 1.0 });
-        if (topElement) topObserver.current.observe(topElement);
 
-        bottomObserver.current = new IntersectionObserver(handleIntersect, { threshold: 1.0 });
-        if (bottomElement) bottomObserver.current.observe(bottomElement);
+        fetchFixtures();
+    }, [dateKey]);
 
-        return () => {
-            if (topElement) topObserver.current?.unobserve(topElement);
-            if (bottomElement) bottomObserver.current?.unobserve(bottomElement);
-        };
-    }, [loadPreviousDay, loadNextDay]);
-
-    const sortedDates = useMemo(() => Object.keys(fixtures).sort((a, b) => a.localeCompare(b)), [fixtures]);
-    
     const favoritedTeamIds = useMemo(() => favorites?.teams ? Object.keys(favorites.teams).map(Number) : [], [favorites.teams]);
     const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
 
-    const renderedContent = useMemo(() => {
-        return sortedDates.map(date => {
-            const fixturesForDate = fixtures[date];
-            if (!fixturesForDate) return null;
+    const filteredFixtures = useMemo(() => {
+        if (filter === 'favorites') {
+            const hasAnyFavorites = favoritedTeamIds.length > 0 || favoritedLeagueIds.length > 0;
+            if (!hasAnyFavorites) return [];
 
-            let fixturesToRender = fixturesForDate;
-            if (filter === 'favorites') {
-                fixturesToRender = fixturesForDate.filter(f =>
-                    favoritedTeamIds.includes(f.teams.home.id) || 
-                    favoritedTeamIds.includes(f.teams.away.id) ||
-                    favoritedLeagueIds.includes(f.league.id)
-                );
-            }
-            
-            if (fixturesToRender.length === 0) return null;
+            return fixtures.filter(f =>
+                favoritedTeamIds.includes(f.teams.home.id) || 
+                favoritedTeamIds.includes(f.teams.away.id) ||
+                favoritedLeagueIds.includes(f.league.id)
+            );
+        }
+        return fixtures;
+    }, [fixtures, filter, favoritedTeamIds, favoritedLeagueIds]);
 
-            return (
-                <div key={date}>
-                    <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b -mx-4">
-                      {getDayLabel(date)}
-                      <span className="text-sm font-normal text-muted-foreground ml-2">{format(parseISO(date), "d MMMM yyyy", { locale: ar })}</span>
-                    </h2>
-                    <div className="space-y-3 pt-4">
-                        {fixturesToRender.map(f => <FixtureItem key={f.fixture.id} fixture={f} />)}
-                    </div>
-                </div>
-            )
-        }).filter(Boolean);
-    }, [sortedDates, fixtures, filter, favoritedTeamIds, favoritedLeagueIds]);
-    
-    const hasAnyFavorites = favoritedTeamIds.length > 0 || favoritedLeagueIds.length > 0;
 
     const renderEmptyState = (title: string, description: string) => (
        <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
@@ -283,45 +187,81 @@ function FixturesList({ filter, favorites }: { filter?: 'favorites', favorites: 
           <p className="text-sm">{description}</p>
       </div>
     );
-    
-    if (filter === 'favorites' && !hasAnyFavorites) {
+
+    if (isLoading) {
+        return (
+            <div className="space-y-3 p-4">
+                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
+            </div>
+        );
+    }
+
+    if (filter === 'favorites' && (favoritedLeagueIds.length === 0 && favoritedTeamIds.length === 0)) {
         return renderEmptyState("لا توجد مباريات في مفضلتك", "أضف فرقا أو بطولات للمفضلة لترى مبارياتها هنا.");
     }
     
-    const isContentEmpty = renderedContent.length === 0;
-    const isStillLoading = isLoadingNext || isLoadingPrev;
-
-    if (isContentEmpty && !isStillLoading) {
-        if(filter === 'favorites' && hasAnyFavorites) {
-            return renderEmptyState("لا توجد مباريات مفضلة في هذه الفترة", "جرّب التمرير لأعلى أو لأسفل لعرض أيام أخرى.");
-        }
+    if (filteredFixtures.length === 0) {
+        return renderEmptyState("لا توجد مباريات", `لا توجد مباريات مجدولة لهذا اليوم ${filter === 'favorites' ? 'في مفضلتك' : ''}.`);
     }
 
     return (
-        <div className="p-4">
-            <div ref={topTriggerRef} className="h-10">
-                {isLoadingPrev && <Skeleton className="h-20 w-full" />}
-            </div>
-            
-            {renderedContent}
-            
-            <div ref={bottomTriggerRef} className="h-10">
-                {isLoadingNext && renderedContent.length > 0 && <Skeleton className="h-20 w-full" />}
-            </div>
+        <div className="p-4 space-y-3">
+            {filteredFixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} />)}
         </div>
     );
 };
 
 
+const DateScroller = ({ selectedDate, onSelectDate }: { selectedDate: Date, onSelectDate: (date: Date) => void }) => {
+    const dates = useMemo(() => {
+        const today = new Date();
+        const days = [];
+        for (let i = -30; i <= 30; i++) {
+            days.push(addDays(today, i));
+        }
+        return days;
+    }, []);
+
+    const selectedDateKey = formatDateKey(selectedDate);
+    const todayKey = formatDateKey(new Date());
+
+    return (
+        <div className="p-2 border-b">
+            <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2" style={{ scrollbarWidth: 'none', '-ms-overflow-style': 'none' }}>
+                {dates.map(date => {
+                    const dateKey = formatDateKey(date);
+                    const isSelected = dateKey === selectedDateKey;
+                    
+                    return (
+                        <Button
+                            key={dateKey}
+                            variant={isSelected ? "default" : "outline"}
+                            className={cn(
+                                "flex flex-col h-auto p-2 min-w-[70px] whitespace-nowrap",
+                                !isSelected && dateKey === todayKey && "border-primary"
+                            )}
+                            onClick={() => onSelectDate(date)}
+                        >
+                            <span className="text-xs font-bold">{getDayLabel(date)}</span>
+                            <span className="text-xs text-muted-foreground">{format(date, "d MMM", {locale: ar})}</span>
+                        </Button>
+                    )
+                })}
+            </div>
+        </div>
+    );
+}
+
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { user } = useFirebase();
   const [favorites, setFavorites] = useState<Favorites>({});
+  const [selectedDate, setSelectedDate] = useState(new Date());
   
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
-      setFavorites(doc.data() as Favorites || { leagues: {}, teams: {} });
+      setFavorites(doc.data() as Favorites || {});
     });
     return () => unsub();
   }, [user]);
@@ -331,28 +271,31 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       <ScreenHeader title="المباريات" onBack={goBack} canGoBack={canGoBack} />
       <div className="flex-1 flex flex-col">
         <Tabs defaultValue="all-matches" className="w-full flex-1 flex flex-col">
-          <div className="p-4 border-b">
+          <div className="px-4 pt-4 border-b">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="my-results">نتائجي</TabsTrigger>
               <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
             </TabsList>
           </div>
+          <DateScroller selectedDate={selectedDate} onSelectDate={setSelectedDate} />
           <TabsContent 
             value="my-results" 
             className="mt-0 flex-1 overflow-y-auto"
-            forceMount // Keep it in the DOM to preserve scroll state
+            forceMount
           >
-             <FixturesList filter="favorites" favorites={favorites}/>
+            <FixturesList filter="favorites" favorites={favorites} selectedDate={selectedDate} />
           </TabsContent>
           <TabsContent 
             value="all-matches" 
             className="mt-0 flex-1 overflow-y-auto"
-             forceMount // Keep it in the DOM to preserve scroll state
+            forceMount
           >
-            <FixturesList favorites={favorites} />
+            <FixturesList favorites={favorites} selectedDate={selectedDate} />
           </TabsContent>
         </Tabs>
       </div>
     </div>
   );
 }
+
+    
