@@ -8,6 +8,7 @@ import type { ScreenProps } from '@/app/page';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { signOut as firebaseSignOut } from '@/lib/firebase-client';
+import { useTheme } from "next-themes";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,19 +21,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-const settingsItems = [
-  { label: 'المظهر', icon: Sun, detail: 'فاتح' },
-  { label: 'اللغة', icon: Languages, detail: 'العربية' },
-  { label: 'الإشعارات', icon: Bell, detail: 'مفعلة' },
-]
 
 export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   
-  useEffect(() => {
-    console.log("SettingsScreen: init");
-  }, []);
-
   const handleSignOut = async () => {
     try {
       await firebaseSignOut();
@@ -50,13 +43,33 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     }
   };
 
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+
+  const settingsItems = [
+    { label: 'اللغة', icon: Languages, detail: 'العربية', action: () => {} },
+    { label: 'الإشعارات', icon: Bell, detail: 'مفعلة', action: () => {} },
+  ]
+
+
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="الإعدادات" onBack={goBack} canGoBack={canGoBack} />
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-2">
+            <button onClick={toggleTheme} className="flex w-full items-center justify-between rounded-lg bg-card p-4 text-right transition-colors hover:bg-accent/50">
+               <div className="flex items-center gap-4">
+                  {theme === 'light' ? <Sun className="h-6 w-6 text-primary"/> : <Moon className="h-6 w-6 text-primary"/>}
+                  <span className="font-medium">المظهر</span>
+               </div>
+               <div className="flex items-center gap-2 text-muted-foreground">
+                  <span>{theme === 'light' ? 'فاتح' : 'داكن'}</span>
+                  <ChevronLeft className="h-5 w-5"/>
+               </div>
+           </button>
             {settingsItems.map(item => (
-                 <button key={item.label} className="flex w-full items-center justify-between rounded-lg bg-card p-4 text-right transition-colors hover:bg-accent/50">
+                 <button key={item.label} onClick={item.action} className="flex w-full items-center justify-between rounded-lg bg-card p-4 text-right transition-colors hover:bg-accent/50">
                      <div className="flex items-center gap-4">
                         <item.icon className="h-6 w-6 text-primary"/>
                         <span className="font-medium">{item.label}</span>

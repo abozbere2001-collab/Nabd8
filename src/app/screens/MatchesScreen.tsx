@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback, useRef, useLayoutEffect } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -12,6 +12,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase-client';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 // Interfaces
 interface Fixture {
@@ -45,15 +46,17 @@ interface Favorites {
     teams?: { [key:string]: any };
 }
 
-type DayFixtures = {
-    date: string; // YYYY-MM-DD
-    fixtures: Fixture[];
-};
-
 // Helper functions
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
 
-const getDayLabel = (dateKey: string) => {
+const getDayLabel = (date: Date) => {
+    if (isToday(date)) return "اليوم";
+    if (isYesterday(date)) return "الأمس";
+    if (isTomorrow(date)) return "غداً";
+    return format(date, "EEE", { locale: ar });
+};
+
+const getFullDayLabel = (dateKey: string) => {
     const date = parseISO(dateKey);
     if (isToday(date)) return `اليوم - ${format(date, "d MMMM", { locale: ar })}`;
     if (isYesterday(date)) return `الأمس - ${format(date, "d MMMM", { locale: ar })}`;
@@ -110,7 +113,6 @@ const LiveTimer = ({ startTime, status }: { startTime: number, status: string })
     );
 };
 
-
 // Fixture Item Component
 const FixtureItem = React.memo(({ fixture }: { fixture: Fixture }) => {
     return (
@@ -160,30 +162,41 @@ FixtureItem.displayName = 'FixtureItem';
 
 
 // Fixtures List Component
-const FixturesList = ({ days, activeTab, favoritedTeamIds, favoritedLeagueIds, hasAnyFavorites }: { 
-    days: DayFixtures[], 
+const FixturesList = ({ 
+    fixtures, 
+    loading,
+    activeTab, 
+    hasAnyFavorites,
+    favoritedLeagueIds,
+    favoritedTeamIds 
+}: { 
+    fixtures: Fixture[], 
+    loading: boolean,
     activeTab: string, 
-    favoritedTeamIds: number[],
+    hasAnyFavorites: boolean,
     favoritedLeagueIds: number[],
-    hasAnyFavorites: boolean
+    favoritedTeamIds: number[]
 }) => {
     
-    const filteredDays = useMemo(() => {
+    const filteredFixtures = useMemo(() => {
         if (activeTab === 'all-matches') {
-            return days;
+            return fixtures;
         }
-        return days.map(day => ({
-            ...day,
-            fixtures: day.fixtures.filter(f => 
-                favoritedTeamIds.includes(f.teams.home.id) ||
-                favoritedTeamIds.includes(f.teams.away.id) ||
-                favoritedLeagueIds.includes(f.league.id)
-            )
-        })).sort((a,b) => a.date.localeCompare(b.date));
-    }, [days, activeTab, favoritedTeamIds, favoritedLeagueIds]);
+        return fixtures.filter(f => 
+            favoritedTeamIds.includes(f.teams.home.id) ||
+            favoritedTeamIds.includes(f.teams.away.id) ||
+            favoritedLeagueIds.includes(f.league.id)
+        );
+    }, [fixtures, activeTab, favoritedTeamIds, favoritedLeagueIds]);
 
-    const hasFixturesInAnyDay = filteredDays.some(day => day.fixtures.length > 0);
-
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+    
     if (activeTab === 'my-results' && !hasAnyFavorites) {
         return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
@@ -192,39 +205,71 @@ const FixturesList = ({ days, activeTab, favoritedTeamIds, favoritedLeagueIds, h
             </div>
         );
     }
-    
-    if (days.length > 0 && !hasFixturesInAnyDay) {
+
+    if (fixtures.length > 0 && filteredFixtures.length === 0) {
+       return (
+            <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
+                <p className="font-bold text-lg">لا توجد مباريات مفضلة لهذا اليوم</p>
+            </div>
+        );
+    }
+
+    if (filteredFixtures.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
-                <p className="font-bold text-lg">لا توجد مباريات مفضلة في هذه الفترة</p>
-                <p className="text-sm">جرّب التمرير لأعلى أو لأسفل للبحث في تواريخ أخرى.</p>
+                <p>لا توجد مباريات لهذا اليوم.</p>
             </div>
         );
     }
 
     return (
-        <div>
-            {filteredDays.map(({ date, fixtures }) => {
-                if (fixtures.length === 0 && activeTab === 'all-matches') {
-                    return (
-                        <div key={date} className="p-4 pt-2 space-y-3">
-                            <h2 className="text-sm font-bold text-center text-muted-foreground pt-4 pb-2">{getDayLabel(date)}</h2>
-                            <p className="text-center text-muted-foreground">لا توجد مباريات لهذا اليوم.</p>
-                        </div>
-                    );
-                }
-                if (fixtures.length === 0) return null;
-                
-                return (
-                    <div key={date} className="p-4 pt-2 space-y-3" id={`day-${date}`}>
-                        <h2 className="text-sm font-bold text-center text-muted-foreground pt-4 pb-2 sticky top-0 bg-background/80 backdrop-blur-md z-10">{getDayLabel(date)}</h2>
-                        {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} />)}
-                    </div>
-                );
-            })}
+        <div className="p-4 pt-2 space-y-3">
+            {filteredFixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} />)}
         </div>
     );
 };
+
+// Date Scroller
+const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: string, onDateSelect: (dateKey: string) => void}) => {
+    const dates = useMemo(() => {
+        const today = new Date();
+        const days = [];
+        for (let i = -30; i <= 30; i++) {
+            days.push(addDays(today, i));
+        }
+        return days;
+    }, []);
+    
+    useEffect(() => {
+        const selectedElement = document.getElementById(`date-btn-${selectedDateKey}`);
+        if (selectedElement) {
+            selectedElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }, [selectedDateKey]);
+
+    return (
+        <div className="p-2 border-b">
+            <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                {dates.map(date => {
+                    const dateKey = formatDateKey(date);
+                    const isSelected = dateKey === selectedDateKey;
+                    return (
+                        <Button
+                            key={dateKey}
+                            id={`date-btn-${dateKey}`}
+                            variant={isSelected ? 'default' : 'outline'}
+                            className={cn("flex flex-col h-auto p-2 min-w-[60px]", isSelected ? 'text-primary-foreground' : 'text-foreground')}
+                            onClick={() => onDateSelect(dateKey)}
+                        >
+                            <span className="text-xs">{getDayLabel(date)}</span>
+                            <span className="font-bold text-lg">{format(date, 'd')}</span>
+                        </Button>
+                    )
+                })}
+            </div>
+        </div>
+    );
+}
 
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
@@ -232,142 +277,28 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [favorites, setFavorites] = useState<Favorites>({});
   const [activeTab, setActiveTab] = useState<'my-results' | 'all-matches'>('all-matches');
 
-  const [days, setDays] = useState<DayFixtures[]>([]);
-  const loadedDaysRef = useRef(new Set<string>());
-  
-  const [isLoadingNext, setIsLoadingNext] = useState(false);
-  const [isLoadingPrev, setIsLoadingPrev] = useState(false);
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-  
-  const today = useMemo(() => new Date(), []);
-  const todayKey = formatDateKey(today);
-  const minDate = useMemo(() => subDays(today, 180), [today]);
-  const maxDate = useMemo(() => addDays(today, 180), [today]);
-
-  const [hasMorePrev, setHasMorePrev] = useState(true);
-  const [hasMoreNext, setHasMoreNext] = useState(true);
-
-  const fetchFixturesForDate = useCallback(async (date: Date) => {
-    const dateKey = formatDateKey(date);
-    if (loadedDaysRef.current.has(dateKey)) return null;
-
-    loadedDaysRef.current.add(dateKey);
-    try {
-      const response = await fetch(`/api/football/fixtures?date=${dateKey}`);
-      if (!response.ok) throw new Error('Failed to fetch');
-      const data = await response.json();
-      return { date: dateKey, fixtures: data.response || [] };
-    } catch (error) {
-      console.error(`Failed to fetch fixtures for ${dateKey}:`, error);
-      return { date: dateKey, fixtures: [] };
-    }
-  }, []);
-
-  const loadNextDay = useCallback(async () => {
-    if (isLoadingNext || !hasMoreNext) return;
-    setIsLoadingNext(true);
-    
-    const lastLoadedDate = days.length > 0 ? parseISO(days[days.length - 1].date) : subDays(today, 1);
-    const nextDay = addDays(lastLoadedDate, 1);
-    
-    if (nextDay > maxDate) {
-        setHasMoreNext(false);
-        setIsLoadingNext(false);
-        return;
-    }
-
-    const newDayData = await fetchFixturesForDate(nextDay);
-    if (newDayData) {
-      setDays(prevDays => [...prevDays, newDayData].sort((a,b) => a.date.localeCompare(b.date)));
-    }
-    setIsLoadingNext(false);
-  }, [isLoadingNext, hasMoreNext, fetchFixturesForDate, days, maxDate, today]);
-
-  const loadPreviousDay = useCallback(async () => {
-    if (isLoadingPrev || !hasMorePrev) return;
-    setIsLoadingPrev(true);
-    
-    const firstLoadedDate = days.length > 0 ? parseISO(days[0].date) : addDays(today, 1);
-    const prevDay = subDays(firstLoadedDate, 1);
-
-    if (prevDay < minDate) {
-        setHasMorePrev(false);
-        setIsLoadingPrev(false);
-        return;
-    }
-    
-    const scrollContainer = scrollRef.current;
-    const oldScrollHeight = scrollContainer?.scrollHeight || 0;
-
-    const newDayData = await fetchFixturesForDate(prevDay);
-    
-    if (newDayData) {
-        setDays(prevDays => [newDayData, ...prevDays].sort((a,b) => a.date.localeCompare(b.date)));
-        
-        if(scrollContainer) {
-            // Wait for DOM update
-            setTimeout(() => {
-                const newScrollHeight = scrollContainer.scrollHeight;
-                scrollContainer.scrollTop += newScrollHeight - oldScrollHeight;
-            }, 0);
-        }
-    }
-    setIsLoadingPrev(false);
-  }, [isLoadingPrev, hasMorePrev, fetchFixturesForDate, days, minDate, today]);
-
-
-  // Initial load
-  useEffect(() => {
-      const loadInitialDay = async () => {
-        setIsLoadingNext(true); // Use a general loader initially
-        const todayData = await fetchFixturesForDate(new Date());
-        if (todayData) {
-            setDays([todayData]);
-             // Scroll to today's section after it has rendered
-            setTimeout(() => {
-                const todayElement = document.getElementById(`day-${todayData.date}`);
-                if (todayElement && scrollRef.current) {
-                    const offset = todayElement.offsetTop - (scrollRef.current.offsetTop);
-                    scrollRef.current.scrollTop = offset;
-                }
-            }, 100);
-        }
-        setIsLoadingNext(false);
-      }
-      if (!loadedDaysRef.current.has(todayKey)) {
-        loadInitialDay();
-      }
-  }, [fetchFixturesForDate, todayKey]);
-  
-  // Intersection Observers for infinite scroll
-  const topObserverRef = useRef<HTMLDivElement>(null);
-  const bottomObserverRef = useRef<HTMLDivElement>(null);
+  const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
+  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const options = { root: scrollRef.current, threshold: 0.1 };
-
-    const topObserver = new IntersectionObserver(
-        ([entry]) => { if (entry.isIntersecting && !isLoadingPrev) loadPreviousDay(); },
-        options
-    );
-    const bottomObserver = new IntersectionObserver(
-        ([entry]) => { if (entry.isIntersecting && !isLoadingNext) loadNextDay(); },
-        options
-    );
-
-    const topEl = topObserverRef.current;
-    const bottomEl = bottomObserverRef.current;
-
-    if (topEl) topObserver.observe(topEl);
-    if (bottomEl) bottomObserver.observe(bottomEl);
-
-    return () => {
-        if (topEl) topObserver.unobserve(topEl);
-        if (bottomEl) bottomObserver.unobserve(bottomEl);
-    };
-  }, [loadPreviousDay, loadNextDay, isLoadingPrev, isLoadingNext]);
-
+    async function fetchFixturesForDate(dateKey: string) {
+        setLoading(true);
+        try {
+            const response = await fetch(`/api/football/fixtures?date=${dateKey}`);
+            if (!response.ok) throw new Error('Failed to fetch');
+            const data = await response.json();
+            setFixtures(data.response || []);
+        } catch (error) {
+            console.error(`Failed to fetch fixtures for ${dateKey}:`, error);
+            setFixtures([]);
+        } finally {
+            setLoading(false);
+        }
+    }
+    fetchFixturesForDate(selectedDateKey);
+  }, [selectedDateKey]);
+  
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
@@ -392,28 +323,18 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             </TabsList>
           </div>
           
-          <div ref={scrollRef} className="flex-1 overflow-y-auto relative">
-              <div ref={topObserverRef} className="h-10 flex justify-center items-center">
-                  {isLoadingPrev && hasMorePrev && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
-              </div>
-              
-              {(days.length === 0 && (isLoadingNext || isLoadingPrev)) ? (
-                 <div className="absolute inset-0 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                 </div>
-              ) : (
-                <FixturesList 
-                    days={days} 
-                    activeTab={activeTab} 
-                    favoritedLeagueIds={favoritedLeagueIds}
-                    favoritedTeamIds={favoritedTeamIds}
-                    hasAnyFavorites={hasAnyFavorites}
-                />
-              )}
-              
-              <div ref={bottomObserverRef} className="h-10 flex justify-center items-center">
-                  {isLoadingNext && hasMoreNext && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
-              </div>
+          <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
+          
+          <div className="flex-1 overflow-y-auto">
+            <h2 className="text-sm font-bold text-center text-muted-foreground pt-4 pb-2">{getFullDayLabel(selectedDateKey)}</h2>
+            <FixturesList 
+                fixtures={fixtures}
+                loading={loading}
+                activeTab={activeTab} 
+                favoritedLeagueIds={favoritedLeagueIds}
+                favoritedTeamIds={favoritedTeamIds}
+                hasAnyFavorites={hasAnyFavorites}
+            />
           </div>
         </Tabs>
       </div>
