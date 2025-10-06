@@ -3,11 +3,11 @@
 import React, { useEffect, useState } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ChevronDown, Star, Pencil } from 'lucide-react';
+import { Star, Pencil } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAdmin } from '@/hooks/useAdmin.tsx';
+import { useAdmin } from '@/hooks/useAdmin';
 
 interface Competition {
   league: {
@@ -76,9 +76,22 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
   const [competitions, setCompetitions] = useState<GroupedCompetitions | null>(null);
   const [loading, setLoading] = useState(true);
   const { isAdmin } = useAdmin();
+  const [favoritedLeagues, setFavoritedLeagues] = useState<Set<number>>(new Set());
+
+  const toggleLeagueFavorite = (leagueId: number) => {
+    setFavoritedLeagues(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(leagueId)) {
+            newSet.delete(leagueId);
+        } else {
+            newSet.add(leagueId);
+        }
+        return newSet;
+    });
+    // In the future, this will also update Firebase
+  };
 
   useEffect(() => {
-    console.log("CompetitionsScreen: init");
     async function fetchCompetitions() {
       try {
         setLoading(true);
@@ -183,11 +196,11 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 size="icon"
                 className="h-8 w-8"
                 onClick={(e) => {
-                e.stopPropagation();
-                console.log('Favorite clicked for', comp.league.name);
+                  e.stopPropagation();
+                  toggleLeagueFavorite(comp.league.id);
                 }}
             >
-                <Star className="h-5 w-5 text-muted-foreground/50" />
+              <Star className={favoritedLeagues.has(comp.league.id) ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
             </Button>
         </div>
       </div>
@@ -207,7 +220,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             ))}
           </div>
         ) : competitions ? (
-          <Accordion type="multiple" className="w-full space-y-4">
+          <Accordion type="multiple" className="w-full space-y-4" defaultValue={['World', 'Europe', 'Asia']}>
             {Object.entries(competitions).map(([continent, content]) => (
               <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
                 <AccordionTrigger className="px-4 text-lg font-bold">
@@ -222,7 +235,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                     <Accordion type="multiple" className="w-full space-y-2 px-2">
                          {Object.entries(content as LeaguesByCountry).map(([country, { flag, leagues }]) => (
                              <AccordionItem value={country} key={country} className="rounded-lg border bg-background">
-                                <AccordionTrigger className="px-4 text-base font-bold">
+                                <AccordionTrigger className="px-4 text-base font-semibold">
                                     <div className="flex items-center gap-3">
                                         {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
                                         <span>{country}</span>

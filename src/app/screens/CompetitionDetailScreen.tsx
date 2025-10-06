@@ -82,6 +82,7 @@ const CURRENT_SEASON = 2024;
 export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, leagueId }: ScreenProps & { title?: string, leagueId?: number }) {
   const { isAdmin } = useAdmin();
   const [isFavorited, setIsFavorited] = useState(false);
+  const [favoritedTeams, setFavoritedTeams] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
@@ -124,7 +125,20 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
 
   const handleFavorite = () => {
     setIsFavorited(!isFavorited);
-    console.log('Favorite clicked for', title);
+    // In the future, this will also update Firebase
+  };
+  
+  const toggleTeamFavorite = (teamId: number) => {
+    setFavoritedTeams(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(teamId)) {
+            newSet.delete(teamId);
+        } else {
+            newSet.add(teamId);
+        }
+        return newSet;
+    });
+     // In the future, this will also update Firebase
   };
   
   const headerActions = (
@@ -152,13 +166,14 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title={title || "البطولة"} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
        <div className="flex-1 overflow-y-auto">
+        <p className="text-center text-xs text-muted-foreground py-2">جميع البيانات تخص موسم {CURRENT_SEASON}</p>
         <Tabs defaultValue="matches" className="w-full">
           <div className="p-4 pb-0 sticky top-0 bg-background z-10">
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="matches"><Shield className="w-4 h-4 mr-1"/>المباريات</TabsTrigger>
-              <TabsTrigger value="standings"><Trophy className="w-4 h-4 mr-1"/>الترتيب</TabsTrigger>
-              <TabsTrigger value="scorers"><BarChart2 className="w-4 h-4 mr-1"/>الهدافين</TabsTrigger>
-              <TabsTrigger value="teams"><Users className="w-4 h-4 mr-1"/>الفرق</TabsTrigger>
+              <TabsTrigger value="matches"><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
+              <TabsTrigger value="standings"><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
+              <TabsTrigger value="scorers"><BarChart2 className="w-4 h-4 ml-1"/>الهدافين</TabsTrigger>
+              <TabsTrigger value="teams"><Users className="w-4 h-4 ml-1"/>الفرق</TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="matches" className="p-4">
@@ -207,6 +222,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
                 <Table>
                     <TableHeader>
                         <TableRow>
+                            <TableHead className="text-right w-[50px]"></TableHead>
                             <TableHead className="text-right w-1/2">الفريق</TableHead>
                             <TableHead className="text-center">لعب</TableHead>
                             <TableHead className="text-center">ف</TableHead>
@@ -218,6 +234,19 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
                     <TableBody>
                         {standings.map((s) => (
                             <TableRow key={s.team.id}>
+                                 <TableCell>
+                                     <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleTeamFavorite(s.team.id);
+                                        }}
+                                    >
+                                        <Star className={favoritedTeams.has(s.team.id) ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                    </Button>
+                                </TableCell>
                                 <TableCell className="font-medium">
                                     <div className="flex items-center gap-2">
                                         <span>{s.rank}</span>
@@ -285,14 +314,27 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
                     ))}
                 </div>
             ) : teams.length > 0 ? (
-                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {teams.map(({ team }) => (
-                        <div key={team.id} className="flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center hover:bg-accent transition-colors cursor-pointer">
+                        <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center">
                             <Avatar className="h-16 w-16">
                                 <AvatarImage src={team.logo} alt={team.name} />
                                 <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
                             </Avatar>
                             <span className="font-semibold text-sm">{team.name}</span>
+                            <div className="absolute top-1 right-1 flex">
+                                 <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleTeamFavorite(team.id);
+                                    }}
+                                >
+                                    <Star className={favoritedTeams.has(team.id) ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                </Button>
+                            </div>
                         </div>
                     ))}
                 </div>
