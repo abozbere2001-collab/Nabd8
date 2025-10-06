@@ -163,9 +163,9 @@ const PlayerIcon = ({ player }: { player: LineupPlayer }) => {
     if (!player.player.grid) return null;
     const [row, col] = player.player.grid.split(':').map(Number);
     
-    const topPercentage = (11 - row) * (100 / 11.5) + 4;
-    const leftPercentage = 50 + (col - 3) * 18;
-
+    // Correct positioning logic
+    const topPercentage = (row / 12) * 100;
+    const leftPercentage = (col / 6) * 100;
 
     return (
         <div 
@@ -198,6 +198,7 @@ const PlayerIcon = ({ player }: { player: LineupPlayer }) => {
     );
 };
 
+
 const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, loading: boolean, fixture: Fixture }) => {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(fixture.teams.home.id);
 
@@ -205,23 +206,24 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
     return <Skeleton className="w-full h-[600px] rounded-lg m-4" />;
   }
 
-  if (!lineups || lineups.length < 2) {
+  if (!lineups || lineups.length < 1) {
     return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة.</p>;
   }
-
+  
   const homeLineup = lineups.find(l => l.team.id === fixture.teams.home.id);
   const awayLineup = lineups.find(l => l.team.id === fixture.teams.away.id);
 
   const selectedLineup = selectedTeamId === fixture.teams.home.id ? homeLineup : awayLineup;
 
-  if (!homeLineup || !awayLineup || !selectedLineup) {
+  if (!selectedLineup) {
       return <p className="text-center text-muted-foreground p-8">تشكيلة الفريق المحدد غير متاحة.</p>;
   }
 
   return (
     <div className="p-4 space-y-6">
       <div className="flex justify-center items-center gap-2">
-        <Button
+       {homeLineup && (
+         <Button
             variant={selectedTeamId === homeLineup.team.id ? "default" : "outline"}
             className="w-40 flex items-center gap-2"
             onClick={() => setSelectedTeamId(homeLineup.team.id)}
@@ -229,6 +231,8 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
             <Avatar className="w-6 h-6"><AvatarImage src={homeLineup.team.logo} /></Avatar>
             <span>{homeLineup.team.name}</span>
         </Button>
+       )}
+       {awayLineup && (
         <Button
             variant={selectedTeamId === awayLineup.team.id ? "default" : "outline"}
             className="w-40 flex items-center gap-2"
@@ -237,6 +241,7 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
             <Avatar className="w-6 h-6"><AvatarImage src={awayLineup.team.logo} /></Avatar>
             <span>{awayLineup.team.name}</span>
         </Button>
+       )}
       </div>
 
       <div className="space-y-4">
