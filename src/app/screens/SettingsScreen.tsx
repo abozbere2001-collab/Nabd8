@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect } from 'react';
-import { signOut } from 'firebase/auth';
-import { getClientAuth } from '@/lib/firebase-client';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut } from 'lucide-react';
-import type { ScreenKey, ScreenProps } from '@/app/page';
+import type { ScreenProps } from '@/app/page';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
 
 const settingsItems = [
   { label: 'المظهر', icon: Sun, detail: 'فاتح' },
@@ -16,14 +15,18 @@ const settingsItems = [
 ]
 
 export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+  const { toast } = useToast();
   useEffect(() => {
     console.log("SettingsScreen init");
-    return () => console.log("SettingsScreen unmount (should not happen with keep-alive)");
+    return () => console.log("SettingsScreen unmount");
   }, []);
 
   const handleSignOut = async () => {
-    const auth = getClientAuth();
-    await signOut(auth);
+    toast({
+      variant: 'destructive',
+      title: "غير مسجل الدخول",
+      description: "لا يوجد مستخدم لتسجيل خروجه.",
+    })
   };
 
   return (
