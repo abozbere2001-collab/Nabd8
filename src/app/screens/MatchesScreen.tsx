@@ -211,15 +211,13 @@ const FixturesList = ({ fixtures, favoritedTeamIds, favoritedLeagueIds, activeTa
 
 const InfiniteScrollTrigger = ({ onIntersect, isLoading }: { onIntersect: () => void; isLoading: boolean; }) => {
     const ref = useRef<HTMLDivElement | null>(null);
-    const onIntersectRef = useRef(onIntersect);
-    onIntersectRef.current = onIntersect;
 
     useEffect(() => {
         const observer = new IntersectionObserver(([entry]) => {
-            if (entry.isIntersecting) {
-                 onIntersectRef.current();
+            if (entry.isIntersecting && !isLoading) {
+                 onIntersect();
             }
-        }, { threshold: 0.1 });
+        }, { threshold: 1.0 });
 
         const currentRef = ref.current;
         if (currentRef) {
@@ -231,7 +229,7 @@ const InfiniteScrollTrigger = ({ onIntersect, isLoading }: { onIntersect: () => 
                 observer.unobserve(currentRef);
             }
         };
-    }, []);
+    }, [onIntersect, isLoading]);
 
     return <div ref={ref} className="h-10 flex justify-center items-center">
         {isLoading && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
@@ -368,3 +366,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
