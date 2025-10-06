@@ -2,7 +2,12 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import type { User } from 'firebase/auth';
-import { onAuthStateChange, signInWithGoogle as firebaseSignIn, signOut as firebaseSignOut, getGoogleRedirectResult } from '../lib/firebase-client';
+import { 
+  signInWithGoogle as firebaseSignIn, 
+  signOut as firebaseSignOut, 
+  getGoogleRedirectResult,
+  onAuthStateChange
+} from '../lib/firebase-client';
 
 interface AuthContextType {
   user: User | null;
@@ -31,7 +36,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Error processing redirect result:", error);
       });
 
-    const unsubscribe = onAuthStateChanged((user) => {
+    const unsubscribe = onAuthStateChange((user) => {
       setUser(user);
       setLoadingAuth(false); // This is the single source of truth for loading state.
     });
@@ -54,8 +59,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = useCallback(async () => {
     setLoadingAuth(true);
-    await firebaseSignOut();
-    // onAuthStateChanged will set user to null and loading to false.
+    try {
+      await firebaseSignOut();
+      // onAuthStateChanged will set user to null and loading to false.
+    } catch (e) {
+       console.error("Sign out error", e);
+       setLoadingAuth(false);
+    }
   }, []);
 
   return (
