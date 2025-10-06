@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { BottomNav } from '@/components/BottomNav';
 import { MatchesScreen } from './screens/MatchesScreen';
 import { CompetitionsScreen } from './screens/CompetitionsScreen';
@@ -40,12 +40,18 @@ type StackItem = {
 
 function AppContent() {
   const { user, loadingAuth } = useAuth();
-  const initialScreen: ScreenKey = !loadingAuth && user ? 'Matches' : 'Login';
   
-  const [stack, setStack] = useState<StackItem[]>([{ key: `${initialScreen}-0`, screen: initialScreen }]);
+  const [stack, setStack] = useState<StackItem[]>([]);
   const [isAnimatingOut, setIsAnimatingOut] = useState<string | null>(null);
   
   const screenInstances = useRef<Record<string, JSX.Element>>({});
+
+  useEffect(() => {
+    if (!loadingAuth) {
+      const initialScreen: ScreenKey = user ? 'Matches' : 'Login';
+      setStack([{ key: `${initialScreen}-0`, screen: initialScreen }]);
+    }
+  }, [loadingAuth, user]);
 
   const goBack = useCallback(() => {
     if (stack.length > 1) {
@@ -67,26 +73,26 @@ function AppContent() {
     const newKey = `${screen}-${Date.now()}`;
     const newItem = { key: newKey, screen, props };
 
-    if (isMainTab) {
-      // If navigating to a main tab, reset the stack to that tab
-      // This is typical for tab-based navigation
-      if (stack.length === 1 && stack[0].screen === screen) return; // Avoid re-navigating to the same tab
-      setStack([newItem]);
-      screenInstances.current = {}; // Clear old instances
-    } else {
-      // For other screens, push to the stack
-      setStack(prev => [...prev, newItem]);
-    }
-  }, [stack]);
+    setStack(prevStack => {
+      if (isMainTab) {
+        if (prevStack.length === 1 && prevStack[0].screen === screen) return prevStack;
+        screenInstances.current = {}; 
+        return [newItem];
+      } else {
+        return [...prevStack, newItem];
+      }
+    });
+  }, []);
 
-  // Effect to handle auth changes
-  React.useEffect(() => {
-    if (loadingAuth) return;
+  useEffect(() => {
+    if (loadingAuth || stack.length === 0) return;
+
     const currentScreen = stack[stack.length-1].screen;
     if (user && (currentScreen === 'Login' || currentScreen === 'SignUp')) {
        navigate('Matches');
     } else if (!user && currentScreen !== 'Login' && currentScreen !== 'SignUp') {
-       navigate('Login');
+       setStack([{ key: 'Login-0', screen: 'Login' }]);
+       screenInstances.current = {};
     }
   }, [user, loadingAuth, navigate, stack]);
 
@@ -109,52 +115,43 @@ function AppContent() {
 
   const activeScreenKey = stack.length > 0 ? stack[stack.length - 1].screen : null;
 
-  if (loadingAuth) {
-    // You can return a global loading spinner here
+  if (loadingAuth || stack.length === 0) {
     return (
-      <div className="w-full h-[700px] bg-background rounded-[32px] flex items-center justify-center">
+      <div className="flex items-center justify-center h-screen bg-background">
         <p>Loading...</p>
       </div>
     );
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-800 dark:bg-gray-900">
-      <div className="w-full max-w-sm mx-auto bg-black rounded-[40px] shadow-2xl p-2 border-4 border-gray-600">
-        <div className="w-full h-[700px] bg-background rounded-[32px] overflow-hidden relative flex flex-col">
-          {/* Notch */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-b-xl z-30"></div>
+    <main className="h-screen w-screen bg-background flex flex-col">
+      <div className="relative flex-1 overflow-hidden">
+        {renderedStack.map((item, index) => {
+          const isTop = index === stack.length - 1;
+          const isAnimating = isAnimatingOut === item.key;
           
-          <div className="relative flex-1 bg-background">
-            {renderedStack.map((item, index) => {
-              const isTop = index === stack.length - 1;
-              const isAnimating = isAnimatingOut === item.key;
-              
-              return (
-                <div
-                  key={item.key}
-                  className={cn(
-                    "absolute inset-0 bg-background transition-transform duration-300 ease-out",
-                    stack.length > 1 && index > 0 && isTop && !isAnimating ? 'animate-slide-in-from-right' : '',
-                    isAnimating ? 'animate-slide-out-to-right' : '',
-                    !isTop ? 'pointer-events-none' : ''
-                  )}
-                  style={{ 
-                    zIndex: index,
-                    visibility: isTop ? 'visible' : 'hidden'
-                  }}
-                  aria-hidden={!isTop}
-                >
-                  {item.component}
-                </div>
-              );
-            })}
-          </div>
-          
-          {activeScreenKey && <BottomNav activeScreen={activeScreenKey} onNavigate={navigate} />}
-        </div>
+          return (
+            <div
+              key={item.key}
+              className={cn(
+                "absolute inset-0 bg-background transition-transform duration-300 ease-out flex flex-col",
+                stack.length > 1 && index > 0 && isTop && !isAnimating ? 'animate-slide-in-from-right' : '',
+                isAnimating ? 'animate-slide-out-to-right' : '',
+                !isTop ? 'pointer-events-none' : ''
+              )}
+              style={{ 
+                zIndex: index,
+                visibility: isTop ? 'visible' : 'hidden'
+              }}
+              aria-hidden={!isTop}
+            >
+              {item.component}
+            </div>
+          );
+        })}
       </div>
-       <p className="text-white/50 text-xs mt-4">Goal Stack - Mobile Simulation</p>
+      
+      {activeScreenKey && <BottomNav activeScreen={activeScreenKey} onNavigate={navigate} />}
     </main>
   );
 }
