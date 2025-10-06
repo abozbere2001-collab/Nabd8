@@ -2,11 +2,11 @@
 
 import { useEffect } from 'react';
 import { signOut } from 'firebase/auth';
-import { getClientAuth } from '@/lib/firebase';
+import { getClientAuth } from '@/lib/firebase-client';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut } from 'lucide-react';
-import type { ScreenProps } from '@/app/page';
+import type { ScreenKey, ScreenProps } from '@/app/page';
 import { Separator } from '@/components/ui/separator';
 
 const settingsItems = [

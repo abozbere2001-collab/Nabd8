@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Loader2 } from 'lucide-react';
-import { getClientAuth } from '@/lib/firebase';
+import { getClientAuth } from '@/lib/firebase-client';
 
 interface AuthContextType {
   user: User | null;

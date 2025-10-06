@@ -1,12 +1,12 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { getClientAuth } from '@/lib/firebase';
+import { getClientAuth } from '@/lib/firebase-client';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import type { ScreenProps } from '@/app/page';
+import type { ScreenKey, ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from 'lucide-react';
@@ -35,8 +35,8 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       let errorMessage = error.message;
       if (error.code === 'auth/popup-closed-by-user') {
         errorMessage = 'تم إغلاق نافذة تسجيل الدخول قبل إتمام العملية.';
-      } else if (error.code === 'auth/invalid-api-key') {
-        errorMessage = 'مفتاح Firebase API غير صالح. يرجى التأكد من صحة الإعدادات.';
+      } else if (error.code === 'auth/invalid-api-key' || error.code === 'auth/api-key-not-valid') {
+        errorMessage = 'مفتاح Firebase API غير صالح. يرجى التأكد من صحة الإعدادات في البيئة الخاصة بك.';
       }
       setError(errorMessage);
     } finally {
