@@ -11,7 +11,7 @@ import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-radix';
+import { Loader2 } from 'lucide-react';
 import { Toaster } from '@/components/ui/toaster';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails';
@@ -61,7 +61,7 @@ export default function Home() {
         screenInstances.current = {};
       }
     }
-  }, [user, loading]);
+  }, [user, loading, stack]);
 
   const goBack = useCallback(() => {
     if (stack.length > 1) {
