@@ -9,8 +9,7 @@ import Image from 'next/image';
 
 export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   useEffect(() => {
-    console.log("NewsScreen init");
-    return () => console.log("NewsScreen unmount (should not happen with keep-alive)");
+    console.log("NewsScreen: init");
   }, []);
 
   return (

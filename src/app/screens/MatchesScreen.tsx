@@ -8,8 +8,7 @@ import type { ScreenProps } from '@/app/page';
 
 export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   useEffect(() => {
-    console.log("MatchesScreen init");
-    return () => console.log("MatchesScreen unmount (should not happen with keep-alive)");
+    console.log("MatchesScreen: init");
   }, []);
 
   return (

@@ -7,8 +7,7 @@ import type { ScreenProps } from '@/app/page';
 
 export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   useEffect(() => {
-    console.log("IraqScreen init");
-    return () => console.log("IraqScreen unmount (should not happen with keep-alive)");
+    console.log("IraqScreen: init");
   }, []);
 
   return (

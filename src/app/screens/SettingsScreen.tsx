@@ -30,8 +30,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { toast } = useToast();
   
   useEffect(() => {
-    console.log("SettingsScreen init");
-    return () => console.log("SettingsScreen unmount");
+    console.log("SettingsScreen: init");
   }, []);
 
   const handleSignOut = async () => {

@@ -7,8 +7,7 @@ import type { ScreenProps } from '@/app/page';
 
 export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title }: ScreenProps & { title?: string }) {
   useEffect(() => {
-    console.log(`CompetitionDetailScreen for ${title} init`);
-    return () => console.log(`CompetitionDetailScreen for ${title} unmount (should not happen with keep-alive)`);
+    console.log(`CompetitionDetailScreen for ${title}: init`);
   }, [title]);
 
   return (

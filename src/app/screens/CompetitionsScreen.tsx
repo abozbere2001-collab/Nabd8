@@ -33,6 +33,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log("CompetitionsScreen: init");
     async function fetchCompetitions() {
       try {
         setLoading(true);
