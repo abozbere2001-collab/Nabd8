@@ -18,36 +18,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
-    // Flag to prevent race conditions
-    let isProcessingRedirect = true;
-
+    // Process the redirect result on initial load
     getGoogleRedirectResult()
       .then((result) => {
         if (result) {
-          // A user signed in via redirect.
-          // The onAuthStateChanged listener below will catch this new user state.
-          console.log("Redirect result successfully processed.");
+          // User signed in via redirect.
+          // The onAuthStateChanged listener below will handle setting the user.
+          console.log("Redirect result processed.");
         }
       })
       .catch((error) => {
         console.error("Error processing redirect result:", error);
-      })
-      .finally(() => {
-        // We are done processing the redirect, regardless of outcome.
-        isProcessingRedirect = false;
-        // If onAuthStateChanged has already run and found no user,
-        // we might need to re-set loading to false.
-        // It's safer to just let the listener handle it.
-        setLoadingAuth(currentLoading => user === null && !currentLoading ? false : currentLoading);
       });
 
-    const unsubscribe = onAuthStateChange((user) => {
+    const unsubscribe = onAuthStateChanged((user) => {
       setUser(user);
-      // Only set loading to false if we are not in the middle of processing a redirect.
-      // This prevents the login screen from flashing before the redirect result is handled.
-      if (!isProcessingRedirect) {
-        setLoadingAuth(false);
-      }
+      setLoadingAuth(false); // This is the single source of truth for loading state.
     });
 
     return () => unsubscribe();
@@ -69,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = useCallback(async () => {
     setLoadingAuth(true);
     await firebaseSignOut();
-    // onAuthStateChanged will set user to null, which will then set loading to false.
+    // onAuthStateChanged will set user to null and loading to false.
   }, []);
 
   return (
