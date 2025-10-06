@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useLayoutEffect } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
-import { format, parseISO, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
+import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useFirebase } from '@/firebase/provider';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -234,20 +234,22 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     const scrollerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-      const scroller = scrollerRef.current;
-      const selectedElement = document.getElementById(`date-btn-${selectedDateKey}`);
-      if (scroller && selectedElement) {
-        const scrollerRect = scroller.getBoundingClientRect();
-        const selectedRect = selectedElement.getBoundingClientRect();
+        const scroller = scrollerRef.current;
+        if (!scroller) return;
         
-        const scrollOffset = selectedRect.left - scrollerRect.left - (scrollerRect.width / 2) + (selectedRect.width / 2);
-        
-        scroller.scrollBy({ left: scrollOffset, behavior: 'smooth' });
-      }
+        const selectedElement = document.getElementById(`date-btn-${selectedDateKey}`);
+        if (selectedElement) {
+            const scrollerRect = scroller.getBoundingClientRect();
+            const selectedRect = selectedElement.getBoundingClientRect();
+            
+            const scrollOffset = selectedRect.left - scrollerRect.left - (scrollerRect.width / 2) + (selectedRect.width / 2);
+            
+            scroller.scrollBy({ left: scrollOffset, behavior: 'smooth' });
+        }
     }, [selectedDateKey]);
 
     return (
-        <div ref={scrollerRef} className="flex space-x-2 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div ref={scrollerRef} className="flex flex-row-reverse space-x-2 space-x-reverse overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {dates.map(date => {
                 const dateKey = formatDateKey(date);
                 const isSelected = dateKey === selectedDateKey;
@@ -314,11 +316,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       <div className="flex-1 flex flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
           
-          <div className="px-4 pt-2 border-b">
-            <TabsList className="grid w-full grid-cols-2 mb-2">
-              <TabsTrigger value="my-results">نتائجي</TabsTrigger>
-              <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
-            </TabsList>
+          <div className="px-4 pt-0 border-b">
+             <div className="mb-2">
+                 <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="my-results">نتائجي</TabsTrigger>
+                  <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
+                </TabsList>
+             </div>
             <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
           </div>
           
@@ -337,3 +341,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
