@@ -6,10 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
-import { addDays, format, isToday, isYesterday, isTomorrow } from 'date-fns';
+import { format, isToday, isYesterday, isTomorrow, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 interface Fixture {
   fixture: {
@@ -36,55 +34,30 @@ interface Fixture {
   };
 }
 
+interface GroupedFixtures {
+    [date: string]: Fixture[];
+}
+
+
 // NOTE: These are temporary, will be replaced by Firebase
 const TEMP_FAVORITE_TEAMS = new Set([50, 529]); // Example: Man City, Real Madrid
 const TEMP_FAVORITE_LEAGUES = new Set([39, 140]); // Example: Premier League, La Liga
 
-const DateSelector = ({ selectedDate, onDateChange }: { selectedDate: Date, onDateChange: (date: Date) => void}) => {
-  const dates = useMemo(() => {
-    const today = new Date();
-    return Array.from({ length: 30 }).map((_, i) => addDays(today, i - 15));
-  }, []);
 
-  const getDayLabel = (date: Date) => {
+const getDayLabel = (dateString: string) => {
+    const date = parseISO(dateString);
     if (isToday(date)) return "اليوم";
     if (isYesterday(date)) return "الأمس";
     if (isTomorrow(date)) return "غداً";
-    return format(date, "E", { locale: ar });
-  }
-
-  return (
-    <div className="p-2 border-b">
-        <ScrollArea className="w-full whitespace-nowrap">
-            <div className="flex w-max space-x-2">
-            {dates.map(date => {
-                const isSelected = format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
-                return (
-                <button 
-                    key={date.toISOString()}
-                    onClick={() => onDateChange(date)}
-                    className={cn(
-                        "flex flex-col items-center justify-center rounded-md p-2 w-16 h-16 transition-colors",
-                        isSelected ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-accent"
-                    )}
-                >
-                    <span className="text-sm font-semibold">{getDayLabel(date)}</span>
-                    <span className="text-xl font-bold">{format(date, "dd")}</span>
-                    <span className="text-xs">{format(date, "MMM", { locale: ar })}</span>
-                </button>
-                )
-            })}
-            </div>
-            <ScrollBar orientation="horizontal" />
-        </ScrollArea>
-    </div>
-  )
+    return format(date, "EEEE", { locale: ar });
 }
 
+
 export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
-  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [groupedFixtures, setGroupedFixtures] = useState<GroupedFixtures>({});
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // We'll manage an array of loaded dates later for infinite scroll
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   const fetchFixtures = useCallback(async (date: Date) => {
     setLoading(true);
@@ -92,37 +65,29 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       const dateString = format(date, 'yyyy-MM-dd');
       const response = await fetch(`/api/football/fixtures?date=${dateString}`);
       const data = await response.json();
-      if (data.response) {
-        setFixtures(data.response);
-      } else {
-        setFixtures([]);
-      }
+      
+      const newFixtures = data.response || [];
+
+      setGroupedFixtures(prev => ({
+          ...prev,
+          [dateString]: newFixtures
+      }));
+
     } catch (error) {
       console.error("Failed to fetch fixtures:", error);
-      setFixtures([]);
+      const dateString = format(date, 'yyyy-MM-dd');
+      setGroupedFixtures(prev => ({ ...prev, [dateString]: [] }));
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    console.log("MatchesScreen: init or date changed");
-    fetchFixtures(selectedDate);
-  }, [selectedDate, fetchFixtures]);
+    fetchFixtures(currentDate);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchFixtures]); // We only want this to run once on initial mount with the current date
 
-  const favoriteTeamFixtures = useMemo(() => fixtures.filter(f =>
-    TEMP_FAVORITE_TEAMS.has(f.teams.home.id) || TEMP_FAVORITE_TEAMS.has(f.teams.away.id)
-  ), [fixtures]);
-
-  const favoriteLeagueFixtures = useMemo(() => fixtures.filter(f =>
-    TEMP_FAVORITE_LEAGUES.has(f.league.id) && !favoriteTeamFixtures.some(fav => fav.fixture.id === f.fixture.id)
-  ), [fixtures, favoriteTeamFixtures]);
-  
-  const otherFixtures = useMemo(() => fixtures.filter(f => 
-    !favoriteTeamFixtures.some(fav => fav.fixture.id === f.fixture.id) &&
-    !favoriteLeagueFixtures.some(favL => favL.fixture.id === f.fixture.id)
-  ), [fixtures, favoriteTeamFixtures, favoriteLeagueFixtures]);
-
+  const sortedDates = useMemo(() => Object.keys(groupedFixtures).sort((a, b) => new Date(a).getTime() - new Date(b).getTime()), [groupedFixtures]);
 
   const renderFixture = (fixture: Fixture) => (
     <div key={fixture.fixture.id} className="rounded-lg border bg-card p-3 text-sm">
@@ -166,62 +131,120 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         <p className="text-sm">{description}</p>
     </div>
   )
-
-  const renderSection = (title: string, data: Fixture[]) => {
-    if (data.length === 0) return null;
-    return (
-        <div>
-            <h3 className="font-bold text-lg my-4 px-4">{title}</h3>
-            <div className="space-y-3 px-4">
-                {data.map(renderFixture)}
+  
+  const renderAllMatches = () => {
+    if (loading && sortedDates.length === 0) {
+        return (
+            <div className="px-4 space-y-3 pt-4">
+                {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
             </div>
-        </div>
-    )
+        );
+    }
+
+    if (sortedDates.every(date => groupedFixtures[date].length === 0)) {
+        return renderEmptyState("لا توجد مباريات متاحة لهذا اليوم.", "حاول مرة أخرى في وقت لاحق أو تأكد من اتصالك بالإنترنت.");
+    }
+    
+    return sortedDates.map(dateString => {
+        const fixturesForDate = groupedFixtures[dateString];
+        if (fixturesForDate.length === 0) return null;
+        
+        return (
+            <div key={dateString}>
+                <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b">
+                  {getDayLabel(dateString)}
+                  <span className="text-sm font-normal text-muted-foreground ml-2">{format(parseISO(dateString), "d MMMM yyyy", { locale: ar })}</span>
+                </h2>
+                <div className="space-y-3 p-4">
+                    {fixturesForDate.map(renderFixture)}
+                </div>
+            </div>
+        )
+    });
+  }
+  
+  const renderMyResults = () => {
+      if (loading && sortedDates.length === 0) {
+        return (
+            <div className="px-4 space-y-3 pt-4">
+                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
+            </div>
+        );
+      }
+      
+      let hasFavorites = false;
+
+      const content = sortedDates.map(dateString => {
+        const fixturesForDate = groupedFixtures[dateString] || [];
+
+        const favoriteTeamFixtures = fixturesForDate.filter(f =>
+            TEMP_FAVORITE_TEAMS.has(f.teams.home.id) || TEMP_FAVORITE_TEAMS.has(f.teams.away.id)
+        );
+
+        const favoriteLeagueFixtures = fixturesForDate.filter(f =>
+            TEMP_FAVORITE_LEAGUES.has(f.league.id) && !favoriteTeamFixtures.some(fav => fav.fixture.id === f.fixture.id)
+        );
+
+        if (favoriteTeamFixtures.length === 0 && favoriteLeagueFixtures.length === 0) {
+            return null;
+        }
+
+        hasFavorites = true;
+
+        return (
+            <div key={dateString}>
+                 <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b">
+                  {getDayLabel(dateString)}
+                  <span className="text-sm font-normal text-muted-foreground ml-2">{format(parseISO(dateString), "d MMMM yyyy", { locale: ar })}</span>
+                </h2>
+                <div className="p-4 space-y-4">
+                   {favoriteTeamFixtures.length > 0 && (
+                        <div>
+                            <h3 className="font-bold text-base my-2">الفرق المفضلة</h3>
+                            <div className="space-y-3">
+                                {favoriteTeamFixtures.map(renderFixture)}
+                            </div>
+                        </div>
+                   )}
+                   {favoriteLeagueFixtures.length > 0 && (
+                        <div>
+                            <h3 className="font-bold text-base my-2">البطولات المفضلة</h3>
+                            <div className="space-y-3">
+                                {favoriteLeagueFixtures.map(renderFixture)}
+                            </div>
+                        </div>
+                   )}
+                </div>
+            </div>
+        );
+    });
+
+    if (!hasFavorites && !loading) {
+        return renderEmptyState("لا توجد مباريات في مفضلتك لهذا اليوم", "أضف فرقا أو بطولات للمفضلة لترى مبارياتها هنا.");
+    }
+    
+    return content;
   }
 
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="المباريات" onBack={goBack} canGoBack={canGoBack} />
-       <DateSelector selectedDate={selectedDate} onDateChange={setSelectedDate} />
-      <div className="flex-1 overflow-y-auto">
-        <Tabs defaultValue="my-results" className="w-full">
-          <div className="p-4 sticky top-0 bg-background z-10">
+      <div className="flex-1 flex flex-col">
+        <Tabs defaultValue="my-results" className="w-full flex-1 flex flex-col">
+          <div className="p-4 border-b">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="my-results">نتائجي</TabsTrigger>
               <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="my-results" className="p-0 pt-0 space-y-4">
-             {loading ? (
-                 <div className="px-4 space-y-3">
-                    {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
-                 </div>
-             ) : favoriteTeamFixtures.length === 0 && favoriteLeagueFixtures.length === 0 ? (
-                renderEmptyState("لا توجد مباريات في مفضلتك لهذا اليوم", "أضف فرقا أو بطولات للمفضلة لترى مبارياتها هنا.")
-             ) : (
-                <>
-                  {renderSection("الفرق المفضلة", favoriteTeamFixtures)}
-                  {renderSection("البطولات المفضلة", favoriteLeagueFixtures)}
-                </>
-             )}
+          <TabsContent value="my-results" className="mt-0 flex-1 overflow-y-auto">
+             {renderMyResults()}
           </TabsContent>
-          <TabsContent value="all-matches" className="p-0 pt-0 space-y-4">
-            {loading ? (
-                 <div className="px-4 space-y-3">
-                    {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
-                 </div>
-            ) : fixtures.length > 0 ? (
-                <div className="space-y-3 px-4 pb-4">
-                    {fixtures.map(renderFixture)}
-                </div>
-            ) : (
-                renderEmptyState("لا توجد مباريات متاحة لهذا اليوم.", "حاول مرة أخرى في وقت لاحق أو تأكد من اتصالك بالإنترنت.")
-            )}
+          <TabsContent value="all-matches" className="mt-0 flex-1 overflow-y-auto">
+            {renderAllMatches()}
           </TabsContent>
         </Tabs>
       </div>
     </div>
   );
 }
-
-    
