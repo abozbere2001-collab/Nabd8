@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getClientAuth } from '@/lib/firebase';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut } from 'lucide-react';
@@ -22,6 +22,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   }, []);
 
   const handleSignOut = async () => {
+    const auth = getClientAuth();
     await signOut(auth);
   };
 

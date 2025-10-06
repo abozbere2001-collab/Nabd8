@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getClientAuth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     e.preventDefault();
     setLoading(true);
     try {
+      const auth = getClientAuth();
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: "تم تسجيل الدخول بنجاح" });
       // The main page component will detect the auth change and switch the stack

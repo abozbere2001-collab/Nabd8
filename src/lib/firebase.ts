@@ -1,3 +1,5 @@
+"use client";
+
 import { initializeApp, getApps, getApp, FirebaseOptions } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
@@ -13,9 +15,20 @@ const firebaseConfig: FirebaseOptions = {
 };
 
 // Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+const getClientSideApp = () => {
+    if (getApps().length) {
+        return getApp();
+    }
+    return initializeApp(firebaseConfig);
+}
 
-export { app, auth, db, storage };
+// Lazy initialization for Auth
+let authInstance: ReturnType<typeof getAuth> | null = null;
+const getClientAuth = () => {
+    if (!authInstance) {
+        authInstance = getAuth(getClientSideApp());
+    }
+    return authInstance;
+}
+
+export { getClientSideApp, getClientAuth };
