@@ -126,10 +126,12 @@ function InfiniteScrollTrigger({ onVisible, isLoading, hasMore }: { onVisible: (
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        if (!hasMore) return;
+        
         const observer = new IntersectionObserver(
             (entries) => {
                 const entry = entries[0];
-                if (entry.isIntersecting && !isLoading && hasMore) {
+                if (entry.isIntersecting && !isLoading) {
                     onVisible();
                 }
             },
@@ -301,8 +303,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             value="all-matches" 
             className="mt-0 flex-1 overflow-y-auto"
           >
-            <Fixtur
-esList />
+            <FixturesList />
           </TabsContent>
         </Tabs>
       </div>
