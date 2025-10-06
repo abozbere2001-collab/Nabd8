@@ -247,25 +247,23 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     }, [selectedDateKey]);
 
     return (
-        <div className="p-2 border-b">
-            <div ref={scrollerRef} className="flex space-x-2 overflow-x-auto pb-1 -mx-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                {dates.map(date => {
-                    const dateKey = formatDateKey(date);
-                    const isSelected = dateKey === selectedDateKey;
-                    return (
-                        <Button
-                            key={dateKey}
-                            id={`date-btn-${dateKey}`}
-                            variant={isSelected ? 'default' : 'outline'}
-                            className={cn("flex flex-col h-auto p-1.5 min-w-[50px]", isSelected ? 'text-primary-foreground' : 'text-foreground')}
-                            onClick={() => onDateSelect(dateKey)}
-                        >
-                            <span className="text-xs font-normal">{getDayLabel(date)}</span>
-                            <span className="font-bold text-base">{format(date, 'd')}</span>
-                        </Button>
-                    )
-                })}
-            </div>
+        <div ref={scrollerRef} className="flex space-x-2 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {dates.map(date => {
+                const dateKey = formatDateKey(date);
+                const isSelected = dateKey === selectedDateKey;
+                return (
+                    <Button
+                        key={dateKey}
+                        id={`date-btn-${dateKey}`}
+                        variant={isSelected ? 'default' : 'outline'}
+                        className={cn("flex flex-col h-auto py-1 px-2.5 min-w-[48px]", isSelected ? 'text-primary-foreground' : 'text-foreground')}
+                        onClick={() => onDateSelect(dateKey)}
+                    >
+                        <span className="text-xs font-normal">{getDayLabel(date)}</span>
+                        <span className="font-bold text-sm">{format(date, 'd')}</span>
+                    </Button>
+                )
+            })}
         </div>
     );
 }
@@ -315,14 +313,14 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       <ScreenHeader title="المباريات" onBack={goBack} canGoBack={canGoBack} />
       <div className="flex-1 flex flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
-          <div className="px-4 pt-4 border-b">
-            <TabsList className="grid w-full grid-cols-2">
+          
+          <div className="px-4 pt-2 border-b">
+            <TabsList className="grid w-full grid-cols-2 mb-2">
               <TabsTrigger value="my-results">نتائجي</TabsTrigger>
               <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
             </TabsList>
+            <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
           </div>
-          
-          <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
           
           <div className="flex-1 overflow-y-auto">
             <FixturesList 
