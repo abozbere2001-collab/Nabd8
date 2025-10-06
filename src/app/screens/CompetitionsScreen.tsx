@@ -1,13 +1,13 @@
-
 "use client";
 
 import React, { useEffect, useState } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ChevronLeft, Star } from 'lucide-react';
+import { ChevronLeft, Star, Pencil } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAdmin } from '@/hooks/useAdmin.tsx';
 
 interface Competition {
   league: {
@@ -75,6 +75,7 @@ const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "N
 export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [competitions, setCompetitions] = useState<GroupedCompetitions | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isAdmin } = useAdmin();
 
   useEffect(() => {
     console.log("CompetitionsScreen: init");
@@ -117,7 +118,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             }
         });
         
-        // Sort continents
         const sortedGrouped: GroupedCompetitions = {};
         continentOrder.forEach(continent => {
             if (groupedByContinent[continent]) {
@@ -154,6 +154,45 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     fetchCompetitions();
   }, []);
 
+  const renderLeagueItem = (comp: Competition) => (
+    <li key={comp.league.id}>
+      <div
+        className="flex w-full items-center justify-between p-3 text-right hover:bg-accent transition-colors rounded-md cursor-pointer"
+        onClick={() => navigate('CompetitionDetails', { title: comp.league.name, leagueId: comp.league.id })}
+      >
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('Rename clicked for', comp.league.name);
+              }}
+            >
+              <Pencil className="h-4 w-4 text-muted-foreground/80" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('Favorite clicked for', comp.league.name);
+            }}
+          >
+            <Star className="h-5 w-5 text-muted-foreground/50" />
+          </Button>
+          <img src={comp.league.logo} alt={comp.league.name} className="h-6 w-6 object-contain" />
+          <span className="text-sm">{comp.league.name}</span>
+        </div>
+        <ChevronLeft className="h-5 w-5 text-muted-foreground" />
+      </div>
+    </li>
+  );
+
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="البطولات" onBack={goBack} canGoBack={canGoBack} />
@@ -176,31 +215,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 <AccordionContent className="px-1">
                   {"leagues" in content ? (
                      <ul className="flex flex-col">
-                        {(content.leagues as Competition[]).map(comp => (
-                          <li key={comp.league.id}>
-                            <div
-                              className="flex w-full items-center justify-between p-3 text-right hover:bg-accent transition-colors rounded-md cursor-pointer"
-                              onClick={() => navigate('CompetitionDetails', { title: comp.league.name, leagueId: comp.league.id })}
-                            >
-                              <div className="flex items-center gap-3">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    console.log('Favorite clicked for', comp.league.name);
-                                  }}
-                                >
-                                    <Star className="h-5 w-5 text-muted-foreground/50" />
-                                </Button>
-                                <img src={comp.league.logo} alt={comp.league.name} className="h-6 w-6 object-contain" />
-                                <span className="text-sm">{comp.league.name}</span>
-                              </div>
-                              <ChevronLeft className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                          </li>
-                        ))}
+                        {(content.leagues as Competition[]).map(renderLeagueItem)}
                       </ul>
                   ) : (
                     <Accordion type="multiple" className="w-full space-y-2 px-2">
@@ -214,31 +229,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                 </AccordionTrigger>
                                 <AccordionContent className="px-1">
                                     <ul className="flex flex-col">
-                                        {leagues.map(comp => (
-                                        <li key={comp.league.id}>
-                                            <div
-                                            className="flex w-full items-center justify-between p-3 text-right hover:bg-accent transition-colors rounded-md cursor-pointer"
-                                            onClick={() => navigate('CompetitionDetails', { title: comp.league.name, leagueId: comp.league.id })}
-                                            >
-                                            <div className="flex items-center gap-3">
-                                                <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="h-8 w-8"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    console.log('Favorite clicked for', comp.league.name);
-                                                }}
-                                                >
-                                                    <Star className="h-5 w-5 text-muted-foreground/50" />
-                                                </Button>
-                                                <img src={comp.league.logo} alt={comp.league.name} className="h-6 w-6 object-contain" />
-                                                <span className="text-sm">{comp.league.name}</span>
-                                            </div>
-                                            <ChevronLeft className="h-5 w-5 text-muted-foreground" />
-                                            </div>
-                                        </li>
-                                        ))}
+                                        {leagues.map(renderLeagueItem)}
                                     </ul>
                                 </AccordionContent>
                              </AccordionItem>
@@ -256,5 +247,3 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     </div>
   );
 }
-
-    

@@ -12,6 +12,7 @@ import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
+import { AdminProvider } from '@/hooks/useAdmin';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails';
 export type ScreenProps = {
@@ -53,7 +54,7 @@ function AppContent({ user }: { user: User }) {
         setStack(prev => {
             const newStack = prev.slice(0, -1);
             if (screenInstances.current[lastItemKey]) {
-              delete screenInstances.current[lastItemKey];
+              // We keep the instance in memory for KeepAlive
             }
             return newStack;
         });
@@ -69,10 +70,14 @@ function AppContent({ user }: { user: User }) {
 
     setStack(prevStack => {
       if (isMainTab) {
-        if (prevStack.length === 1 && prevStack[0].screen === screen) return prevStack;
-        screenInstances.current = {}; 
+        // If it's a main tab, check if it's already the current one
+        if (prevStack.length === 1 && prevStack[0].screen === screen) {
+           return prevStack;
+        }
+        // Replace the stack with the new main tab screen
         return [newItem];
       } else {
+        // For other screens, push to the stack
         return [...prevStack, newItem];
       }
     });
@@ -175,5 +180,9 @@ export default function Home() {
     return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
   }
 
-  return <AppContent user={user} />;
+  return (
+    <AdminProvider user={user}>
+      <AppContent user={user} />
+    </AdminProvider>
+  );
 }
