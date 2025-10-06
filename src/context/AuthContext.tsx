@@ -19,36 +19,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange((user) => {
-      if (user) {
-        setUser(user);
-        setLoadingAuth(false);
-      } else {
-        // This handles the redirect result after coming back from Google sign-in
-        getGoogleRedirectResult()
-          .then((result) => {
-            if (result && result.user) {
-              setUser(result.user);
-            }
-          })
-          .catch((error) => {
-            console.error("Error getting redirect result:", error);
-          })
-          .finally(() => {
-            setLoadingAuth(false);
-          });
-      }
+      setUser(user);
+      setLoadingAuth(false);
     });
+
+    // Separately handle the redirect result on initial load.
+    getGoogleRedirectResult()
+      .then((result) => {
+        if (result && result.user) {
+          // The onAuthStateChanged observer will also catch this,
+          // but we can set it here to potentially speed up the UI update.
+          setUser(result.user);
+        }
+      })
+      .catch((error) => {
+        // This is where 'auth/unauthorized-domain' might be caught.
+        // We log it but don't want to crash the app. The user will simply not be logged in.
+        console.error("Error processing redirect result:", error);
+      })
+      .finally(() => {
+        // We let onAuthStateChanged control the final loading state
+        // to ensure we have the definitive auth status.
+      });
 
     return () => unsubscribe();
   }, []);
 
   const signInWithGoogle = async () => {
     setLoadingAuth(true);
-    return firebaseSignIn();
+    // signInWithRedirect doesn't resolve a promise here as the page navigates away.
+    // Errors are caught in getRedirectResult.
+    await firebaseSignIn();
   };
 
   const signOut = async () => {
-    return firebaseSignOut();
+    setLoadingAuth(true);
+    await firebaseSignOut();
+    setUser(null); // Explicitly set user to null on sign out
+    setLoadingAuth(false);
   };
 
   return (
