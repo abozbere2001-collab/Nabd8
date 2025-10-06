@@ -114,7 +114,7 @@ function useInfiniteFixtures() {
       const prevDay = subDays(earliestDate, 1);
       await fetchFixturesByDate(prevDay);
       setEarliestDate(prevDay);
-      setIsLoadingPrev(false); // We don't need complex scroll adjustment for now
+      setIsLoadingPrev(false); 
   }, [isLoadingPrev, hasMorePrev, earliestDate, fetchFixturesByDate]);
 
   const sortedDates = useMemo(() => Object.keys(fixtures).sort((a, b) => new Date(a).getTime() - new Date(b).getTime()), [fixtures]);
@@ -122,13 +122,14 @@ function useInfiniteFixtures() {
   return { fixtures, sortedDates, isLoadingNext, isLoadingPrev, loadNextDay, loadPreviousDay, hasMoreNext, hasMorePrev };
 }
 
-function InfiniteScrollTrigger({ onVisible, isLoading, hasMore, direction }: { onVisible: () => void, isLoading: boolean, hasMore: boolean, direction: 'up' | 'down' }) {
+function InfiniteScrollTrigger({ onVisible, isLoading, hasMore }: { onVisible: () => void, isLoading: boolean, hasMore: boolean }) {
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries[0].isIntersecting && !isLoading && hasMore) {
+                const entry = entries[0];
+                if (entry.isIntersecting && !isLoading && hasMore) {
                     onVisible();
                 }
             },
@@ -158,7 +159,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { user } = useFirebase();
   const [favorites, setFavorites] = useState<Favorites>({});
   
-  const { fixtures, sortedDates, isLoadingNext, isLoadingPrev, loadNextDay, loadPreviousDay, hasMoreNext, hasMorePrev } = useInfiniteFixtures();
+  const allMatchesFixtures = useInfiniteFixtures();
+  const favoriteMatchesFixtures = useInfiniteFixtures();
 
   useEffect(() => {
     if (!user) return;
@@ -211,46 +213,47 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   )
 
-  const renderFixturesForDate = (dateString: string, filter?: 'favorites') => {
-    const fixturesForDate = fixtures[dateString];
-    if (!fixturesForDate) return null;
-
-    let fixturesToRender = fixturesForDate;
-
-    if (filter === 'favorites') {
-        const favoritedTeamIds = favorites?.teams ? Object.keys(favorites.teams).map(Number) : [];
-        const favoritedLeagueIds = favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [];
-        
-        fixturesToRender = fixturesForDate.filter(f =>
-            favoritedTeamIds.includes(f.teams.home.id) || 
-            favoritedTeamIds.includes(f.teams.away.id) ||
-            favoritedLeagueIds.includes(f.league.id)
-        );
-    }
-     
-     if (fixturesToRender.length === 0) return null;
-
-     return (
-        <div key={dateString}>
-            <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b -mx-4">
-              {getDayLabel(dateString)}
-              <span className="text-sm font-normal text-muted-foreground ml-2">{format(parseISO(dateString), "d MMMM yyyy", { locale: ar })}</span>
-            </h2>
-            <div className="space-y-3 pt-4">
-                {fixturesToRender.map(renderFixture)}
-            </div>
-        </div>
-    )
-  }
-  
   const FixturesList = ({ filter }: { filter?: 'favorites' }) => {
+    const { fixtures, sortedDates, isLoadingNext, isLoadingPrev, loadNextDay, loadPreviousDay, hasMoreNext, hasMorePrev } = 
+        filter === 'favorites' ? favoriteMatchesFixtures : allMatchesFixtures;
+
     const hasFavorites = (favorites?.teams && Object.keys(favorites.teams).length > 0) || (favorites?.leagues && Object.keys(favorites.leagues).length > 0);
 
     if (filter === 'favorites' && !hasFavorites) {
         return renderEmptyState("لا توجد مباريات في مفضلتك", "أضف فرقا أو بطولات للمفضلة لترى مبارياتها هنا.");
     }
       
-    const renderedContent = sortedDates.map(date => renderFixturesForDate(date, filter)).filter(Boolean);
+    const renderedContent = sortedDates.map(date => {
+      const fixturesForDate = fixtures[date];
+      if (!fixturesForDate) return null;
+
+      let fixturesToRender = fixturesForDate;
+
+      if (filter === 'favorites') {
+          const favoritedTeamIds = favorites?.teams ? Object.keys(favorites.teams).map(Number) : [];
+          const favoritedLeagueIds = favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [];
+          
+          fixturesToRender = fixturesForDate.filter(f =>
+              favoritedTeamIds.includes(f.teams.home.id) || 
+              favoritedTeamIds.includes(f.teams.away.id) ||
+              favoritedLeagueIds.includes(f.league.id)
+          );
+      }
+      
+      if (fixturesToRender.length === 0) return null;
+
+      return (
+          <div key={date}>
+              <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b -mx-4">
+                {getDayLabel(date)}
+                <span className="text-sm font-normal text-muted-foreground ml-2">{format(parseISO(date), "d MMMM yyyy", { locale: ar })}</span>
+              </h2>
+              <div className="space-y-3 pt-4">
+                  {fixturesToRender.map(renderFixture)}
+              </div>
+          </div>
+      )
+    }).filter(Boolean);
 
     if (renderedContent.length === 0 && !isLoadingPrev && !isLoadingNext) {
         return renderEmptyState(
@@ -265,14 +268,12 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 onVisible={loadPreviousDay}
                 isLoading={isLoadingPrev}
                 hasMore={hasMorePrev}
-                direction="up"
             />
             {renderedContent}
             <InfiniteScrollTrigger
                 onVisible={loadNextDay}
                 isLoading={isLoadingNext}
                 hasMore={hasMoreNext}
-                direction="down"
             />
         </div>
     );
@@ -300,7 +301,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             value="all-matches" 
             className="mt-0 flex-1 overflow-y-auto"
           >
-            <FixturesList />
+            <Fixtur
+esList />
           </TabsContent>
         </Tabs>
       </div>
