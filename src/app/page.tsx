@@ -143,11 +143,20 @@ export default function Home() {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
-    // onAuthStateChange is the single source of truth.
-    // It runs on initial load and whenever the auth state changes.
+    // This effect runs once on mount
+    
+    // First, check if we're coming back from a redirect
+    checkRedirectResult().catch(err => {
+        // This will catch any errors from getRedirectResult, although onAuthStateChanged
+        // will still be the final source of truth.
+        console.error("Redirect check failed:", err);
+    });
+
+    // Then, set up the listener that will handle all auth state changes,
+    // including the one from the redirect result.
     const unsubscribe = onAuthStateChange((currentUser) => {
       setUser(currentUser);
-      setLoadingAuth(false);
+      setLoadingAuth(false); // Auth state is now determined, stop loading.
     });
     
     // Cleanup subscription on unmount
