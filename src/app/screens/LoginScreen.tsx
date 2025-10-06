@@ -1,7 +1,6 @@
 "use client";
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import type { ScreenProps } from '@/app/page';
@@ -14,26 +13,26 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { signInWithGoogle } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
 
   const handleGoogleLogin = async () => {
-    if (loading) return; // Prevent re-triggering if already loading
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
       await signInWithGoogle();
-      // On successful sign-in, the AuthProvider will change the user state,
-      // and the main AppContent component will navigate to the 'Matches' screen.
-      // We don't need to set loading to false here as the component will unmount.
+      // On successful sign-in, AuthProvider handles navigation.
+      // The component will unmount, so no need to setLoading(false).
     } catch (e: any) {
       console.error("Login Error:", e);
-      let errorMessage = 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
+      // This specific error code can happen when the popup is closed by browser/environment events
+      // like resizing the window. It's often not a "real" user cancellation.
+      // We'll ignore it to prevent showing a disruptive error message on resize.
       if (e.code === 'auth/popup-closed-by-user') {
-        // This can happen if the user closes the popup or if the screen resizes.
-        // We can show a less scary message or just reset the state.
-        errorMessage = 'تم إلغاء عملية تسجيل الدخول.';
+        setLoading(false); // Reset the button to be clickable again
+        return; // Exit without setting an error message
       }
-      
+
+      let errorMessage = 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
       setError(errorMessage);
       setLoading(false); // Allow the user to try again
     }
