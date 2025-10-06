@@ -9,12 +9,13 @@ import { IraqScreen } from './screens/IraqScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
+import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
 import { FirebaseProvider } from '@/firebase/provider';
 
-export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails';
+export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails';
 export type ScreenProps = {
   navigate: (screen: ScreenKey, props?: Record<string, any>) => void;
   goBack: () => void;
@@ -30,6 +31,7 @@ const screens: Record<ScreenKey, React.ComponentType<any>> = {
   News: NewsScreen,
   Settings: SettingsScreen,
   CompetitionDetails: CompetitionDetailScreen,
+  MatchDetails: MatchDetailScreen,
 };
 
 const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];

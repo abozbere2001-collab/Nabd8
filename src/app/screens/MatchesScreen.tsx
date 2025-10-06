@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef, useLayoutEffect } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -30,10 +30,11 @@ interface Fixture {
     id: number;
     name: string;
     logo: string;
+    round: string;
   };
   teams: {
-    home: { id: number; name: string; logo: string; winner: boolean };
-    away: { id: number; name: string; logo: string; winner: boolean };
+    home: { id: number; name: string; logo: string; winner: boolean | null };
+    away: { id: number; name: string; logo: string; winner: boolean | null };
   };
   goals: {
     home: number | null;
@@ -57,57 +58,50 @@ const getDayLabel = (date: Date) => {
 };
 
 // Live Timer Component
-const LiveTimer = ({ startTime, status }: { startTime: number, status: string }) => {
-    const [elapsed, setElapsed] = useState<string>('');
+const LiveTimer = ({ startTime, status, elapsed }: { startTime: number, status: string, elapsed: number | null }) => {
+    const [elapsedTime, setElapsedTime] = useState<string>('');
 
     useEffect(() => {
-        if (status !== '1H' && status !== '2H' && status !== 'HT' && status !== 'ET') {
-            setElapsed(status);
+        if (!['1H', '2H', 'HT', 'ET', 'P', 'BT'].includes(status)) {
+            setElapsedTime(status);
             return;
         }
 
         if (status === 'HT') {
-            setElapsed('نصف الوقت');
+            setElapsedTime('نصف الوقت');
             return;
         }
-
-        const calculateElapsed = () => {
-            const now = Math.floor(Date.now() / 1000);
-            const difference = now - startTime;
-            let minutes = Math.floor(difference / 60);
-
-            if(status === '1H') {
-                 if (minutes > 45) minutes = 45;
-            } else if (status === '2H') {
-                minutes = 45 + Math.max(0, minutes - 45);
-                 if (minutes > 90) minutes = 90;
-            }
-             
-            return `${minutes}'`;
-        };
         
-        const interval = setInterval(() => {
-            setElapsed(calculateElapsed());
-        }, 1000 * 30); // Update every 30 seconds
+        if (elapsed) {
+            setElapsedTime(`${elapsed}'`);
+        }
 
-        setElapsed(calculateElapsed());
+        const interval = setInterval(() => {
+            if (elapsed) {
+              setElapsedTime(`${elapsed}'`);
+            }
+        }, 1000 * 60); // Update every minute
 
         return () => clearInterval(interval);
-    }, [startTime, status]);
+    }, [startTime, status, elapsed]);
 
-    if (!elapsed) return null;
+    if (!elapsedTime) return null;
 
     return (
         <span className="text-red-600 font-bold text-xs animate-pulse">
-            {elapsed}
+            {elapsedTime}
         </span>
     );
 };
 
 // Fixture Item Component
-const FixtureItem = React.memo(({ fixture }: { fixture: Fixture }) => {
+const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSelect: (fixtureId: number, fixture: Fixture) => void }) => {
     return (
-      <div key={fixture.fixture.id} className="rounded-lg border bg-card p-3 text-sm">
+      <div 
+        key={fixture.fixture.id} 
+        className="rounded-lg border bg-card p-3 text-sm transition-colors hover:bg-accent"
+        onClick={() => onSelect(fixture.fixture.id, fixture)}
+      >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
               <div className="flex items-center gap-2">
                   <Avatar className="h-4 w-4">
@@ -116,11 +110,11 @@ const FixtureItem = React.memo(({ fixture }: { fixture: Fixture }) => {
                   </Avatar>
                   <span className="truncate">{fixture.league.name}</span>
               </div>
-              {['1H', '2H', 'HT', 'ET'].includes(fixture.fixture.status.short) ? (
-                <LiveTimer startTime={fixture.fixture.timestamp} status={fixture.fixture.status.short} />
-              ) : (
-                <span>{fixture.fixture.status.long}</span>
-              )}
+              <LiveTimer 
+                startTime={fixture.fixture.timestamp} 
+                status={fixture.fixture.status.short}
+                elapsed={fixture.fixture.status.elapsed}
+              />
          </div>
          <div className="flex items-center justify-between gap-2">
              <div className="flex items-center gap-2 flex-1 justify-end truncate">
@@ -159,14 +153,16 @@ const FixturesList = ({
     activeTab, 
     hasAnyFavorites,
     favoritedLeagueIds,
-    favoritedTeamIds 
+    favoritedTeamIds,
+    onSelectFixture,
 }: { 
     fixtures: Fixture[], 
     loading: boolean,
     activeTab: string, 
     hasAnyFavorites: boolean,
     favoritedLeagueIds: number[],
-    favoritedTeamIds: number[]
+    favoritedTeamIds: number[],
+    onSelectFixture: (fixtureId: number, fixture: Fixture) => void
 }) => {
     
     const filteredFixtures = useMemo(() => {
@@ -214,8 +210,8 @@ const FixturesList = ({
     }
 
     return (
-        <div className="p-4 pt-2 space-y-3">
-            {filteredFixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} />)}
+        <div className="space-y-3">
+            {filteredFixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} onSelect={onSelectFixture} />)}
         </div>
     );
 };
@@ -232,19 +228,19 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     }, []);
     
     const scrollerRef = useRef<HTMLDivElement>(null);
+    const selectedButtonRef = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
         const scroller = scrollerRef.current;
-        if (!scroller) return;
-        
-        const selectedElement = document.getElementById(`date-btn-${selectedDateKey}`);
-        if (selectedElement) {
+        const selectedButton = selectedButtonRef.current;
+
+        if (scroller && selectedButton) {
             const scrollerRect = scroller.getBoundingClientRect();
-            const selectedRect = selectedElement.getBoundingClientRect();
+            const selectedRect = selectedButton.getBoundingClientRect();
             
             const scrollOffset = selectedRect.left - scrollerRect.left - (scrollerRect.width / 2) + (selectedRect.width / 2);
             
-            scroller.scrollBy({ left: scrollOffset, behavior: 'smooth' });
+            scroller.scrollTo({ left: scroller.scrollLeft + scrollOffset, behavior: 'smooth' });
         }
     }, [selectedDateKey]);
 
@@ -256,7 +252,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                 return (
                     <Button
                         key={dateKey}
-                        id={`date-btn-${dateKey}`}
+                        ref={isSelected ? selectedButtonRef : null}
                         variant={isSelected ? 'default' : 'outline'}
                         className={cn("flex flex-col h-auto py-1 px-2.5 min-w-[48px]", isSelected ? 'text-primary-foreground' : 'text-foreground')}
                         onClick={() => onDateSelect(dateKey)}
@@ -279,6 +275,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const handleSelectFixture = (fixtureId: number, fixture: Fixture) => {
+    navigate('MatchDetails', { fixtureId, fixture });
+  };
 
   useEffect(() => {
     async function fetchFixturesForDate(dateKey: string) {
@@ -313,10 +313,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="المباريات" onBack={goBack} canGoBack={canGoBack} />
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex flex-1 flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
           
-          <div className="px-4 pt-0 border-b">
+          <div className="px-4 pt-2 border-b">
              <div className="mb-2">
                  <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="my-results">نتائجي</TabsTrigger>
@@ -326,7 +326,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
           </div>
           
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto p-4">
             <FixturesList 
                 fixtures={fixtures}
                 loading={loading}
@@ -334,6 +334,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 favoritedLeagueIds={favoritedLeagueIds}
                 favoritedTeamIds={favoritedTeamIds}
                 hasAnyFavorites={hasAnyFavorites}
+                onSelectFixture={handleSelectFixture}
             />
           </div>
         </Tabs>
@@ -341,5 +342,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
