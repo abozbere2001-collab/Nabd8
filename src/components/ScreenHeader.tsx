@@ -1,5 +1,5 @@
 "use client";
-import { ArrowRight } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ScreenHeaderProps {
@@ -17,14 +17,14 @@ export function ScreenHeader({ title, canGoBack, onBack, actions }: ScreenHeader
           variant="ghost"
           size="icon"
           onClick={onBack}
-          className="absolute left-2 top-1/2 -translate-y-1/2"
+          className="absolute right-2 top-1/2 -translate-y-1/2"
           aria-label="Go back"
         >
-          <ArrowRight className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5" />
         </Button>
       )}
       <h1 className="truncate text-lg font-bold">{title}</h1>
-      {actions && <div className="absolute right-2 top-1/2 -translate-y-1/2">{actions}</div>}
+      {actions && <div className="absolute left-2 top-1/2 -translate-y-1/2">{actions}</div>}
     </header>
   );
 }
