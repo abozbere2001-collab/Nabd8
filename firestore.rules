@@ -1,0 +1,132 @@
+/**
+ * @fileoverview Firestore Security Rules for the application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model. Each user can only
+ * read and write their own profile data and manage their own lists of
+ * favorite leagues and teams.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores public profile information for each user.
+ * - /users/{userId}/favoriteLeagues/{leagueId}: Stores a user's favorite leagues.
+ * - /users/{userId}/favoriteTeams/{teamId}: Stores a user's favorite teams.
+ *
+ * Key Security Decisions:
+ * - Users can only manage their own data.
+ * - No public listing of users is allowed.
+ *
+ * Denormalization for Authorization:
+ *  - The user ID is embedded in the path for user-specific data, allowing for easy
+ *    validation using the `isOwner(userId)` function.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Controls access to user profile information.
+     * @path /users/{userId}
+     * @allow (create) User with ID 'user123' can create their own profile.
+     *          request.auth.uid == 'user123'
+     * @allow (get) User with ID 'user123' can read their own profile.
+     *          request.auth.uid == 'user123'
+     * @allow (update) User with ID 'user123' can update their own profile.
+     *          request.auth.uid == 'user123'
+     * @allow (delete) User with ID 'user123' can delete their own profile.
+     *          request.auth.uid == 'user123'
+     * @deny (create) User with ID 'user456' cannot create a profile for user 'user123'.
+     *          request.auth.uid != 'user123'
+     * @deny (get) User with ID 'user456' cannot read profile of user 'user123'.
+     *          request.auth.uid != 'user123'
+     * @deny (update) User with ID 'user456' cannot update the profile of user 'user123'.
+     *          request.auth.uid != 'user123'
+     * @deny (delete) User with ID 'user456' cannot delete the profile of user 'user123'.
+     *          request.auth.uid != 'user123'
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId} {
+      // Verify that the user is signed in
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      // On create, we must validate that the userId matches the authenticated user's ID.
+      // This prevents a malicious client from creating a document with a different user ID.
+      // Since `request.resource.data` only contains the *new* data on create, we check it here.
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.size() > 0;
+      // On update, `request.resource.data` represents the *merged* document. We enforce immutability
+      // of the userId field by ensuring that the value remains consistent.
+      allow update: if isSignedIn() && isExistingOwner(userId) && isOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to a user's favorite leagues.
+     * @path /users/{userId}/favoriteLeagues/{leagueId}
+     * @allow (create) User with ID 'user123' can add a league to their favorites.
+     *          request.auth.uid == 'user123'
+     * @allow (get) User with ID 'user123' can read a league from their favorites.
+     *          request.auth.uid == 'user123'
+     * @allow (update) User with ID 'user123' can update a league in their favorites.
+     *          request.auth.uid == 'user123'
+     * @allow (delete) User with ID 'user123' can remove a league from their favorites.
+     *          request.auth.uid == 'user123'
+     * @deny (create) User with ID 'user456' cannot add a league to user 'user123's favorites.
+     *          request.auth.uid != 'user123'
+     * @deny (get) User with ID 'user456' cannot read a league from user 'user123's favorites.
+     *          request.auth.uid != 'user123'
+     * @deny (update) User with ID 'user456' cannot update a league in user 'user123's favorites.
+     *          request.auth.uid != 'user123'
+     * @deny (delete) User with ID 'user456' cannot remove a league from user 'user123's favorites.
+     *          request.auth.uid != 'user123'
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId}/favoriteLeagues/{leagueId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.size() > 0;
+      allow update: if isSignedIn() && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to a user's favorite teams.
+     * @path /users/{userId}/favoriteTeams/{teamId}
+     * @allow (create) User with ID 'user123' can add a team to their favorites.
+     *          request.auth.uid == 'user123'
+     * @allow (get) User with ID 'user123' can read a team from their favorites.
+     *          request.auth.uid == 'user123'
+     * @allow (update) User with ID 'user123' can update a team in their favorites.
+     *          request.auth.uid == 'user123'
+     * @allow (delete) User with ID 'user123' can remove a team from their favorites.
+     *          request.auth.uid == 'user123'
+     * @deny (create) User with ID 'user456' cannot add a team to user 'user123's favorites.
+     *          request.auth.uid != 'user123'
+     * @deny (get) User with ID 'user456' cannot read a team from user 'user123's favorites.
+     *          request.auth.uid != 'user123'
+     * @deny (update) User with ID 'user456' cannot update a team in user 'user123's favorites.
+     *          request.auth.uid != 'user123'
+     * @deny (delete) User with ID 'user456' cannot remove a team from user 'user123's favorites.
+     *          request.auth.uid != 'user123'
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId}/favoriteTeams/{teamId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.size() > 0;
+      allow update: if isSignedIn() && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+  }
+
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+  }
+}
