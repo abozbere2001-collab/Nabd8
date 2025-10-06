@@ -65,7 +65,7 @@ const END_DATE = addDays(new Date(), 180);
 
 export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { user } = useFirebase();
-  const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
+  const [favorites, setFavorites] = useState<Favorites>({});
 
   const [fixtures, setFixtures] = useState<GroupedFixtures>({});
   const [isLoadingNext, setIsLoadingNext] = useState(false);
@@ -82,7 +82,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
-      setFavorites(doc.data() as Favorites || { leagues: {}, teams: {} });
+      setFavorites(doc.data() as Favorites || {});
     });
     return () => unsub();
   }, [user]);
@@ -238,25 +238,25 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     if (!fixturesForDate) return null;
 
     let fixturesToRender = fixturesForDate;
-    let favoriteTeamFixtures: Fixture[] = [];
-    let favoriteLeagueFixtures: Fixture[] = [];
 
     if (filter === 'favorites') {
         const favoritedTeamIds = favorites?.teams ? Object.keys(favorites.teams).map(Number) : [];
         const favoritedLeagueIds = favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [];
         
-        favoriteTeamFixtures = fixturesForDate.filter(f =>
+        const favoriteTeamFixtures = fixturesForDate.filter(f =>
             favoritedTeamIds.includes(f.teams.home.id) || favoritedTeamIds.includes(f.teams.away.id)
         );
 
-        favoriteLeagueFixtures = fixturesForDate.filter(f =>
+        const favoriteLeagueFixtures = fixturesForDate.filter(f =>
             favoritedLeagueIds.includes(f.league.id) && !favoriteTeamFixtures.some(fav => fav.fixture.id === f.fixture.id)
         );
 
-        if(favoriteTeamFixtures.length === 0 && favoriteLeagueFixtures.length === 0) return null;
+        const allFavoriteFixtures = [...favoriteTeamFixtures, ...favoriteLeagueFixtures];
+        if(allFavoriteFixtures.length === 0) return null;
+        fixturesToRender = allFavoriteFixtures;
     }
      
-     if (fixturesToRender.length === 0 && filter !== 'favorites') return null;
+     if (fixturesToRender.length === 0) return null;
 
      return (
         <div key={dateString}>
@@ -265,28 +265,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
               <span className="text-sm font-normal text-muted-foreground ml-2">{format(parseISO(dateString), "d MMMM yyyy", { locale: ar })}</span>
             </h2>
             <div className="space-y-3 pt-4">
-                {filter === 'favorites' ? (
-                    <>
-                        {favoriteTeamFixtures.length > 0 && (
-                            <div>
-                                <h3 className="font-bold text-base my-2">الفرق المفضلة</h3>
-                                <div className="space-y-3">
-                                    {favoriteTeamFixtures.map(renderFixture)}
-                                </div>
-                            </div>
-                       )}
-                       {favoriteLeagueFixtures.length > 0 && (
-                            <div>
-                                <h3 className="font-bold text-base my-2">البطولات المفضلة</h3>
-                                <div className="space-y-3">
-                                    {favoriteLeagueFixtures.map(renderFixture)}
-                                </div>
-                            </div>
-                       )}
-                    </>
-                ) : (
-                    fixturesToRender.map(renderFixture)
-                )}
+                {fixturesToRender.map(renderFixture)}
             </div>
         </div>
     )
