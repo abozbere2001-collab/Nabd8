@@ -13,7 +13,6 @@ import { db } from '@/lib/firebase-client';
 import { Loader2 } from 'lucide-react';
 import { useLayoutEffect } from 'react';
 
-
 // Interfaces
 interface Fixture {
   fixture: {
@@ -76,12 +75,10 @@ const LiveTimer = ({ startTime, status }: { startTime: number, status: string })
         const calculateElapsed = () => {
             const now = Math.floor(Date.now() / 1000);
             const difference = now - startTime;
-            const minutes = Math.max(0, Math.floor(difference / 60));
-
-            // Basic half-time logic
-            if (status === '1H' && minutes > 45) return 45;
-            if (status === '2H' && minutes > 90) return 90;
-            // more logic for ET can be added
+            let minutes = Math.floor(difference / 60);
+            if (status === '1H' && minutes > 45) minutes = 45;
+            if (status === '2H') minutes = 45 + Math.max(0, minutes - 45);
+            if (minutes > 90) minutes = 90;
             return minutes;
         };
         
@@ -89,13 +86,13 @@ const LiveTimer = ({ startTime, status }: { startTime: number, status: string })
 
         const interval = setInterval(() => {
             setElapsed(calculateElapsed());
-        }, 60000); // Update every minute
+        }, 1000 * 60); // Update every minute
 
         return () => clearInterval(interval);
     }, [startTime, status]);
 
     if (elapsed === null) return null;
-    const displayTime = elapsed > 45 && elapsed < 60 ? "45+" : `'${elapsed}`;
+    const displayTime = elapsed > 45 && status === '1H' ? "45+" : `${elapsed}'`;
 
     return (
         <span className="text-red-600 font-bold text-xs animate-pulse">
@@ -172,7 +169,7 @@ const FixturesList = ({ days, activeTab, favoritedTeamIds, favoritedLeagueIds, h
                 favoritedTeamIds.includes(f.teams.away.id) ||
                 favoritedLeagueIds.includes(f.league.id)
             )
-        }));
+        })).sort((a,b) => a.date.localeCompare(b.date));
     }, [days, activeTab, favoritedTeamIds, favoritedLeagueIds]);
 
     const hasFixturesInAnyDay = filteredDays.some(day => day.fixtures.length > 0);
@@ -232,21 +229,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [isLoadingPrev, setIsLoadingPrev] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollPosRef = useRef(0);
-
-  const minDate = useMemo(() => subDays(new Date(), 180), []);
-  const maxDate = useMemo(() => addDays(new Date(), 180), []);
+  
+  const today = useMemo(() => new Date(), []);
+  const minDate = useMemo(() => subDays(today, 180), [today]);
+  const maxDate = useMemo(() => addDays(today, 180), [today]);
 
   const [hasMorePrev, setHasMorePrev] = useState(true);
   const [hasMoreNext, setHasMoreNext] = useState(true);
-
-  // Preserve scroll position when loading previous days
-  useLayoutEffect(() => {
-    if (scrollRef.current && scrollPosRef.current > 0) {
-      scrollRef.current.scrollTop = scrollPosRef.current;
-      scrollPosRef.current = 0;
-    }
-  }, [days]);
 
   const fetchFixturesForDate = useCallback(async (date: Date) => {
     const dateKey = formatDateKey(date);
@@ -266,10 +255,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
   const loadNextDay = useCallback(async () => {
     if (isLoadingNext || !hasMoreNext) return;
-
     setIsLoadingNext(true);
-    const lastDayStr = days.length > 0 ? days[days.length - 1].date : formatDateKey(subDays(new Date(), 1));
-    const nextDay = addDays(parseISO(lastDayStr), 1);
+    
+    const lastLoadedDate = days.length > 0 ? parseISO(days[days.length - 1].date) : subDays(today, 1);
+    const nextDay = addDays(lastLoadedDate, 1);
     
     if (nextDay > maxDate) {
         setHasMoreNext(false);
@@ -279,17 +268,17 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
     const newDayData = await fetchFixturesForDate(nextDay);
     if (newDayData) {
-      setDays(prevDays => [...prevDays, newDayData]);
+      setDays(prevDays => [...prevDays, newDayData].sort((a,b) => a.date.localeCompare(b.date)));
     }
     setIsLoadingNext(false);
-  }, [isLoadingNext, hasMoreNext, fetchFixturesForDate, days, maxDate]);
+  }, [isLoadingNext, hasMoreNext, fetchFixturesForDate, days, maxDate, today]);
 
   const loadPreviousDay = useCallback(async () => {
     if (isLoadingPrev || !hasMorePrev) return;
-
     setIsLoadingPrev(true);
-    const firstDayStr = days.length > 0 ? days[0].date : formatDateKey(addDays(new Date(), 1));
-    const prevDay = subDays(parseISO(firstDayStr), 1);
+    
+    const firstLoadedDate = days.length > 0 ? parseISO(days[0].date) : addDays(today, 1);
+    const prevDay = subDays(firstLoadedDate, 1);
 
     if (prevDay < minDate) {
         setHasMorePrev(false);
@@ -297,20 +286,22 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         return;
     }
     
+    const scrollContainer = scrollRef.current;
+    const oldScrollHeight = scrollContainer?.scrollHeight || 0;
+
     const newDayData = await fetchFixturesForDate(prevDay);
     
-    if (newDayData && scrollRef.current) {
-        const oldScrollHeight = scrollRef.current.scrollHeight;
-        const oldScrollTop = scrollRef.current.scrollTop;
+    if (newDayData) {
+        setDays(prevDays => [newDayData, ...prevDays].sort((a,b) => a.date.localeCompare(b.date)));
         
-        setDays(prevDays => [newDayData, ...prevDays]);
-
-        // This is the magic: after the new state is rendered, this will be calculated
-        const newScrollHeight = scrollRef.current.scrollHeight;
-        scrollPosRef.current = oldScrollTop + (newScrollHeight - oldScrollHeight);
+        // This will be scheduled to run after the DOM has been updated
+        if(scrollContainer) {
+            const newScrollHeight = scrollContainer.scrollHeight;
+            scrollContainer.scrollTop += newScrollHeight - oldScrollHeight;
+        }
     }
     setIsLoadingPrev(false);
-  }, [isLoadingPrev, hasMorePrev, fetchFixturesForDate, days, minDate]);
+  }, [isLoadingPrev, hasMorePrev, fetchFixturesForDate, days, minDate, today]);
 
 
   // Initial load
@@ -332,31 +323,28 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const bottomObserverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const options = { root: scrollRef.current, threshold: 0.1 };
+
     const topObserver = new IntersectionObserver(
-        ([entry]) => {
-            if (entry.isIntersecting && !isLoadingPrev) {
-                loadPreviousDay();
-            }
-        },
-        { root: scrollRef.current, threshold: 0.1 }
+        ([entry]) => { if (entry.isIntersecting) loadPreviousDay(); },
+        options
     );
     const bottomObserver = new IntersectionObserver(
-        ([entry]) => {
-            if (entry.isIntersecting && !isLoadingNext) {
-                loadNextDay();
-            }
-        },
-        { root: scrollRef.current, threshold: 0.1 }
+        ([entry]) => { if (entry.isIntersecting) loadNextDay(); },
+        options
     );
 
-    if (topObserverRef.current) topObserver.observe(topObserverRef.current);
-    if (bottomObserverRef.current) bottomObserver.observe(bottomObserverRef.current);
+    const topEl = topObserverRef.current;
+    const bottomEl = bottomObserverRef.current;
+
+    if (topEl) topObserver.observe(topEl);
+    if (bottomEl) bottomObserver.observe(bottomEl);
 
     return () => {
-        if (topObserverRef.current) topObserver.unobserve(topObserverRef.current);
-        if (bottomObserverRef.current) bottomObserver.unobserve(bottomObserverRef.current);
+        if (topEl) topObserver.unobserve(topEl);
+        if (bottomEl) bottomObserver.unobserve(bottomEl);
     };
-  }, [isLoadingPrev, isLoadingNext, loadPreviousDay, loadNextDay]);
+  }, [loadPreviousDay, loadNextDay]);
 
   useEffect(() => {
     if (!user) return;
@@ -384,7 +372,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           
           <div ref={scrollRef} className="flex-1 overflow-y-auto">
               <div ref={topObserverRef} className="h-10 flex justify-center items-center">
-                  {isLoadingPrev && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+                  {isLoadingPrev && hasMorePrev && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
               </div>
               
               <FixturesList 
@@ -396,7 +384,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
               />
               
               <div ref={bottomObserverRef} className="h-10 flex justify-center items-center">
-                  {isLoadingNext && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+                  {isLoadingNext && hasMoreNext && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
               </div>
           </div>
         </Tabs>
