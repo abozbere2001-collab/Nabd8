@@ -6,10 +6,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Share2, Star, Clock, User, ArrowRight, ArrowLeftRight, RectangleVertical, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Share2, Star, Clock, User, ArrowLeftRight, RectangleVertical, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import Image from 'next/image';
 
 // --- TYPE DEFINITIONS ---
 interface Fixture {
@@ -119,22 +120,22 @@ function useMatchData(fixtureId?: number, leagueId?: number) {
 
 // --- SUB-COMPONENTS ---
 const MatchHeader = ({ fixture, onBack }: { fixture: Fixture; onBack: () => void }) => (
-  <header className="relative bg-slate-800 text-white pt-10 pb-6 px-4 rounded-b-3xl shadow-lg">
+  <header className="relative bg-card text-foreground pt-10 pb-6 px-4 shadow-lg border-b">
     <div className="absolute top-4 right-4">
-      <Button variant="ghost" size="icon" onClick={onBack} className="text-white hover:bg-white/10">
+      <Button variant="ghost" size="icon" onClick={onBack} className="text-foreground/80 hover:bg-accent">
         <ArrowLeft />
       </Button>
     </div>
     <div className="absolute top-4 left-4 flex gap-2">
-      <Button variant="ghost" size="icon" className="text-white hover:bg-white/10"><Star /></Button>
-      <Button variant="ghost" size="icon" className="text-white hover:bg-white/10"><Share2 /></Button>
+      <Button variant="ghost" size="icon" className="text-foreground/80 hover:bg-accent"><Star /></Button>
+      <Button variant="ghost" size="icon" className="text-foreground/80 hover:bg-accent"><Share2 /></Button>
     </div>
-    <div className="text-center text-sm opacity-80 mb-4">
+    <div className="text-center text-sm text-muted-foreground mb-4">
         {fixture.league.name} - {fixture.league.round}
     </div>
     <div className="flex justify-around items-center">
       <div className="flex flex-col items-center gap-2 w-1/3 text-center">
-        <Avatar className="w-16 h-16 border-2 border-white/50">
+        <Avatar className="w-16 h-16 border-2 border-border">
           <AvatarImage src={fixture.teams.home.logo} />
           <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
         </Avatar>
@@ -144,10 +145,10 @@ const MatchHeader = ({ fixture, onBack }: { fixture: Fixture; onBack: () => void
         <div className="text-4xl font-bold tracking-tight">
           {fixture.goals.home ?? '-'} : {fixture.goals.away ?? '-'}
         </div>
-        <div className="text-xs opacity-80 mt-1">{fixture.fixture.status.long}</div>
+        <div className="text-xs text-muted-foreground mt-1">{fixture.fixture.status.long}</div>
       </div>
       <div className="flex flex-col items-center gap-2 w-1/3 text-center">
-        <Avatar className="w-16 h-16 border-2 border-white/50">
+        <Avatar className="w-16 h-16 border-2 border-border">
           <AvatarImage src={fixture.teams.away.logo} />
           <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
         </Avatar>
@@ -157,22 +158,29 @@ const MatchHeader = ({ fixture, onBack }: { fixture: Fixture; onBack: () => void
   </header>
 );
 
-const PlayerIcon = ({ player, pos, grid }: { player: { name: string, number: number, photo: string }, pos: string, grid: string | null }) => {
+const PlayerIcon = ({ player, pos, grid, homeAway }: { player: { name: string, number: number, photo: string }, pos: string, grid: string | null, homeAway: 'home' | 'away' }) => {
     if (!grid) return null;
     const [row, col] = grid.split(':').map(Number);
     
-    // Position adjustments to fit a 5-row, 5-col grid system
-    const top = `${(row - 1) * 20 + 10}%`;
-    const left = `${(col - 1) * 20 + 10}%`;
+    // Total rows are dynamic but usually 4 or 5. Let's use 5 as a base.
+    // Total columns are also dynamic, can be up to 5.
+    const topPercentage = (row - 1) * (100 / 5) + 10;
+    const leftPercentage = (col - 1) * (100 / 5) + 10;
 
     return (
-        <div className="absolute text-center" style={{ top, left, transform: 'translate(-50%, -50%)' }}>
+        <div 
+          className="absolute text-center flex flex-col items-center" 
+          style={{ top: `${topPercentage}%`, left: `${leftPercentage}%`, transform: 'translate(-50%, -50%)' }}
+        >
             <div className="relative">
-                <Avatar className="w-12 h-12 border-2 bg-gray-200 border-white">
+                <Avatar className="w-10 h-10 border-2 bg-gray-200 border-white">
                     <AvatarImage src={player.photo} alt={player.name} />
                     <AvatarFallback>{player.name.substring(0,1)}</AvatarFallback>
                 </Avatar>
-                <span className="absolute -top-1 -right-1 bg-gray-800 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-white">
+                <span className={cn(
+                  "absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-white",
+                  homeAway === 'home' ? 'bg-blue-600' : 'bg-red-600'
+                  )}>
                     {player.number}
                 </span>
             </div>
@@ -184,87 +192,84 @@ const PlayerIcon = ({ player, pos, grid }: { player: { name: string, number: num
 };
 
 const LineupsTab = ({ lineups, loading }: { lineups: Lineup[] | null, loading: boolean }) => {
-  const [activeTeamId, setActiveTeamId] = useState<number | null>(null);
-  
-  useEffect(() => {
-    if (lineups && lineups.length > 0) {
-      setActiveTeamId(lineups[0].team.id);
-    }
-  }, [lineups]);
-
   if (loading) {
-    return <Skeleton className="w-full h-[500px] rounded-lg" />;
+    return <Skeleton className="w-full h-[600px] rounded-lg m-4" />;
   }
 
-  if (!lineups || lineups.length === 0) {
+  if (!lineups || lineups.length < 2) {
     return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة.</p>;
   }
 
-  const activeLineup = lineups.find(l => l.team.id === activeTeamId);
+  const homeLineup = lineups[0];
+  const awayLineup = lineups[1];
 
   return (
-    <div>
-      <div className="p-4 bg-card rounded-lg m-4">
-        <Tabs value={activeTeamId?.toString()} onValueChange={(val) => setActiveTeamId(Number(val))} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            {lineups.map(lineup => (
-              <TabsTrigger key={lineup.team.id} value={lineup.team.id.toString()}>{lineup.team.name}</TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+    <div className="p-4 space-y-8">
+      {/* Pitch View */}
+      <div>
+        <h3 className="font-bold text-center mb-4">
+          خطة اللعب
+        </h3>
+        <div 
+            className="relative w-full max-w-md mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-500/50" 
+            style={{backgroundImage: "url(/football-pitch.svg)"}}
+        >
+          {homeLineup.startXI.map(p => (
+              <PlayerIcon key={p.player.id} player={p.player} pos={p.player.pos} grid={p.player.grid} homeAway="home" />
+          ))}
+          {awayLineup.startXI.map(p => (
+              <PlayerIcon key={p.player.id} player={p.player} pos={p.player.pos} grid={p.player.grid} homeAway="away" />
+          ))}
+        </div>
       </div>
-
-      {activeLineup && (
-        <>
-          <div className="px-4">
-            <h3 className="font-bold text-center mb-4">
-              الخطة: {activeLineup.formation}
-            </h3>
-            <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-600 rounded-lg overflow-hidden border-4 border-green-500/50">
-              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('/football-pitch.svg')"}}></div>
-              {activeLineup.startXI.map(p => (
-                  <PlayerIcon key={p.player.id} player={p.player} pos={p.player.pos} grid={p.player.grid} />
-              ))}
+      
+      {/* Substitutes & Coaches */}
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        {([homeLineup, awayLineup]).map(lineup => (
+          <div key={lineup.team.id} className="space-y-4">
+            <div className="p-2 rounded-lg bg-card border">
+              <h4 className="font-bold mb-2 flex items-center gap-2">
+                <Avatar className="w-5 h-5"><AvatarImage src={lineup.team.logo} /></Avatar>
+                البدلاء
+              </h4>
+              <div className="space-y-1">
+                {lineup.substitutes.map(s => (
+                  <div key={s.player.id} className="flex items-center gap-2">
+                    <span className="text-muted-foreground w-6 text-center">{s.player.number}</span>
+                    <span className="font-medium">{s.player.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-2 rounded-lg bg-card border">
+              <h4 className="font-bold mb-2">المدرب</h4>
+              <div className="flex items-center gap-3">
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={lineup.coach.photo} alt={lineup.coach.name} />
+                  <AvatarFallback>{lineup.coach.name.substring(0,1)}</AvatarFallback>
+                </Avatar>
+                <span className="font-medium">{lineup.coach.name}</span>
+              </div>
             </div>
           </div>
-          <div className="p-4">
-             <h3 className="font-bold mb-2">البدلاء</h3>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                 {activeLineup.substitutes.map(s => (
-                    <div key={s.player.id} className="flex items-center gap-2 bg-card p-2 rounded-md">
-                        <span className="text-muted-foreground">{s.player.number}</span>
-                        <span className="font-medium">{s.player.name}</span>
-                    </div>
-                 ))}
-             </div>
-          </div>
-           <div className="p-4">
-             <h3 className="font-bold mb-2">المدرب</h3>
-              <div className="flex items-center gap-3 bg-card p-2 rounded-md">
-                  <Avatar>
-                      <AvatarImage src={activeLineup.coach.photo} alt={activeLineup.coach.name} />
-                      <AvatarFallback>{activeLineup.coach.name.substring(0,1)}</AvatarFallback>
-                  </Avatar>
-                  <span className="font-medium">{activeLineup.coach.name}</span>
-              </div>
-          </div>
-        </>
-      )}
+        ))}
+      </div>
     </div>
   );
 };
 
+
 const StatsTab = ({ stats, loading }: { stats: MatchStats[] | null, loading: boolean }) => {
-    if (loading) return <Skeleton className="w-full h-96" />;
+    if (loading) return <Skeleton className="w-full h-96 m-4" />;
     if (!stats || stats.length < 2) return <p className="text-center p-8">الإحصائيات غير متاحة.</p>;
 
-    const homeStats = stats[0].statistics;
-    const awayStats = stats[1].statistics;
+    const homeStats = stats.find(s => s.team.id === stats[0].team.id)?.statistics || [];
+    const awayStats = stats.find(s => s.team.id !== stats[0].team.id)?.statistics || [];
 
     const statTypes = [
-        "Shots on Goal", "Shots off Goal", "Total Shots", "Blocked Shots", "Shots insidebox", "Shots outsidebox",
-        "Fouls", "Corner Kicks", "Offsides", "Ball Possession", "Yellow Cards", "Red Cards",
-        "Goalkeeper Saves", "Total passes", "Passes accurate", "Passes %"
+        "Ball Possession", "Total Shots", "Shots on Goal", "Shots off Goal", "Blocked Shots", "Shots insidebox", "Shots outsidebox",
+        "Fouls", "Corner Kicks", "Offsides", "Yellow Cards", "Red Cards",
+        "Goalkeeper Saves", "Total passes", "Passes accurate"
     ];
     
     const combinedStats = statTypes.map(type => {
@@ -278,23 +283,23 @@ const StatsTab = ({ stats, loading }: { stats: MatchStats[] | null, loading: boo
     });
 
     return (
-        <div className="p-4 space-y-3">
+        <div className="p-4 space-y-4">
             {combinedStats.map(({ type, homeValue, awayValue }) => {
                 const home = Number(String(homeValue).replace('%', ''));
                 const away = Number(String(awayValue).replace('%', ''));
                 const total = home + away;
-                const homePercentage = total > 0 ? (home / total) * 100 : 0;
+                const homePercentage = type === 'Ball Possession' ? home : (total > 0 ? (home / total) * 100 : 50);
                 
                 return (
                     <div key={type}>
-                        <div className="flex justify-between items-center mb-1 text-sm font-semibold">
-                            <span>{homeValue}</span>
-                            <span className="text-muted-foreground">{type}</span>
-                            <span>{awayValue}</span>
+                        <div className="flex justify-between items-center mb-1 text-sm font-semibold px-1">
+                            <span>{homeValue ?? 0}</span>
+                            <span className="text-muted-foreground text-xs">{type}</span>
+                            <span>{awayValue ?? 0}</span>
                         </div>
-                        <div className="flex items-center w-full">
-                            <Progress value={homePercentage} className="rounded-l-full rounded-r-none h-2" />
-                            <Progress value={100 - homePercentage} className="rounded-r-full rounded-l-none h-2" dir="rtl" />
+                        <div className="flex items-center w-full bg-muted rounded-full h-2">
+                           <div style={{ width: `${homePercentage}%`}} className="bg-primary h-2 rounded-l-full"></div>
+                           <div style={{ width: `${100 - homePercentage}%`}} className="bg-destructive h-2 rounded-r-full"></div>
                         </div>
                     </div>
                 )
@@ -304,7 +309,7 @@ const StatsTab = ({ stats, loading }: { stats: MatchStats[] | null, loading: boo
 };
 
 const StandingsTab = ({ standings, loading, fixture }: { standings: Standing[][] | null, loading: boolean, fixture: Fixture }) => {
-    if (loading) return <Skeleton className="w-full h-96" />;
+    if (loading) return <Skeleton className="w-full h-96 m-4" />;
     if (!standings || standings.length === 0) return <p className="text-center p-8">الترتيب غير متاح.</p>;
 
     return (
@@ -352,13 +357,13 @@ const StandingsTab = ({ standings, loading, fixture }: { standings: Standing[][]
 };
 
 const EventsTab = ({ events, fixture, loading }: { events: Event[] | null, fixture: Fixture, loading: boolean }) => {
-    if (loading) return <Skeleton className="w-full h-96" />;
+    if (loading) return <Skeleton className="w-full h-96 m-4" />;
     if (!events || events.length === 0) return <p className="text-center p-8">لا توجد أحداث رئيسية.</p>;
 
     const getEventIcon = (event: Event) => {
         switch (event.type) {
             case 'Goal':
-                return <User className="text-green-500" size={18} />; // Should be a soccer ball
+                return <User className="text-green-500" size={18} />; // Placeholder for a soccer ball icon
             case 'Card':
                 if (event.detail === 'Yellow Card') return <RectangleVertical className="text-yellow-400 fill-yellow-400" size={18} />;
                 return <RectangleVertical className="text-red-500 fill-red-500" size={18} />;
@@ -373,44 +378,38 @@ const EventsTab = ({ events, fixture, loading }: { events: Event[] | null, fixtu
     
     return (
       <div className="p-4">
-        <div className="relative flex flex-col items-center">
+        <div className="relative">
           {/* Timeline */}
           <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
           
           {events.map((event, index) => {
             const isHomeTeam = event.team.id === fixture.teams.home.id;
             const content = (
-              <div className="flex-1">
-                <p className="font-semibold text-sm">{event.player.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {event.type === 'subst' ? `${event.assist.name || 'خروج'} / ${event.player.name || 'دخول'}` : event.detail}
-                </p>
+              <div className={cn("flex items-center gap-3", isHomeTeam ? "flex-row-reverse" : "flex-row")}>
+                 <span className="font-bold text-sm w-8">{event.time.elapsed}'</span>
+                 {getEventIcon(event)}
+                 <div>
+                    <p className="font-semibold text-sm">{event.player.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {event.type === 'subst' ? `دخول: ${event.player.name} / خروج: ${event.assist.name || ''}` : event.detail}
+                    </p>
+                 </div>
               </div>
             );
 
             return (
-              <div key={index} className="relative w-full flex items-center my-3">
-                {/* Timeline Dot */}
-                <div className="absolute left-1/2 h-3 w-3 rounded-full bg-muted-foreground -translate-x-1/2 z-10"></div>
+              <div key={index} className="relative flex justify-center items-center my-4">
+                 {/* Timeline Dot */}
+                 <div className="absolute left-1/2 h-3 w-3 rounded-full bg-muted-foreground -translate-x-1/2 z-10 border-2 border-background"></div>
                 
-                {/* Event Content */}
-                <div className={cn("w-1/2 p-2 flex gap-3 items-center", isHomeTeam ? "pr-8 flex-row-reverse text-right" : "pl-8 text-left")}>
-                  {isHomeTeam ? (
-                    <>
-                      {content}
-                      {getEventIcon(event)}
-                      <span className="font-bold text-sm w-8">{event.time.elapsed}'</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-bold text-sm w-8">{event.time.elapsed}'</span>
-                      {getEventIcon(event)}
-                      {content}
-                    </>
-                  )}
-                </div>
-                {/* The other half is empty */}
-                <div className="w-1/2 p-2"></div>
+                 {/* Event Content */}
+                 <div className={cn("w-[calc(50%-1.5rem)]", isHomeTeam ? 'text-right mr-auto' : 'text-left ml-auto')}>
+                    {isHomeTeam ? content : null}
+                 </div>
+                 <div className="w-[3rem]"></div>
+                 <div className={cn("w-[calc(50%-1.5rem)]", !isHomeTeam ? 'text-left ml-auto' : 'text-right mr-auto')}>
+                    {!isHomeTeam ? content : null}
+                 </div>
               </div>
             );
           })}
