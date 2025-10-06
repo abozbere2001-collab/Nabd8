@@ -1,0 +1,20 @@
+<svg width="360" height="480" viewBox="0 0 360 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="360" height="480" fill="url(#paint0_linear_1_2)"/>
+<g opacity="0.1">
+<path d="M1 240C1 155.025 61.0254 95 146 95H214C298.975 95 359 155.025 359 240V480H1V240Z" stroke="white" stroke-width="2"/>
+<path d="M110 95C110 111.569 96.5685 125 80 125C63.4315 125 50 111.569 50 95" stroke="white" stroke-width="2"/>
+<path d="M250 95C250 111.569 263.431 125 280 125C296.569 125 310 111.569 310 95" stroke="white" stroke-width="2"/>
+<path d="M1 240H359" stroke="white" stroke-width="2"/>
+<path d="M1 480L90 320" stroke="white" stroke-width="2"/>
+<path d="M359 480L270 320" stroke="white" stroke-width="2"/>
+<rect x="90" y="320" width="180" height="160" stroke="white" stroke-width="2"/>
+<rect x="130" y="400" width="100" height="80" stroke="white" stroke-width="2"/>
+</g>
+<circle cx="180" cy="240" r="40" stroke="white" stroke-opacity="0.1" stroke-width="2"/>
+<defs>
+<linearGradient id="paint0_linear_1_2" x1="180" y1="0" x2="180" y2="480" gradientUnits="userSpaceOnUse">
+<stop stop-color="#3A823C"/>
+<stop offset="1" stop-color="#2D6A2F"/>
+</linearGradient>
+</defs>
+</svg>
