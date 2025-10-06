@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -55,15 +55,6 @@ const getDayLabel = (date: Date) => {
     if (isTomorrow(date)) return "غداً";
     return format(date, "EEE", { locale: ar });
 };
-
-const getFullDayLabel = (dateKey: string) => {
-    const date = parseISO(dateKey);
-    if (isToday(date)) return `اليوم - ${format(date, "d MMMM", { locale: ar })}`;
-    if (isYesterday(date)) return `الأمس - ${format(date, "d MMMM", { locale: ar })}`;
-    if (isTomorrow(date)) return `غداً - ${format(date, "d MMMM", { locale: ar })}`;
-    return format(date, "EEEE, d MMMM yyyy", { locale: ar });
-};
-
 
 // Live Timer Component
 const LiveTimer = ({ startTime, status }: { startTime: number, status: string }) => {
@@ -240,16 +231,24 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
         return days;
     }, []);
     
+    const scrollerRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
-        const selectedElement = document.getElementById(`date-btn-${selectedDateKey}`);
-        if (selectedElement) {
-            selectedElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        }
+      const scroller = scrollerRef.current;
+      const selectedElement = document.getElementById(`date-btn-${selectedDateKey}`);
+      if (scroller && selectedElement) {
+        const scrollerRect = scroller.getBoundingClientRect();
+        const selectedRect = selectedElement.getBoundingClientRect();
+        
+        const scrollOffset = selectedRect.left - scrollerRect.left - (scrollerRect.width / 2) + (selectedRect.width / 2);
+        
+        scroller.scrollBy({ left: scrollOffset, behavior: 'smooth' });
+      }
     }, [selectedDateKey]);
 
     return (
         <div className="p-2 border-b">
-            <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div ref={scrollerRef} className="flex space-x-2 overflow-x-auto pb-1 -mx-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 {dates.map(date => {
                     const dateKey = formatDateKey(date);
                     const isSelected = dateKey === selectedDateKey;
@@ -258,11 +257,11 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                             key={dateKey}
                             id={`date-btn-${dateKey}`}
                             variant={isSelected ? 'default' : 'outline'}
-                            className={cn("flex flex-col h-auto p-2 min-w-[60px]", isSelected ? 'text-primary-foreground' : 'text-foreground')}
+                            className={cn("flex flex-col h-auto p-1.5 min-w-[50px]", isSelected ? 'text-primary-foreground' : 'text-foreground')}
                             onClick={() => onDateSelect(dateKey)}
                         >
-                            <span className="text-xs">{getDayLabel(date)}</span>
-                            <span className="font-bold text-lg">{format(date, 'd')}</span>
+                            <span className="text-xs font-normal">{getDayLabel(date)}</span>
+                            <span className="font-bold text-base">{format(date, 'd')}</span>
                         </Button>
                     )
                 })}
@@ -326,7 +325,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
           
           <div className="flex-1 overflow-y-auto">
-            <h2 className="text-sm font-bold text-center text-muted-foreground pt-4 pb-2 sticky top-0 bg-background z-10">{getFullDayLabel(selectedDateKey)}</h2>
             <FixturesList 
                 fixtures={fixtures}
                 loading={loading}
