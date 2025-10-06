@@ -56,7 +56,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [earliestDate, setEarliestDate] = useState(new Date());
   const [latestDate, setLatestDate] = useState(new Date());
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const allMatchesContainerRef = useRef<HTMLDivElement>(null);
+  const myResultsContainerRef = useRef<HTMLDivElement>(null);
+  const scrollPositions = useRef({ all: 0, my: 0 }).current;
+
 
   const fetchFixtures = useCallback(async (date: Date) => {
     const dateString = format(date, 'yyyy-MM-dd');
@@ -77,46 +80,88 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     }
   }, [groupedFixtures]);
 
-  const loadNextDay = useCallback(async () => {
-    if (isLoadingNext) return;
-    setIsLoadingNext(true);
-    const nextDay = addDays(latestDate, 1);
-    await fetchFixtures(nextDay);
-    setLatestDate(nextDay);
-    setIsLoadingNext(false);
-  }, [isLoadingNext, latestDate, fetchFixtures]);
-
-  const loadPreviousDay = useCallback(async () => {
-    if (isLoadingPrev) return;
-    setIsLoadingPrev(true);
-    const prevDay = subDays(earliestDate, 1);
-    await fetchFixtures(prevDay);
-    setEarliestDate(prevDay);
-    setIsLoadingPrev(false);
-  }, [isLoadingPrev, earliestDate, fetchFixtures]);
-  
   useEffect(() => {
     fetchFixtures(new Date());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+  const handleScroll = useCallback((container: HTMLDivElement | null, type: 'all' | 'my') => {
+      if (!container) return;
 
-    const handleScroll = () => {
-        const { scrollTop, scrollHeight, clientHeight } = container;
-        if (scrollTop + clientHeight >= scrollHeight - 200 && !isLoadingNext) {
-            loadNextDay();
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      scrollPositions[type] = scrollTop;
+
+      const loadNextDay = async () => {
+          if (isLoadingNext) return;
+          setIsLoadingNext(true);
+          const nextDay = addDays(latestDate, 1);
+          await fetchFixtures(nextDay);
+          setLatestDate(nextDay);
+          setIsLoadingNext(false);
+      };
+
+      const loadPreviousDay = async () => {
+          if (isLoadingPrev) return;
+          setIsLoadingPrev(true);
+          const prevDay = subDays(earliestDate, 1);
+          
+          const oldScrollHeight = container.scrollHeight;
+
+          await fetchFixtures(prevDay);
+          setEarliestDate(prevDay);
+          
+          // Use a short timeout to allow the DOM to update
+          setTimeout(() => {
+            if (container) {
+                const newScrollHeight = container.scrollHeight;
+                const addedHeight = newScrollHeight - oldScrollHeight;
+                container.scrollTop = scrollTop + addedHeight;
+            }
+            setIsLoadingPrev(false);
+          }, 50);
+      };
+
+      if (scrollTop + clientHeight >= scrollHeight - 300 && !isLoadingNext) {
+          loadNextDay();
+      }
+      if (scrollTop <= 300 && !isLoadingPrev) {
+          loadPreviousDay();
+      }
+  }, [isLoadingNext, isLoadingPrev, latestDate, earliestDate, fetchFixtures, scrollPositions]);
+
+  useEffect(() => {
+    const allMatchesContainer = allMatchesContainerRef.current;
+    const myResultsContainer = myResultsContainerRef.current;
+
+    const allMatchesScrollHandler = () => handleScroll(allMatchesContainer, 'all');
+    const myResultsScrollHandler = () => handleScroll(myResultsContainer, 'my');
+
+    if (allMatchesContainer) {
+        allMatchesContainer.addEventListener('scroll', allMatchesScrollHandler);
+    }
+    if (myResultsContainer) {
+        myResultsContainer.addEventListener('scroll', myResultsScrollHandler);
+    }
+    
+    return () => {
+        if (allMatchesContainer) {
+            allMatchesContainer.removeEventListener('scroll', allMatchesScrollHandler);
         }
-        if (scrollTop <= 200 && !isLoadingPrev) {
-            loadPreviousDay();
+        if (myResultsContainer) {
+            myResultsContainer.removeEventListener('scroll', myResultsScrollHandler);
         }
     };
+  }, [handleScroll]);
 
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [isLoadingNext, isLoadingPrev, loadNextDay, loadPreviousDay]);
+  // Restore scroll position when switching tabs
+  useEffect(() => {
+    if (allMatchesContainerRef.current) {
+        allMatchesContainerRef.current.scrollTop = scrollPositions.all;
+    }
+    if (myResultsContainerRef.current) {
+        myResultsContainerRef.current.scrollTop = scrollPositions.my;
+    }
+  }, []); // Run only on mount to set initial scroll
 
   const sortedDates = useMemo(() => Object.keys(groupedFixtures).sort((a, b) => new Date(a).getTime() - new Date(b).getTime()), [groupedFixtures]);
 
@@ -298,14 +343,14 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           <TabsContent 
             value="my-results" 
             className="mt-0 flex-1 overflow-y-auto"
-            ref={scrollContainerRef}
+            ref={myResultsContainerRef}
           >
              {renderMyResults()}
           </TabsContent>
           <TabsContent 
             value="all-matches" 
             className="mt-0 flex-1 overflow-y-auto"
-            ref={scrollContainerRef} // Both tabs share the same scroll logic for now
+            ref={allMatchesContainerRef}
           >
             {renderAllMatches()}
           </TabsContent>
