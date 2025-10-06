@@ -7,7 +7,7 @@ import { onAuthStateChange, signInWithGoogle as firebaseSignIn, signOut as fireb
 interface AuthContextType {
   user: User | null;
   loadingAuth: boolean;
-  signInWithGoogle: () => Promise<any>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -18,49 +18,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
+    // This function handles the result of a redirect operation.
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getGoogleRedirectResult();
+        if (result && result.user) {
+          // User signed in successfully via redirect.
+          // onAuthStateChanged will also fire, but this can make the UI update faster.
+          setUser(result.user);
+        }
+      } catch (error: any) {
+        // Handle errors from the redirect, e.g., if the user closes the window
+        // or if there are other issues like 'auth/unauthorized-domain' on the redirect itself.
+        console.error("Error processing redirect result:", error);
+      } finally {
+        // It's important to set loading to false AFTER checking the redirect.
+        // But we will let onAuthStateChanged be the final authority.
+      }
+    };
+
+    // Check for redirect result on initial load.
+    checkRedirectResult();
+
     // This is the primary listener for auth state changes.
+    // It will fire after the redirect check and whenever the auth state changes.
     const unsubscribe = onAuthStateChange((user) => {
       setUser(user);
       setLoadingAuth(false);
     });
-
-    // We also explicitly check for a redirect result on initial load.
-    // This can catch the user from the redirect faster than onAuthStateChanged
-    // and helps in scenarios where the auth state might be slow to update.
-    getGoogleRedirectResult()
-      .then((result) => {
-        if (result && result.user) {
-          // The user is successfully signed in from the redirect.
-          // onAuthStateChanged will also fire, but setting it here can speed up UI updates.
-          setUser(result.user);
-        }
-      })
-      .catch((error) => {
-        // This is where 'auth/unauthorized-domain' would be caught if the redirect itself failed.
-        // We've proven the domain is authorized, so this error shouldn't happen,
-        // but we log it just in case.
-        console.error("Error processing redirect result:", error);
-      })
-      .finally(() => {
-        // Regardless of the redirect result, we let onAuthStateChanged
-        // be the final authority on the loading state to ensure we have
-        // the definitive auth status from Firebase.
-      });
 
     return () => unsubscribe();
   }, []);
 
   const signInWithGoogle = async () => {
     setLoadingAuth(true);
-    // Using signInWithRedirect. This function does not resolve as the page navigates away.
-    // The result is handled by getRedirectResult when the user returns to the app.
-    await firebaseSignIn();
+    // Using signInWithRedirect. The page will navigate away.
+    // The result is handled by getRedirectResult in the useEffect hook when the user returns.
+    try {
+      await firebaseSignIn();
+    } catch(error) {
+       console.error("Error starting redirect sign-in:", error);
+       setLoadingAuth(false); // Reset loading state if the redirect fails to start
+    }
   };
 
   const signOut = async () => {
     setLoadingAuth(true);
     await firebaseSignOut();
-    setUser(null); // Explicitly set user to null on sign out for immediate UI update
+    setUser(null); // Explicitly set user to null on sign out
     setLoadingAuth(false);
   };
 
