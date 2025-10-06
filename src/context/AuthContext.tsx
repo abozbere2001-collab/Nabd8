@@ -18,28 +18,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
-    // First, check for the redirect result
+    // Flag to prevent race conditions
+    let isProcessingRedirect = true;
+
     getGoogleRedirectResult()
       .then((result) => {
         if (result) {
-          // User signed in or already signed in.
-          // onAuthStateChanged will handle setting the user.
-          console.log("Redirect result processed.");
+          // A user signed in via redirect.
+          // The onAuthStateChanged listener below will catch this new user state.
+          console.log("Redirect result successfully processed.");
         }
-        // Even if result is null, we continue to the auth state listener.
       })
       .catch((error) => {
         console.error("Error processing redirect result:", error);
       })
       .finally(() => {
-        // Now, set up the real-time listener.
-        const unsubscribe = onAuthStateChange((user) => {
-          setUser(user);
-          setLoadingAuth(false);
-        });
-        return () => unsubscribe();
+        // We are done processing the redirect, regardless of outcome.
+        isProcessingRedirect = false;
+        // If onAuthStateChanged has already run and found no user,
+        // we might need to re-set loading to false.
+        // It's safer to just let the listener handle it.
+        setLoadingAuth(currentLoading => user === null && !currentLoading ? false : currentLoading);
       });
+
+    const unsubscribe = onAuthStateChange((user) => {
+      setUser(user);
+      // Only set loading to false if we are not in the middle of processing a redirect.
+      // This prevents the login screen from flashing before the redirect result is handled.
+      if (!isProcessingRedirect) {
+        setLoadingAuth(false);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
+
 
   const signInWithGoogle = useCallback(async () => {
     setLoadingAuth(true); // Set loading before redirect
@@ -49,13 +62,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch(e) {
         console.error("signInWithRedirect error", e);
         setLoadingAuth(false); // Reset loading on error
+        throw e;
     }
   }, []);
 
   const signOut = useCallback(async () => {
     setLoadingAuth(true);
     await firebaseSignOut();
-    // onAuthStateChanged will set user to null and setLoadingAuth to false.
+    // onAuthStateChanged will set user to null, which will then set loading to false.
   }, []);
 
   return (
