@@ -104,7 +104,7 @@ const FixtureItem = ({ fixture }: { fixture: Fixture }) => {
               </div>
               {fixture.fixture.status.short === 'HT' ? (
                  <span className="text-red-600 font-bold text-xs">نصف الوقت</span>
-              ) : fixture.fixture.status.short === 'LIVE' ? (
+              ) : ['LIVE', '1H', '2H'].includes(fixture.fixture.status.short) ? (
                 <LiveTimer startTime={fixture.fixture.timestamp} />
               ) : (
                 <span>{fixture.fixture.status.long}</span>
@@ -112,14 +112,14 @@ const FixtureItem = ({ fixture }: { fixture: Fixture }) => {
          </div>
          <div className="flex items-center justify-between gap-2">
              <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                 <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+                 <span className="font-semibold truncate">{teams.home.name}</span>
                  <Avatar className="h-8 w-8">
                      <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
                      <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
                  </Avatar>
              </div>
              <div className="font-bold text-lg px-2 bg-muted rounded-md min-w-[80px] text-center">
-                 {(['FT', 'AET', 'PEN', 'LIVE', 'HT'].includes(fixture.fixture.status.short))
+                 {(['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short))
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
                    : format(new Date(fixture.fixture.date), "HH:mm")}
              </div>
@@ -227,7 +227,7 @@ const DateScroller = ({ selectedDate, onSelectDate }: { selectedDate: Date, onSe
 
     return (
         <div className="p-2 border-b">
-            <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2" style={{ scrollbarWidth: 'none', '-ms-overflow-style': 'none' }}>
+            <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 {dates.map(date => {
                     const dateKey = formatDateKey(date);
                     const isSelected = dateKey === selectedDateKey;
@@ -281,14 +281,12 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           <TabsContent 
             value="my-results" 
             className="mt-0 flex-1 overflow-y-auto"
-            forceMount
           >
             <FixturesList filter="favorites" favorites={favorites} selectedDate={selectedDate} />
           </TabsContent>
           <TabsContent 
             value="all-matches" 
             className="mt-0 flex-1 overflow-y-auto"
-            forceMount
           >
             <FixturesList favorites={favorites} selectedDate={selectedDate} />
           </TabsContent>
@@ -297,5 +295,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
