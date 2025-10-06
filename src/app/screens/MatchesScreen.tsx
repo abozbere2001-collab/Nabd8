@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
-import { format, isToday, isYesterday, isTomorrow, parseISO } from 'date-fns';
+import { format, isToday, isYesterday, isTomorrow, parseISO, addDays, subDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 interface Fixture {
@@ -38,11 +38,8 @@ interface GroupedFixtures {
     [date: string]: Fixture[];
 }
 
-
-// NOTE: These are temporary, will be replaced by Firebase
-const TEMP_FAVORITE_TEAMS = new Set([50, 529]); // Example: Man City, Real Madrid
-const TEMP_FAVORITE_LEAGUES = new Set([39, 140]); // Example: Premier League, La Liga
-
+const TEMP_FAVORITE_TEAMS = new Set([50, 529]);
+const TEMP_FAVORITE_LEAGUES = new Set([39, 140]); 
 
 const getDayLabel = (dateString: string) => {
     const date = parseISO(dateString);
@@ -52,40 +49,74 @@ const getDayLabel = (dateString: string) => {
     return format(date, "EEEE", { locale: ar });
 }
 
-
 export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [groupedFixtures, setGroupedFixtures] = useState<GroupedFixtures>({});
-  const [loading, setLoading] = useState(true);
-  // We'll manage an array of loaded dates later for infinite scroll
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [isLoadingNext, setIsLoadingNext] = useState(false);
+  const [isLoadingPrev, setIsLoadingPrev] = useState(false);
+  const [earliestDate, setEarliestDate] = useState(new Date());
+  const [latestDate, setLatestDate] = useState(new Date());
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchFixtures = useCallback(async (date: Date) => {
-    setLoading(true);
+    const dateString = format(date, 'yyyy-MM-dd');
+    if (groupedFixtures[dateString]) return;
+
     try {
-      const dateString = format(date, 'yyyy-MM-dd');
       const response = await fetch(`/api/football/fixtures?date=${dateString}`);
       const data = await response.json();
-      
       const newFixtures = data.response || [];
 
       setGroupedFixtures(prev => ({
           ...prev,
           [dateString]: newFixtures
       }));
-
     } catch (error) {
-      console.error("Failed to fetch fixtures:", error);
-      const dateString = format(date, 'yyyy-MM-dd');
+      console.error(`Failed to fetch fixtures for ${dateString}:`, error);
       setGroupedFixtures(prev => ({ ...prev, [dateString]: [] }));
-    } finally {
-      setLoading(false);
     }
+  }, [groupedFixtures]);
+
+  const loadNextDay = useCallback(async () => {
+    if (isLoadingNext) return;
+    setIsLoadingNext(true);
+    const nextDay = addDays(latestDate, 1);
+    await fetchFixtures(nextDay);
+    setLatestDate(nextDay);
+    setIsLoadingNext(false);
+  }, [isLoadingNext, latestDate, fetchFixtures]);
+
+  const loadPreviousDay = useCallback(async () => {
+    if (isLoadingPrev) return;
+    setIsLoadingPrev(true);
+    const prevDay = subDays(earliestDate, 1);
+    await fetchFixtures(prevDay);
+    setEarliestDate(prevDay);
+    setIsLoadingPrev(false);
+  }, [isLoadingPrev, earliestDate, fetchFixtures]);
+  
+  useEffect(() => {
+    fetchFixtures(new Date());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    fetchFixtures(currentDate);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchFixtures]); // We only want this to run once on initial mount with the current date
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        if (scrollTop + clientHeight >= scrollHeight - 200 && !isLoadingNext) {
+            loadNextDay();
+        }
+        if (scrollTop <= 200 && !isLoadingPrev) {
+            loadPreviousDay();
+        }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [isLoadingNext, isLoadingPrev, loadNextDay, loadPreviousDay]);
 
   const sortedDates = useMemo(() => Object.keys(groupedFixtures).sort((a, b) => new Date(a).getTime() - new Date(b).getTime()), [groupedFixtures]);
 
@@ -131,51 +162,63 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         <p className="text-sm">{description}</p>
     </div>
   )
-  
-  const renderAllMatches = () => {
-    if (loading && sortedDates.length === 0) {
+
+  const renderFixturesForDate = (dateString: string) => {
+    const fixturesForDate = groupedFixtures[dateString];
+    if (!fixturesForDate) {
         return (
-            <div className="px-4 space-y-3 pt-4">
-                {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
+            <div key={`${dateString}-loading`} className="p-4">
+                <Skeleton className="h-6 w-1/2 mb-4" />
+                <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
+                </div>
             </div>
         );
     }
-
-    if (sortedDates.every(date => groupedFixtures[date].length === 0)) {
-        return renderEmptyState("لا توجد مباريات متاحة لهذا اليوم.", "حاول مرة أخرى في وقت لاحق أو تأكد من اتصالك بالإنترنت.");
-    }
-    
-    return sortedDates.map(dateString => {
-        const fixturesForDate = groupedFixtures[dateString];
-        if (fixturesForDate.length === 0) return null;
+     if (fixturesForDate.length === 0) return null;
         
-        return (
-            <div key={dateString}>
-                <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b">
-                  {getDayLabel(dateString)}
-                  <span className="text-sm font-normal text-muted-foreground ml-2">{format(parseISO(dateString), "d MMMM yyyy", { locale: ar })}</span>
-                </h2>
-                <div className="space-y-3 p-4">
-                    {fixturesForDate.map(renderFixture)}
-                </div>
+     return (
+        <div key={dateString}>
+            <h2 className="font-bold text-lg sticky top-0 bg-background/95 backdrop-blur-sm z-10 p-4 py-3 border-b">
+              {getDayLabel(dateString)}
+              <span className="text-sm font-normal text-muted-foreground ml-2">{format(parseISO(dateString), "d MMMM yyyy", { locale: ar })}</span>
+            </h2>
+            <div className="space-y-3 p-4">
+                {fixturesForDate.map(renderFixture)}
             </div>
-        )
-    });
+        </div>
+    )
   }
   
-  const renderMyResults = () => {
-      if (loading && sortedDates.length === 0) {
+  const renderAllMatches = () => {
+    if (sortedDates.length === 0 && (isLoadingPrev || isLoadingNext)) {
         return (
             <div className="px-4 space-y-3 pt-4">
+                <Skeleton className="h-6 w-1/2 mb-4" />
                 {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
             </div>
         );
-      }
-      
+    }
+    
+    if (sortedDates.every(date => (groupedFixtures[date] || []).length === 0)) {
+        return renderEmptyState("لا توجد مباريات متاحة.", "حاول مرة أخرى في وقت لاحق أو تأكد من اتصالك بالإنترنت.");
+    }
+    
+    return (
+        <>
+            {isLoadingPrev && <div className="p-4"><Skeleton className="h-24 w-full" /></div>}
+            {sortedDates.map(renderFixturesForDate)}
+            {isLoadingNext && <div className="p-4"><Skeleton className="h-24 w-full" /></div>}
+        </>
+    );
+  }
+  
+  const renderMyResults = () => {
       let hasFavorites = false;
 
       const content = sortedDates.map(dateString => {
         const fixturesForDate = groupedFixtures[dateString] || [];
+        if (fixturesForDate.length === 0) return null;
 
         const favoriteTeamFixtures = fixturesForDate.filter(f =>
             TEMP_FAVORITE_TEAMS.has(f.teams.home.id) || TEMP_FAVORITE_TEAMS.has(f.teams.away.id)
@@ -217,13 +260,28 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 </div>
             </div>
         );
-    });
+      }).filter(Boolean);
 
-    if (!hasFavorites && !loading) {
-        return renderEmptyState("لا توجد مباريات في مفضلتك لهذا اليوم", "أضف فرقا أو بطولات للمفضلة لترى مبارياتها هنا.");
+    if (sortedDates.length === 0 && (isLoadingPrev || isLoadingNext)) {
+        return (
+             <div className="px-4 space-y-3 pt-4">
+                <Skeleton className="h-6 w-1/2 mb-4" />
+                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
+            </div>
+        )
+    }
+
+    if (!hasFavorites && !isLoadingPrev && !isLoadingNext) {
+        return renderEmptyState("لا توجد مباريات في مفضلتك", "أضف فرقا أو بطولات للمفضلة لترى مبارياتها هنا. اسحب للأسفل أو الأعلى لعرض أيام أخرى.");
     }
     
-    return content;
+    return (
+        <>
+            {isLoadingPrev && <div className="p-4"><Skeleton className="h-24 w-full" /></div>}
+            {content}
+            {isLoadingNext && <div className="p-4"><Skeleton className="h-24 w-full" /></div>}
+        </>
+    );
   }
 
   return (
@@ -237,10 +295,18 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
               <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="my-results" className="mt-0 flex-1 overflow-y-auto">
+          <TabsContent 
+            value="my-results" 
+            className="mt-0 flex-1 overflow-y-auto"
+            ref={scrollContainerRef}
+          >
              {renderMyResults()}
           </TabsContent>
-          <TabsContent value="all-matches" className="mt-0 flex-1 overflow-y-auto">
+          <TabsContent 
+            value="all-matches" 
+            className="mt-0 flex-1 overflow-y-auto"
+            ref={scrollContainerRef} // Both tabs share the same scroll logic for now
+          >
             {renderAllMatches()}
           </TabsContent>
         </Tabs>
