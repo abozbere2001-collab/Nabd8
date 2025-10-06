@@ -114,6 +114,7 @@ function AppContent() {
   }, [stack, navigate, goBack]);
 
   const activeScreenKey = stack.length > 0 ? stack[stack.length - 1].screen : null;
+  const showBottomNav = user && activeScreenKey && mainTabs.includes(activeScreenKey);
 
   if (loadingAuth || stack.length === 0) {
     return (
@@ -151,7 +152,7 @@ function AppContent() {
         })}
       </div>
       
-      {activeScreenKey && <BottomNav activeScreen={activeScreenKey} onNavigate={navigate} />}
+      {showBottomNav && activeScreenKey && <BottomNav activeScreen={activeScreenKey} onNavigate={navigate} />}
     </main>
   );
 }
