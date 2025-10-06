@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from 'firebase/auth';
-import { onAuthStateChange, signInWithGoogle as firebaseSignIn, signOut as firebaseSignOut, getGoogleRedirectResult } from '../lib/firebase-client';
+import { onAuthStateChange, signInWithGoogle as firebaseSignIn, signOut as firebaseSignOut } from '../lib/firebase-client';
 
 interface AuthContextType {
   user: User | null;
@@ -18,30 +18,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
-    // This function handles the result of a redirect operation.
-    const checkRedirectResult = async () => {
-      try {
-        const result = await getGoogleRedirectResult();
-        if (result && result.user) {
-          // User signed in successfully via redirect.
-          // onAuthStateChanged will also fire, but this can make the UI update faster.
-          setUser(result.user);
-        }
-      } catch (error: any) {
-        // Handle errors from the redirect, e.g., if the user closes the window
-        // or if there are other issues like 'auth/unauthorized-domain' on the redirect itself.
-        console.error("Error processing redirect result:", error);
-      } finally {
-        // It's important to set loading to false AFTER checking the redirect.
-        // But we will let onAuthStateChanged be the final authority.
-      }
-    };
-
-    // Check for redirect result on initial load.
-    checkRedirectResult();
-
-    // This is the primary listener for auth state changes.
-    // It will fire after the redirect check and whenever the auth state changes.
     const unsubscribe = onAuthStateChange((user) => {
       setUser(user);
       setLoadingAuth(false);
@@ -51,21 +27,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signInWithGoogle = async () => {
-    setLoadingAuth(true);
-    // Using signInWithRedirect. The page will navigate away.
-    // The result is handled by getRedirectResult in the useEffect hook when the user returns.
     try {
-      await firebaseSignIn();
+        await firebaseSignIn();
     } catch(error) {
-       console.error("Error starting redirect sign-in:", error);
-       setLoadingAuth(false); // Reset loading state if the redirect fails to start
+       console.error("Error with popup sign-in:", error);
+       // The error will be surfaced to the user in the calling component
+       throw error;
     }
   };
 
   const signOut = async () => {
     setLoadingAuth(true);
     await firebaseSignOut();
-    setUser(null); // Explicitly set user to null on sign out
+    setUser(null);
     setLoadingAuth(false);
   };
 

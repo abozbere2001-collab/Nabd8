@@ -84,19 +84,6 @@ function AppContent() {
     });
   }, []);
 
-  useEffect(() => {
-    if (loadingAuth || stack.length === 0) return;
-
-    const currentScreen = stack[stack.length-1].screen;
-    if (user && (currentScreen === 'Login' || currentScreen === 'SignUp')) {
-       navigate('Matches');
-    } else if (!user && currentScreen !== 'Login' && currentScreen !== 'SignUp') {
-       setStack([{ key: 'Login-0', screen: 'Login' }]);
-       screenInstances.current = {};
-    }
-  }, [user, loadingAuth, navigate, stack]);
-
-
   const renderedStack = useMemo(() => {
     const canGoBack = stack.length > 1;
     const navigationProps = { navigate, goBack, canGoBack };
