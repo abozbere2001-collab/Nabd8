@@ -3,10 +3,9 @@
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup, // Using popup
   signOut as firebaseSignOut, 
-  onAuthStateChanged, 
+  onAuthStateChanged as firebaseOnAuthStateChanged,
   type User, 
   type Auth, 
   type UserCredential 
@@ -20,6 +19,7 @@ try {
   auth = getAuth(app);
 } catch (error) {
   console.error("Error initializing Firebase Auth:", error);
+  // Create a mock auth object to prevent crashing the app server-side or if Firebase fails
   auth = {
     currentUser: null,
     onAuthStateChanged: () => () => {},
@@ -28,12 +28,8 @@ try {
 
 const provider = new GoogleAuthProvider();
 
-export const signInWithGoogle = (): Promise<void> => {
-  return signInWithRedirect(auth, provider);
-};
-
-export const getGoogleRedirectResult = (): Promise<UserCredential | null> => {
-   return getRedirectResult(auth);
+export const signInWithGoogle = (): Promise<UserCredential> => {
+  return signInWithPopup(auth, provider);
 };
 
 export const signOut = (): Promise<void> => {
@@ -41,5 +37,5 @@ export const signOut = (): Promise<void> => {
 };
 
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
-  return onAuthStateChanged(auth, callback);
+  return firebaseOnAuthStateChanged(auth, callback);
 };

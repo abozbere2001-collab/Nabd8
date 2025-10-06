@@ -2,7 +2,6 @@
 import { Goal, Trophy, Map, Newspaper, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ScreenKey } from '@/app/page';
-import { useAuth } from '@/context/AuthContext';
 
 const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
   { key: 'Matches', label: 'المباريات', icon: Goal },
@@ -19,8 +18,6 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
-  const { user } = useAuth();
-
   const handleNavigation = (key: ScreenKey) => {
     if (navItems.some(item => item.key === key)) {
       onNavigate(key);
@@ -29,7 +26,7 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
   
   const isMainTabActive = navItems.some(item => item.key === activeScreen);
 
-  if (!isMainTabActive || !user) return null;
+  if (!isMainTabActive) return null;
 
   return (
     <div className="h-20 flex-shrink-0 border-t bg-background/80 backdrop-blur-md">

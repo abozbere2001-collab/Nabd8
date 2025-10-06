@@ -5,7 +5,6 @@ import type { User } from 'firebase/auth';
 import { 
   signInWithGoogle as firebaseSignIn, 
   signOut as firebaseSignOut, 
-  getGoogleRedirectResult,
   onAuthStateChange
 } from '../lib/firebase-client';
 
@@ -23,22 +22,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
-    // Process the redirect result on initial load
-    getGoogleRedirectResult()
-      .then((result) => {
-        if (result) {
-          // User signed in via redirect.
-          // The onAuthStateChanged listener below will handle setting the user.
-          console.log("Redirect result processed.");
-        }
-      })
-      .catch((error) => {
-        console.error("Error processing redirect result:", error);
-      });
-
     const unsubscribe = onAuthStateChange((user) => {
       setUser(user);
-      setLoadingAuth(false); // This is the single source of truth for loading state.
+      setLoadingAuth(false);
     });
 
     return () => unsubscribe();
@@ -46,25 +32,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   const signInWithGoogle = useCallback(async () => {
-    setLoadingAuth(true); // Set loading before redirect
+    setLoadingAuth(true);
     try {
-        await firebaseSignIn();
-        // The page will redirect, so no need to do anything after this.
+      await firebaseSignIn();
+      // onAuthStateChanged will handle the rest
     } catch(e) {
-        console.error("signInWithRedirect error", e);
-        setLoadingAuth(false); // Reset loading on error
-        throw e;
+      console.error("signInWithPopup error", e);
+      setLoadingAuth(false);
+      throw e;
     }
   }, []);
 
   const signOut = useCallback(async () => {
-    setLoadingAuth(true);
     try {
       await firebaseSignOut();
-      // onAuthStateChanged will set user to null and loading to false.
+      // onAuthStateChanged will set user to null
     } catch (e) {
        console.error("Sign out error", e);
-       setLoadingAuth(false);
     }
   }, []);
 

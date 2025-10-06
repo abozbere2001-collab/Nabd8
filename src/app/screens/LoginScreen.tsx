@@ -7,21 +7,31 @@ import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { signInWithGoogle } from '@/lib/firebase-client';
 
 export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
-  const { signInWithGoogle, loadingAuth } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleGoogleLogin = async () => {
-    if (loadingAuth) return;
+    if (loading) return;
+    setLoading(true);
     setError(null);
     try {
       await signInWithGoogle();
-      // After this call, the page will redirect. We don't need to handle success here.
+      // After this call, the onAuthStateChanged listener in `Home` component will handle the user state.
+      // No need to set loading to false here, as the component will unmount.
     } catch (e: any) {
       console.error("Login Error:", e);
+      // Smartly handle the popup closed error
+      if (e.code === 'auth/popup-closed-by-user') {
+        // This error happens when resizing the screen. It's not a "real" error.
+        // We just reset the state to allow the user to try again.
+        setLoading(false);
+        return; 
+      }
       setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+      setLoading(false);
     }
   };
 
@@ -44,11 +54,11 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         <Button 
           onClick={handleGoogleLogin} 
           className="w-full max-w-xs" 
-          disabled={loadingAuth}
+          disabled={loading}
           size="lg"
         >
-          {loadingAuth ? (
-            'جاري التحميل...'
+          {loading ? (
+            'جاري المصادقة...'
           ) : (
             <>
               <GoogleIcon className="h-5 w-5 mr-2" />

@@ -7,7 +7,7 @@ import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/context/AuthContext';
+import { signOut as firebaseSignOut } from '@/lib/firebase-client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +28,6 @@ const settingsItems = [
 
 export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { toast } = useToast();
-  const { user, signOut } = useAuth();
   
   useEffect(() => {
     console.log("SettingsScreen init");
@@ -36,21 +35,13 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   }, []);
 
   const handleSignOut = async () => {
-    if (!user) {
-      toast({
-        variant: 'destructive',
-        title: "غير مسجل الدخول",
-        description: "لا يوجد مستخدم لتسجيل خروجه.",
-      });
-      return;
-    }
     try {
-      await signOut();
+      await firebaseSignOut();
       toast({
         title: "تم تسجيل الخروج",
         description: "نأمل رؤيتك مرة أخرى قريبا.",
       });
-      // Navigation to Login screen is handled by the effect in Home
+      // The onAuthStateChanged listener in Home will handle navigation
     } catch (error) {
        toast({
         variant: 'destructive',
@@ -79,31 +70,27 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             ))}
         </div>
         
-        {user && (
-          <>
-            <Separator className="my-8" />
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="w-full gap-2">
-                  <LogOut className="h-5 w-5" />
-                  تسجيل الخروج
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    سيؤدي هذا الإجراء إلى تسجيل خروجك من حسابك.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleSignOut}>متابعة</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </>
-        )}
+        <Separator className="my-8" />
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" className="w-full gap-2">
+              <LogOut className="h-5 w-5" />
+              تسجيل الخروج
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+              <AlertDialogDescription>
+                سيؤدي هذا الإجراء إلى تسجيل خروجك من حسابك.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction onClick={handleSignOut}>متابعة</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
