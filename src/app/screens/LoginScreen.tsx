@@ -22,18 +22,14 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       await signInWithGoogle();
       // On success, the AuthProvider's onAuthStateChanged listener
       // will handle the user state update, and the app will navigate away.
-      // We don't need to explicitly set loading to false here on success.
     } catch (e: any) {
-      // Specifically ignore the popup closed by user error, as it's
-      // a non-critical error caused by the dev environment's resizing.
-      if (e.code === 'auth/popup-closed-by-user') {
-        console.log('Popup closed by user or environment, this is safe to ignore.');
-      } else {
-        console.error("Login Error:", e);
-        let errorMessage = 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
-        setError(errorMessage);
+      console.error("Login Error:", e);
+      let errorMessage = 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
+      if (e.message) {
+        errorMessage = e.message;
       }
-      setLoading(false); // Ensure loading is always false after an error or ignored action.
+      setError(errorMessage);
+      setLoading(false); // Ensure loading is always false after an error.
     }
   };
 
