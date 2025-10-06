@@ -10,6 +10,7 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails';
 export type ScreenProps = {
@@ -19,7 +20,7 @@ export type ScreenProps = {
 };
 
 const screens: Record<ScreenKey, React.ComponentType<any>> = {
-  Login: LoginScreen, // Kept for potential future use
+  Login: LoginScreen,
   SignUp: LoginScreen, 
   Matches: MatchesScreen,
   Competitions: CompetitionsScreen,
@@ -37,8 +38,11 @@ type StackItem = {
   props?: Record<string, any>;
 };
 
-export default function Home() {
-  const [stack, setStack] = useState<StackItem[]>([{ key: 'Matches-0', screen: 'Matches' }]);
+function AppContent() {
+  const { user, loadingAuth } = useAuth();
+  const initialScreen: ScreenKey = !loadingAuth && user ? 'Matches' : 'Login';
+  
+  const [stack, setStack] = useState<StackItem[]>([{ key: `${initialScreen}-0`, screen: initialScreen }]);
   const [isAnimatingOut, setIsAnimatingOut] = useState<string | null>(null);
   
   const screenInstances = useRef<Record<string, JSX.Element>>({});
@@ -64,16 +68,28 @@ export default function Home() {
     const newItem = { key: newKey, screen, props };
 
     if (isMainTab) {
-      // If the screen is already at the top of a single-item stack, do nothing
-      if (stack.length === 1 && stack[0].screen === screen) {
-        return;
-      }
+      // If navigating to a main tab, reset the stack to that tab
+      // This is typical for tab-based navigation
+      if (stack.length === 1 && stack[0].screen === screen) return; // Avoid re-navigating to the same tab
       setStack([newItem]);
-      screenInstances.current = {};
+      screenInstances.current = {}; // Clear old instances
     } else {
+      // For other screens, push to the stack
       setStack(prev => [...prev, newItem]);
     }
   }, [stack]);
+
+  // Effect to handle auth changes
+  React.useEffect(() => {
+    if (loadingAuth) return;
+    const currentScreen = stack[stack.length-1].screen;
+    if (user && (currentScreen === 'Login' || currentScreen === 'SignUp')) {
+       navigate('Matches');
+    } else if (!user && currentScreen !== 'Login' && currentScreen !== 'SignUp') {
+       navigate('Login');
+    }
+  }, [user, loadingAuth, navigate, stack]);
+
 
   const renderedStack = useMemo(() => {
     const canGoBack = stack.length > 1;
@@ -93,6 +109,15 @@ export default function Home() {
 
   const activeScreenKey = stack.length > 0 ? stack[stack.length - 1].screen : null;
 
+  if (loadingAuth) {
+    // You can return a global loading spinner here
+    return (
+      <div className="w-full h-[700px] bg-background rounded-[32px] flex items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-800 dark:bg-gray-900">
       <div className="w-full max-w-sm mx-auto bg-black rounded-[40px] shadow-2xl p-2 border-4 border-gray-600">
@@ -110,15 +135,12 @@ export default function Home() {
                   key={item.key}
                   className={cn(
                     "absolute inset-0 bg-background transition-transform duration-300 ease-out",
-                    // Apply animation only for navigation, not on initial load
                     stack.length > 1 && index > 0 && isTop && !isAnimating ? 'animate-slide-in-from-right' : '',
                     isAnimating ? 'animate-slide-out-to-right' : '',
-                    // Hide non-top screens from screen readers and pointer events
                     !isTop ? 'pointer-events-none' : ''
                   )}
                   style={{ 
                     zIndex: index,
-                    // Keep non-top screens in the DOM but visually hidden to preserve state
                     visibility: isTop ? 'visible' : 'hidden'
                   }}
                   aria-hidden={!isTop}
@@ -135,4 +157,12 @@ export default function Home() {
        <p className="text-white/50 text-xs mt-4">Goal Stack - Mobile Simulation</p>
     </main>
   );
+}
+
+export default function Home() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  )
 }

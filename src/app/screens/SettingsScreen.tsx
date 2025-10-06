@@ -7,6 +7,18 @@ import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const settingsItems = [
   { label: 'المظهر', icon: Sun, detail: 'فاتح' },
@@ -16,17 +28,36 @@ const settingsItems = [
 
 export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { toast } = useToast();
+  const { user, signOut } = useAuth();
+  
   useEffect(() => {
     console.log("SettingsScreen init");
     return () => console.log("SettingsScreen unmount");
   }, []);
 
   const handleSignOut = async () => {
-    toast({
-      variant: 'destructive',
-      title: "غير مسجل الدخول",
-      description: "لا يوجد مستخدم لتسجيل خروجه.",
-    })
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: "غير مسجل الدخول",
+        description: "لا يوجد مستخدم لتسجيل خروجه.",
+      });
+      return;
+    }
+    try {
+      await signOut();
+      toast({
+        title: "تم تسجيل الخروج",
+        description: "نأمل رؤيتك مرة أخرى قريبا.",
+      });
+      // Navigation to Login screen is handled by the effect in Home
+    } catch (error) {
+       toast({
+        variant: 'destructive',
+        title: "فشل تسجيل الخروج",
+        description: "حدث خطأ أثناء تسجيل الخروج. يرجى المحاولة مرة أخرى.",
+      });
+    }
   };
 
   return (
@@ -47,11 +78,32 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                  </button>
             ))}
         </div>
-        <Separator className="my-8" />
-        <Button variant="destructive" className="w-full gap-2" onClick={handleSignOut}>
-            <LogOut className="h-5 w-5" />
-            تسجيل الخروج
-        </Button>
+        
+        {user && (
+          <>
+            <Separator className="my-8" />
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="w-full gap-2">
+                  <LogOut className="h-5 w-5" />
+                  تسجيل الخروج
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    سيؤدي هذا الإجراء إلى تسجيل خروجك من حسابك.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleSignOut}>متابعة</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        )}
       </div>
     </div>
   );

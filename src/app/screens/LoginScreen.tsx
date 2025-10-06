@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
@@ -8,23 +8,35 @@ import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
-  const [loading] = useState(false);
-  const [error] = useState<string | null>("ميزة تسجيل الدخول معطلة مؤقتًا.");
+  const { signInWithGoogle } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    console.log("LoginScreen init");
-    return () => console.log("LoginScreen unmount");
-  }, []);
-
   const handleGoogleLogin = async () => {
-    toast({
-      variant: "destructive",
-      title: "ميزة معطلة",
-      description: "تسجيل الدخول معطل مؤقتًا.",
-    });
+    setLoading(true);
+    setError(null);
+    try {
+      await signInWithGoogle();
+      // Navigation will be handled by the effect in Home component
+    } catch (e: any) {
+      console.error("Login Error:", e);
+      const errorMessage = e.code === 'auth/popup-closed-by-user' 
+        ? 'تم إلغاء عملية تسجيل الدخول.'
+        : 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
+      
+      setError(errorMessage);
+      toast({
+        variant: "destructive",
+        title: "فشل تسجيل الدخول",
+        description: errorMessage,
+      });
+      setLoading(false);
+    }
+    // No need to setLoading(false) on success because the component will unmount
   };
 
   return (
@@ -34,7 +46,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>ميزة معطلة</AlertTitle>
+            <AlertTitle>خطأ في تسجيل الدخول</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
@@ -46,7 +58,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         <Button 
           onClick={handleGoogleLogin} 
           className="w-full max-w-xs" 
-          disabled={true}
+          disabled={loading}
           size="lg"
         >
           {loading ? (
