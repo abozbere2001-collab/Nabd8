@@ -81,8 +81,8 @@ interface Team {
 }
 
 interface Favorites {
-    leagues: { [key: number]: any };
-    teams: { [key: number]: any };
+    leagues?: { [key: number]: any };
+    teams?: { [key: number]: any };
 }
 
 const CURRENT_SEASON = 2024;
@@ -99,7 +99,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   
-  const isFavorited = leagueId ? favorites.leagues[leagueId] : false;
+  const isFavorited = leagueId && favorites?.leagues?.[leagueId];
 
   useEffect(() => {
     if (!user) return;
@@ -168,7 +168,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
     if (!user) return;
     const favRef = doc(db, 'favorites', user.uid);
     const fieldPath = `teams.${team.id}`;
-    const isTeamFavorited = favorites.teams[team.id];
+    const isTeamFavorited = favorites?.teams?.[team.id];
 
     if (isTeamFavorited) {
         await updateDoc(favRef, { [fieldPath]: deleteField() });
@@ -288,7 +288,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
                                             toggleTeamFavorite(s.team);
                                         }}
                                     >
-                                        <Star className={favorites.teams[s.team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                        <Star className={favorites?.teams?.[s.team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                     </Button>
                                 </TableCell>
                                 <TableCell className="font-medium">
@@ -376,7 +376,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
                                         toggleTeamFavorite(team);
                                     }}
                                 >
-                                    <Star className={favorites.teams[team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                    <Star className={favorites?.teams?.[team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                 </Button>
                             </div>
                         </div>

@@ -39,8 +39,8 @@ interface Fixture {
 }
 
 interface Favorites {
-    leagues: { [key: number]: any };
-    teams: { [key: number]: any };
+    leagues?: { [key: number]: any };
+    teams?: { [key: number]: any };
 }
 
 interface GroupedFixtures {
@@ -267,6 +267,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   
   const renderMyResults = () => {
       let hasFavorites = false;
+      if (!favorites || !favorites.teams || !favorites.leagues) {
+        return renderEmptyState("لا توجد مباريات في مفضلتك", "أضف فرقا أو بطولات للمفضلة لترى مبارياتها هنا. اسحب للأسفل أو الأعلى لعرض أيام أخرى.");
+      }
+      
       const favoritedTeamIds = Object.keys(favorites.teams).map(Number);
       const favoritedLeagueIds = Object.keys(favorites.leagues).map(Number);
 

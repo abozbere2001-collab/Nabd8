@@ -26,8 +26,8 @@ interface Competition {
 }
 
 interface Favorites {
-    leagues: { [key: number]: any };
-    teams: { [key: number]: any };
+    leagues?: { [key: number]: any };
+    teams?: { [key: number]: any };
 }
 
 interface LeaguesByCountry {
@@ -102,7 +102,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     const leagueId = comp.league.id;
     const favRef = doc(db, 'favorites', user.uid);
     const fieldPath = `leagues.${leagueId}`;
-    const isFavorited = favorites.leagues[leagueId];
+    const isFavorited = favorites?.leagues?.[leagueId];
 
     if (isFavorited) {
         await updateDoc(favRef, { [fieldPath]: deleteField() });
@@ -228,7 +228,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                   toggleLeagueFavorite(comp);
                 }}
             >
-              <Star className={favorites.leagues[comp.league.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+              <Star className={favorites?.leagues?.[comp.league.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
             </Button>
         </div>
       </div>
