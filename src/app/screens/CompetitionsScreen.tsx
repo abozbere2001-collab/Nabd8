@@ -106,19 +106,27 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                   <ul className="flex flex-col">
                     {leagues.map(comp => (
                       <li key={comp.league.id}>
-                        <button 
+                        <div
+                          className="flex w-full items-center justify-between p-3 text-right hover:bg-accent transition-colors rounded-md cursor-pointer"
                           onClick={() => navigate('CompetitionDetails', { title: comp.league.name, leagueId: comp.league.id })}
-                          className="flex w-full items-center justify-between p-3 text-right hover:bg-accent transition-colors rounded-md"
                         >
                           <div className="flex items-center gap-3">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                console.log('Favorite clicked for', comp.league.name);
+                              }}
+                            >
                                 <Star className="h-5 w-5 text-muted-foreground/50" />
                             </Button>
                             <img src={comp.league.logo} alt={comp.league.name} className="h-6 w-6 object-contain" />
                             <span className="text-sm">{comp.league.name}</span>
                           </div>
                           <ChevronLeft className="h-5 w-5 text-muted-foreground" />
-                        </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
