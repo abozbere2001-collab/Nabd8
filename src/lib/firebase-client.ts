@@ -3,7 +3,8 @@
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithPopup, // Using popup
+  signInWithRedirect, // Using redirect
+  getRedirectResult,  // To get the result after redirect
   signOut as firebaseSignOut, 
   onAuthStateChanged as firebaseOnAuthStateChanged,
   type User, 
@@ -19,7 +20,6 @@ try {
   auth = getAuth(app);
 } catch (error) {
   console.error("Error initializing Firebase Auth:", error);
-  // Create a mock auth object to prevent crashing the app server-side or if Firebase fails
   auth = {
     currentUser: null,
     onAuthStateChanged: () => () => {},
@@ -28,9 +28,14 @@ try {
 
 const provider = new GoogleAuthProvider();
 
-export const signInWithGoogle = (): Promise<UserCredential> => {
-  return signInWithPopup(auth, provider);
+export const signInWithGoogle = (): Promise<void> => {
+  // Use signInWithRedirect instead of signInWithPopup
+  return signInWithRedirect(auth, provider);
 };
+
+export const checkRedirectResult = (): Promise<UserCredential | null> => {
+    return getRedirectResult(auth);
+}
 
 export const signOut = (): Promise<void> => {
   return firebaseSignOut(auth);

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import { BottomNav } from '@/components/BottomNav';
 import { MatchesScreen } from './screens/MatchesScreen';
 import { CompetitionsScreen } from './screens/CompetitionsScreen';
@@ -11,12 +11,7 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
-import { getAuth } from 'firebase/auth';
-import { initializeFirebase } from '@/lib/firebase';
-
-// Initialize Firebase and Auth
-const app = initializeFirebase();
-const auth = getAuth(app);
+import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails';
 export type ScreenProps = {
@@ -148,7 +143,12 @@ export default function Home() {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    // Check for redirect result first
+    checkRedirectResult().catch(error => {
+      console.error("Error checking redirect result:", error);
+    });
+
+    const unsubscribe = onAuthStateChange((currentUser) => {
       setUser(currentUser);
       setLoadingAuth(false);
     });
