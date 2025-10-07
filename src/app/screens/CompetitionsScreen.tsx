@@ -11,6 +11,7 @@ import { useAdmin } from '@/firebase/provider';
 import { useFirebase } from '@/firebase/provider';
 import { db } from '@/lib/firebase-client';
 import { doc, setDoc, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
+import { RenameDialog } from '@/components/RenameDialog';
 
 
 interface Competition {
@@ -39,6 +40,11 @@ interface LeaguesByCountry {
 
 interface GroupedCompetitions {
   [continent: string]: LeaguesByCountry | { leagues: Competition[] };
+}
+
+interface RenameState {
+    isOpen: boolean;
+    league: Competition | null;
 }
 
 const countryToContinent: { [key: string]: string } = {
@@ -87,6 +93,8 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
   const { isAdmin } = useAdmin();
   const { user } = useFirebase();
   const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
+  const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, league: null });
+
 
   useEffect(() => {
     if (!user) return;
@@ -195,6 +203,14 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     fetchCompetitions();
   }, []);
 
+  const handleSaveRename = (newName: string) => {
+    if (!renameState.league) return;
+    console.log(`Saving new name for league ${renameState.league.league.id}: ${newName}`);
+    // Here you would typically update your backend/database.
+    // For now, we'll just close the dialog.
+    setRenameState({ isOpen: false, league: null });
+  };
+
   const renderLeagueItem = (comp: Competition) => (
     <li key={comp.league.id}>
       <div
@@ -213,7 +229,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 className="h-8 w-8"
                 onClick={(e) => {
                     e.stopPropagation();
-                    console.log('Rename clicked for', comp.league.name);
+                    setRenameState({ isOpen: true, league: comp });
                 }}
                 >
                 <Pencil className="h-4 w-4 text-muted-foreground/80" />
@@ -248,6 +264,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             ))}
           </div>
         ) : competitions ? (
+          <>
           <Accordion type="multiple" className="w-full space-y-4" defaultValue={['World', 'Europe', 'Asia']}>
             {Object.entries(competitions).map(([continent, content]) => (
               <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
@@ -282,6 +299,16 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
               </AccordionItem>
             ))}
           </Accordion>
+          {renameState.league && (
+            <RenameDialog
+                isOpen={renameState.isOpen}
+                onOpenChange={(isOpen) => setRenameState({ isOpen, league: isOpen ? renameState.league : null })}
+                currentName={renameState.league.league.name}
+                onSave={handleSaveRename}
+                itemType="البطولة"
+            />
+          )}
+          </>
         ) : (
           <div className="text-center text-muted-foreground py-10">فشل في تحميل البطولات. يرجى التحقق من مفتاح API أو المحاولة مرة أخرى لاحقًا.</div>
         )}

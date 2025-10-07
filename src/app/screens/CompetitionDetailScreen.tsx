@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useFirebase } from '@/firebase/provider';
 import { db } from '@/lib/firebase-client';
 import { doc, setDoc, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
+import { RenameDialog } from '@/components/RenameDialog';
 
 
 // Interfaces for API data
@@ -98,6 +99,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
   const [standings, setStandings] = useState<Standing[]>([]);
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [isRenameOpen, setRenameOpen] = useState(false);
   
   const isFavorited = leagueId && favorites?.leagues?.[leagueId];
 
@@ -184,17 +186,31 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
         }, { merge: true });
     }
   };
+
+  const handleSaveRename = (newName: string) => {
+    console.log(`Saving new name for league ${leagueId}: ${newName}`);
+    // Here you would typically update your backend/database
+  };
   
   const headerActions = (
     <div className="flex items-center gap-1">
       {isAdmin && (
+         <>
          <Button
           variant="ghost"
           size="icon"
-          onClick={() => console.log('Rename clicked for', title)}
+          onClick={() => setRenameOpen(true)}
         >
           <Pencil className="h-5 w-5" />
         </Button>
+        <RenameDialog 
+          isOpen={isRenameOpen}
+          onOpenChange={setRenameOpen}
+          currentName={title || ''}
+          onSave={handleSaveRename}
+          itemType="البطولة"
+        />
+        </>
       )}
       <Button
         variant="ghost"
