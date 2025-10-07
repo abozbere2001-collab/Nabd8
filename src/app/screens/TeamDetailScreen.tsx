@@ -96,7 +96,7 @@ function useTeamData(teamId?: number) {
             } else {
                 totalPages = currentPage; // stop loop
             }
-        } while (currentPage < totalPages);
+        } while (currentPage <= totalPages);
 
 
         const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
@@ -205,7 +205,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
   
   const isTeamFavorited = !!favorites?.teams?.[teamId];
 
-  const localHeaderActions = teamInfo && (
+  const secondaryActions = teamInfo && (
     <div className="flex items-center gap-1">
       {isAdmin && (
          <Button variant="ghost" size="icon" onClick={() => handleOpenRename('team', teamId, displayTitle)}>
@@ -213,14 +213,14 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         </Button>
       )}
         <Button variant="ghost" size="icon" onClick={() => handleFavorite('team', teamInfo.team)}>
-            <Star className={cn("h-5 w-5", isTeamFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground/80")} />
+            <Star className={cn("h-5 w-5 opacity-80", isTeamFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground")} />
         </Button>
     </div>
   );
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title={displayTitle} onBack={goBack} canGoBack={canGoBack} actions={headerActions} secondaryActions={localHeaderActions} />
+      <ScreenHeader title={displayTitle} onBack={goBack} canGoBack={canGoBack} actions={headerActions} secondaryActions={secondaryActions} />
       {renameItem && <RenameDialog isOpen={isRenameOpen} onOpenChange={setRenameOpen} currentName={renameItem.name} onSave={handleSaveRename} itemType={renameItem.type === 'team' ? 'الفريق' : 'اللاعب'} />}
       
       {loading ? <div className="p-4 space-y-4">
@@ -242,12 +242,10 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                             <p className="text-sm text-muted-foreground">{teamInfo.venue.name} ({teamInfo.venue.city})</p>
                         </div>
                     </div>
-                    <div className="px-4">
-                        <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="details">التفاصيل</TabsTrigger>
-                            <TabsTrigger value="players">اللاعبون</TabsTrigger>
-                        </TabsList>
-                    </div>
+                    <TabsList className="grid w-full grid-cols-2 rounded-none">
+                        <TabsTrigger value="details">التفاصيل</TabsTrigger>
+                        <TabsTrigger value="players">اللاعبون</TabsTrigger>
+                    </TabsList>
                 </div>
 
                 <TabsContent value="players" className="px-4 pt-4">
@@ -267,7 +265,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                     <Star className={cn("h-5 w-5", favorites?.players?.[player.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
                                 </Button>
                                 {isAdmin && <Button variant="ghost" size="icon" onClick={() => handleOpenRename('player', player.id, player.name)}>
-                                    <Pencil className="h-5 w-5 text-muted-foreground/60" />
+                                    <Pencil className="h-5 w-5 text-muted-foreground" />
                                 </Button>}
                             </div>
                          </div>
@@ -276,14 +274,14 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                 </TabsContent>
                 <TabsContent value="details" className="p-0">
                      <Tabs defaultValue="matches" className="w-full">
-                         <div className="px-4 py-2 bg-background sticky top-[152px] z-10 border-b">
-                            <TabsList className="grid w-full grid-cols-3">
+                         <div className="bg-background sticky top-[152px] z-10 border-b">
+                            <TabsList className="grid w-full grid-cols-3 rounded-none">
                                 <TabsTrigger value="matches"><Shirt className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
                                 <TabsTrigger value="standings"><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
                                 <TabsTrigger value="scorers"><BarChart2 className="w-4 h-4 ml-1"/>الإحصائيات</TabsTrigger>
                             </TabsList>
                          </div>
-                         <TabsContent value="matches" className="px-4 pt-4">
+                         <TabsContent value="matches" className="p-4">
                              {fixtures && fixtures.length > 0 ? (
                                 <div className="space-y-2">
                                 {fixtures.map(({fixture, teams, goals, league}) => (

@@ -265,7 +265,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
                     <Star className={cn("h-4 w-4", favorites?.players?.[playerInfo.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
                 </Button>
                 {isAdmin && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRename('player', playerInfo.id, playerInfo.name)}>
-                    <Pencil className="h-4 w-4 text-muted-foreground/60" />
+                    <Pencil className="h-4 w-4 text-muted-foreground" />
                 </Button>}
             </div>
         </div>
@@ -273,31 +273,33 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
   }
 
   return (
-    <div className="px-4 pt-4 space-y-4">
-      <div className="flex justify-center items-center gap-2">
-       {homeLineup && (
-         <Button
-            variant={selectedTeamId === homeLineup.team.id ? "default" : "outline"}
-            className="w-40 flex items-center gap-2"
-            onClick={() => setSelectedTeamId(homeLineup.team.id)}
-        >
-            <Avatar className="w-6 h-6"><AvatarImage src={homeLineup.team.logo} /></Avatar>
-            <span>{homeLineup.team.name}</span>
-        </Button>
-       )}
-       {awayLineup && (
-        <Button
-            variant={selectedTeamId === awayLineup.team.id ? "default" : "outline"}
-            className="w-40 flex items-center gap-2"
-            onClick={() => setSelectedTeamId(awayLineup.team.id)}
-        >
-            <Avatar className="w-6 h-6"><AvatarImage src={awayLineup.team.logo} /></Avatar>
-            <span>{awayLineup.team.name}</span>
-        </Button>
-       )}
-      </div>
+    <div className="space-y-4">
+       <div className="bg-muted">
+        <div className="flex justify-center items-center gap-2 p-2">
+         {homeLineup && (
+           <Button
+              variant={selectedTeamId === homeLineup.team.id ? "default" : "outline"}
+              className="w-40 flex items-center gap-2"
+              onClick={() => setSelectedTeamId(homeLineup.team.id)}
+          >
+              <Avatar className="w-6 h-6"><AvatarImage src={homeLineup.team.logo} /></Avatar>
+              <span>{homeLineup.team.name}</span>
+          </Button>
+         )}
+         {awayLineup && (
+          <Button
+              variant={selectedTeamId === awayLineup.team.id ? "default" : "outline"}
+              className="w-40 flex items-center gap-2"
+              onClick={() => setSelectedTeamId(awayLineup.team.id)}
+          >
+              <Avatar className="w-6 h-6"><AvatarImage src={awayLineup.team.logo} /></Avatar>
+              <span>{awayLineup.team.name}</span>
+          </Button>
+         )}
+        </div>
+       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 px-4">
         <div 
             className="relative w-full max-w-md mx-auto aspect-[3/4] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-500/30 shadow-2xl" 
             style={{
@@ -322,7 +324,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
         </div>
       </div>
       
-      <div className="p-2 rounded-lg bg-card border">
+      <div className="p-2 rounded-lg bg-card border mx-4">
         <h4 className="font-bold mb-2 text-base px-2">طاقم التدريب</h4>
         <div className="space-y-2">
             <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted">
@@ -337,14 +339,14 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
                  <div className='flex opacity-80'>
                     {/* Favorite for coach can be added if needed */}
                     {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onRename('coach', lineupToShow.coach.id, lineupToShow.coach.name)}>
-                        <Pencil className="h-4 w-4 text-muted-foreground/60" />
+                        <Pencil className="h-4 w-4 text-muted-foreground" />
                     </Button>}
                 </div>
             </div>
         </div>
       </div>
 
-      <div className="p-2 rounded-lg bg-card border">
+      <div className="p-2 rounded-lg bg-card border mx-4 mb-4">
          <h4 className="font-bold mb-2 text-base px-2">البدلاء</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
             {lineupToShow.substitutes.map(s => renderPlayerRow(s.player))}
@@ -569,7 +571,7 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
   const handleSaveRename = async (newName: string) => {
     if (!renameItem) return;
     const { id, type } = renameItem;
-    let collectionName = type === 'player' ? 'playerCustomizations' : 'coachCustomizations';
+    const collectionName = type === 'player' ? 'playerCustomizations' : 'coachCustomizations';
     await setDoc(doc(db, collectionName, String(id)), { customName: newName });
     // TODO: Need a way to refresh the view with the new name
   };
@@ -587,8 +589,8 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
         />}
       <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="lineups" className="w-full">
-          <div className="px-4 py-2 sticky top-0 bg-background z-10 border-b">
-            <TabsList className="grid w-full grid-cols-4">
+          <div className="sticky top-0 bg-background z-10 border-b">
+            <TabsList className="grid w-full grid-cols-4 rounded-none">
               <TabsTrigger value="details">التفاصيل</TabsTrigger>
               <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
               <TabsTrigger value="stats">الإحصائيات</TabsTrigger>

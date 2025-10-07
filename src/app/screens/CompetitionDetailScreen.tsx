@@ -221,7 +221,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     await setDoc(doc(db, collectionName, String(id)), { customName: newName });
   };
   
-  const localHeaderActions = (
+  const secondaryActions = (
     <div className="flex items-center gap-1">
       {isAdmin && leagueId && (
          <Button
@@ -234,7 +234,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       )}
       {leagueId &&
         <Button variant="ghost" size="icon" onClick={() => handleFavorite('league', {})}>
-            <Star className={cn("h-5 w-5", isFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground/80")} />
+            <Star className={cn("h-5 w-5 opacity-80", isFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground")} />
         </Button>
       }
     </div>
@@ -242,7 +242,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title={displayTitle || "البطولة"} onBack={goBack} canGoBack={canGoBack} actions={headerActions} secondaryActions={localHeaderActions} />
+      <ScreenHeader title={displayTitle || "البطولة"} onBack={goBack} canGoBack={canGoBack} actions={headerActions} secondaryActions={secondaryActions} />
       {renameItem && <RenameDialog 
           isOpen={isRenameOpen}
           onOpenChange={setRenameOpen}
@@ -252,16 +252,18 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         />}
        <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="matches" className="w-full">
-          <div className="px-4 py-2 sticky top-0 bg-background z-10 border-b">
-             <p className="text-center text-xs text-muted-foreground pb-2">جميع البيانات تخص موسم {CURRENT_SEASON}</p>
-            <TabsList className="grid w-full grid-cols-4">
+          <div className="sticky top-0 bg-background z-10 border-b">
+             <p className="text-center text-xs text-muted-foreground pt-2 pb-2">جميع البيانات تخص موسم {CURRENT_SEASON}</p>
+            <div className='px-4'>
+             <TabsList className="grid w-full grid-cols-4 rounded-md">
               <TabsTrigger value="matches"><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
               <TabsTrigger value="standings"><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
               <TabsTrigger value="scorers"><BarChart2 className="w-4 h-4 ml-1"/>الهدافين</TabsTrigger>
               <TabsTrigger value="teams"><Users className="w-4 h-4 ml-1"/>الفرق</TabsTrigger>
             </TabsList>
+            </div>
           </div>
-          <TabsContent value="matches" className="px-4 pt-4">
+          <TabsContent value="matches" className="p-4">
              {loading ? (
                 <div className="space-y-4">
                     {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
@@ -340,7 +342,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             <Star className={cn("h-5 w-5", favorites?.teams?.[s.team.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                         </Button>
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('team', s.team.id, s.team.name)}>
-                                            <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                            <Pencil className="h-4 w-4 text-muted-foreground" />
                                         </Button>}
                                      </div>
                                 </TableCell>
@@ -387,7 +389,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             <Star className={cn("h-5 w-5", favorites?.players?.[player.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                         </Button>
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('player', player.id, player.name)}>
-                                            <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                            <Pencil className="h-4 w-4 text-muted-foreground" />
                                         </Button>}
                                      </div>
                                 </TableCell>
@@ -397,7 +399,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 </Table>
             ) : <p className="pt-4 text-center text-muted-foreground">قائمة الهدافين غير متاحة حاليًا.</p>}
           </TabsContent>
-          <TabsContent value="teams" className="px-4 pt-4">
+          <TabsContent value="teams" className="p-4">
             {loading ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {Array.from({ length: 12 }).map((_, i) => (
@@ -421,7 +423,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                     <Star className={cn("h-5 w-5", favorites?.teams?.[team.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
                                 {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team.name)}}>
-                                    <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                    <Pencil className="h-4 w-4 text-muted-foreground" />
                                 </Button>}
                             </div>
                         </div>
