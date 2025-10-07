@@ -25,7 +25,7 @@ export interface Team {
 
 export interface Favorites {
     leagues?: { [key: number]: any };
-    teams?: { [key: number]: any };
+    teams?: { [key:string]: any };
     players?: { [key: number]: any };
 }
 
@@ -41,6 +41,7 @@ export interface MatchDetails {
 }
 
 export interface MatchComment {
+    id?: string;
     userId: string;
     userName: string;
     userPhoto: string;
