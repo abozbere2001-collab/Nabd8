@@ -147,10 +147,7 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
          </div>
          <div className="flex items-center justify-between gap-2">
              <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                  <div className="text-right truncate">
-                    <span className="font-semibold truncate">{fixture.teams.home.name}</span>
-                    {homeOdd && <p className="text-xs text-muted-foreground font-mono">{homeOdd}</p>}
-                  </div>
+                 <span className="font-semibold truncate">{fixture.teams.home.name}</span>
                  <Avatar className="h-8 w-8">
                      <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
                      <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
@@ -158,24 +155,36 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
              </div>
              <div className={cn(
                 "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
-                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-background"
+                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-card"
                 )}>
                  {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
                    : format(new Date(fixture.fixture.date), "HH:mm")}
-                   {drawOdd && <p className="text-xs text-muted-foreground font-mono">{drawOdd}</p>}
              </div>
              <div className="flex items-center gap-2 flex-1 truncate">
                   <Avatar className="h-8 w-8">
                      <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
                      <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
                   </Avatar>
-                 <div className="text-left truncate">
-                    <span className="font-semibold truncate">{fixture.teams.away.name}</span>
-                    {awayOdd && <p className="text-xs text-muted-foreground font-mono">{awayOdd}</p>}
-                 </div>
+                 <span className="font-semibold truncate">{fixture.teams.away.name}</span>
              </div>
          </div>
+         {odds && (
+            <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground text-center grid grid-cols-3 gap-2">
+                <div>
+                    <p className="font-semibold text-foreground">{homeOdd}</p>
+                    <p>فوز المضيف</p>
+                </div>
+                <div>
+                    <p className="font-semibold text-foreground">{drawOdd}</p>
+                    <p>تعادل</p>
+                </div>
+                <div>
+                    <p className="font-semibold text-foreground">{awayOdd}</p>
+                    <p>فوز الضيف</p>
+                </div>
+            </div>
+         )}
       </div>
     );
 });
@@ -372,8 +381,12 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   const [showLiveOnly, setShowLiveOnly] = useState(false);
 
   useEffect(() => {
-    const savedState = localStorage.getItem(ODDS_STORAGE_KEY);
-    setShowOdds(savedState === 'true');
+    try {
+      const savedState = localStorage.getItem(ODDS_STORAGE_KEY);
+      setShowOdds(savedState === 'true');
+    } catch (error) {
+      console.warn('Could not access localStorage:', error);
+    }
   }, []);
 
   const handleSelectFixture = (fixtureId: number, fixture: Fixture) => {
@@ -407,9 +420,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   useEffect(() => {
     async function fetchFixturesForDate(dateKey: string) {
         setLoading(true);
-        setOdds({}); // Reset odds when date changes
+        // Do not reset odds here, let them persist until new ones are fetched
         if(showOdds) {
             fetchOddsForDate(dateKey);
+        } else {
+            setOdds({}); // Clear odds if the feature is turned off
         }
         try {
             const response = await fetch(`/api/football/fixtures?date=${dateKey}`);
@@ -441,9 +456,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   const toggleShowOdds = () => {
     const newShowOdds = !showOdds;
     setShowOdds(newShowOdds);
-    localStorage.setItem(ODDS_STORAGE_KEY, String(newShowOdds));
-    if(newShowOdds && Object.keys(odds).length === 0) { // Fetch if turning on and odds are not loaded
-        fetchOddsForDate(selectedDateKey);
+    try {
+      localStorage.setItem(ODDS_STORAGE_KEY, String(newShowOdds));
+    } catch (error) {
+      console.warn('Could not access localStorage:', error);
     }
   }
 
@@ -484,7 +500,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <FixturesList 
             fixtures={fixtures}
-            loading={loading || loadingOdds}
+            loading={loading}
             activeTab={activeTab}
             showLiveOnly={showLiveOnly} 
             favoritedLeagueIds={favoritedLeagueIds}
