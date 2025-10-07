@@ -28,37 +28,39 @@ const handleNewUser = async (user: User) => {
     const userRef = doc(db, 'users', user.uid);
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
 
-    const userDoc = await getDoc(userRef);
+    try {
+        const userDoc = await getDoc(userRef);
+        if (!userDoc.exists()) {
+            const userProfileData: UserProfile = {
+                displayName: user.displayName || 'مستخدم جديد',
+                email: user.email!,
+                photoURL: user.photoURL || '',
+            };
+            await setDoc(userRef, userProfileData);
+        }
 
-    if (!userDoc.exists()) {
-        const userProfileData: UserProfile = {
-            displayName: user.displayName || 'مستخدم جديد',
-            email: user.email!,
-            photoURL: user.photoURL || '',
-        };
-        setDoc(userRef, userProfileData).catch(serverError => {
+        const leaderboardDoc = await getDoc(leaderboardRef);
+        if (!leaderboardDoc.exists()) {
+             const leaderboardEntry: UserScore = {
+                userId: user.uid,
+                userName: user.displayName || 'مستخدم جديد',
+                userPhoto: user.photoURL || '',
+                totalPoints: 0,
+            };
+            await setDoc(leaderboardRef, leaderboardEntry);
+        }
+
+    } catch (error: any) {
+         if (error.name === 'FirestorePermissionError') {
+            errorEmitter.emit('permission-error', error);
+         } else {
+             // Fallback for other potential errors, though less likely for this operation
             const permissionError = new FirestorePermissionError({
-                path: userRef.path,
+                path: `users/${user.uid} or leaderboard/${user.uid}`,
                 operation: 'create',
-                requestResourceData: userProfileData,
             });
             errorEmitter.emit('permission-error', permissionError);
-        });
-
-        const leaderboardEntry: UserScore = {
-            userId: user.uid,
-            userName: user.displayName || 'مستخدم جديد',
-            userPhoto: user.photoURL || '',
-            totalPoints: 0,
-        };
-        setDoc(leaderboardRef, leaderboardEntry).catch(serverError => {
-            const permissionError = new FirestorePermissionError({
-                path: leaderboardRef.path,
-                operation: 'create',
-                requestResourceData: leaderboardEntry,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        });
+         }
     }
 }
 
