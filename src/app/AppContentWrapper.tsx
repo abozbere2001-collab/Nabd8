@@ -23,7 +23,7 @@ import { ProfileButton } from '@/components/ProfileButton';
 import { SearchSheet } from '@/components/SearchSheet';
 import type { ScreenKey } from './page';
 
-const screens: Record<Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp'>, React.ComponentType<any>> = {
+const screens: Record<Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp' | 'Profile'>, React.ComponentType<any>> = {
   Matches: MatchesScreen,
   Competitions: CompetitionsScreen,
   Iraq: IraqScreen,
@@ -37,7 +37,6 @@ const screens: Record<Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp'>, React.C
   Notifications: NotificationsScreen,
   GlobalPredictions: GlobalPredictionsScreen,
   AdminMatchSelection: AdminMatchSelectionScreen,
-  Profile: ProfileScreen,
 };
 
 const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
@@ -66,7 +65,19 @@ export function AppContentWrapper() {
   const navigate = useCallback((screen: ScreenKey, props?: Record<string, any>) => {
     const isMainTab = mainTabs.includes(screen);
     const newKey = `${screen}-${Date.now()}`;
+    
+    // Handle special navigation cases that need a different component
+    if (screen === 'Profile') {
+        const profileItem = { key: 'Profile-Special', screen: 'Profile', props };
+         setIsEntering(true);
+        setTimeout(() => setIsEntering(false), 300);
+        setStack(prev => [...prev, profileItem]);
+        return;
+    }
+
+
     const newItem = { key: newKey, screen, props };
+
 
     if (!isMainTab) {
         setIsEntering(true);
@@ -100,7 +111,7 @@ export function AppContentWrapper() {
   const activeStackItem = stack[stack.length - 1];
   const previousStackItem = stack.length > 1 ? stack[stack.length - 2] : null;
 
-  const ActiveScreenComponent = screens[activeStackItem.screen as Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp'>];
+  const ActiveScreenComponent = activeStackItem.screen === 'Profile' ? ProfileScreen : screens[activeStackItem.screen as Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp' | 'Profile'>];
   
   const navigationProps = { 
       navigate, 
@@ -126,7 +137,8 @@ export function AppContentWrapper() {
         {/* Previous screen for animation */}
         {previousStackItem && isAnimatingOut && (
              (() => {
-                const PreviousScreenComponent = screens[previousStackItem.screen as Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp'>];
+                const PreviousScreenComponent = previousStackItem.screen === 'Profile' ? ProfileScreen : screens[previousStackItem.screen as Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp' | 'Profile'>];
+                if (!PreviousScreenComponent) return null;
                 return (
                      <div
                         key={previousStackItem.key}
@@ -149,7 +161,7 @@ export function AppContentWrapper() {
             )}
             style={{ zIndex: stack.length -1 }}
         >
-           <ActiveScreenComponent {...navigationProps} {...activeStackItem.props} headerActions={headerActions} />
+           {ActiveScreenComponent ? <ActiveScreenComponent {...navigationProps} {...activeStackItem.props} headerActions={headerActions} /> : <p>Screen not found</p>}
         </div>
 
       </div>
