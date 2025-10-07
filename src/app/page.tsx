@@ -110,13 +110,14 @@ function AppContent({ user }: { user: User | null }) {
       )
     };
     
-    return stack.map((item) => {
+    return stack.map((item, index) => {
       if (!screenInstances.current[item.key]) {
         const ScreenComponent = screens[item.screen];
         screenInstances.current[item.key] = <ScreenComponent {...navigationProps} {...item.props} />;
       }
       return {
         ...item,
+        isEntering: index === stack.length - 1 && stack.length > 1 && !mainTabs.includes(item.screen),
         component: screenInstances.current[item.key]
       };
     });
@@ -139,15 +140,14 @@ function AppContent({ user }: { user: User | null }) {
         {renderedStack.map((item, index) => {
           const isTop = index === stack.length - 1;
           const isAnimating = isAnimatingOut === item.key;
-          const isMainTab = mainTabs.includes(item.screen);
           
           return (
             <div
               key={item.key}
               className={cn(
-                "absolute inset-0 bg-background transition-transform duration-300 ease-out flex-col",
-                stack.length > 1 && index === stack.length - 1 && !isMainTab && !isAnimating ? 'animate-slide-in-from-right' : '',
-                isAnimating ? 'animate-slide-out-to-right' : '',
+                "absolute inset-0 bg-background flex flex-col",
+                item.isEntering && !isAnimating ? 'animate-slide-in-from-right' : '',
+                isAnimating ? 'animate-slide-out-to-right' : ''
               )}
               style={{ 
                 zIndex: index,
