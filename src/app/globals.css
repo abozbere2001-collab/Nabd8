@@ -6,22 +6,22 @@
   :root {
     --background: 0 0% 0%; /* #000000 */
     --foreground: 210 40% 98%;
-    --card: 222 47% 8%;
+    --card: 222 47% 11%;
     --card-foreground: 210 40% 98%;
-    --popover: 222 47% 5%;
+    --popover: 222 47% 8%;
     --popover-foreground: 210 40% 98%;
     --primary: 217.2 91.2% 59.8%; /* Sharper Blue */
     --primary-foreground: 210 40% 98%;
-    --secondary: 222 47% 15%;
+    --secondary: 222 47% 11%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 222 47% 15%; /* #1F2948 */
+    --muted: 222 47% 11%;
     --muted-foreground: 210 40% 60%;
     --accent: 177 78% 52%; /* #29E2D9 */
     --accent-foreground: 222 47% 11%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 222 47% 15%;
-    --input: 222 47% 15%;
+    --border: 222 47% 11%;
+    --input: 222 47% 11%;
     --ring: 217.2 91.2% 59.8%; /* Sharper Blue */
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
