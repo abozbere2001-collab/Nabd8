@@ -273,7 +273,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="px-4 pt-4 space-y-4">
       <div className="flex justify-center items-center gap-2">
        {homeLineup && (
          <Button
@@ -383,7 +383,7 @@ const StatsTab = ({ stats, loading, fixture }: { stats: MatchStats[] | null, loa
     }).filter(s => s.homeValue !== null || s.awayValue !== null);
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="px-4 pt-4 space-y-4">
             {combinedStats.map(({ type, homeValue, awayValue }) => {
                 const home = Number(String(homeValue).replace('%', ''));
                 const away = Number(String(awayValue).replace('%', ''));
@@ -413,7 +413,7 @@ const StandingsTab = ({ standings, loading, fixture, navigate }: { standings: St
     if (!standings || standings.length === 0) return <p className="text-center p-8">الترتيب غير متاح.</p>;
 
     return (
-        <div className="p-4">
+        <div className="px-4 pt-4">
             {standings.map((group, index) => (
                 <div key={index} className="mb-6">
                     <h3 className="font-bold text-lg mb-2">{group[0]?.group || fixture.league.name}</h3>
@@ -491,7 +491,7 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
     };
     
     return (
-      <div className="p-4">
+      <div className="px-4 pt-4">
         <div className="relative flex flex-col">
           <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
           
@@ -595,7 +595,7 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
               <TabsTrigger value="standings">الترتيب</TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="details">
+          <TabsContent value="details" className='p-0'>
             <Tabs defaultValue={eventFilter} onValueChange={(val) => setEventFilter(val as EventFilter)} className="w-full">
                  <div className="px-4 pt-2">
                     <TabsList className="grid w-full grid-cols-2">
@@ -603,21 +603,21 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
                         <TabsTrigger value="all">جميع التفاصيل</TabsTrigger>
                     </TabsList>
                 </div>
-                <TabsContent value="highlights">
+                <TabsContent value="highlights" className='p-0'>
                     <EventsTab events={events} fixture={fixture} loading={loading} filter="highlights" />
                 </TabsContent>
-                <TabsContent value="all">
+                <TabsContent value="all" className='p-0'>
                     <EventsTab events={events} fixture={fixture} loading={loading} filter="all" />
                 </TabsContent>
             </Tabs>
           </TabsContent>
-          <TabsContent value="lineups">
+          <TabsContent value="lineups" className='p-0'>
             <LineupsTab lineups={lineups} loading={loading} fixture={fixture} favorites={favorites} onRename={handleOpenRename} onFavorite={handleFavorite} isAdmin={isAdmin} />
           </TabsContent>
-          <TabsContent value="stats">
+          <TabsContent value="stats" className='p-0'>
             <StatsTab stats={stats} loading={loading} fixture={fixture} />
           </TabsContent>
-          <TabsContent value="standings">
+          <TabsContent value="standings" className='p-0'>
             <StandingsTab standings={standings} loading={loading} fixture={fixture} navigate={navigate} />
           </TabsContent>
         </Tabs>

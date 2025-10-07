@@ -33,11 +33,13 @@ interface Player {
 }
 interface PlayerInfoFromApi {
     player: Player;
+    statistics: any[];
 }
 interface Fixture {
   fixture: { id: number; date: string; status: { short: string; }; };
   teams: { home: { id: number; name: string; logo: string; }; away: { id: number; name: string; logo: string; }; };
   goals: { home: number | null; away: number | null; };
+  league: any;
 }
 interface Standing {
   rank: number;
@@ -46,7 +48,7 @@ interface Standing {
 }
 interface TopScorer {
     player: { id: number; name: string; photo: string; };
-    statistics: { goals: { total: number; }; assists: number | null; }[];
+    statistics: { team: { id: number; name: string;}; goals: { total: number; }; assists: number | null; }[];
 }
 
 interface Favorites {
@@ -88,13 +90,13 @@ function useTeamData(teamId?: number) {
             if (playersData.response) {
                 allPlayers = allPlayers.concat(playersData.response);
             }
-            if (playersData.paging) {
+            if (playersData.paging && playersData.paging.current < playersData.paging.total) {
                 currentPage = playersData.paging.current + 1;
                 totalPages = playersData.paging.total;
             } else {
-                totalPages = currentPage -1; // stop loop
+                totalPages = currentPage; // stop loop
             }
-        } while (currentPage <= totalPages);
+        } while (currentPage < totalPages);
 
 
         const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
@@ -211,7 +213,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         </Button>
       )}
         <Button variant="ghost" size="icon" onClick={() => handleFavorite('team', teamInfo.team)}>
-            <Star className={isTeamFavorited ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/80"} />
+            <Star className={cn("h-5 w-5", isTeamFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground/80")} />
         </Button>
     </div>
   );
@@ -248,7 +250,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                     </div>
                 </div>
 
-                <TabsContent value="players" className="p-4">
+                <TabsContent value="players" className="px-4 pt-4">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      {players?.map(({ player }) => (
                          <div key={player.id} className="flex items-center gap-3 p-2 rounded-lg border bg-card">
@@ -281,11 +283,11 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                 <TabsTrigger value="scorers"><BarChart2 className="w-4 h-4 ml-1"/>الإحصائيات</TabsTrigger>
                             </TabsList>
                          </div>
-                         <TabsContent value="matches" className="p-4">
+                         <TabsContent value="matches" className="px-4 pt-4">
                              {fixtures && fixtures.length > 0 ? (
                                 <div className="space-y-2">
-                                {fixtures.map(({fixture, teams, goals}) => (
-                                    <div key={fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.id, fixture: { fixture, teams, goals, league: { id: 0, name: '', logo: '', round: ''} } })}>
+                                {fixtures.map(({fixture, teams, goals, league}) => (
+                                    <div key={fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.id, fixture: { fixture, teams, goals, league } })}>
                                         <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
                                             <span>{format(new Date(fixture.date), 'EEE, d MMM yyyy')}</span>
                                             <span>{fixture.status.short}</span>

@@ -14,6 +14,7 @@ import { useFirebase } from '@/firebase/provider';
 import { db } from '@/lib/firebase-client';
 import { doc, setDoc, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
+import { cn } from '@/lib/utils';
 
 
 // Interfaces for API data
@@ -233,7 +234,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       )}
       {leagueId &&
         <Button variant="ghost" size="icon" onClick={() => handleFavorite('league', {})}>
-            <Star className={isFavorited ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/80"} />
+            <Star className={cn("h-5 w-5", isFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground/80")} />
         </Button>
       }
     </div>
@@ -260,7 +261,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
               <TabsTrigger value="teams"><Users className="w-4 h-4 ml-1"/>الفرق</TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="matches" className="p-4">
+          <TabsContent value="matches" className="px-4 pt-4">
              {loading ? (
                 <div className="space-y-4">
                     {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
@@ -336,7 +337,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                  <TableCell onClick={e => e.stopPropagation()}>
                                      <div className='flex items-center justify-end opacity-80'>
                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleFavorite('team', s.team)}>
-                                            <Star className={favorites?.teams?.[s.team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                            <Star className={cn("h-5 w-5", favorites?.teams?.[s.team.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                         </Button>
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('team', s.team.id, s.team.name)}>
                                             <Pencil className="h-4 w-4 text-muted-foreground/80" />
@@ -383,7 +384,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 <TableCell>
                                     <div className='flex items-center justify-end opacity-80'>
                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleFavorite('player', player)}>
-                                            <Star className={favorites?.players?.[player.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                            <Star className={cn("h-5 w-5", favorites?.players?.[player.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                         </Button>
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('player', player.id, player.name)}>
                                             <Pencil className="h-4 w-4 text-muted-foreground/80" />
@@ -396,7 +397,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 </Table>
             ) : <p className="pt-4 text-center text-muted-foreground">قائمة الهدافين غير متاحة حاليًا.</p>}
           </TabsContent>
-          <TabsContent value="teams" className="p-4">
+          <TabsContent value="teams" className="px-4 pt-4">
             {loading ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {Array.from({ length: 12 }).map((_, i) => (
@@ -417,7 +418,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             <span className="font-semibold text-sm">{team.name}</span>
                             <div className="absolute top-1 right-1 flex opacity-80">
                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('team', team);}}>
-                                    <Star className={favorites?.teams?.[team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                    <Star className={cn("h-5 w-5", favorites?.teams?.[team.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
                                 {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team.name)}}>
                                     <Pencil className="h-4 w-4 text-muted-foreground/80" />
