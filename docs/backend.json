@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -164,20 +165,7 @@
         "userName": { "type": "string", "description": "The display name of the user." },
         "userPhoto": { "type": "string", "format": "uri", "description": "The profile picture URL of the user." },
         "text": { "type": "string", "description": "The content of the comment." },
-        "timestamp": { "type": "string", "format": "date-time", "description": "The timestamp when the comment was created." },
-        "parentId": { "type": ["string", "null"], "description": "The ID of the parent comment if this is a reply." },
-        "likes": {
-          "type": "array",
-          "description": "A list of user IDs who liked this comment.",
-          "items": { "type": "string" }
-        },
-        "replies": { 
-            "type": "array", 
-            "description": "A list of replies to this comment.",
-            "items": {
-                "$ref": "#/entities/MatchComment"
-            }
-        }
+        "timestamp": { "type": "string", "format": "date-time", "description": "The timestamp when the comment was created." }
       },
       "required": ["userId", "userName", "text", "timestamp"]
     },
@@ -254,5 +242,3 @@
     }
   }
 }
-
-    

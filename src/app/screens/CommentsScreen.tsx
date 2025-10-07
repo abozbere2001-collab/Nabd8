@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Send, MoreVertical, Edit, Trash2, CornerDownRight, Heart } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, setDoc } from 'firebase/firestore';
 import type { MatchComment, Like } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -242,8 +242,6 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     const q = query(commentsColRef, orderBy('timestamp', 'asc'));
     
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-        const topLevelComments: MatchComment[] = [];
-
         // Use Promise.all to fetch subcollections concurrently
         const commentPromises = snapshot.docs.map(async (doc) => {
             const commentData = doc.data() as Omit<MatchComment, 'id' | 'replies' | 'likes'>;
@@ -257,7 +255,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
             // Fetch likes
             const likesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'likes');
             const likesSnapshot = await getDocs(likesRef);
-            const likes = likesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id } as Like));
+            const likes = likesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
 
             return {
                 id: doc.id,
