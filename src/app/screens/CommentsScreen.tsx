@@ -243,33 +243,31 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
       return collection(db, 'matches', String(matchId), 'comments');
   }, [db, matchId]);
   
- const fetchComments = useCallback(async () => {
-    // If there's no user or no valid collection reference, stop.
+  useEffect(() => {
+    // If we don't have a user or a valid collection reference, do nothing.
     if (!user || !commentsColRef) {
         setLoading(false);
         setComments([]);
-        return; // Return undefined, so the cleanup function doesn't try to call it.
+        return;
     }
 
     setLoading(true);
     const q = query(commentsColRef, orderBy('timestamp', 'asc'));
     
+    // Set up the real-time listener
     const unsubscribe = onSnapshot(q, async (snapshot) => {
         const commentPromises = snapshot.docs.map(async (doc) => {
             const commentData = { id: doc.id, ...doc.data() } as MatchComment;
             
-            // Fetch replies for each top-level comment
             const repliesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies');
             const repliesQuery = query(repliesRef, orderBy('timestamp', 'asc'));
             const repliesSnapshot = await getDocs(repliesQuery);
             const replies = repliesSnapshot.docs.map(replyDoc => ({ id: replyDoc.id, ...replyDoc.data() } as MatchComment));
 
-            // Fetch likes for each top-level comment
             const likesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'likes');
             const likesSnapshot = await getDocs(likesRef);
             const likes = likesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
 
-             // Fetch likes for each reply
             const repliesWithLikes = await Promise.all(replies.map(async (reply) => {
                 if (!reply.id) return reply;
                 const replyLikesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies', reply.id, 'likes');
@@ -290,9 +288,10 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         setLoading(false);
 
     }, (error) => {
-        // Only emit an error if a user is actually logged in.
-        // This prevents a permission error flash on logout.
-        if (user) {
+        // This error handler is for the listener itself.
+        // We only show a permission error if a user is actually logged in.
+        // This prevents the error flash on logout.
+        if (user) { 
             const permissionError = new FirestorePermissionError({
                 path: commentsColRef.path,
                 operation: 'list',
@@ -302,25 +301,13 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         setLoading(false);
     });
 
-    return unsubscribe;
-  }, [matchId, db, commentsColRef, user]);
-
-
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    
-    fetchComments().then(unsub => {
-      if (unsub) {
-        unsubscribe = unsub;
-      }
-    });
-    
+    // Return the cleanup function.
+    // This will be called when the component unmounts or when dependencies change.
     return () => {
-      if (unsubscribe) {
         unsubscribe();
-      }
     };
-  }, [fetchComments]);
+
+  }, [user, commentsColRef, db, matchId]);
 
 
   useEffect(() => {
@@ -522,6 +509,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     const likeData = { userId: user.uid };
 
     // Optimistic UI Update
+    const originalComments = comments; // Keep a copy to revert on error
     setComments(prevComments => prevComments.map(p => {
         const updateCommentLikes = (c: MatchComment): MatchComment => {
             if (c.id === commentId) {
@@ -568,7 +556,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         }
     }).catch((serverError) => {
         // Revert UI on error
-        setComments(prev => [...prev]); 
+        setComments(originalComments); 
         
         const permissionError = new FirestorePermissionError({
             path: likeRef.path,
