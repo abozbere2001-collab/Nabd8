@@ -15,7 +15,7 @@ import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
 import type { Fixture, UserScore, Prediction, DailyGlobalPredictions } from '@/lib/types';
-import { collection, query, orderBy, onSnapshot, doc, getDoc, where, setDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, getDoc, where } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -173,10 +173,11 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
         fetchDailyMatches();
         
+        let unsubscribePreds = () => {};
         if (user) {
             const predsRef = collection(db, 'predictions');
             const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
-            const unsubscribePreds = onSnapshot(userPredsQuery, (snapshot) => {
+             unsubscribePreds = onSnapshot(userPredsQuery, (snapshot) => {
                 const userPredictions: { [key: number]: Prediction } = {};
                 snapshot.forEach(doc => {
                     const pred = doc.data() as Prediction;
@@ -184,18 +185,15 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 });
                 setPredictions(userPredictions);
             }, (error) => {
-                 const permissionError = new FirestorePermissionError({ path: 'predictions', operation: 'list' });
+                 const permissionError = new FirestorePermissionError({ path: `predictions where userId == ${user.uid}`, operation: 'list' });
                  errorEmitter.emit('permission-error', permissionError);
             });
-             return () => { 
-                unsubscribeLeaderboard();
-                unsubscribePreds();
-            };
         }
 
 
         return () => {
             unsubscribeLeaderboard();
+            unsubscribePreds();
         };
     }, [db, user]);
 
