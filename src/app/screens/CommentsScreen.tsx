@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -238,9 +238,17 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
-  const commentsColRef = collection(db, 'matches', String(matchId), 'comments');
+  const commentsColRef = useMemo(() => {
+      if (!db || !matchId) return null;
+      return collection(db, 'matches', String(matchId), 'comments');
+  }, [db, matchId]);
   
   const fetchComments = useCallback(async () => {
+    if (!commentsColRef) {
+        setLoading(false);
+        return () => {};
+    }
+
     setLoading(true);
     const q = query(commentsColRef, orderBy('timestamp', 'asc'));
     
@@ -307,7 +315,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   }, [comments, editingCommentId, replyingTo]);
 
   const handleSendComment = async (text: string) => {
-    if (!text.trim() || !user || sending) return;
+    if (!text.trim() || !user || sending || !commentsColRef) return;
   
     setSending(true);
     
