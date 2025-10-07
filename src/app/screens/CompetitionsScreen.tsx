@@ -395,3 +395,5 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
 }
 
     
+
+    
