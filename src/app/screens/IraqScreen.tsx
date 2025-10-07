@@ -356,7 +356,10 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const { db } = useFirestore();
     const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
-    const iraqiLeagueFixtureIds = useMemo(() => fixtures.filter(f => f.league.id === IRAQI_LEAGUE_ID).map(f => f.fixture.id), [fixtures]);
+    
+    const iraqiLeagueFixtureIds = useMemo(() => {
+        return fixtures.filter(f => f.league.id === IRAQI_LEAGUE_ID).map(f => f.fixture.id);
+    }, [fixtures]);
 
     useEffect(() => {
         if (!db) return;
@@ -381,22 +384,23 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
            snapshot.forEach(doc => scores.push(doc.data() as UserScore));
            setLeaderboard(scores);
         }, (error) => {
-           const permissionError = new FirestorePermissionError({ path: leaderboardRef.path, operation: 'list' });
+           const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
            errorEmitter.emit('permission-error', permissionError);
         });
 
         let unsubscribePreds = () => {};
-        if (user) {
+        if (user && iraqiLeagueFixtureIds.length > 0) {
             const predsRef = collection(db, 'predictions');
-            const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
+            const userPredsQuery = query(
+                predsRef, 
+                where('userId', '==', user.uid),
+                where('fixtureId', 'in', iraqiLeagueFixtureIds.slice(0, 30)) // Firestore 'in' query limit
+            );
             unsubscribePreds = onSnapshot(userPredsQuery, (snapshot) => {
                 const userPredictions: { [key: number]: Prediction } = {};
                 snapshot.forEach(doc => {
                     const pred = doc.data() as Prediction;
-                    // Filter for only Iraqi league predictions client-side
-                    if (iraqiLeagueFixtureIds.includes(pred.fixtureId)) {
-                       userPredictions[pred.fixtureId] = pred;
-                    }
+                    userPredictions[pred.fixtureId] = pred;
                 });
                 setPredictions(userPredictions);
             }, (error) => {
@@ -410,7 +414,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             unsubscribePreds();
         };
 
-    }, [user, db, iraqiLeagueFixtureIds]);
+    }, [user, db, iraqiLeagueFixtureIds.length]);
 
     const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
         if (!user || homeGoalsStr === '' || awayGoalsStr === '' || !db) return;
