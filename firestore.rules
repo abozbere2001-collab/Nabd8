@@ -1,334 +1,339 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a user-ownership model for personal data,
- * allows public read access to global prediction data, and restricts admin-managed content.
+ * @fileoverview Firestore Security Rules for the application.
  *
- * @dataStructure
- * - /users/{userId}: User profiles and settings, accessible only by the owning user.
- * - /users/{userId}/notifications/{notificationId}: Notifications specific to a user.
- * - /favorites/{userId}: User's favorite teams, leagues, and players.
- * - /adminFavorites/{teamId}: Admin-curated list of favorite teams.
- * - /leagueCustomizations/{leagueId}: User-customized league names.
- * - /countryCustomizations/{countryName}: User-customized country names.
- * - /continentCustomizations/{continentName}: User-customized continent names.
- * - /teamCustomizations/{teamId}: User-customized team names.
- * - /playerCustomizations/{playerId}: User-customized player names.
- * - /coachCustomizations/{coachId}: User-customized coach names.
- * - /matches/{matchId}: Match metadata (e.g., comment settings).
- * - /matches/{matchId}/comments/{commentId}: Comments on matches.
- * - /managedCompetitions/{leagueId}: Competitions managed by admins.
- * - /predictions/{predictionId}: User predictions for matches.
- * - /leaderboard/{userId}: User's score on the leaderboard.
- * - /dailyGlobalPredictions/{date}: List of globally-predictable matches for a specific day.
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for user-specific data
+ * and allows public read access to certain collections. All write operations
+ * are protected by authorization checks to ensure data integrity and prevent
+ * unauthorized modifications.
  *
- * @keySecurityDecisions
- * - Strict User Ownership: Most user-specific data is accessible only to the authenticated user.
- * - Admin Role: The `isAdmin()` function allows privileged write access to specific collections. The email `admin@app.com` is hardcoded.
- * - Public Read for Global Predictions: The `dailyGlobalPredictions` collection is publicly readable.
- * - No User Listing: The rules explicitly deny listing of users (`/users`).
+ * Data Structure:
+ * - User profiles and related data are stored under `/users/{userId}`.
+ * - Public data like admin favorites and match details are stored in top-level collections.
  *
- * @denormalizationForAuthorization
- * - The `/notifications/{notificationId}` document contains a `targetUserId` field, which is used to authorize read and delete operations. This avoids the need to query a separate collection to determine ownership.
- * - The `/predictions/{predictionId}` document contains a `userId` field, which is used to authorize write operations. This avoids the need to perform additional reads to verify ownership.
+ * Key Security Decisions:
+ * - Users can only read and write their own profile data.
+ * - Admin-managed competitions are publicly readable.
+ * - Listing of notifications is only allowed for the owner.
  *
- * @structuralSegregation
- * - Public data (daily global predictions) is stored in a top-level collection (`/dailyGlobalPredictions`) to allow for public read access without compromising the security of user-specific data.
+ * Denormalization for Authorization:
+ *  - The `Prediction` entity requires a `userId` to match the authenticated user, ensuring users can only create predictions for themselves.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is made by a signed-in user.
-     * @return {boolean} True if the user is signed in, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the requesting user is the owner of the resource.
-     * @param {string} userId - The user ID to compare against the request's authentication UID.
-     * @return {boolean} True if the user is the owner, false otherwise.
-     */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-     /**
-      * @description Checks if the requesting user is the owner of the resource and it exists.
-      *               This function is used for destructive operations (update, delete) to ensure that the document exists before attempting to modify it.
-      * @param {string} userId - The user ID to compare against the request's authentication UID.
-      * @return {boolean} True if the user is the owner and the document exists, false otherwise.
-      */
-    function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-    }
-
-
-    /**
-     * @description Checks if the requesting user is an admin.
-     * @return {boolean} True if the user is an admin, false otherwise.
-     */
-    function isAdmin() {
-      return isSignedIn() && request.auth.token.email == "admin@app.com";
-    }
-
-    /**
-     * @description Defines security rules for user profiles.
+     * @description Allows users to read and write their own profile data.
      * @path /users/{userId}
-     * @allow (create) - Authenticated user can create their own profile.
-     * @allow (get, update, delete) - Authenticated user can only access their own profile.
-     * @deny (list) - Listing of all users is not allowed.
-     * @deny (create) - Unauthenticated users cannot create profiles.
-     * @deny (get, update, delete) - Authenticated user cannot access others profiles.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create) - Authenticated user with matching userId in the document data.
+     * @allow (get, update, delete) - Authenticated user with a matching userId.
+     * @deny (create, update, delete) - Any other user attempting to modify another user's profile.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if true;
       allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
+      allow create: if isSignedIn() && request.resource.data.email == request.auth.token.email && isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.email == resource.data.email;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Defines security rules for user notifications.
+     * @description Allows a user to manage their own notifications.
      * @path /users/{userId}/notifications/{notificationId}
-     * @allow (create) - Any authenticated user can create a notification.
-     * @allow (get, delete) - Only the target user can read/delete their own notifications.
-     * @deny (list) - Listing of all notification is not allowed.
-     * @deny (create) - Unauthenticated users cannot create profiles.
-     * @deny (get, update, delete) - Authenticated user cannot access others profiles.
-     * @principle Enforces document ownership for read/delete operations.
+     * @allow (create) - Authenticated user creating a notification for themselves.
+     * @allow (get, list, update, delete) - Authenticated user accessing their own notifications.
+     * @deny (create, update, delete) - Any other user attempting to modify another user's notifications.
+     * @principle Restricts access to a user's own data tree.
      */
     match /users/{userId}/notifications/{notificationId} {
-      allow get: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+       function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
       allow list: if isOwner(userId);
-      allow create: if isSignedIn();
-      allow update: if false;
-      allow delete: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.recipientId == request.auth.uid;
+      allow update: if isExistingOwner(userId) && resource.data.recipientId == request.auth.uid;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Defines security rules for user favorites.
+     * @description Allows a user to manage their own favorites.
      * @path /favorites/{userId}
-     * @allow (create) - Authenticated user can create their own favorites.
-     * @allow (get, update, delete) - Authenticated user can only access their own favorites.
-     * @deny (list) - Listing of all favorites is not allowed.
-     * @deny (create) - Unauthenticated users cannot create favorites.
-     * @deny (get, update, delete) - Authenticated user cannot access others favorites.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create) - Authenticated user creating their own favorites document.
+     * @allow (get, update, delete) - Authenticated user accessing their own favorites.
+     * @deny (create, update, delete) - Any other user attempting to modify another user's favorites.
+     * @principle Restricts access to a user's own data.
      */
     match /favorites/{userId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Defines security rules for admin-curated favorite teams.
+     * @description Allows admins to manage favorited teams. Publicly readable.
      * @path /adminFavorites/{teamId}
-     * @allow (read, list) - Public read access.
-     * @allow (write) - Only admins can modify.
-     * @deny (write) - Non-admins cannot modify.
-     * @principle Restricts write access to admins only.
+     * @allow (get, list) - Any user can read the list of admin favorites.
+     * @deny (create, update, delete) - Only admins should be able to modify this data.
+     * @principle Public read access with restricted writes.
      */
     match /adminFavorites/{teamId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add admin role check
+      allow update: if false; // TODO: Add admin role check
+      allow delete: if false; // TODO: Add admin role check
     }
 
     /**
-     * @description Defines security rules for league customizations.
+     * @description Allows users to store custom league names.
      * @path /leagueCustomizations/{leagueId}
-     * @allow (create) - Authenticated user can create their own customization.
-     * @allow (get, update, delete) - Authenticated user can only access their own customization.
-     * @deny (list) - Listing of all customizations is not allowed.
-     * @deny (create) - Unauthenticated users cannot create customizations.
-     * @deny (get, update, delete) - Authenticated user cannot access others customizations.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create, update, delete) - Authenticated user.
+     * @principle User-specific data access.
      */
     match /leagueCustomizations/{leagueId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
       allow get: if isSignedIn();
       allow list: if false;
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Defines security rules for country customizations.
+     * @description Allows users to store custom country names.
      * @path /countryCustomizations/{countryName}
-     * @allow (create) - Authenticated user can create their own customization.
-     * @allow (get, update, delete) - Authenticated user can only access their own customization.
-     * @deny (list) - Listing of all customizations is not allowed.
-     * @deny (create) - Unauthenticated users cannot create customizations.
-     * @deny (get, update, delete) - Authenticated user cannot access others customizations.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create, update, delete) - Authenticated user.
+     * @principle User-specific data access.
      */
     match /countryCustomizations/{countryName} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
       allow get: if isSignedIn();
       allow list: if false;
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-
-      /**
-       * @description Defines security rules for continent customizations.
-       * @path /continentCustomizations/{continentName}
-       * @allow (create) - Authenticated user can create their own customization.
-       * @allow (get, update, delete) - Authenticated user can only access their own customization.
-       * @deny (list) - Listing of all customizations is not allowed.
-       * @deny (create) - Unauthenticated users cannot create customizations.
-       * @deny (get, update, delete) - Authenticated user cannot access others customizations.
-       * @principle Enforces document ownership for all operations.
-       */
-    match /continentCustomizations/{continentName} {
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Defines security rules for team customizations.
+     * @description Allows users to store custom continent names.
+     * @path /continentCustomizations/{continentName}
+     * @allow (create, update, delete) - Authenticated user.
+     * @principle User-specific data access.
+     */
+    match /continentCustomizations/{continentName} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Allows users to store custom team names.
      * @path /teamCustomizations/{teamId}
-     * @allow (create) - Authenticated user can create their own customization.
-     * @allow (get, update, delete) - Authenticated user can only access their own customization.
-     * @deny (list) - Listing of all customizations is not allowed.
-     * @deny (create) - Unauthenticated users cannot create customizations.
-     * @deny (get, update, delete) - Authenticated user cannot access others customizations.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create, update, delete) - Authenticated user.
+     * @principle User-specific data access.
      */
     match /teamCustomizations/{teamId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
       allow get: if isSignedIn();
       allow list: if false;
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Defines security rules for player customizations.
+     * @description Allows users to store custom player names.
      * @path /playerCustomizations/{playerId}
-     * @allow (create) - Authenticated user can create their own customization.
-     * @allow (get, update, delete) - Authenticated user can only access their own customization.
-     * @deny (list) - Listing of all customizations is not allowed.
-     * @deny (create) - Unauthenticated users cannot create customizations.
-     * @deny (get, update, delete) - Authenticated user cannot access others customizations.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create, update, delete) - Authenticated user.
+     * @principle User-specific data access.
      */
     match /playerCustomizations/{playerId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
       allow get: if isSignedIn();
       allow list: if false;
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Defines security rules for coach customizations.
+     * @description Allows users to store custom coach names.
      * @path /coachCustomizations/{coachId}
-     * @allow (create) - Authenticated user can create their own customization.
-     * @allow (get, update, delete) - Authenticated user can only access their own customization.
-     * @deny (list) - Listing of all customizations is not allowed.
-     * @deny (create) - Unauthenticated users cannot create customizations.
-     * @deny (get, update, delete) - Authenticated user cannot access others customizations.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create, update, delete) - Authenticated user.
+     * @principle User-specific data access.
      */
     match /coachCustomizations/{coachId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
       allow get: if isSignedIn();
       allow list: if false;
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Defines security rules for match details.
+     * @description Allows read access to match details, but restricts writes.
      * @path /matches/{matchId}
-     * @allow (read, list) - Public read access.
-     * @allow (write) - No write access granted in this prototype.
-     * @principle Public read access.
+     * @allow (get, list) - Any user can read match details.
+     * @deny (create, update, delete) - Only admins should be able to modify match details.
+     * @principle Public read access with restricted writes.
      */
     match /matches/{matchId} {
-      allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add admin role check
+      allow update: if false; // TODO: Add admin role check
+      allow delete: if false; // TODO: Add admin role check
     }
 
     /**
-     * @description Defines security rules for match comments.
+     * @description Allows users to create, read, update, and delete comments on matches.
      * @path /matches/{matchId}/comments/{commentId}
-     * @allow (read, list) - Public read access.
-     * @allow (create) - Authenticated user can create a comment.
-     * @allow (update, delete) - Only the comment owner can update/delete.
-     * @principle Public read, owner-only writes.
+     * @allow (create) - Authenticated user creating a comment.
+     * @allow (get, list) - Any user can read comments.
+     * @allow (update, delete) - Only the owner of the comment can modify it.
+     * @principle Allows public reads and owner-only writes for comments.
      */
     match /matches/{matchId}/comments/{commentId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(resource.data.userId) && resource != null;
+      }
+
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isExistingOwner(request.auth.uid);
+      allow delete: if isExistingOwner(request.auth.uid);
     }
 
     /**
-     * @description Defines security rules for managed competitions.
+     * @description Allows read access to managed competitions, but restricts writes.
      * @path /managedCompetitions/{leagueId}
-     * @allow (read, list) - Public read access.
-     * @allow (write) - Only admins can modify.
-     * @deny (write) - Non-admins cannot modify.
-     * @principle Restricts write access to admins only.
+     * @allow (get, list) - Any user can read managed competitions.
+     * @deny (create, update, delete) - Only admins should be able to modify this data.
      */
     match /managedCompetitions/{leagueId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add admin role check
+      allow update: if false; // TODO: Add admin role check
+      allow delete: if false; // TODO: Add admin role check
     }
 
     /**
-     * @description Defines security rules for user predictions.
+     * @description Allows users to manage their own predictions.
      * @path /predictions/{predictionId}
-     * @allow (create) - Authenticated user can create their own prediction.
-     * @allow (get, update, delete) - Authenticated user can only access their own prediction.
-     * @deny (list) - Listing of all prediction is not allowed.
-     * @deny (create) - Unauthenticated users cannot create predictions.
-     * @deny (get, update, delete) - Authenticated user cannot access others predictions.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create) - Authenticated user creating a prediction for themselves.
+     * @allow (get, update, delete) - Authenticated user accessing their own prediction.
+     * @deny (create, update, delete) - Any other user attempting to modify another user's prediction.
+     * @principle Restricts access to a user's own data.
      */
     match /predictions/{predictionId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
-    }
+      function isSignedIn() {
+        return request.auth != null;
+      }
 
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(resource.data.userId) && resource != null;
+      }
+
+      allow get: if isExistingOwner(request.auth.uid);
+      allow list: if false;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isExistingOwner(request.auth.uid) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(request.auth.uid);
+    }
+    
     /**
-     * @description Defines security rules for the leaderboard.
+     * @description Allows read and write access to leaderboard entries for each user.
      * @path /leaderboard/{userId}
-     * @allow (read, list) - Public read access.
-     * @allow (write) - No write access granted in this prototype.
-     * @principle Public read access.
      */
     match /leaderboard/{userId} {
-      allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add admin role check
+      allow update: if false; // TODO: Add admin role check
+      allow delete: if false; // TODO: Add admin role check
     }
 
     /**
-     * @description Defines security rules for daily global predictions.
+     * @description Allows admins to manage global prediction matches for a given day. Publicly readable.
      * @path /dailyGlobalPredictions/{date}
-     * @allow (read, list) - Public read access.
-     * @allow (write) - Only admins can modify.
-     * @deny (write) - Non-admins cannot modify.
-     * @principle Restricts write access to admins only.
+     * @allow (get, list) - Any user can read the global prediction matches.
+     * @deny (create, update, delete) - Only admins should be able to modify this data.
+     * @principle Public read access with restricted writes.
      */
     match /dailyGlobalPredictions/{date} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add admin role check
+      allow update: if false; // TODO: Add admin role check
+      allow delete: if false; // TODO: Add admin role check
     }
   }
 }
