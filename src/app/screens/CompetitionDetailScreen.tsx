@@ -252,18 +252,16 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         />}
        <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="matches" className="w-full">
-          <div className="sticky top-0 bg-background z-10 border-b">
+           <div className="sticky top-0 bg-background z-10 border-b">
              <p className="text-center text-xs text-muted-foreground pt-2 pb-2">جميع البيانات تخص موسم {CURRENT_SEASON}</p>
-            <div className='px-4'>
-             <TabsList className="grid w-full grid-cols-4 rounded-md">
-              <TabsTrigger value="matches"><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
-              <TabsTrigger value="standings"><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
-              <TabsTrigger value="scorers"><BarChart2 className="w-4 h-4 ml-1"/>الهدافين</TabsTrigger>
-              <TabsTrigger value="teams"><Users className="w-4 h-4 ml-1"/>الفرق</TabsTrigger>
+             <TabsList className="grid w-full grid-cols-4 rounded-none h-auto p-0 border-t">
+              <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
+              <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
+              <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'><BarChart2 className="w-4 h-4 ml-1"/>الهدافين</TabsTrigger>
+              <TabsTrigger value="teams" className='rounded-none data-[state=active]:rounded-md'><Users className="w-4 h-4 ml-1"/>الفرق</TabsTrigger>
             </TabsList>
-            </div>
           </div>
-          <TabsContent value="matches" className="p-4">
+          <TabsContent value="matches" className="p-4 mt-0">
              {loading ? (
                 <div className="space-y-4">
                     {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
@@ -300,7 +298,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 </div>
             ) : <p className="pt-4 text-center text-muted-foreground">لا توجد مباريات متاحة لهذا الموسم.</p>}
           </TabsContent>
-          <TabsContent value="standings" className="p-0">
+          <TabsContent value="standings" className="p-0 mt-0">
             {loading ? (
                  <div className="space-y-px p-4">
                     {Array.from({ length: 18 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
@@ -352,7 +350,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 </Table>
             ): <p className="pt-4 text-center text-muted-foreground">جدول الترتيب غير متاح حاليًا.</p>}
           </TabsContent>
-           <TabsContent value="scorers" className="p-0">
+           <TabsContent value="scorers" className="p-0 mt-0">
             {loading ? (
                 <div className="space-y-px p-4">
                     {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
@@ -399,7 +397,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 </Table>
             ) : <p className="pt-4 text-center text-muted-foreground">قائمة الهدافين غير متاحة حاليًا.</p>}
           </TabsContent>
-          <TabsContent value="teams" className="p-4">
+          <TabsContent value="teams" className="p-4 mt-0">
             {loading ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {Array.from({ length: 12 }).map((_, i) => (

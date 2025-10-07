@@ -16,8 +16,8 @@ import { LoginScreen } from './screens/LoginScreen';
 import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
 import { FirebaseProvider } from '@/firebase/provider';
 import { ProfileButton } from '@/components/ProfileButton';
-import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
+import { SearchSheet } from '@/components/SearchSheet';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails';
 export type ScreenProps = {
@@ -92,21 +92,17 @@ function AppContent({ user }: { user: User | null }) {
 
   const renderedStack = useMemo(() => {
     const canGoBack = stack.length > 1;
-    const handleSearch = () => {
-        // TODO: Implement search functionality
-        console.log("Search button clicked");
-    };
-
+    
     const navigationProps = { 
       navigate, 
       goBack, 
       canGoBack,
       headerActions: (
           <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={handleSearch}>
-                  <Search className="h-5 w-5" />
-              </Button>
-              <ProfileButton navigate={navigate} />
+             <SearchSheet>
+                <Search className="h-5 w-5" />
+             </SearchSheet>
+             <ProfileButton navigate={navigate} />
           </div>
       )
     };

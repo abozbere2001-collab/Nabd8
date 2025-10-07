@@ -12,7 +12,6 @@ import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firest
 import { db } from '@/lib/firebase-client';
 import { RenameDialog } from '@/components/RenameDialog';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -72,7 +71,10 @@ function useTeamData(teamId?: number) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!teamId) return;
+    if (!teamId) {
+      setLoading(false);
+      return;
+    };
 
     const fetchData = async () => {
       setLoading(true);
@@ -84,19 +86,21 @@ function useTeamData(teamId?: number) {
         let allPlayers: PlayerInfoFromApi[] = [];
         let currentPage = 1;
         let totalPages = 1;
-        do {
-            const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}&page=${currentPage}`);
-            const playersData = await playersRes.json();
-            if (playersData.response) {
-                allPlayers = allPlayers.concat(playersData.response);
-            }
-            if (playersData.paging && playersData.paging.current < playersData.paging.total) {
-                currentPage = playersData.paging.current + 1;
-                totalPages = playersData.paging.total;
-            } else {
-                totalPages = currentPage; // stop loop
-            }
-        } while (currentPage <= totalPages);
+        if(teamId) {
+          do {
+              const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}&page=${currentPage}`);
+              const playersData = await playersRes.json();
+              if (playersData.response) {
+                  allPlayers = allPlayers.concat(playersData.response);
+              }
+              if (playersData.paging && playersData.paging.current < playersData.paging.total) {
+                  currentPage++;
+                  totalPages = playersData.paging.total;
+              } else {
+                  totalPages = currentPage; // stop loop
+              }
+          } while (currentPage < totalPages);
+        }
 
 
         const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
@@ -242,13 +246,13 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                             <p className="text-sm text-muted-foreground">{teamInfo.venue.name} ({teamInfo.venue.city})</p>
                         </div>
                     </div>
-                    <TabsList className="grid w-full grid-cols-2 rounded-none">
-                        <TabsTrigger value="details">التفاصيل</TabsTrigger>
-                        <TabsTrigger value="players">اللاعبون</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-2 rounded-none h-auto p-0 border-t">
+                        <TabsTrigger value="details" className='rounded-none data-[state=active]:rounded-md'>التفاصيل</TabsTrigger>
+                        <TabsTrigger value="players" className='rounded-none data-[state=active]:rounded-md'>اللاعبون</TabsTrigger>
                     </TabsList>
                 </div>
 
-                <TabsContent value="players" className="px-4 pt-4">
+                <TabsContent value="players" className="px-4 pt-4 mt-0">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      {players?.map(({ player }) => (
                          <div key={player.id} className="flex items-center gap-3 p-2 rounded-lg border bg-card">
@@ -272,16 +276,16 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                      ))}
                    </div>
                 </TabsContent>
-                <TabsContent value="details" className="p-0">
+                <TabsContent value="details" className="p-0 mt-0">
                      <Tabs defaultValue="matches" className="w-full">
                          <div className="bg-background sticky top-[152px] z-10 border-b">
-                            <TabsList className="grid w-full grid-cols-3 rounded-none">
-                                <TabsTrigger value="matches"><Shirt className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
-                                <TabsTrigger value="standings"><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
-                                <TabsTrigger value="scorers"><BarChart2 className="w-4 h-4 ml-1"/>الإحصائيات</TabsTrigger>
+                            <TabsList className="grid w-full grid-cols-3 rounded-none h-auto p-0">
+                                <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'><Shirt className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
+                                <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
+                                <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'><BarChart2 className="w-4 h-4 ml-1"/>الإحصائيات</TabsTrigger>
                             </TabsList>
                          </div>
-                         <TabsContent value="matches" className="p-4">
+                         <TabsContent value="matches" className="p-4 mt-0">
                              {fixtures && fixtures.length > 0 ? (
                                 <div className="space-y-2">
                                 {fixtures.map(({fixture, teams, goals, league}) => (
@@ -306,7 +310,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                 </div>
                              ) : <p className="text-center py-8 text-muted-foreground">لا توجد مباريات متاحة.</p>}
                          </TabsContent>
-                         <TabsContent value="standings" className="p-0">
+                         <TabsContent value="standings" className="p-0 mt-0">
                             {standings && standings.length > 0 ? (
                                 <Table>
                                     <TableHeader><TableRow><TableHead className="w-1/2 text-right">الفريق</TableHead><TableHead className="text-center">ل</TableHead><TableHead className="text-center">ف</TableHead><TableHead className="text-center">ت</TableHead><TableHead className="text-center">خ</TableHead><TableHead className="text-center">ن</TableHead></TableRow></TableHeader>
@@ -321,7 +325,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                 </Table>
                             ) : <p className="text-center py-8 text-muted-foreground">الترتيب غير متاح حاليًا.</p>}
                          </TabsContent>
-                         <TabsContent value="scorers" className="p-0">
+                         <TabsContent value="scorers" className="p-0 mt-0">
                              {scorers && scorers.length > 0 ? (
                                 <Table>
                                     <TableHeader><TableRow><TableHead className="text-right">اللاعب</TableHead><TableHead className="text-center">الأهداف</TableHead><TableHead className="text-center">صناعة</TableHead></TableRow></TableHeader>

@@ -228,22 +228,28 @@ const FixturesList = ({
         );
     }
 
+    const sortedLeagues = Object.keys(groupedFixtures).sort((a,b) => a.localeCompare(b));
+
+
     return (
-        <div className="space-y-6">
-            {Object.entries(groupedFixtures).map(([leagueName, { league, fixtures }]) => (
-                <div key={leagueName}>
-                    <div className="flex items-center gap-3 mb-3 px-1">
-                        <Avatar className="h-6 w-6">
-                            <AvatarImage src={league.logo} alt={league.name} />
-                            <AvatarFallback>{league.name.substring(0,1)}</AvatarFallback>
-                        </Avatar>
-                        <h3 className="font-bold text-foreground">{leagueName}</h3>
+        <div className="space-y-4">
+            {sortedLeagues.map(leagueName => {
+                const { league, fixtures } = groupedFixtures[leagueName];
+                return (
+                    <div key={leagueName}>
+                        <div className="flex items-center gap-3 mb-3 px-1">
+                            <Avatar className="h-6 w-6">
+                                <AvatarImage src={league.logo} alt={league.name} />
+                                <AvatarFallback>{league.name.substring(0,1)}</AvatarFallback>
+                            </Avatar>
+                            <h3 className="font-bold text-foreground">{leagueName}</h3>
+                        </div>
+                        <div className="space-y-2">
+                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} onSelect={onSelectFixture} />)}
+                        </div>
                     </div>
-                    <div className="space-y-2">
-                        {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} onSelect={onSelectFixture} />)}
-                    </div>
-                </div>
-            ))}
+                )
+            })}
         </div>
     );
 };
