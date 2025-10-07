@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Star, Pencil } from 'lucide-react';
@@ -26,11 +26,6 @@ interface Competition {
   };
 }
 
-interface CustomLeagueName {
-    id: string;
-    customName: string;
-}
-
 interface Favorites {
     leagues?: { [key: number]: any };
     teams?: { [key: number]: any };
@@ -49,8 +44,11 @@ interface GroupedCompetitions {
 
 interface RenameState {
     isOpen: boolean;
-    league: Competition | null;
+    type: 'league' | 'country' | 'continent' | null;
+    id: string; // Can be leagueId, country name, or continent name
+    currentName: string;
 }
+
 
 const countryToContinent: { [key: string]: string } = {
     "World": "World",
@@ -98,8 +96,10 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
   const { isAdmin } = useAdmin();
   const { user } = useFirebase();
   const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
-  const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, league: null });
-  const [customNames, setCustomNames] = useState<Map<number, string>>(new Map());
+  const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, type: null, id: '', currentName: '' });
+  const [customLeagueNames, setCustomLeagueNames] = useState<Map<number, string>>(new Map());
+  const [customCountryNames, setCustomCountryNames] = useState<Map<string, string>>(new Map());
+  const [customContinentNames, setCustomContinentNames] = useState<Map<string, string>>(new Map());
 
 
   useEffect(() => {
@@ -110,6 +110,27 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     return () => unsub();
   }, [user]);
 
+  const fetchAllCustomNames = useCallback(async () => {
+      const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
+          getDocs(collection(db, 'leagueCustomizations')),
+          getDocs(collection(db, 'countryCustomizations')),
+          getDocs(collection(db, 'continentCustomizations'))
+      ]);
+      
+      const leagueNames = new Map<number, string>();
+      leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+      setCustomLeagueNames(leagueNames);
+
+      const countryNames = new Map<string, string>();
+      countriesSnapshot.forEach(doc => countryNames.set(doc.id, doc.data().customName));
+      setCustomCountryNames(countryNames);
+
+      const continentNames = new Map<string, string>();
+      continentsSnapshot.forEach(doc => continentNames.set(doc.id, doc.data().customName));
+      setCustomContinentNames(continentNames);
+
+      return { leagueNames, countryNames, continentNames };
+  }, []);
 
   const toggleLeagueFavorite = async (comp: Competition) => {
     if (!user) return;
@@ -117,7 +138,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     const favRef = doc(db, 'favorites', user.uid);
     const fieldPath = `leagues.${leagueId}`;
     const isFavorited = favorites?.leagues?.[leagueId];
-    const leagueName = customNames.get(leagueId) || comp.league.name;
+    const leagueName = customLeagueNames.get(leagueId) || comp.league.name;
 
     if (isFavorited) {
         await updateDoc(favRef, { [fieldPath]: deleteField() });
@@ -138,17 +159,11 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     async function fetchCompetitions() {
       try {
         setLoading(true);
-        const [leaguesResponse, customNamesSnapshot] = await Promise.all([
+        const [leaguesResponse, { leagueNames, countryNames, continentNames }] = await Promise.all([
             fetch('/api/football/leagues'),
-            getDocs(collection(db, 'leagueCustomizations'))
+            fetchAllCustomNames()
         ]);
         
-        const customNamesMap = new Map<number, string>();
-        customNamesSnapshot.forEach(doc => {
-            customNamesMap.set(Number(doc.id), doc.data().customName);
-        });
-        setCustomNames(customNamesMap);
-
         if (!leaguesResponse.ok) {
             const errorBody = await leaguesResponse.text();
             console.error('Failed to fetch competitions:', errorBody);
@@ -164,11 +179,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         const groupedByContinent: GroupedCompetitions = {};
 
         (data.response as Competition[]).forEach(comp => {
-            const customName = customNamesMap.get(comp.league.id);
-            if (customName) {
-                comp.league.name = customName;
-            }
-
             const countryName = comp.country.name;
             const continent = countryToContinent[countryName] || "Other";
 
@@ -223,24 +233,51 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
       }
     }
     fetchCompetitions();
-  }, []);
+  }, [fetchAllCustomNames]);
 
   const handleSaveRename = async (newName: string) => {
-    if (!renameState.league) return;
-    const leagueId = renameState.league.league.id;
-
-    const customNameRef = doc(db, 'leagueCustomizations', String(leagueId));
-    await setDoc(customNameRef, { customName: newName });
+    if (!renameState.type || !renameState.id) return;
     
-    // Optimistically update the UI
-    setCustomNames(prev => new Map(prev).set(leagueId, newName));
+    let collectionName = '';
+    let docId = renameState.id;
 
-    setRenameState({ isOpen: false, league: null });
+    switch (renameState.type) {
+        case 'league':
+            collectionName = 'leagueCustomizations';
+            break;
+        case 'country':
+            collectionName = 'countryCustomizations';
+            break;
+        case 'continent':
+            collectionName = 'continentCustomizations';
+            break;
+    }
+    
+    if (collectionName) {
+        const customNameRef = doc(db, collectionName, docId);
+        await setDoc(customNameRef, { customName: newName });
+    
+        // Optimistically update UI
+        if (renameState.type === 'league') {
+             setCustomLeagueNames(prev => new Map(prev).set(Number(docId), newName));
+        } else if (renameState.type === 'country') {
+             setCustomCountryNames(prev => new Map(prev).set(docId, newName));
+        } else if (renameState.type === 'continent') {
+             setCustomContinentNames(prev => new Map(prev).set(docId, newName));
+        }
+    }
+
+    setRenameState({ isOpen: false, type: null, id: '', currentName: '' });
   };
   
-  const getLeagueName = (comp: Competition) => {
-      return customNames.get(comp.league.id) || comp.league.name;
-  }
+  const getLeagueName = (comp: Competition) => customLeagueNames.get(comp.league.id) || comp.league.name;
+  const getCountryName = (name: string) => customCountryNames.get(name) || name;
+  const getContinentName = (name: string) => customContinentNames.get(name) || name;
+
+  const openRenameDialog = (type: RenameState['type'], id: string, currentName: string) => {
+      setRenameState({ isOpen: true, type, id, currentName });
+  };
+
 
   const renderLeagueItem = (comp: Competition) => (
     <li key={comp.league.id}>
@@ -260,7 +297,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 className="h-8 w-8"
                 onClick={(e) => {
                     e.stopPropagation();
-                    setRenameState({ isOpen: true, league: comp });
+                    openRenameDialog('league', String(comp.league.id), getLeagueName(comp));
                 }}
                 >
                 <Pencil className="h-4 w-4 text-muted-foreground/80" />
@@ -282,6 +319,12 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     </li>
   );
 
+  const itemTypeMap = {
+    league: 'البطولة',
+    country: 'الدولة',
+    continent: 'القارة'
+  };
+
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="البطولات" onBack={goBack} canGoBack={canGoBack} />
@@ -300,7 +343,22 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             {Object.entries(competitions).map(([continent, content]) => (
               <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
                 <AccordionTrigger className="px-4 text-lg font-bold">
-                  {continent}
+                   <div className="flex items-center gap-2">
+                        <span>{getContinentName(continent)}</span>
+                        {isAdmin && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    openRenameDialog('continent', continent, getContinentName(continent));
+                                }}
+                            >
+                                <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                            </Button>
+                        )}
+                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-1">
                   {"leagues" in content ? (
@@ -314,7 +372,20 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                 <AccordionTrigger className="px-4 text-base font-semibold">
                                     <div className="flex items-center gap-3">
                                         {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
-                                        <span>{country}</span>
+                                        <span>{getCountryName(country)}</span>
+                                        {isAdmin && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openRenameDialog('country', country, getCountryName(country));
+                                                }}
+                                            >
+                                                <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </AccordionTrigger>
                                 <AccordionContent className="px-1">
@@ -330,15 +401,13 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
               </AccordionItem>
             ))}
           </Accordion>
-          {renameState.league && (
-            <RenameDialog
-                isOpen={renameState.isOpen}
-                onOpenChange={(isOpen) => setRenameState({ isOpen, league: isOpen ? renameState.league : null })}
-                currentName={getLeagueName(renameState.league)}
-                onSave={handleSaveRename}
-                itemType="البطولة"
-            />
-          )}
+          <RenameDialog
+              isOpen={renameState.isOpen}
+              onOpenChange={(isOpen) => setRenameState({ ...renameState, isOpen })}
+              currentName={renameState.currentName}
+              onSave={handleSaveRename}
+              itemType={renameState.type ? itemTypeMap[renameState.type] : "العنصر"}
+          />
           </>
         ) : (
           <div className="text-center text-muted-foreground py-10">فشل في تحميل البطولات. يرجى التحقق من مفتاح API أو المحاولة مرة أخرى لاحقًا.</div>

@@ -66,6 +66,30 @@
             }
         },
         "required": ["customName"]
+    },
+    "CountryCustomization": {
+        "title": "Country Customization",
+        "description": "Stores user-defined names for countries.",
+        "type": "object",
+        "properties": {
+            "customName": {
+                "type": "string",
+                "description": "The custom name for the country."
+            }
+        },
+        "required": ["customName"]
+    },
+    "ContinentCustomization": {
+        "title": "Continent Customization",
+        "description": "Stores user-defined names for continents.",
+        "type": "object",
+        "properties": {
+            "customName": {
+                "type": "string",
+                "description": "The custom name for the continent."
+            }
+        },
+        "required": ["customName"]
     }
   },
   "auth": {
@@ -89,6 +113,18 @@
             "$ref": "#/entities/LeagueCustomization"
         },
         "description": "Stores custom names for leagues, keyed by league ID."
+    },
+    "/countryCustomizations/{countryName}": {
+        "schema": {
+            "$ref": "#/entities/CountryCustomization"
+        },
+        "description": "Stores custom names for countries, keyed by the English country name."
+    },
+    "/continentCustomizations/{continentName}": {
+        "schema": {
+            "$ref": "#/entities/ContinentCustomization"
+        },
+        "description": "Stores custom names for continents, keyed by the English continent name."
     }
   }
 }
