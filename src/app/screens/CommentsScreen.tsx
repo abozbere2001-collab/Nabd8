@@ -106,7 +106,6 @@ const CommentItem = ({
     user,
     onEdit,
     onDelete,
-    onReply,
     onLike,
     isDeleting,
     isEditing,
@@ -115,12 +114,12 @@ const CommentItem = ({
     sending,
     editingText,
     setEditingText,
+    children
 }: {
     comment: MatchComment,
     user: any,
     onEdit: (comment: MatchComment) => void,
     onDelete: (commentId: string) => void,
-    onReply: (commentId: string) => void,
     onLike: (commentId: string) => void,
     isDeleting: string | null,
     isEditing: boolean,
@@ -129,6 +128,7 @@ const CommentItem = ({
     sending: boolean,
     editingText: string,
     setEditingText: (text: string) => void,
+    children: React.ReactNode,
 }) => {
     const hasLiked = user && comment.likes?.some(like => like.id === user.uid);
     
@@ -166,18 +166,13 @@ const CommentItem = ({
               <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">{comment.text}</p>
             )}
             
-            {!isEditing && (
-                 <div className="flex items-center gap-2 mt-2 -mb-2 -ml-2">
-                    <Button variant="ghost" size="sm" onClick={() => onReply(comment.id!)}>
-                        <CornerDownRight className="w-3 h-3 ml-1" />
-                        رد
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => onLike(comment.id!)}>
-                        <Heart className={cn("w-4 h-4 ml-1", hasLiked ? "text-red-500 fill-current" : "text-muted-foreground")} />
-                        <span className="text-xs">{comment.likes?.length || 0}</span>
-                    </Button>
-                </div>
-            )}
+            <div className="flex items-center gap-2 mt-2 -mb-2 -ml-2">
+               {children}
+                <Button variant="ghost" size="sm" onClick={() => onLike(comment.id!)}>
+                    <Heart className={cn("w-4 h-4 ml-1", hasLiked ? "text-red-500 fill-current" : "text-muted-foreground")} />
+                    <span className="text-xs">{comment.likes?.length || 0}</span>
+                </Button>
+            </div>
           </div>
 
           {user && user.uid === comment.userId && !isEditing && (
@@ -244,7 +239,6 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   }, [db, matchId]);
   
   useEffect(() => {
-    // If we don't have a user or a valid collection reference, do nothing.
     if (!user || !commentsColRef) {
         setLoading(false);
         setComments([]);
@@ -254,7 +248,6 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     setLoading(true);
     const q = query(commentsColRef, orderBy('timestamp', 'asc'));
     
-    // Set up the real-time listener
     const unsubscribe = onSnapshot(q, async (snapshot) => {
         const commentPromises = snapshot.docs.map(async (doc) => {
             const commentData = { id: doc.id, ...doc.data() } as MatchComment;
@@ -288,21 +281,15 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         setLoading(false);
 
     }, (error) => {
-        // This error handler is for the listener itself.
-        // We only show a permission error if a user is actually logged in.
-        // This prevents the error flash on logout.
-        if (user) { 
-            const permissionError = new FirestorePermissionError({
-                path: commentsColRef.path,
-                operation: 'list',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        }
+        if (!user) return;
+        const permissionError = new FirestorePermissionError({
+            path: commentsColRef.path,
+            operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
         setLoading(false);
     });
 
-    // Return the cleanup function.
-    // This will be called when the component unmounts or when dependencies change.
     return () => {
         unsubscribe();
     };
@@ -394,7 +381,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   };
   
   const handleReplyClick = (commentId: string) => {
-    setReplyingTo(commentId);
+    setReplyingTo(replyingTo === commentId ? null : commentId);
     setEditingCommentId(null);
   }
 
@@ -402,7 +389,6 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     if (!editingCommentId || !editingText.trim() || sending) return;
     setSending(true);
     
-    // Determine if it's a top-level comment or a reply
     let commentDocRef;
     let parentCommentIdForReply;
 
@@ -452,7 +438,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         : doc(db, 'matches', String(matchId), 'comments', parentCommentId!, 'replies', commentId);
 
     const likesRef = collection(commentRef, 'likes');
-    const repliesRef = collection(commentRef, 'replies'); // Only for top-level
+    const repliesRef = collection(commentRef, 'replies'); 
 
     const ops = [];
     ops.push(getDocs(likesRef).then(snapshot => snapshot.forEach(doc => batch.delete(doc.ref))));
@@ -481,7 +467,6 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   const handleLikeComment = (commentId: string) => {
     if (!user || !db) return;
 
-    // Find the comment and its path
     let parentCommentId: string | null = null;
     let originalComment: MatchComment | null = null;
 
@@ -508,8 +493,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     const hasLiked = originalComment.likes?.some(like => like.id === user.uid);
     const likeData = { userId: user.uid };
 
-    // Optimistic UI Update
-    const originalComments = comments; // Keep a copy to revert on error
+    const originalComments = comments; 
     setComments(prevComments => prevComments.map(p => {
         const updateCommentLikes = (c: MatchComment): MatchComment => {
             if (c.id === commentId) {
@@ -527,7 +511,6 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         return updateCommentLikes(p);
     }));
 
-    // Firebase Operation
     const operation = hasLiked ? deleteDoc(likeRef) : setDoc(likeRef, likeData);
 
     operation.then(() => {
@@ -555,7 +538,6 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
             });
         }
     }).catch((serverError) => {
-        // Revert UI on error
         setComments(originalComments); 
         
         const permissionError = new FirestorePermissionError({
@@ -567,14 +549,13 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     });
   };
 
-  const renderCommentTree = (comment: MatchComment, isReply: boolean = false) => (
+  const renderCommentTree = (comment: MatchComment, parentId: string | null = null) => (
     <div key={comment.id}>
         <CommentItem
             comment={comment}
             user={user}
             onEdit={handleEditClick}
             onDelete={handleDeleteComment}
-            onReply={handleReplyClick}
             onLike={handleLikeComment}
             isDeleting={isDeleting}
             isEditing={editingCommentId === comment.id}
@@ -583,26 +564,31 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
             sending={sending && editingCommentId === comment.id}
             editingText={editingText}
             setEditingText={setEditingText}
-        />
+        >
+            <Button variant="ghost" size="sm" onClick={() => handleReplyClick(comment.id)}>
+                <CornerDownRight className="w-3 h-3 ml-1" />
+                رد
+            </Button>
+        </CommentItem>
         
-        {replyingTo === comment.id && !isReply && (
-             <div className="ml-8 mt-2 pl-4 border-r-2">
+        <div className="ml-8 mt-2 pl-4 border-r-2">
+            {replyingTo === comment.id && (
                 <CommentInput 
                     user={user}
                     sending={sending && !editingCommentId}
-                    onSend={handleSendComment}
+                    onSend={(text) => handleSendComment(text)}
                     isReply={true}
                     onCancel={() => setReplyingTo(null)}
                     autoFocus
                 />
-             </div>
-        )}
-        
-        {comment.replies && comment.replies.length > 0 && (
-            <div className="ml-8 mt-4 space-y-4 pl-4 border-r-2">
-                {comment.replies.map(reply => renderCommentTree(reply, true))}
-            </div>
-        )}
+            )}
+            
+            {comment.replies && comment.replies.length > 0 && (
+                <div className="mt-4 space-y-4">
+                    {comment.replies.map(reply => renderCommentTree(reply, comment.id))}
+                </div>
+            )}
+        </div>
     </div>
   );
 
