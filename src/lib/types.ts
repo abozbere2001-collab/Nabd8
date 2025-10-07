@@ -91,6 +91,12 @@ export interface UserScore {
     totalPoints: number;
 }
 
+export interface UserProfile {
+    displayName: string;
+    email: string;
+    photoURL: string;
+}
+
 export interface GlobalPredictionMatch {
   fixtureId: number;
   leagueId: number;

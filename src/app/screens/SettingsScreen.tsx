@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useEffect } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut } from 'lucide-react';
+import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut, User } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
@@ -48,6 +49,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack, headerActions }: S
   };
 
   const settingsItems = [
+    { label: 'الملف الشخصي', icon: User, detail: '', action: () => navigate('Profile') },
     { label: 'اللغة', icon: Languages, detail: 'العربية', action: () => {} },
     { label: 'الإشعارات', icon: Bell, detail: '', action: () => navigate('Notifications') },
   ]
