@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -300,11 +299,12 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
         
         if (actualHome === null || actualAway === null) return "bg-card text-foreground";
 
-        const correctScore = actualHome === predHome && actualAway === predAway;
-        if (correctScore) {
+        // Exact score prediction
+        if (actualHome === predHome && actualAway === predAway) {
             return "bg-green-500/20 text-green-500";
         }
 
+        // Correct outcome (winner or draw)
         const actualWinner = actualHome > actualAway ? 'home' : actualHome < actualAway ? 'away' : 'draw';
         const predWinner = predHome > predAway ? 'home' : predHome < predAway ? 'away' : 'draw';
         
@@ -312,14 +312,15 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
             return "bg-yellow-500/20 text-yellow-500";
         }
 
-        return "bg-card text-foreground";
+        // Incorrect prediction
+        return "bg-destructive/20 text-destructive";
     };
 
     const getPointsColor = () => {
         if (!isMatchFinished || userPrediction?.points === undefined) return 'text-primary';
         if (userPrediction.points === 5) return 'text-green-500';
         if (userPrediction.points === 3) return 'text-yellow-500';
-        return 'text-foreground';
+        return 'text-destructive';
     };
     
     useEffect(() => {
@@ -459,6 +460,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             fixtureId,
             homeGoals,
             awayGoals,
+            points: 0,
             timestamp: new Date().toISOString()
         };
         setDoc(predictionRef, predictionData, { merge: true }).catch(serverError => {

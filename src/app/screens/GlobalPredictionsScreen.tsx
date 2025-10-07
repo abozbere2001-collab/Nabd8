@@ -64,11 +64,12 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
         
         if (actualHome === null || actualAway === null) return "bg-card text-foreground";
 
-        const correctScore = actualHome === predHome && actualAway === predAway;
-        if (correctScore) {
+        // Exact score prediction
+        if (actualHome === predHome && actualAway === predAway) {
             return "bg-green-500/20 text-green-500";
         }
 
+        // Correct outcome (winner or draw)
         const actualWinner = actualHome > actualAway ? 'home' : actualHome < actualAway ? 'away' : 'draw';
         const predWinner = predHome > predAway ? 'home' : predHome < predAway ? 'away' : 'draw';
         
@@ -76,14 +77,15 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
             return "bg-yellow-500/20 text-yellow-500";
         }
 
-        return "bg-card text-foreground";
+        // Incorrect prediction
+        return "bg-destructive/20 text-destructive";
     };
     
     const getPointsColor = () => {
         if (!isMatchFinished || userPrediction?.points === undefined) return 'text-primary';
         if (userPrediction.points === 5) return 'text-green-500'; // Correct score
         if (userPrediction.points === 3) return 'text-yellow-500'; // Correct winner
-        return 'text-foreground'; // Wrong prediction
+        return 'text-destructive'; // Wrong prediction
     };
 
     useEffect(() => {
@@ -307,6 +309,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             fixtureId,
             homeGoals,
             awayGoals,
+            points: 0, // Default points, will be updated by a backend process
             timestamp: new Date().toISOString()
         };
 
@@ -323,13 +326,14 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title="التوقعات العالمية" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+            <ScreenHeader title="التوقعات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
             <div className="flex-1 overflow-y-auto">
                 <Tabs defaultValue="predictions" className="w-full">
                     <div className="sticky top-0 bg-background z-10 border-b">
-                       <TabsList className="grid w-full grid-cols-3">
+                       <TabsList className="grid w-full grid-cols-4">
                            <TabsTrigger value="prizes">الجوائز</TabsTrigger>
                            <TabsTrigger value="leaderboard">الترتيب</TabsTrigger>
+                           <TabsTrigger value="season_predictions">توقعات الموسم</TabsTrigger>
                            <TabsTrigger value="predictions">التصويت</TabsTrigger>
                        </TabsList>
                     </div>
@@ -364,6 +368,16 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                             )}
                         </div>
                     </TabsContent>
+                    
+                    <TabsContent value="season_predictions" className="p-4 mt-0">
+                         <Card className="cursor-pointer hover:bg-card/90" onClick={() => navigate('SeasonPredictions')}>
+                           <CardContent className="p-6 text-center">
+                                <p className="text-lg font-bold">توقع بطل الموسم والهداف</p>
+                                <p className="text-sm text-muted-foreground">اربح نقاطًا إضافية في نهاية الموسم. اضغط هنا للمشاركة.</p>
+                           </CardContent>
+                        </Card>
+                    </TabsContent>
+
 
                     <TabsContent value="leaderboard" className="p-4 mt-0">
                          <Card>

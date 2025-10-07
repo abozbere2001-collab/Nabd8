@@ -17,6 +17,7 @@ import { NotificationsScreen } from './screens/NotificationsScreen';
 import { GlobalPredictionsScreen } from './screens/GlobalPredictionsScreen';
 import { AdminMatchSelectionScreen } from './screens/AdminMatchSelectionScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { SeasonPredictionsScreen } from './screens/SeasonPredictionsScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { ProfileButton } from '@/components/ProfileButton';
@@ -37,6 +38,7 @@ const screens: Record<Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp' | 'Profil
   Notifications: NotificationsScreen,
   GlobalPredictions: GlobalPredictionsScreen,
   AdminMatchSelection: AdminMatchSelectionScreen,
+  SeasonPredictions: SeasonPredictionsScreen,
 };
 
 const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
