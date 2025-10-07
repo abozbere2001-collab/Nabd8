@@ -273,7 +273,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
   }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-4">
       <div className="flex justify-center items-center gap-2">
        {homeLineup && (
          <Button
@@ -587,7 +587,7 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
         />}
       <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="lineups" className="w-full">
-          <div className="p-4 pb-0 sticky top-0 bg-background z-10 border-b">
+          <div className="px-4 py-2 sticky top-0 bg-background z-10 border-b">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="details">التفاصيل</TabsTrigger>
               <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
@@ -597,7 +597,7 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
           </div>
           <TabsContent value="details">
             <Tabs defaultValue={eventFilter} onValueChange={(val) => setEventFilter(val as EventFilter)} className="w-full">
-                 <div className="px-4 pt-4">
+                 <div className="px-4 pt-2">
                     <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="highlights">الأبرز</TabsTrigger>
                         <TabsTrigger value="all">جميع التفاصيل</TabsTrigger>

@@ -251,8 +251,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         />}
        <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="matches" className="w-full">
-          <div className="p-4 pt-2 pb-0 sticky top-0 bg-background z-10">
-             <p className="text-center text-xs text-muted-foreground py-2">جميع البيانات تخص موسم {CURRENT_SEASON}</p>
+          <div className="px-4 py-2 sticky top-0 bg-background z-10 border-b">
+             <p className="text-center text-xs text-muted-foreground pb-2">جميع البيانات تخص موسم {CURRENT_SEASON}</p>
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="matches"><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
               <TabsTrigger value="standings"><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
@@ -334,7 +334,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 <TableCell className="text-center">{s.all.lose}</TableCell>
                                 <TableCell className="text-center font-bold">{s.points}</TableCell>
                                  <TableCell onClick={e => e.stopPropagation()}>
-                                     <div className='flex items-center justify-end'>
+                                     <div className='flex items-center justify-end opacity-80'>
                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleFavorite('team', s.team)}>
                                             <Star className={favorites?.teams?.[s.team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                         </Button>
@@ -381,7 +381,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 </TableCell>
                                 <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
                                 <TableCell>
-                                    <div className='flex items-center justify-end'>
+                                    <div className='flex items-center justify-end opacity-80'>
                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleFavorite('player', player)}>
                                             <Star className={favorites?.players?.[player.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                         </Button>

@@ -228,8 +228,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
       </div> : teamInfo ? (
         <div className="flex-1 overflow-y-auto">
             <Tabs defaultValue="details" className="w-full">
-                 <div className="bg-card sticky top-0 z-10">
-                    <div className="p-4 flex items-center gap-4">
+                 <div className="bg-card sticky top-0 z-10 border-b">
+                    <div className="px-4 pt-4 pb-2 flex items-center gap-4">
                         <Avatar className="h-20 w-20 border">
                             <AvatarImage src={teamInfo.team.logo} />
                             <AvatarFallback>{teamInfo.team.name.substring(0, 2)}</AvatarFallback>
@@ -272,9 +272,9 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                      ))}
                    </div>
                 </TabsContent>
-                <TabsContent value="details">
+                <TabsContent value="details" className="p-0">
                      <Tabs defaultValue="matches" className="w-full">
-                         <div className="px-4 pt-2 bg-background sticky top-[152px] z-10">
+                         <div className="px-4 py-2 bg-background sticky top-[152px] z-10 border-b">
                             <TabsList className="grid w-full grid-cols-3">
                                 <TabsTrigger value="matches"><Shirt className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
                                 <TabsTrigger value="standings"><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
