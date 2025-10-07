@@ -107,7 +107,7 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg border bg-muted p-3 text-sm transition-colors hover:bg-accent cursor-pointer"
+        className="rounded-lg bg-card p-3 text-sm transition-colors hover:bg-accent cursor-pointer"
         onClick={() => onSelect(fixture.fixture.id, fixture)}
       >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
@@ -134,7 +134,7 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
              </div>
              <div className={cn(
                 "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
-                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-card" : "bg-card"
+                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-muted"
                 )}>
                  {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
@@ -236,14 +236,8 @@ const FixturesList = ({
             {sortedLeagues.map(leagueName => {
                 const { league, fixtures } = groupedFixtures[leagueName];
                 return (
-                    <div key={leagueName}>
-                        <div className="flex items-center gap-3 px-1 py-4">
-                            <Avatar className="h-6 w-6">
-                                <AvatarImage src={league.logo} alt={league.name} />
-                                <AvatarFallback>{league.name.substring(0,1)}</AvatarFallback>
-                            </Avatar>
-                            <h3 className="font-bold text-foreground">{leagueName}</h3>
-                        </div>
+                    <div key={leagueName} className="space-y-2">
+                        <h3 className="font-bold text-foreground px-1 py-2">{leagueName}</h3>
                         <div className="space-y-2">
                             {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} onSelect={onSelectFixture} />)}
                         </div>
@@ -288,16 +282,19 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                 const dateKey = formatDateKey(date);
                 const isSelected = dateKey === selectedDateKey;
                 return (
-                    <Button
+                     <button
                         key={dateKey}
                         ref={isSelected ? selectedButtonRef : null}
-                        variant={isSelected ? 'default' : 'outline'}
-                        className={cn("flex flex-col h-auto py-1 px-2.5 min-w-[48px]", isSelected ? 'text-primary-foreground' : 'text-foreground')}
+                        className={cn(
+                            "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-md transition-colors",
+                            isSelected ? "text-primary" : "text-foreground/80 hover:text-primary"
+                        )}
                         onClick={() => onDateSelect(dateKey)}
                     >
                         <span className="text-xs font-normal">{getDayLabel(date)}</span>
                         <span className="font-bold text-sm">{format(date, 'd')}</span>
-                    </Button>
+                         {isSelected && <div className="absolute inset-0 rounded-md ring-2 ring-primary"></div>}
+                    </button>
                 )
             })}
         </div>
@@ -354,7 +351,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
       <div className="flex flex-1 flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
           
-          <div className="border-b bg-card">
+          <div className="border-b bg-card pt-2">
              <TabsList className="grid w-full grid-cols-2 rounded-none h-auto p-0">
                 <TabsTrigger value="my-results" className='rounded-none'>نتائجي</TabsTrigger>
                 <TabsTrigger value="all-matches" className='rounded-none'>كل المباريات</TabsTrigger>
@@ -364,7 +361,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto px-4 mt-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <FixturesList 
                 fixtures={fixtures}
                 loading={loading}
