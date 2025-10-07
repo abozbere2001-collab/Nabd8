@@ -155,7 +155,19 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         const fetchDailyMatchesAndPredictions = async () => {
             setLoading(true);
             try {
-                // 1. Fetch today's global matches from Firestore
+                // 1. Fetch ALL of the user's predictions with a simple query first.
+                const predsRef = collection(db, 'predictions');
+                const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
+                const userPredsSnapshot = await getDocs(userPredsQuery);
+
+                const allUserPredictions: { [key: number]: Prediction } = {};
+                userPredsSnapshot.forEach(doc => {
+                    const pred = doc.data() as Prediction;
+                    allUserPredictions[pred.fixtureId] = pred;
+                });
+                setPredictions(allUserPredictions);
+
+                // 2. Fetch today's global matches from Firestore
                 const today = format(new Date(), 'yyyy-MM-dd');
                 const dailyDocRef = doc(db, 'dailyGlobalPredictions', today);
                 const docSnap = await getDoc(dailyDocRef);
@@ -174,24 +186,12 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     return; // No matches for today, exit early.
                 }
 
-                // 2. Fetch details for those fixtures from the API
+                // 3. Fetch details for those fixtures from the API
                 const res = await fetch(`/api/football/fixtures?ids=${fixtureIds.join('-')}`);
                 const data = await res.json();
                 const fetchedFixtures = data.response || [];
                 setSelectedMatches(fetchedFixtures);
                 
-                // 3. Fetch ALL of the user's predictions with a simple query
-                const predsRef = collection(db, 'predictions');
-                const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
-                const userPredsSnapshot = await getDocs(userPredsQuery);
-
-                const allUserPredictions: { [key: number]: Prediction } = {};
-                userPredsSnapshot.forEach(doc => {
-                    const pred = doc.data() as Prediction;
-                    allUserPredictions[pred.fixtureId] = pred;
-                });
-                setPredictions(allUserPredictions);
-
             } catch (error) {
                  const permissionError = new FirestorePermissionError({ path: `dailyGlobalPredictions or predictions where userId == ${user.uid}`, operation: 'list' });
                  errorEmitter.emit('permission-error', permissionError);
@@ -316,4 +316,4 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     );
 }
 
-  
+    
