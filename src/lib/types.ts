@@ -36,3 +36,14 @@ export interface AdminFavorite {
   note: string;
 }
 
+export interface MatchDetails {
+    commentsEnabled: boolean;
+}
+
+export interface MatchComment {
+    userId: string;
+    userName: string;
+    userPhoto: string;
+    text: string;
+    createdAt: any; // Firestore ServerTimestamp
+}

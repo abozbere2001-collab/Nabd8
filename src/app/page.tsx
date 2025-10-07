@@ -12,6 +12,7 @@ import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
 import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
+import { CommentsScreen } from './screens/CommentsScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
@@ -22,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { SearchSheet } from '@/components/SearchSheet';
 
 
-export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails' | 'AdminFavoriteTeamDetails';
+export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails' | 'AdminFavoriteTeamDetails' | 'Comments';
 export type ScreenProps = {
   navigate: (screen: ScreenKey, props?: Record<string, any>) => void;
   goBack: () => void;
@@ -41,9 +42,10 @@ const screens: Record<Exclude<ScreenKey, 'Search'>, React.ComponentType<any>> = 
   MatchDetails: MatchDetailScreen,
   TeamDetails: TeamDetailScreen,
   AdminFavoriteTeamDetails: AdminFavoriteTeamScreen,
+  Comments: CommentsScreen,
 };
 
-const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
+const mainTabs: ScreenKey[] = ['Settings', 'News', 'Iraq', 'Competitions', 'Matches'];
 
 type StackItem = {
   key: string;
@@ -64,6 +66,8 @@ function AppContent({ user }: { user: User | null }) {
       setTimeout(() => {
         setStack(prev => {
             const newStack = prev.slice(0, -1);
+            // Clean up the instance of the screen we are leaving
+            delete screenInstances.current[lastItemKey];
             return newStack;
         });
         setIsAnimatingOut(null);
@@ -81,6 +85,8 @@ function AppContent({ user }: { user: User | null }) {
         if (prevStack.length === 1 && prevStack[0].screen === screen) {
            return prevStack;
         }
+        // Clean up all screen instances when switching main tabs
+        screenInstances.current = {};
         return [newItem];
       } else {
         return [...prevStack, newItem];

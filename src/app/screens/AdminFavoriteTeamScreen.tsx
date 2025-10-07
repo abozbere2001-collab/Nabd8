@@ -9,15 +9,19 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { Fixture } from '@/lib/types';
+import { CommentsButton } from '@/components/CommentsButton';
 
 
-const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSelect: (fixtureId: number, fixture: Fixture) => void }) => {
+const FixtureItem = React.memo(({ fixture, navigate }: { fixture: Fixture, navigate: (screen: 'MatchDetails', props: any) => void }) => {
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg bg-card border p-3 text-sm transition-all duration-300 hover:bg-accent/50 cursor-pointer"
-        onClick={() => onSelect(fixture.fixture.id, fixture)}
+        className="rounded-lg bg-card border p-3 text-sm transition-all duration-300"
       >
+        <div 
+            className="hover:bg-accent/50 cursor-pointer -m-3 p-3"
+            onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
+        >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
               <div className="flex items-center gap-2">
                   <Avatar className="h-4 w-4">
@@ -51,6 +55,10 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
                  <span className="font-semibold truncate">{fixture.teams.away.name}</span>
              </div>
          </div>
+        </div>
+        <div className="mt-2 pt-2 border-t border-border/50">
+           <CommentsButton matchId={fixture.fixture.id} navigate={navigate as any} />
+        </div>
       </div>
     );
 });
@@ -77,10 +85,6 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
         fetchFixtures();
     }, [teamId]);
 
-    const handleSelectFixture = (fixtureId: number, fixture: Fixture) => {
-        navigate('MatchDetails', { fixtureId, fixture });
-    };
-
     return (
         <div className="flex h-full flex-col bg-background">
             <ScreenHeader title={teamName} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
@@ -92,7 +96,7 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
                 ) : fixtures.length > 0 ? (
                     <div className="space-y-3">
                         {fixtures.map((fixture) => (
-                           <FixtureItem key={fixture.fixture.id} fixture={fixture} onSelect={handleSelectFixture} />
+                           <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate as any} />
                         ))}
                     </div>
                 ) : (
@@ -102,4 +106,3 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
         </div>
     );
 }
-

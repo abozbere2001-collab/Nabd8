@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { SearchSheet } from '@/components/SearchSheet';
+import { CommentsButton } from '@/components/CommentsButton';
 
 
 // Interfaces
@@ -120,7 +121,7 @@ const LiveTimer = ({ startTime, status, elapsed }: { startTime: number, status: 
 };
 
 // Fixture Item Component
-const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture, onSelect: (fixtureId: number, fixture: Fixture) => void, odds?: Odds['bookmakers'][0]['bets'][0]['values'] }) => {
+const FixtureItem = React.memo(({ fixture, navigate, odds }: { fixture: Fixture, navigate: ScreenProps['navigate'], odds?: Odds['bookmakers'][0]['bets'][0]['values'] }) => {
     
     const homeOdd = odds?.find(o => o.value === 'Home')?.odd;
     const drawOdd = odds?.find(o => o.value === 'Draw')?.odd;
@@ -129,9 +130,12 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg bg-card border p-3 text-sm transition-all duration-300 hover:bg-accent/50 cursor-pointer"
-        onClick={() => onSelect(fixture.fixture.id, fixture)}
+        className="rounded-lg bg-card border p-3 text-sm transition-all duration-300"
       >
+        <div 
+          className="hover:bg-accent/50 cursor-pointer -m-3 p-3"
+          onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
+        >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
               <div className="flex items-center gap-2">
                   <Avatar className="h-4 w-4">
@@ -170,6 +174,7 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
                  <span className="font-semibold truncate">{fixture.teams.away.name}</span>
              </div>
          </div>
+         </div>
          {odds && (
             <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground text-center grid grid-cols-3 gap-2">
                 <div>
@@ -186,6 +191,9 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
                 </div>
             </div>
          )}
+         <div className="mt-2 pt-2 border-t border-border/50">
+            <CommentsButton matchId={fixture.fixture.id} navigate={navigate} />
+         </div>
       </div>
     );
 });
@@ -202,7 +210,7 @@ const FixturesList = ({
     favoritedLeagueIds,
     favoritedTeamIds,
     odds,
-    onSelectFixture,
+    navigate,
 }: { 
     fixtures: Fixture[], 
     loading: boolean,
@@ -212,7 +220,7 @@ const FixturesList = ({
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
     odds: { [fixtureId: number]: Odds['bookmakers'][0]['bets'][0]['values'] },
-    onSelectFixture: (fixtureId: number, fixture: Fixture) => void
+    navigate: ScreenProps['navigate'],
 }) => {
     
     const filteredFixtures = useMemo(() => {
@@ -297,7 +305,7 @@ const FixturesList = ({
                     <div key={leagueName} className="space-y-2">
                         <h3 className="font-bold text-foreground px-1 py-2">{leagueName}</h3>
                         <div className="space-y-2">
-                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} onSelect={onSelectFixture} odds={odds[f.fixture.id]} />)}
+                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} odds={odds[f.fixture.id]} />)}
                         </div>
                     </div>
                 )
@@ -389,10 +397,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
       console.warn('Could not access localStorage:', error);
     }
   }, []);
-
-  const handleSelectFixture = (fixtureId: number, fixture: Fixture) => {
-    navigate('MatchDetails', { fixtureId, fixture });
-  };
   
   const fetchOddsForDate = async (dateKey: string) => {
       setLoadingOdds(true);
@@ -493,7 +497,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
       <div className="flex flex-1 flex-col min-h-0">
         <div className="flex flex-col border-b bg-card">
             <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none flex-row-reverse">
+              <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
                   <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
                   <TabsTrigger value="my-results">نتائجي</TabsTrigger>
               </TabsList>
@@ -512,7 +516,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
             favoritedTeamIds={favoritedTeamIds}
             hasAnyFavorites={hasAnyFavorites}
             odds={odds}
-            onSelectFixture={handleSelectFixture}
+            navigate={navigate}
         />
         </div>
       </div>
