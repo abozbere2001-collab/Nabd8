@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -19,6 +20,9 @@ import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, query
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
+import type { Favorites } from '@/lib/types';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 interface TeamResult {
   team: { id: number; name: string; logo: string; };
@@ -31,10 +35,6 @@ interface LeagueResult {
 
 type SearchResult = (TeamResult & { type: 'team' }) | (LeagueResult & { type: 'league' });
 
-interface Favorites {
-    leagues?: { [key: number]: any };
-    teams?: { [key: number]: any };
-}
 type RenameType = 'league' | 'team';
 
 export function SearchSheet({ children, navigate }: { children: React.ReactNode, navigate: ScreenProps['navigate'] }) {
@@ -49,7 +49,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   const { isAdmin } = useAdmin();
   const { user } = useAuth();
   const { db } = useFirestore();
-  const [favorites, setFavorites] = useState<Favorites>({});
+  const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || ''});
   const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
   
@@ -58,16 +58,20 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
 
   const fetchFavorites = useCallback(async () => {
     if (!user) return;
+    const docRef = doc(db, 'favorites', user.uid);
     try {
-        const docRef = doc(db, 'favorites', user.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
             setFavorites(docSnap.data() as Favorites);
         } else {
-            setFavorites({});
+            setFavorites({ userId: user.uid });
         }
     } catch (error) {
-        console.error("Error fetching favorites:", error);
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
     }
   }, [user, db]);
 
@@ -86,20 +90,34 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   
   const fetchAllCustomNames = useCallback(async () => {
     try {
+        const leaguesCollection = collection(db, 'leagueCustomizations');
+        const teamsCollection = collection(db, 'teamCustomizations');
+        
         const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
-            getDocs(collection(db, 'leagueCustomizations')),
-            getDocs(collection(db, 'teamCustomizations'))
-        ]);
+            getDocs(leaguesCollection),
+            getDocs(teamsCollection)
+        ]).catch(error => {
+            const permissionError = new FirestorePermissionError({
+              path: 'leagueCustomizations or teamCustomizations',
+              operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            return [null, null];
+        });
         
         const leagueNames = new Map<number, string>();
-        leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+        leaguesSnapshot?.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
         
         const teamNames = new Map<string, string>();
-        teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+        teamsSnapshot?.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
         
-        setCustomNames({ leagues: leagueNames, teams: teamNames });
+        setCustomNames({ leagues: leagueNames, teams: teamNames as any });
     } catch(error) {
-        console.error("Failed to fetch custom names for search:", error);
+         const permissionError = new FirestorePermissionError({
+            path: 'customizations',
+            operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
     }
   }, [db]);
 
@@ -175,7 +193,11 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
       
       setResults(Array.from(resultsMap.values()));
     } catch (error) {
-      console.error("Search failed:", error);
+      const permissionError = new FirestorePermissionError({
+        path: 'teamCustomizations/leagueCustomizations',
+        operation: 'list'
+      });
+      errorEmitter.emit('permission-error', permissionError);
       setResults([]);
     } finally {
       setLoading(false);
@@ -197,9 +219,19 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     if (!renameItem) return;
     const { id, type } = renameItem;
     let collectionName = type === 'league' ? 'leagueCustomizations' : 'teamCustomizations';
-    await setDoc(doc(db, collectionName, String(id)), { customName: newName });
-    // Manually refetch custom names to update UI
-    await fetchAllCustomNames();
+    const docRef = doc(db, collectionName, String(id));
+    const data = { customName: newName };
+    try {
+        await setDoc(docRef, data);
+        await fetchAllCustomNames();
+    } catch(error) {
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'create',
+          requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    }
   };
   
   const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
@@ -209,12 +241,23 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
 
   const handleSaveNote = async (note: string) => {
     if (!noteTeam) return;
-    await setDoc(doc(db, "adminFavorites", String(noteTeam.id)), {
+    const docRef = doc(db, "adminFavorites", String(noteTeam.id));
+    const data = {
       teamId: noteTeam.id,
       name: noteTeam.name,
       logo: noteTeam.logo,
       note: note
-    });
+    };
+    try {
+        await setDoc(docRef, data);
+    } catch(error) {
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'create',
+          requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    }
   }
 
   const handleFavorite = async (type: 'team' | 'league', item: any) => {
@@ -224,20 +267,28 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     const fieldPath = `${itemPath}.${item.id}`;
     const isFavorited = !!favorites?.[itemPath]?.[item.id];
     
-    let favoriteData: any = {};
+    let favoriteData: any = { userId: user.uid };
      if (type === 'team') {
-       favoriteData = { teams: { [item.id]: { teamId: item.id, name: item.name, logo: item.logo }}};
+       favoriteData.teams = { [item.id]: { teamId: item.id, name: item.name, logo: item.logo }};
     } else {
-       favoriteData = { leagues: { [item.id]: { leagueId: item.id, name: item.name, logo: item.logo }}};
+       favoriteData.leagues = { [item.id]: { leagueId: item.id, name: item.name, logo: item.logo }};
     }
 
-    if (isFavorited) {
-        await updateDoc(favRef, { [fieldPath]: deleteField() });
-    } else {
-        await setDoc(favRef, favoriteData, { merge: true });
+    try {
+        if (isFavorited) {
+            await updateDoc(favRef, { [fieldPath]: deleteField() });
+        } else {
+            await setDoc(favRef, favoriteData, { merge: true });
+        }
+        await fetchFavorites();
+    } catch(error) {
+        const permissionError = new FirestorePermissionError({
+          path: favRef.path,
+          operation: 'update',
+          requestResourceData: favoriteData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
     }
-    // Manually refetch favorites to update UI
-    await fetchFavorites();
   };
 
   const handleResultClick = (result: SearchResult) => {

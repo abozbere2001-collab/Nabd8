@@ -18,6 +18,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Fixture, Standing, TopScorer, Favorites } from '@/lib/types';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 
 // --- TYPE DEFINITIONS ---
@@ -129,7 +131,11 @@ function useTeamData(teamId?: number) {
         });
 
       } catch (error) {
-        console.error("Failed to fetch team details:", error);
+        const permissionError = new FirestorePermissionError({
+            path: `/api/football/teams?id=${teamId}`,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
       } finally {
         setLoading(false);
       }
@@ -156,8 +162,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
 
   const fetchCustomTeamName = React.useCallback(async () => {
     if (teamId) {
+        const docRef = doc(db, "teamCustomizations", String(teamId));
         try {
-            const docRef = doc(db, "teamCustomizations", String(teamId));
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
                 setDisplayTitle(docSnap.data().customName);
@@ -165,7 +171,11 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                 setDisplayTitle(teamInfo.team.name);
             }
         } catch (error) {
-            console.error("Error fetching custom team name:", error);
+            const permissionError = new FirestorePermissionError({
+              path: docRef.path,
+              operation: 'get',
+            });
+            errorEmitter.emit('permission-error', permissionError);
              if (teamInfo?.team.name) {
                 setDisplayTitle(teamInfo.team.name);
             }
@@ -181,8 +191,15 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
 
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
+    const docRef = doc(db, 'favorites', user.uid);
+    const unsub = onSnapshot(docRef, (doc) => {
         setFavorites(doc.data() as Favorites || { userId: user.uid });
+    }, (error) => {
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
     });
     return () => unsub();
   }, [user, db]);
@@ -196,9 +213,20 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     if (!renameItem) return;
     const { id, type } = renameItem;
     const collectionName = type === 'player' ? 'playerCustomizations' : 'teamCustomizations';
-    await setDoc(doc(db, collectionName, String(id)), { customName: newName });
-    if(type === 'team') {
-        fetchCustomTeamName();
+    const docRef = doc(db, collectionName, String(id));
+    const data = { customName: newName };
+    try {
+        await setDoc(docRef, data);
+        if(type === 'team') {
+            fetchCustomTeamName();
+        }
+    } catch (error) {
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'create',
+          requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
     }
   };
 
@@ -216,10 +244,19 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
        favoriteData.players = { [item.id]: { playerId: item.id, name: item.name, photo: item.photo }};
     }
 
-    if (isFavorited) {
-        await updateDoc(favRef, { [fieldPath]: deleteField() });
-    } else {
-        await setDoc(favRef, favoriteData, { merge: true });
+    try {
+        if (isFavorited) {
+            await updateDoc(favRef, { [fieldPath]: deleteField() });
+        } else {
+            await setDoc(favRef, favoriteData, { merge: true });
+        }
+    } catch (error) {
+        const permissionError = new FirestorePermissionError({
+          path: favRef.path,
+          operation: 'update',
+          requestResourceData: favoriteData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
     }
   };
   
@@ -230,12 +267,23 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
 
   const handleSaveNote = async (note: string) => {
     if (!noteTeam) return;
-    await setDoc(doc(db, "adminFavorites", String(noteTeam.id)), {
+    const docRef = doc(db, "adminFavorites", String(noteTeam.id));
+    const data = {
       teamId: noteTeam.id,
       name: noteTeam.name,
       logo: noteTeam.logo,
       note: note
-    });
+    };
+    try {
+        await setDoc(docRef, data);
+    } catch (error) {
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'create',
+          requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    }
   }
 
   const isTeamFavorited = !!favorites?.teams?.[teamId];

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -10,6 +11,8 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { Fixture } from '@/lib/types';
 import { CommentsButton } from '@/components/CommentsButton';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 
 const FixtureItem = React.memo(({ fixture, navigate }: { fixture: Fixture, navigate: (screen: 'MatchDetails', props: any) => void }) => {
@@ -77,7 +80,11 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
                 const data = await res.json();
                 setFixtures(data.response || []);
             } catch (error) {
-                console.error("Failed to fetch team fixtures:", error);
+                const permissionError = new FirestorePermissionError({
+                  path: `/api/football/fixtures?team=${teamId}`,
+                  operation: 'get',
+                });
+                errorEmitter.emit('permission-error', permissionError);
             } finally {
                 setLoading(false);
             }

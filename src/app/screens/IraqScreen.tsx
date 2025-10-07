@@ -14,6 +14,8 @@ import { collection, getDocs } from 'firebase/firestore';
 import { useFirestore, useAdmin } from '@/firebase/provider';
 import type { Fixture, Standing, TopScorer, AdminFavorite } from '@/lib/types';
 import { CommentsButton } from '@/components/CommentsButton';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 
 const IRAQI_LEAGUE_ID = 548;
@@ -222,15 +224,20 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 return;
             }
             setLoading(true);
+            const favsRef = collection(db, 'adminFavorites');
             try {
-                const snapshot = await getDocs(collection(db, 'adminFavorites'));
+                const snapshot = await getDocs(favsRef);
                 const fetchedTeams: AdminFavorite[] = [];
                 snapshot.forEach((doc) => {
                     fetchedTeams.push(doc.data() as AdminFavorite);
                 });
                 setTeams(fetchedTeams);
             } catch (error) {
-                console.error("Failed to fetch admin favorites:", error);
+                const permissionError = new FirestorePermissionError({
+                  path: favsRef.path,
+                  operation: 'list',
+                });
+                errorEmitter.emit('permission-error', permissionError);
             } finally {
                 setLoading(false);
             }
@@ -303,5 +310,3 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
     </div>
   );
 }
-
-    
