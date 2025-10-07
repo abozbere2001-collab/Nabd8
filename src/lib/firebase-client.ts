@@ -106,12 +106,13 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
     const userRef = doc(db, 'users', user.uid);
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
     
+    // Note: The field name is `displayName` not `name`.
     const userProfileUpdateData = { displayName: newDisplayName };
     const leaderboardUpdateData = { userName: newDisplayName };
 
-    // Update user profile
+    // Update user profile in 'users' collection
     setDoc(userRef, userProfileUpdateData, { merge: true })
-        .catch(serverError => {
+        .catch((serverError) => {
             const permissionError = new FirestorePermissionError({
                 path: userRef.path,
                 operation: 'update',
@@ -120,9 +121,9 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
             errorEmitter.emit('permission-error', permissionError);
         });
 
-    // Update leaderboard entry
+    // Update leaderboard entry in 'leaderboard' collection
     setDoc(leaderboardRef, leaderboardUpdateData, { merge: true })
-        .catch(serverError => {
+        .catch((serverError) => {
             const permissionError = new FirestorePermissionError({
                 path: leaderboardRef.path,
                 operation: 'update',
