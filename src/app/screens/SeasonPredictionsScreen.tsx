@@ -35,7 +35,7 @@ const leagues = [
 ];
 
 interface LeagueData {
-    teams: Team[];
+    teams: { team: Team }[];
     scorers: TopScorer[];
 }
 
@@ -45,6 +45,10 @@ const useLeagueData = (leagueId: number) => {
 
     useEffect(() => {
         const fetchData = async () => {
+            if (!leagueId) {
+                 setLoading(false);
+                 return;
+            }
             setLoading(true);
             try {
                 const [teamsRes, scorersRes] = await Promise.all([
@@ -77,6 +81,8 @@ const LeaguePredictionCard = ({ league, userId }: { league: { id: number, name: 
     const [championId, setChampionId] = useState<string | undefined>();
     const [scorerId, setScorerId] = useState<string | undefined>();
     const [saving, setSaving] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(true);
+
 
     const predictionDocRef = useMemo(() => {
         if (!db) return null;
@@ -85,6 +91,8 @@ const LeaguePredictionCard = ({ league, userId }: { league: { id: number, name: 
 
     useEffect(() => {
         if (!predictionDocRef) return;
+        
+        setInitialLoading(true);
         getDoc(predictionDocRef).then(docSnap => {
             if (docSnap.exists()) {
                 const data = docSnap.data() as SeasonPrediction;
@@ -94,6 +102,8 @@ const LeaguePredictionCard = ({ league, userId }: { league: { id: number, name: 
         }).catch(error => {
             const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'get' });
             errorEmitter.emit('permission-error', permissionError);
+        }).finally(() => {
+            setInitialLoading(false);
         });
     }, [predictionDocRef]);
 
@@ -123,14 +133,16 @@ const LeaguePredictionCard = ({ league, userId }: { league: { id: number, name: 
                 setSaving(false);
             });
     };
+    
+    const isLoading = loading || initialLoading;
 
     return (
         <div className="p-4 border rounded-lg bg-card">
             <h3 className="font-bold mb-4">{league.name}</h3>
-            {loading ? <Loader2 className="mx-auto h-6 w-6 animate-spin" /> : (
+            {isLoading ? <Loader2 className="mx-auto h-6 w-6 animate-spin" /> : (
                 <div className="space-y-4">
                     <div>
-                        <label className="text-sm font-medium">توقع البطل</label>
+                        <label className="text-sm font-medium mb-1 block">توقع البطل</label>
                         <Select value={championId} onValueChange={setChampionId}>
                             <SelectTrigger><SelectValue placeholder="اختر الفريق البطل..." /></SelectTrigger>
                             <SelectContent>
@@ -141,7 +153,7 @@ const LeaguePredictionCard = ({ league, userId }: { league: { id: number, name: 
                         </Select>
                     </div>
                     <div>
-                        <label className="text-sm font-medium">توقع الهداف</label>
+                        <label className="text-sm font-medium mb-1 block">توقع الهداف</label>
                          <Select value={scorerId} onValueChange={setScorerId}>
                             <SelectTrigger><SelectValue placeholder="اختر الهداف..." /></SelectTrigger>
                             <SelectContent>
