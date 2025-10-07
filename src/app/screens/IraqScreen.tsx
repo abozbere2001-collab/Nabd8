@@ -18,8 +18,8 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
 
-const IRAQI_LEAGUE_ID = 548;
-const CURRENT_SEASON = new Date().getFullYear();
+const IRAQI_LEAGUE_ID = 542;
+const CURRENT_SEASON = 2025;
 
 
 const FixtureItem = React.memo(({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
