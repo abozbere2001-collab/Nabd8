@@ -5,7 +5,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Star, Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Star, Pencil, Plus, Trash2, Loader2, Copy } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,6 +15,18 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
 // Interfaces
 interface ApiLeague {
@@ -95,6 +107,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     const { isAdmin } = useAdmin();
     const { user } = useAuth();
     const { db } = useFirestore();
+    const { toast } = useToast();
     const [favorites, setFavorites] = useState<Favorites>({ userId: '', leagues: {} });
     const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, type: null, id: '', currentName: '' });
     const [isAddOpen, setAddOpen] = useState(false);
@@ -106,6 +119,12 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     const getLeagueName = useCallback((comp: ManagedCompetition) => customLeagueNames.get(comp.leagueId) || comp.name, [customLeagueNames]);
     const getCountryName = useCallback((name: string) => customCountryNames.get(name) || name, [customCountryNames]);
     const getContinentName = useCallback((name: string) => customContinentNames.get(name) || name, [customContinentNames]);
+
+    const handleCopy = (url: string | null) => {
+        if (!url) return;
+        navigator.clipboard.writeText(url);
+        toast({ title: "تم نسخ الرابط", description: url });
+    };
 
     useEffect(() => {
         if (!user) return;
@@ -228,9 +247,11 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         const docRef = doc(db, 'managedCompetitions', String(leagueId));
         try {
             await deleteDoc(docRef);
+             toast({ title: 'نجاح', description: `تم حذف البطولة بنجاح.` });
         } catch (error) {
             const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
             errorEmitter.emit('permission-error', permissionError);
+             toast({ variant: 'destructive', title: 'فشل', description: `فشل حذف البطولة.` });
         }
     }
     
@@ -326,7 +347,10 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         <li key={comp.leagueId}>
             <div className="flex w-full items-center justify-between p-3 hover:bg-accent transition-colors rounded-md cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: getLeagueName(comp), leagueId: comp.leagueId, logo: comp.logo })}>
                 <div className="flex items-center gap-3">
-                    <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+                     <div className="relative">
+                        <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+                        {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(comp.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                    </div>
                     <div className="text-sm">
                         {getLeagueName(comp)}
                         {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {comp.leagueId})</span>}
@@ -334,9 +358,25 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                 </div>
                 <div className="flex items-center gap-1">
                     {isAdmin && (<>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleDeleteCompetition(comp.leagueId); }}>
-                            <Trash2 className="h-4 w-4 text-destructive/80" />
-                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                                    <Trash2 className="h-4 w-4 text-destructive/80" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        سيؤدي هذا الإجراء إلى حذف بطولة "{getLeagueName(comp)}" نهائياً. لا يمكن التراجع عن هذا الإجراء.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeleteCompetition(comp.leagueId)}>تأكيد الحذف</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openRenameDialog('league', String(comp.leagueId), getLeagueName(comp)); }}>
                             <Pencil className="h-4 w-4 text-muted-foreground/80" />
                         </Button>
@@ -383,7 +423,12 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                                                     <div className="flex w-full items-center justify-between">
                                                         <AccordionTrigger className="px-4 text-base font-semibold flex-1 hover:no-underline">
                                                             <div className="flex items-center gap-3">
-                                                                {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
+                                                                {flag && (
+                                                                     <div className="relative">
+                                                                        <img src={flag} alt={country} className="h-5 w-7 object-contain" />
+                                                                         {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(flag); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                                                                    </div>
+                                                                )}
                                                                 <span>{getCountryName(country)}</span>
                                                             </div>
                                                         </AccordionTrigger>

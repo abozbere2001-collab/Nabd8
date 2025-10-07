@@ -8,12 +8,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Share2, Star, Clock, User, ArrowLeftRight, RectangleVertical, ShieldAlert, Pencil } from 'lucide-react';
+import { ArrowLeft, Share2, Star, Clock, User, ArrowLeftRight, RectangleVertical, ShieldAlert, Pencil, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
+import { useToast } from '@/hooks/use-toast';
 
 // --- TYPE DEFINITIONS ---
 interface Fixture {
@@ -140,7 +141,7 @@ function useMatchData(fixtureId?: number, leagueId?: number) {
 }
 
 // --- SUB-COMPONENTS ---
-const MatchHeader = ({ fixture, onBack, headerActions, navigate }: { fixture: Fixture; onBack: () => void, headerActions?: React.ReactNode, navigate: ScreenProps['navigate'] }) => (
+const MatchHeader = ({ fixture, onBack, headerActions, navigate, isAdmin, onCopy }: { fixture: Fixture; onBack: () => void, headerActions?: React.ReactNode, navigate: ScreenProps['navigate'], isAdmin: boolean, onCopy: (url: string) => void }) => (
   <header className="relative bg-card text-foreground pt-10 pb-6 px-4 shadow-lg border-b">
     <div className="absolute top-4 left-4">
       <Button variant="ghost" size="icon" onClick={onBack} className="text-foreground/80 hover:bg-accent">
@@ -155,10 +156,13 @@ const MatchHeader = ({ fixture, onBack, headerActions, navigate }: { fixture: Fi
     </div>
     <div className="flex justify-around items-center">
       <div className="flex flex-col items-center gap-2 w-1/3 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
-        <Avatar className="w-16 h-16 border-2 border-border">
-          <AvatarImage src={fixture.teams.home.logo} />
-          <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
-        </Avatar>
+        <div className="relative">
+            <Avatar className="w-16 h-16 border-2 border-border">
+                <AvatarImage src={fixture.teams.home.logo} />
+                <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
+            </Avatar>
+            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(fixture.teams.home.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+        </div>
         <span className="font-bold">{fixture.teams.home.name}</span>
       </div>
       <div className="text-center">
@@ -168,17 +172,20 @@ const MatchHeader = ({ fixture, onBack, headerActions, navigate }: { fixture: Fi
         <div className="text-xs text-muted-foreground mt-1">{fixture.fixture.status.long}</div>
       </div>
       <div className="flex flex-col items-center gap-2 w-1/3 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
-        <Avatar className="w-16 h-16 border-2 border-border">
-          <AvatarImage src={fixture.teams.away.logo} />
-          <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
-        </Avatar>
+        <div className="relative">
+            <Avatar className="w-16 h-16 border-2 border-border">
+                <AvatarImage src={fixture.teams.away.logo} />
+                <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
+            </Avatar>
+             {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(fixture.teams.away.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+        </div>
         <span className="font-bold">{fixture.teams.away.name}</span>
       </div>
     </div>
   </header>
 );
 
-const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isAdmin }: { player: LineupPlayer, isHomeTeam: boolean, onRename: () => void, onFavorite: () => void, isFavorited: boolean, isAdmin: boolean }) => {
+const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isAdmin, onCopy }: { player: LineupPlayer, isHomeTeam: boolean, onRename: () => void, onFavorite: () => void, isFavorited: boolean, isAdmin: boolean, onCopy: (url: string) => void }) => {
     if (!player.player.grid) return null;
 
     const [row, col] = player.player.grid.split(':').map(Number);
@@ -223,6 +230,7 @@ const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isA
                         <Pencil className="h-4 w-4 text-white" />
                     </Button>}
                 </div>
+                 {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(player.player.photo); }}><Copy className="h-3 w-3 text-white" /></Button>}
             </div>
             <span className="text-[10px] font-semibold bg-black/50 text-white rounded-sm px-1 py-0.5 mt-1 whitespace-nowrap shadow-lg truncate w-full">
                 {player.player.name}
@@ -233,7 +241,7 @@ const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isA
 };
 
 
-const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite, isAdmin }: { lineups: Lineup[] | null, loading: boolean, fixture: Fixture, favorites: Favorites, onRename: (type: RenameType, id: number, name: string) => void, onFavorite: (type: 'player' | 'coach', item: any) => void, isAdmin: boolean }) => {
+const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite, isAdmin, onCopy }: { lineups: Lineup[] | null, loading: boolean, fixture: Fixture, favorites: Favorites, onRename: (type: RenameType, id: number, name: string) => void, onFavorite: (type: 'player' | 'coach', item: any) => void, isAdmin: boolean, onCopy: (url: string) => void }) => {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(fixture.teams.home.id);
 
   if (loading) {
@@ -257,10 +265,13 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
     return (
          <div key={playerInfo.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted">
             <span className="text-muted-foreground w-6 text-center font-mono">{playerInfo.number}</span>
-            <Avatar className="w-6 h-6">
-                <AvatarImage src={playerInfo.photo} />
-                <AvatarFallback>{playerInfo.name.substring(0,1)}</AvatarFallback>
-            </Avatar>
+             <div className="relative">
+                <Avatar className="w-6 h-6">
+                    <AvatarImage src={playerInfo.photo} />
+                    <AvatarFallback>{playerInfo.name.substring(0,1)}</AvatarFallback>
+                </Avatar>
+                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(playerInfo.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+            </div>
             <span className="font-medium truncate flex-1">
                 {playerInfo.name}
                 {isAdmin && <span className="text-xs text-muted-foreground/70 ml-2">(ID: {playerInfo.id})</span>}
@@ -321,6 +332,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
                 onFavorite={() => onFavorite('player', p.player)}
                 isFavorited={!!favorites?.players?.[p.player.id]}
                 isAdmin={isAdmin}
+                onCopy={onCopy}
               />
           ))}
           <div className="absolute bottom-2 right-2 bg-black/50 text-white text-sm font-bold px-2 py-1 rounded">
@@ -333,10 +345,13 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
         <h4 className="font-bold mb-2 text-base px-2">طاقم التدريب</h4>
         <div className="space-y-2">
             <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted">
-                <Avatar className="w-10 h-10">
-                <AvatarImage src={lineupToShow.coach.photo} alt={lineupToShow.coach.name} />
-                <AvatarFallback>{lineupToShow.coach.name.substring(0,1)}</AvatarFallback>
-                </Avatar>
+                 <div className="relative">
+                    <Avatar className="w-10 h-10">
+                        <AvatarImage src={lineupToShow.coach.photo} alt={lineupToShow.coach.name} />
+                        <AvatarFallback>{lineupToShow.coach.name.substring(0,1)}</AvatarFallback>
+                    </Avatar>
+                    {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(lineupToShow.coach.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                </div>
                 <div className='flex-1'>
                     <p className="font-medium">{lineupToShow.coach.name}</p>
                     <p className="text-xs text-muted-foreground">
@@ -545,10 +560,18 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
   const { isAdmin } = useAdmin();
   const { user } = useAuth();
   const { db } = useFirestore();
+  const { toast } = useToast();
   const [favorites, setFavorites] = useState<Favorites>({});
   const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
   const [eventFilter, setEventFilter] = useState<EventFilter>("highlights");
+  
+  const handleCopy = (url: string | null) => {
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    toast({ title: "تم نسخ الرابط", description: url });
+  };
+
 
   useEffect(() => {
     if (!user) return;
@@ -589,7 +612,7 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <MatchHeader fixture={fixture} onBack={goBack} headerActions={headerActions} navigate={navigate} />
+      <MatchHeader fixture={fixture} onBack={goBack} headerActions={headerActions} navigate={navigate} isAdmin={isAdmin} onCopy={handleCopy} />
       {renameItem && <RenameDialog 
           isOpen={isRenameOpen}
           onOpenChange={setRenameOpen}
@@ -624,7 +647,7 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
             </Tabs>
           </TabsContent>
           <TabsContent value="lineups" className='p-0'>
-            <LineupsTab lineups={lineups} loading={loading} fixture={fixture} favorites={favorites} onRename={handleOpenRename} onFavorite={handleFavorite} isAdmin={isAdmin} />
+            <LineupsTab lineups={lineups} loading={loading} fixture={fixture} favorites={favorites} onRename={handleOpenRename} onFavorite={handleFavorite} isAdmin={isAdmin} onCopy={handleCopy} />
           </TabsContent>
           <TabsContent value="stats" className='p-0'>
             <StatsTab stats={stats} loading={loading} fixture={fixture} />
@@ -637,5 +660,3 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
     </div>
   );
 }
-
-    

@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Star, Pencil, Shirt, Users, Trophy, BarChart2, Heart } from 'lucide-react';
+import { Star, Pencil, Shirt, Users, Trophy, BarChart2, Heart, Copy } from 'lucide-react';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc, updateDoc, deleteField, getDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import type { Fixture, Standing, TopScorer, Favorites } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { useToast } from '@/hooks/use-toast';
 
 
 // --- TYPE DEFINITIONS ---
@@ -153,6 +154,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
   const { isAdmin } = useAdmin();
   const { user } = useAuth();
   const { db } = useFirestore();
+  const { toast } = useToast();
   const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || '' });
   const [renameItem, setRenameItem] = useState<{ id: number; name: string; type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
@@ -182,6 +184,12 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         }
     }
   }, [db, teamId, teamInfo?.team.name]);
+
+  const handleCopy = (url: string | null) => {
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    toast({ title: "تم نسخ الرابط", description: url });
+  };
 
 
   useEffect(() => {
@@ -326,10 +334,13 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
             <Tabs defaultValue="details" className="w-full">
                  <div className="bg-card sticky top-0 z-10 border-b">
                     <div className="p-4 flex items-center gap-4">
-                        <Avatar className="h-20 w-20 border">
-                            <AvatarImage src={teamInfo.team.logo} />
-                            <AvatarFallback>{teamInfo.team.name.substring(0, 2)}</AvatarFallback>
-                        </Avatar>
+                        <div className="relative">
+                            <Avatar className="h-20 w-20 border">
+                                <AvatarImage src={teamInfo.team.logo} />
+                                <AvatarFallback>{teamInfo.team.name.substring(0, 2)}</AvatarFallback>
+                            </Avatar>
+                            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(teamInfo.team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                        </div>
                         <div className="space-y-1">
                             <h2 className="text-2xl font-bold">{displayTitle}</h2>
                             <p className="text-sm text-muted-foreground">{teamInfo.team.country} - تأسس {teamInfo.team.founded}</p>
@@ -346,10 +357,13 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      {players?.map(({ player }) => (
                          <div key={player.id} className="flex items-center gap-3 p-2 rounded-lg border bg-card">
-                            <Avatar className="h-12 w-12">
-                                <AvatarImage src={player.photo} alt={player.name} />
-                                <AvatarFallback>{player.name.substring(0, 1)}</AvatarFallback>
-                            </Avatar>
+                            <div className="relative">
+                                <Avatar className="h-12 w-12">
+                                    <AvatarImage src={player.photo} alt={player.name} />
+                                    <AvatarFallback>{player.name.substring(0, 1)}</AvatarFallback>
+                                </Avatar>
+                                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(player.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                            </div>
                             <div className="flex-1">
                                 <p className="font-bold">{player.name}</p>
                                 <p className="text-sm text-muted-foreground">

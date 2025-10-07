@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
-import { Star, Pencil, Shield, Users, Trophy, BarChart2, Heart } from 'lucide-react';
+import { Star, Pencil, Shield, Users, Trophy, BarChart2, Heart, Copy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,6 +17,7 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
 import type { Fixture, Standing, TopScorer, Team, Favorites } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 
 type RenameType = 'league' | 'team' | 'player';
@@ -27,6 +28,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const { isAdmin } = useAdmin();
   const { user } = useAuth();
   const { db } = useFirestore();
+  const { toast } = useToast();
 
   const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || '', leagues: {}, teams: {}, players: {} });
 
@@ -52,6 +54,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   
   const isFavorited = leagueId && favorites?.leagues?.[leagueId];
+
+  const handleCopy = (url: string | null) => {
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    toast({ title: "تم نسخ الرابط", description: url });
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -305,10 +313,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 <TableCell className="font-medium">
                                     <div className="flex items-center gap-2 justify-end">
                                         <span>{s.rank}</span>
-                                        <Avatar className="h-6 w-6">
-                                            <AvatarImage src={s.team.logo} alt={s.team.name} />
-                                            <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
-                                        </Avatar>
+                                         <div className="relative">
+                                            <Avatar className="h-6 w-6">
+                                                <AvatarImage src={s.team.logo} alt={s.team.name} />
+                                                <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
+                                            </Avatar>
+                                            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(s.team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                                        </div>
                                         <span className="truncate">
                                             {getDisplayName('team', s.team.id, s.team.name)}
                                             {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {s.team.id})</span>}
@@ -359,10 +370,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             <TableRow key={player.id}>
                                 <TableCell>
                                     <div className="flex items-center gap-3 justify-end">
-                                        <Avatar className="h-10 w-10">
-                                            <AvatarImage src={player.photo} alt={player.name} />
-                                            <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
-                                        </Avatar>
+                                        <div className="relative">
+                                            <Avatar className="h-10 w-10">
+                                                <AvatarImage src={player.photo} alt={player.name} />
+                                                <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
+                                            </Avatar>
+                                            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(player.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                                        </div>
                                         <p className="font-semibold">
                                             {getDisplayName('player', player.id, player.name)}
                                             {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {player.id})</span>}
@@ -403,10 +417,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {teams.map(({ team }) => (
                         <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
-                            <Avatar className="h-16 w-16">
-                                <AvatarImage src={team.logo} alt={team.name} />
-                                <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
-                            </Avatar>
+                            <div className='relative'>
+                                <Avatar className="h-16 w-16">
+                                    <AvatarImage src={team.logo} alt={team.name} />
+                                    <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
+                                </Avatar>
+                                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                            </div>
                             <span className="font-semibold text-sm">
                                 {getDisplayName('team', team.id, team.name)}
                                 {isAdmin && <span className="block text-xs text-muted-foreground">(ID: {team.id})</span>}
