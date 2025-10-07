@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,8 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Send, MoreVertical, Edit, Trash2, CornerDownRight, Heart } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, where, arrayUnion, arrayRemove } from 'firebase/firestore';
-import type { MatchComment } from '@/lib/types';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, where } from 'firebase/firestore';
+import type { MatchComment, Like } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import {
@@ -49,7 +49,7 @@ const CommentInput = ({
 }: {
     user: any,
     sending: boolean,
-    onSend: (text: string, parentId: string | null) => Promise<void>,
+    onSend: (text: string, parentId?: string | null) => Promise<void>,
     initialText?: string,
     parentId?: string | null,
     onCancel?: () => void,
@@ -127,7 +127,7 @@ const CommentItem = ({
     editingText: string,
     setEditingText: (text: string) => void,
 }) => {
-    const hasLiked = user && comment.likes?.includes(user.uid);
+    const hasLiked = user && comment.likes?.some(like => like.id === user.uid);
     
     return (
         <div className="flex items-start gap-3">
@@ -236,39 +236,55 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
   const commentsColRef = collection(db, 'matches', String(matchId), 'comments');
-
-  useEffect(() => {
+  
+  const fetchComments = useCallback(async () => {
     setLoading(true);
     const q = query(commentsColRef, orderBy('timestamp', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchComment));
-      
-      const commentMap: { [key: string]: MatchComment & { replies: MatchComment[] } } = {};
-      const topLevelComments: MatchComment[] = [];
+    
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const topLevelComments: MatchComment[] = [];
 
-      // First pass: create map
-      for (const comment of fetchedComments) {
-        commentMap[comment.id!] = { ...comment, replies: [] };
-      }
+        // Use Promise.all to fetch subcollections concurrently
+        const commentPromises = snapshot.docs.map(async (doc) => {
+            const commentData = doc.data() as Omit<MatchComment, 'id' | 'replies' | 'likes'>;
+            
+            // Fetch replies
+            const repliesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies');
+            const repliesQuery = query(repliesRef, orderBy('timestamp', 'asc'));
+            const repliesSnapshot = await getDocs(repliesQuery);
+            const replies = repliesSnapshot.docs.map(replyDoc => ({ id: replyDoc.id, ...replyDoc.data() } as MatchComment));
 
-      // Second pass: build hierarchy
-      for (const comment of fetchedComments) {
-        if (comment.parentId && commentMap[comment.parentId]) {
-          commentMap[comment.parentId].replies.push(commentMap[comment.id!]);
-        } else {
-          topLevelComments.push(commentMap[comment.id!]);
-        }
-      }
+            // Fetch likes
+            const likesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'likes');
+            const likesSnapshot = await getDocs(likesRef);
+            const likes = likesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id } as Like));
 
-      setComments(topLevelComments);
-      setLoading(false);
+            return {
+                id: doc.id,
+                ...commentData,
+                replies,
+                likes
+            };
+        });
+
+        const resolvedComments = await Promise.all(commentPromises);
+        setComments(resolvedComments);
+        setLoading(false);
+
     }, (error) => {
-      console.error("Error fetching comments:", error);
-      setLoading(false);
+        console.error("Error fetching comments:", error);
+        setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [matchId, db]);
+    return unsubscribe;
+  }, [matchId, db, commentsColRef]);
+
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    fetchComments().then(unsub => unsubscribe = unsub);
+    return () => unsubscribe && unsubscribe();
+  }, [fetchComments]);
 
 
   useEffect(() => {
@@ -277,7 +293,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     }
   }, [comments, editingCommentId, replyingTo]);
 
-  const handleSendComment = async (text: string, parentId: string | null = null) => {
+  const handleSendComment = async (text: string, parentId?: string | null) => {
     if (!text.trim() || !user || sending) return;
 
     setSending(true);
@@ -288,19 +304,17 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         userName: user.displayName,
         userPhoto: user.photoURL,
         timestamp: serverTimestamp(),
-        parentId: parentId,
-        likes: [],
       };
       
-      const newDocRef = await addDoc(commentsColRef, newCommentData);
+      let collectionRef = commentsColRef;
+      if (parentId) {
+        collectionRef = collection(db, 'matches', String(matchId), 'comments', parentId, 'replies');
+      }
+
+      const newDocRef = await addDoc(collectionRef, newCommentData);
       
       if (parentId) {
-        // Find parent comment to notify its owner
-        const q = query(commentsColRef, orderBy('timestamp', 'asc'));
-        const querySnapshot = await getDocs(q);
-        const allComments = querySnapshot.docs.map(d => ({id: d.id, ...d.data()}));
-        const parentComment = allComments.find(c => c.id === parentId);
-
+        const parentComment = comments.find(c => c.id === parentId);
         if (parentComment && parentComment.userId !== user.uid) {
             const notificationRef = collection(db, 'users', parentComment.userId, 'notifications');
             await addDoc(notificationRef, {
@@ -310,7 +324,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
                 senderPhoto: user.photoURL,
                 type: 'reply',
                 matchId: matchId,
-                commentId: newDocRef.id,
+                commentId: parentId, // Notifying about the parent comment
                 commentText: text.trim(),
                 read: false,
                 timestamp: serverTimestamp(),
@@ -365,23 +379,25 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     setIsDeleting(commentId);
     try {
         const batch = writeBatch(db);
+        const commentRef = doc(db, 'matches', String(matchId), 'comments', commentId);
 
-        // This is a simplified deletion. For deeply nested replies, a recursive function would be better.
-        // For now, it handles one level of replies.
-        const allToDelete = new Set<string>([commentId]);
-        const q = query(commentsColRef, where("parentId", "==", commentId));
-        const repliesSnapshot = await getDocs(q);
-        repliesSnapshot.forEach(doc => allToDelete.add(doc.id));
+        // Delete all replies
+        const repliesRef = collection(commentRef, 'replies');
+        const repliesSnapshot = await getDocs(repliesRef);
+        repliesSnapshot.forEach(replyDoc => batch.delete(replyDoc.ref));
 
-        allToDelete.forEach(id => {
-            const docRef = doc(db, 'matches', String(matchId), 'comments', id);
-            batch.delete(docRef);
-        });
+        // Delete all likes
+        const likesRef = collection(commentRef, 'likes');
+        const likesSnapshot = await getDocs(likesRef);
+        likesSnapshot.forEach(likeDoc => batch.delete(likeDoc.ref));
+
+        // Delete the comment itself
+        batch.delete(commentRef);
 
         await batch.commit();
 
     } catch(error) {
-      console.error("Error deleting comment and replies:", error);
+      console.error("Error deleting comment and subcollections:", error);
     } finally {
       setIsDeleting(null);
     }
@@ -389,39 +405,37 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
 
   const handleLikeComment = async (commentId: string) => {
       if (!user) return;
-      const commentDocRef = doc(db, 'matches', String(matchId), 'comments', commentId);
-      const q = query(commentsColRef, orderBy('timestamp', 'asc'));
-      const querySnapshot = await getDocs(q);
-      const allComments = querySnapshot.docs.map(d => ({id: d.id, ...d.data()}));
-      const comment = allComments.find(c => c.id === commentId);
-
+      const comment = comments.find(c => c.id === commentId);
       if (!comment) return;
 
-      const hasLiked = comment.likes?.includes(user.uid);
+      const likeRef = doc(db, 'matches', String(matchId), 'comments', commentId, 'likes', user.uid);
+      const hasLiked = comment.likes?.some(like => like.id === user.uid);
 
-      await updateDoc(commentDocRef, {
-          likes: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid)
-      });
-      
-      // Create notification if liking and not the owner
-      if (!hasLiked && comment.userId !== user.uid) {
-          const notificationRef = collection(db, 'users', comment.userId, 'notifications');
-          await addDoc(notificationRef, {
-              recipientId: comment.userId,
-              senderId: user.uid,
-              senderName: user.displayName,
-              senderPhoto: user.photoURL,
-              type: 'like',
-              matchId: matchId,
-              commentId: commentId,
-              commentText: comment.text,
-              read: false,
-              timestamp: serverTimestamp(),
-          });
+      if (hasLiked) {
+        await deleteDoc(likeRef);
+      } else {
+        await setDoc(likeRef, { userId: user.uid });
+        
+        // Create notification if liking and not the owner
+        if (comment.userId !== user.uid) {
+            const notificationRef = collection(db, 'users', comment.userId, 'notifications');
+            await addDoc(notificationRef, {
+                recipientId: comment.userId,
+                senderId: user.uid,
+                senderName: user.displayName,
+                senderPhoto: user.photoURL,
+                type: 'like',
+                matchId: matchId,
+                commentId: commentId,
+                commentText: comment.text,
+                read: false,
+                timestamp: serverTimestamp(),
+            });
+        }
       }
   };
 
-  const renderCommentTree = (comment: MatchComment) => (
+  const renderCommentTree = (comment: MatchComment, isReply: boolean = false) => (
     <div key={comment.id}>
         <CommentItem
             comment={comment}
@@ -454,7 +468,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         
         {comment.replies && comment.replies.length > 0 && (
             <div className="ml-8 mt-4 space-y-4 pl-4 border-r-2">
-                {comment.replies.map(reply => renderCommentTree(reply))}
+                {comment.replies.map(reply => renderCommentTree(reply, true))}
             </div>
         )}
     </div>

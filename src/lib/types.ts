@@ -40,17 +40,21 @@ export interface MatchDetails {
     commentsEnabled: boolean;
 }
 
+export interface Like {
+    id: string; // User ID
+}
+
 export interface MatchComment {
-    id?: string;
+    id: string;
     userId: string;
     userName: string;
     userPhoto: string;
     text: string;
     timestamp: any; // Firestore ServerTimestamp
-    parentId: string | null;
-    likes?: string[];
-    replies?: MatchComment[];
+    likes: Like[]; // Now an array of Like objects
+    replies: MatchComment[];
 }
+
 
 export interface Notification {
     id?: string;
@@ -65,5 +69,3 @@ export interface Notification {
     read: boolean;
     timestamp: any; // Firestore ServerTimestamp
 }
-
-    
