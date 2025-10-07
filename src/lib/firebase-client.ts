@@ -101,13 +101,13 @@ export const checkRedirectResult = async (): Promise<User | null> => {
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {
     if (!user) throw new Error("User not authenticated.");
 
+    // This updates the name in Firebase Auth itself
     await updateProfile(user, { displayName: newDisplayName });
 
     const userRef = doc(db, 'users', user.uid);
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
     
     // Update user profile in 'users' collection
-    // This matches the security rule: affectedKeys().hasOnly(['displayName','photoUrl'])
     const userProfileUpdateData = { displayName: newDisplayName };
     setDoc(userRef, userProfileUpdateData, { merge: true })
         .catch((serverError) => {
@@ -120,7 +120,6 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
         });
 
     // Update leaderboard entry in 'leaderboard' collection
-    // This matches the security rule: affectedKeys().hasOnly(['userName'])
     const leaderboardUpdateData = { userName: newDisplayName };
     setDoc(leaderboardRef, leaderboardUpdateData, { merge: true })
         .catch((serverError) => {
