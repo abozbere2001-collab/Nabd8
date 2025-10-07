@@ -1,5 +1,4 @@
 
-
 // --- TYPE DEFINITIONS ---
 export interface Fixture {
   fixture: { id: number; date: string; timestamp: number; status: { short: string; long: string; elapsed: number | null; }; };
@@ -22,7 +21,18 @@ export interface TopScorer {
 }
 
 export interface Team {
-  team: { id: number; name: string; logo: string; };
+  id: number;
+  name: string;
+  logo: string;
+}
+
+export interface Player {
+    id: number;
+    name: string;
+    age: number;
+    number: number | null;
+    position: string;
+    photo: string;
 }
 
 export interface Favorites {
