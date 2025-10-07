@@ -295,7 +295,10 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
       >
         <div className="flex items-center gap-3">
           <img src={comp.league.logo} alt={comp.league.name} className="h-6 w-6 object-contain" />
-          <span className="text-sm">{getLeagueName(comp)}</span>
+          <div className="text-sm">
+            {getLeagueName(comp)}
+            {isAdmin && <span className="text-xs text-muted-foreground ml-2"> (ID: {comp.league.id})</span>}
+          </div>
         </div>
         <div className="flex items-center gap-1">
             {isAdmin && (

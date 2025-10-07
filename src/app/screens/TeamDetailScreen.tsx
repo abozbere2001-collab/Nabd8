@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 
 // --- TYPE DEFINITIONS ---
 interface TeamInfo {
-    team: { id: number; name: string; logo: string; country: string; founded: number; };
+    team: { id: number; name: string; logo: string; country: string; founded: number; type: string; };
     venue: { name: string; city: string; capacity: number; image: string; };
 }
 interface Player {
@@ -81,6 +81,7 @@ function useTeamData(teamId?: number) {
       try {
         const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
         const teamData = await teamRes.json();
+        const teamInfo: TeamInfo | null = teamData.response?.[0] || null;
 
         // Fetch all pages of players
         let allPlayers: PlayerInfoFromApi[] = [];
@@ -101,8 +102,12 @@ function useTeamData(teamId?: number) {
               }
           } while (currentPage < totalPages);
         }
+        
+        const fixturesUrl = teamInfo?.team.type === 'National' 
+          ? `/api/football/fixtures?team=${teamId}`
+          : `/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
 
-        const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
+        const fixturesRes = await fetch(fixturesUrl);
         const fixturesData = await fixturesRes.json();
         const fixtures: Fixture[] = fixturesData.response || [];
         
@@ -125,8 +130,9 @@ function useTeamData(teamId?: number) {
         let standingsData = { response: [] };
         let scorersData = { response: [] };
         if (leagueIdForStandings) {
+            const standingsSeason = teamInfo?.team.type === 'National' ? (new Date(worldCupFixture?.fixture.date || Date.now()).getFullYear()) : CURRENT_SEASON;
             const [standingsRes, scorersRes] = await Promise.all([
-                 fetch(`/api/football/standings?league=${leagueIdForStandings}&season=${CURRENT_SEASON}`),
+                 fetch(`/api/football/standings?league=${leagueIdForStandings}&season=${standingsSeason}`),
                  fetch(`/api/football/players/topscorers?league=${leagueIdForStandings}&season=${CURRENT_SEASON}`)
             ]);
             standingsData = await standingsRes.json();
@@ -134,7 +140,7 @@ function useTeamData(teamId?: number) {
         }
         
         setData({
-          teamInfo: teamData.response?.[0] || null,
+          teamInfo: teamInfo,
           players: allPlayers,
           fixtures: fixtures,
           standings: standingsData.response?.[0]?.league?.standings?.[0] || [],
