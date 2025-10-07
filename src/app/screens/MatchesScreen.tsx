@@ -417,7 +417,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
           });
           setOdds(oddsByFixture);
       } catch (error) {
-          console.error(`Failed to fetch odds for ${dateKey}:`, error);
+          const permissionError = new FirestorePermissionError({
+            path: `/api/football/odds?date=${dateKey}`,
+            operation: 'get',
+          });
+          errorEmitter.emit('permission-error', permissionError);
           setOdds({});
       } finally {
           setLoadingOdds(false);
@@ -537,5 +541,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
     </div>
   );
 }
-
-    
