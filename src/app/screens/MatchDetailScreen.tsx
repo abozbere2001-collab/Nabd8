@@ -182,25 +182,20 @@ const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isA
 
     const [row, col] = player.player.grid.split(':').map(Number);
     
-    let top, left;
-
-    // Normalize grid positions to a 0-100 scale, with some padding
-    const padding = 5; // 5% padding from edges
-    const fieldHeight = 100 - (2 * padding);
-    const fieldWidth = 100 - (2 * padding);
+    // Normalize grid positions to a 0-100 scale for CSS positioning
+    // The grid is typically 1-11 for rows and 1-5 for columns
+    let top = (row / 12) * 100;
+    let left = ((col - 1) / 4) * 100;
     
-    top = padding + ( (row - 1) / 10 ) * fieldHeight;
-    left = padding + ( (col - 1) / 4 ) * fieldWidth;
-    
+    // Reverse positions for the away team to appear on the opposite side
     if (!isHomeTeam) {
        top = 100 - top;
        left = 100 - left;
     }
 
-
     return (
         <div 
-          className="absolute text-center flex flex-col items-center transition-all duration-300 group/player" 
+          className="absolute text-center flex flex-col items-center transition-all duration-300" 
           style={{ 
             top: `${top}%`, 
             left: `${left}%`,
@@ -219,7 +214,7 @@ const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isA
                   )}>
                     {player.player.number}
                 </span>
-                <div className='absolute -bottom-1 -left-1 opacity-0 group-hover/player:opacity-100 transition-opacity'>
+                <div className='absolute -bottom-1 -left-1 flex opacity-80'>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {e.stopPropagation(); onFavorite(); }}>
                         <Star className={cn("h-4 w-4", isFavorited ? "text-yellow-400 fill-current" : "text-white")} />
                     </Button>
@@ -258,14 +253,14 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
   
   const renderPlayerRow = (playerInfo: LineupPlayerInfo) => {
     return (
-         <div key={playerInfo.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted group/sub">
+         <div key={playerInfo.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted">
             <span className="text-muted-foreground w-6 text-center font-mono">{playerInfo.number}</span>
             <Avatar className="w-6 h-6">
                 <AvatarImage src={playerInfo.photo} />
                 <AvatarFallback>{playerInfo.name.substring(0,1)}</AvatarFallback>
             </Avatar>
             <span className="font-medium truncate flex-1">{playerInfo.name}</span>
-            <div className='flex opacity-0 group-hover/sub:opacity-100 transition-opacity'>
+            <div className='flex opacity-80'>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onFavorite('player', playerInfo)}>
                     <Star className={cn("h-4 w-4", favorites?.players?.[playerInfo.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
                 </Button>
@@ -330,7 +325,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
       <div className="p-2 rounded-lg bg-card border">
         <h4 className="font-bold mb-2 text-base px-2">طاقم التدريب</h4>
         <div className="space-y-2">
-            <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted group/coach">
+            <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted">
                 <Avatar className="w-10 h-10">
                 <AvatarImage src={lineupToShow.coach.photo} alt={lineupToShow.coach.name} />
                 <AvatarFallback>{lineupToShow.coach.name.substring(0,1)}</AvatarFallback>
@@ -339,7 +334,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
                     <p className="font-medium">{lineupToShow.coach.name}</p>
                     <p className="text-xs text-muted-foreground">المدرب</p>
                 </div>
-                 <div className='flex opacity-0 group-hover/coach:opacity-100 transition-opacity'>
+                 <div className='flex opacity-80'>
                     {/* Favorite for coach can be added if needed */}
                     {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onRename('coach', lineupToShow.coach.id, lineupToShow.coach.name)}>
                         <Pencil className="h-4 w-4 text-muted-foreground/60" />

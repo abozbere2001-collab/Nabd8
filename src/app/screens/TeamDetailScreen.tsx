@@ -211,32 +211,31 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         <Skeleton className="h-64 w-full" />
       </div> : teamInfo ? (
         <div className="flex-1 overflow-y-auto">
-            <Card className="m-4 mb-0 border-b-0 rounded-b-none shadow-lg">
-                <CardContent className="p-4 flex items-center gap-4">
-                     <Avatar className="h-20 w-20 border">
-                        <AvatarImage src={teamInfo.team.logo} />
-                        <AvatarFallback>{teamInfo.team.name.substring(0, 2)}</AvatarFallback>
-                    </Avatar>
-                    <div className="space-y-1">
-                        <h2 className="text-2xl font-bold">{displayTitle}</h2>
-                        <p className="text-sm text-muted-foreground">{teamInfo.team.country} - تأسس {teamInfo.team.founded}</p>
-                        <p className="text-sm text-muted-foreground">{teamInfo.venue.name} ({teamInfo.venue.city})</p>
-                    </div>
-                </CardContent>
-            </Card>
-
             <Tabs defaultValue="details" className="w-full">
-                <div className="p-4 pt-0 m-4 mt-0 bg-card rounded-b-lg shadow-lg">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="details">التفاصيل</TabsTrigger>
-                        <TabsTrigger value="players">اللاعبون</TabsTrigger>
-                    </TabsList>
-                </div>
+                <Card className="m-4 mb-0 border-b-0 rounded-b-none shadow-lg sticky top-0 bg-background z-10">
+                    <CardContent className="p-4 flex items-center gap-4">
+                        <Avatar className="h-20 w-20 border">
+                            <AvatarImage src={teamInfo.team.logo} />
+                            <AvatarFallback>{teamInfo.team.name.substring(0, 2)}</AvatarFallback>
+                        </Avatar>
+                        <div className="space-y-1">
+                            <h2 className="text-2xl font-bold">{displayTitle}</h2>
+                            <p className="text-sm text-muted-foreground">{teamInfo.team.country} - تأسس {teamInfo.team.founded}</p>
+                            <p className="text-sm text-muted-foreground">{teamInfo.venue.name} ({teamInfo.venue.city})</p>
+                        </div>
+                    </CardContent>
+                    <div className="px-4 pb-0">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="details">التفاصيل</TabsTrigger>
+                            <TabsTrigger value="players">اللاعبون</TabsTrigger>
+                        </TabsList>
+                    </div>
+                </Card>
 
                 <TabsContent value="players" className="p-4">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      {players?.map(({ player }) => (
-                         <div key={player.id} className="flex items-center gap-3 p-2 rounded-lg border bg-card group">
+                         <div key={player.id} className="flex items-center gap-3 p-2 rounded-lg border bg-card">
                             <Avatar className="h-12 w-12">
                                 <AvatarImage src={player.photo} alt={player.name} />
                                 <AvatarFallback>{player.name.substring(0, 1)}</AvatarFallback>
@@ -245,7 +244,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                 <p className="font-bold">{player.name}</p>
                                 <p className="text-sm text-muted-foreground">{player.position}</p>
                             </div>
-                            <div className='flex items-center opacity-0 group-hover:opacity-100 transition-opacity'>
+                            <div className='flex items-center opacity-80'>
                                 <Button variant="ghost" size="icon" onClick={() => handleFavorite('player', player)}>
                                     <Star className={cn("h-5 w-5", favorites?.players?.[player.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
                                 </Button>
@@ -259,7 +258,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                 </TabsContent>
                 <TabsContent value="details">
                      <Tabs defaultValue="matches" className="w-full">
-                         <div className="px-4">
+                         <div className="px-4 pt-2">
                             <TabsList className="grid w-full grid-cols-3">
                                 <TabsTrigger value="matches"><Shirt className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
                                 <TabsTrigger value="standings"><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
@@ -270,7 +269,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                              {fixtures && fixtures.length > 0 ? (
                                 <div className="space-y-2">
                                 {fixtures.map(({fixture, teams, goals}) => (
-                                    <div key={fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.id, fixture })}>
+                                    <div key={fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.id, fixture: { fixture, teams, goals, league: { id: 0, name: '', logo: '', round: ''} } })}>
                                         <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
                                             <span>{format(new Date(fixture.date), 'EEE, d MMM yyyy')}</span>
                                             <span>{fixture.status.short}</span>
@@ -291,13 +290,13 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                 </div>
                              ) : <p className="text-center py-8 text-muted-foreground">لا توجد مباريات متاحة.</p>}
                          </TabsContent>
-                         <TabsContent value="standings" className="p-4">
+                         <TabsContent value="standings" className="p-0">
                             {standings && standings.length > 0 ? (
                                 <Table>
                                     <TableHeader><TableRow><TableHead className="w-1/2 text-right">الفريق</TableHead><TableHead className="text-center">ل</TableHead><TableHead className="text-center">ف</TableHead><TableHead className="text-center">ت</TableHead><TableHead className="text-center">خ</TableHead><TableHead className="text-center">ن</TableHead></TableRow></TableHeader>
                                     <TableBody>
                                     {standings.map((s) => (
-                                        <TableRow key={s.team.id} className={s.team.id === teamId ? 'bg-primary/10' : ''}>
+                                        <TableRow key={s.team.id} className={cn("cursor-pointer", s.team.id === teamId ? 'bg-primary/10' : '')} onClick={() => navigate('TeamDetails', {teamId: s.team.id})}>
                                             <TableCell className="font-medium"><div className="flex items-center gap-2"><span>{s.rank}</span><Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar><span className="truncate">{s.team.name}</span></div></TableCell>
                                             <TableCell className="text-center">{s.all.played}</TableCell><TableCell className="text-center">{s.all.win}</TableCell><TableCell className="text-center">{s.all.draw}</TableCell><TableCell className="text-center">{s.all.lose}</TableCell><TableCell className="text-center font-bold">{s.points}</TableCell>
                                         </TableRow>
@@ -306,12 +305,12 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                 </Table>
                             ) : <p className="text-center py-8 text-muted-foreground">الترتيب غير متاح حاليًا.</p>}
                          </TabsContent>
-                         <TabsContent value="scorers" className="p-4">
+                         <TabsContent value="scorers" className="p-0">
                              {scorers && scorers.length > 0 ? (
                                 <Table>
                                     <TableHeader><TableRow><TableHead className="text-right">اللاعب</TableHead><TableHead className="text-center">الأهداف</TableHead><TableHead className="text-center">صناعة</TableHead></TableRow></TableHeader>
                                     <TableBody>
-                                    {scorers.map(({ player, statistics }) => (
+                                    {scorers.filter(scorer => scorer.statistics[0].team.id === teamId).map(({ player, statistics }) => (
                                         <TableRow key={player.id}>
                                             <TableCell><div className="flex items-center gap-3"><Avatar className="h-10 w-10"><AvatarImage src={player.photo} /></Avatar><p className="font-semibold">{player.name}</p></div></TableCell>
                                             <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total || 0}</TableCell>
