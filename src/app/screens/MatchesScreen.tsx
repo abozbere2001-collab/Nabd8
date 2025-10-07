@@ -450,7 +450,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
   const screenHeaderActions = (
     <div className='flex items-center gap-2'>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 rtl:space-x-reverse">
             <Switch
                 id="live-mode"
                 checked={showLiveOnly}
@@ -458,7 +458,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
             />
             <Label htmlFor="live-mode" className="text-xs">مباشر</Label>
         </div>
-       <Button variant={showOdds ? 'default' : 'outline'} className="h-8 px-2 text-xs" onClick={toggleShowOdds} disabled={loadingOdds}>
+       <Button variant={showOdds ? 'default' : 'outline'} className="h-7 px-2 text-xs" onClick={toggleShowOdds} disabled={loadingOdds}>
             {loadingOdds ? <Loader2 className="h-4 w-4 animate-spin" /> : '1X2'}
         </Button>
         {baseHeaderActions}
