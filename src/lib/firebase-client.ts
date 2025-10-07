@@ -87,17 +87,13 @@ export const checkRedirectResult = async (): Promise<User | null> => {
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {
     if (!user) throw new Error("User not authenticated.");
 
-    // Update Firebase Auth display name
+    // Update Firebase Auth display name first
     await updateProfile(user, { displayName: newDisplayName });
 
-    // Update display name in 'users' collection
+    // Then, update the name in both Firestore documents
     const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, { displayName: newDisplayName }, { merge: true });
-
-    // Update display name in 'leaderboard' collection
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
-    await setDoc(leaderboardRef, { userName: newDisplayName }, { merge: true });
 
-    // Note: We are not updating the name in past comments/predictions to avoid many writes.
-    // New comments/predictions will use the new name.
+    await setDoc(userRef, { displayName: newDisplayName }, { merge: true });
+    await setDoc(leaderboardRef, { userName: newDisplayName }, { merge: true });
 };
