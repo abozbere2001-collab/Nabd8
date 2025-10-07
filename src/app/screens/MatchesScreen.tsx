@@ -494,8 +494,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
         <div className="flex flex-col border-b bg-card">
             <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full">
               <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none flex-row-reverse">
-                  <TabsTrigger value="my-results">نتائجي</TabsTrigger>
                   <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
+                  <TabsTrigger value="my-results">نتائجي</TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="py-2">
