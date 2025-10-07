@@ -45,5 +45,5 @@ export interface MatchComment {
     userName: string;
     userPhoto: string;
     text: string;
-    createdAt: any; // Firestore ServerTimestamp
+    timestamp: any; // Firestore ServerTimestamp
 }

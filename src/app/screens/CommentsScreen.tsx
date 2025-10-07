@@ -32,7 +32,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
 
   useEffect(() => {
     setLoading(true);
-    const q = query(commentsColRef, orderBy('createdAt', 'asc'));
+    const q = query(commentsColRef, orderBy('timestamp', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchComment));
       setComments(fetchedComments);
@@ -60,7 +60,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         userId: user.uid,
         userName: user.displayName,
         userPhoto: user.photoURL,
-        createdAt: serverTimestamp(),
+        timestamp: serverTimestamp(),
       });
       setComment('');
     } catch (error) {
@@ -96,9 +96,9 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
               <div className="flex-1 rounded-lg bg-card border p-3">
                 <div className="flex items-center justify-between mb-1">
                   <p className="font-semibold text-sm">{c.userName}</p>
-                  {c.createdAt && (
+                  {c.timestamp && (
                      <p className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(c.createdAt.toDate(), { addSuffix: true, locale: ar })}
+                        {formatDistanceToNow(c.timestamp.toDate(), { addSuffix: true, locale: ar })}
                      </p>
                   )}
                 </div>

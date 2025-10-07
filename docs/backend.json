@@ -177,13 +177,13 @@
           "type": "string",
           "description": "The content of the comment."
         },
-        "createdAt": {
+        "timestamp": {
           "type": "string",
           "format": "date-time",
           "description": "The timestamp when the comment was created."
         }
       },
-      "required": ["userId", "userName", "text", "createdAt"]
+      "required": ["userId", "userName", "text", "timestamp"]
     }
   },
   "auth": {
