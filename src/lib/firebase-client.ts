@@ -106,11 +106,9 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
     const userRef = doc(db, 'users', user.uid);
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
     
-    // Note: The field name is `displayName` not `name`.
-    const userProfileUpdateData = { displayName: newDisplayName };
-    const leaderboardUpdateData = { userName: newDisplayName };
-
     // Update user profile in 'users' collection
+    // This matches the security rule: affectedKeys().hasOnly(['displayName','photoUrl'])
+    const userProfileUpdateData = { displayName: newDisplayName };
     setDoc(userRef, userProfileUpdateData, { merge: true })
         .catch((serverError) => {
             const permissionError = new FirestorePermissionError({
@@ -122,6 +120,8 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
         });
 
     // Update leaderboard entry in 'leaderboard' collection
+    // This matches the security rule: affectedKeys().hasOnly(['userName'])
+    const leaderboardUpdateData = { userName: newDisplayName };
     setDoc(leaderboardRef, leaderboardUpdateData, { merge: true })
         .catch((serverError) => {
             const permissionError = new FirestorePermissionError({
