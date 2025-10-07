@@ -369,7 +369,7 @@ const ODDS_STORAGE_KEY = 'goalstack-showOdds';
 export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: baseHeaderActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   const { user } = useFirebase();
   const [favorites, setFavorites] = useState<Favorites>({});
-  const [activeTab, setActiveTab] = useState<'my-results' | 'all-matches'>('all-matches');
+  const [activeTab, setActiveTab] = useState<'my-results' | 'all-matches'>('my-results');
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
