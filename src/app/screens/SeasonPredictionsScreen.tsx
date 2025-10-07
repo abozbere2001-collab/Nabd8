@@ -118,7 +118,9 @@ const LeaguePredictionCard = ({ league, userId }: { league: { id: number, name: 
             leagueId: league.id,
             season: CURRENT_SEASON,
             predictedChampionId: Number(championId),
-            predictedTopScorerId: Number(scorerId)
+            predictedTopScorerId: Number(scorerId),
+            championPoints: 0,
+            topScorerPoints: 0
         };
         
         setDoc(predictionDocRef, predictionData)
@@ -197,3 +199,5 @@ export function SeasonPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    
