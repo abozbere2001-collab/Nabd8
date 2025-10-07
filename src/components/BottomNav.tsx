@@ -4,11 +4,11 @@ import { cn } from '@/lib/utils';
 import type { ScreenKey } from '@/app/page';
 
 const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
-  { key: 'Settings', label: 'الإعدادات', icon: Settings2 },
-  { key: 'News', label: 'الأخبار', icon: Newspaper },
-  { key: 'Iraq', label: 'العراق', icon: Map },
-  { key: 'Competitions', label: 'البطولات', icon: Trophy },
   { key: 'Matches', label: 'المباريات', icon: Goal },
+  { key: 'Competitions', label: 'البطولات', icon: Trophy },
+  { key: 'Iraq', label: 'العراق', icon: Map },
+  { key: 'News', label: 'الأخبار', icon: Newspaper },
+  { key: 'Settings', label: 'الإعدادات', icon: Settings2 },
 ];
 
 
