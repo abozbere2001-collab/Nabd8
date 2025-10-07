@@ -25,6 +25,7 @@ export function CommentsButton({ matchId, navigate }: CommentsButtonProps) {
 
   useEffect(() => {
     const fetchMatchDetails = async () => {
+      // Only admins should fetch this, as regular users don't have direct access
       if (!isAdmin) {
           setLoading(false);
           return;
@@ -36,7 +37,8 @@ export function CommentsButton({ matchId, navigate }: CommentsButtonProps) {
         if (docSnap.exists()) {
           setMatchDetails(docSnap.data() as MatchDetails);
         } else {
-          setMatchDetails(null);
+          // If doc doesn't exist, it means comments are not enabled
+          setMatchDetails({ commentsEnabled: false });
         }
       } catch (error) {
         const permissionError = new FirestorePermissionError({
@@ -44,6 +46,8 @@ export function CommentsButton({ matchId, navigate }: CommentsButtonProps) {
             operation: 'get',
         });
         errorEmitter.emit('permission-error', permissionError);
+        // Set a default state on error to avoid inconsistent UI
+        setMatchDetails({ commentsEnabled: false });
       } finally {
         setLoading(false);
       }
@@ -71,7 +75,8 @@ export function CommentsButton({ matchId, navigate }: CommentsButtonProps) {
     }
   };
 
-  if (loading) {
+  // If loading and user is admin, show loading state.
+  if (loading && isAdmin) {
     return (
       <Button variant="ghost" className="w-full" disabled>
         <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -111,20 +116,18 @@ export function CommentsButton({ matchId, navigate }: CommentsButtonProps) {
     );
   }
 
-  // Regular user view
-  if (matchDetails?.commentsEnabled) {
-    return (
-      <Button 
-        variant="ghost" 
-        className="w-full"
-        onClick={() => navigate('Comments', { matchId })}
-      >
-        <MessageSquare className="h-4 w-4 mr-2" />
-        التعليقات
-      </Button>
-    );
-  }
-
-  // If comments are not enabled and user is not admin, show nothing.
-  return null;
+  // For regular users, we can't be sure if comments are enabled without a read.
+  // The most robust solution is to just always show the button and let the CommentsScreen handle it
+  // if the match doc doesn't exist or isn't enabled.
+  // The alternative would be to make `/matches/{matchId}` readable by everyone.
+  return (
+    <Button 
+      variant="ghost" 
+      className="w-full"
+      onClick={() => navigate('Comments', { matchId })}
+    >
+      <MessageSquare className="h-4 w-4 mr-2" />
+      التعليقات
+    </Button>
+  );
 }
