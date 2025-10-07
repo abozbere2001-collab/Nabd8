@@ -159,7 +159,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
             try {
                 const docSnap = await getDoc(dailyDocRef);
-                let fetchedMatches: Fixture[] = [];
                 let fixtureIds: number[] = [];
 
                 if (docSnap.exists()) {
@@ -168,16 +167,15 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                         fixtureIds = dailyData.selectedMatches.map(m => m.fixtureId);
                         const res = await fetch(`/api/football/fixtures?ids=${fixtureIds.join('-')}`);
                         const data = await res.json();
-                        fetchedMatches = data.response || [];
+                        setSelectedMatches(data.response || []);
                     }
                 }
-                setSelectedMatches(fetchedMatches);
                 
                 if (fixtureIds.length > 0) {
                     const predsRef = collection(db, 'predictions');
                     const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
-                    
                     const querySnapshot = await getDocs(userPredsQuery);
+                    
                     const userPredictions: { [key: number]: Prediction } = {};
                     const todaysFixtureIds = new Set(fixtureIds);
                     querySnapshot.forEach(doc => {
@@ -192,7 +190,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 }
 
             } catch (error) {
-                // This will catch getDoc and getDocs permission errors
                  const permissionError = new FirestorePermissionError({ path: `dailyGlobalPredictions or predictions where userId == ${user.uid}`, operation: 'list' });
                  errorEmitter.emit('permission-error', permissionError);
             } finally {
@@ -315,5 +312,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
 
     
