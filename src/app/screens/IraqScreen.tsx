@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
@@ -20,8 +20,9 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { useDebounce } from '@/hooks/use-debounce';
 
 
 const IRAQI_LEAGUE_ID = 542;
@@ -279,6 +280,60 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     );
 }
 
+const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture, userPrediction?: Prediction, onSave: (home: string, away: string) => void }) => {
+    const isPredictionDisabled = isPast(new Date(fixture.fixture.date));
+    const [homeValue, setHomeValue] = useState(userPrediction?.homeGoals?.toString() ?? '');
+    const [awayValue, setAwayValue] = useState(userPrediction?.awayGoals?.toString() ?? '');
+    
+    const debouncedHome = useDebounce(homeValue, 500);
+    const debouncedAway = useDebounce(awayValue, 500);
+
+    useEffect(() => {
+        if (debouncedHome !== '' && debouncedAway !== '' && (debouncedHome !== userPrediction?.homeGoals?.toString() || debouncedAway !== userPrediction?.awayGoals?.toString())) {
+            onSave(debouncedHome, debouncedAway);
+        }
+    }, [debouncedHome, debouncedAway, onSave, userPrediction]);
+
+    const handleHomeChange = (e: React.ChangeEvent<HTMLInputElement>) => setHomeValue(e.target.value);
+    const handleAwayChange = (e: React.ChangeEvent<HTMLInputElement>) => setAwayValue(e.target.value);
+    
+    useEffect(() => {
+        setHomeValue(userPrediction?.homeGoals?.toString() ?? '');
+        setAwayValue(userPrediction?.awayGoals?.toString() ?? '');
+    }, [userPrediction]);
+
+    return (
+        <Card>
+            <CardContent className="p-3">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1 justify-end truncate">
+                        <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <Input type="number" className="w-12 h-10 text-center text-lg font-bold" min="0" value={homeValue} onChange={handleHomeChange} id={`home-${fixture.fixture.id}`} disabled={isPredictionDisabled} />
+                        <span className='font-bold'>-</span>
+                        <Input type="number" className="w-12 h-10 text-center text-lg font-bold" min="0" value={awayValue} onChange={handleAwayChange} id={`away-${fixture.fixture.id}`} disabled={isPredictionDisabled} />
+                    </div>
+                    <div className="flex items-center gap-2 flex-1 truncate">
+                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                        <span className="font-semibold truncate">{fixture.teams.away.name}</span>
+                    </div>
+                </div>
+                 <div className="text-center text-xs text-muted-foreground mt-2">
+                    {format(new Date(fixture.fixture.date), "EEE, d MMM, HH:mm", { locale: ar })}
+                </div>
+                {isPredictionDisabled && userPrediction?.points !== undefined && (
+                     <p className="text-center text-primary font-bold text-sm mt-2">+{userPrediction.points} نقاط</p>
+                )}
+                {userPrediction && !isPredictionDisabled && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
+                {isPredictionDisabled && !userPrediction && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
+            </CardContent>
+        </Card>
+    );
+};
+
+
 function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
     const [loading, setLoading] = useState(true);
@@ -291,7 +346,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
         async function fetchData() {
             setLoading(true);
             try {
-                const res = await fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`); // Fetch all, filter on client
+                const res = await fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`);
                 const data = await res.json();
                 if (data.response) setFixtures(data.response);
             } catch (error) {
@@ -302,10 +357,21 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
         }
         fetchData();
 
+        const leaderboardRef = query(collection(db, 'leaderboard'), orderBy('totalPoints', 'desc'));
+        const unsubscribeLeaderboard = onSnapshot(leaderboardRef, (snapshot) => {
+           const scores: UserScore[] = [];
+           snapshot.forEach(doc => scores.push(doc.data() as UserScore));
+           setLeaderboard(scores);
+        }, (error) => {
+           const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
+           errorEmitter.emit('permission-error', permissionError);
+        });
+
+        let unsubscribePreds = () => {};
         if (user) {
             const predsRef = collection(db, 'predictions');
             const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
-            const unsubscribePreds = onSnapshot(userPredsQuery, (snapshot) => {
+            unsubscribePreds = onSnapshot(userPredsQuery, (snapshot) => {
                 const userPredictions: { [key: number]: Prediction } = {};
                 snapshot.forEach(doc => {
                     const pred = doc.data() as Prediction;
@@ -316,32 +382,23 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 const permissionError = new FirestorePermissionError({ path: 'predictions', operation: 'list' });
                 errorEmitter.emit('permission-error', permissionError);
             });
-
-             const leaderboardRef = query(collection(db, 'leaderboard'), orderBy('totalPoints', 'desc'));
-             const unsubscribeLeaderboard = onSnapshot(leaderboardRef, (snapshot) => {
-                const scores: UserScore[] = [];
-                snapshot.forEach(doc => scores.push(doc.data() as UserScore));
-                setLeaderboard(scores);
-            }, (error) => {
-                const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
-                errorEmitter.emit('permission-error', permissionError);
-            });
-
-            return () => {
-                unsubscribePreds();
-                unsubscribeLeaderboard();
-            };
         }
+        
+        return () => {
+            unsubscribeLeaderboard();
+            unsubscribePreds();
+        };
+
     }, [user, db]);
 
-    const handleSavePrediction = async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
+    const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
         if (!user || homeGoalsStr === '' || awayGoalsStr === '') return;
         const homeGoals = parseInt(homeGoalsStr, 10);
         const awayGoals = parseInt(awayGoalsStr, 10);
         if (isNaN(homeGoals) || isNaN(awayGoals)) return;
 
         const predictionRef = doc(db, 'predictions', `${user.uid}_${fixtureId}`);
-        const predictionData: Partial<Prediction> = {
+        const predictionData: Prediction = {
             userId: user.uid,
             fixtureId,
             homeGoals,
@@ -358,7 +415,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             });
             errorEmitter.emit('permission-error', permissionError);
         }
-    };
+    }, [user, db]);
     
     if (loading) {
         return (
@@ -368,7 +425,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
         );
     }
 
-    const upcomingFixtures = fixtures.filter(f => f.fixture.status.short === 'NS');
+    const upcomingFixtures = fixtures.filter(f => f.fixture.status.short === 'NS' || f.fixture.status.short === 'TBD');
     
     return (
         <div className="space-y-4 pt-4">
@@ -405,55 +462,14 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
               </Card>
 
             <h3 className="text-lg font-bold mt-6">المباريات القادمة</h3>
-            {upcomingFixtures.length > 0 ? upcomingFixtures.map(fixture => {
-                const userPrediction = predictions[fixture.fixture.id];
-                const isPredictionDisabled = isPast(new Date(fixture.fixture.date));
-                return (
-                <Card key={fixture.fixture.id} className="p-4">
-                     <div className="flex items-center justify-between">
-                         <div className="flex items-center gap-2 flex-1">
-                            <Avatar><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                            <span className="font-semibold">{fixture.teams.home.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Input 
-                                type="number" 
-                                className="w-14 h-8 text-center" 
-                                min="0" 
-                                defaultValue={userPrediction?.homeGoals}
-                                onChange={(e) => handleSavePrediction(fixture.fixture.id, e.target.value, (document.getElementById(`away-${fixture.fixture.id}`) as HTMLInputElement)?.value || '')}
-                                id={`home-${fixture.fixture.id}`}
-                                disabled={isPredictionDisabled}
-                            />
-                            <span>-</span>
-                            <Input 
-                                type="number" 
-                                className="w-14 h-8 text-center" 
-                                min="0"
-                                defaultValue={userPrediction?.awayGoals}
-                                onChange={(e) => handleSavePrediction(fixture.fixture.id, (document.getElementById(`home-${fixture.fixture.id}`) as HTMLInputElement)?.value || '', e.target.value)}
-                                id={`away-${fixture.fixture.id}`}
-                                disabled={isPredictionDisabled}
-                            />
-                        </div>
-                         <div className="flex items-center gap-2 flex-1 justify-end">
-                            <span className="font-semibold">{fixture.teams.away.name}</span>
-                            <Avatar><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                        </div>
-                    </div>
-                    <div className="text-center text-xs text-muted-foreground mt-2">
-                        {format(new Date(fixture.fixture.date), "EEE, d MMM, HH:mm", { locale: ar })}
-                    </div>
-                    {isPredictionDisabled && userPrediction?.points !== undefined && (
-                        <p className="text-center text-primary font-bold text-sm mt-2">
-                           +{userPrediction.points} نقاط
-                        </p>
-                    )}
-                    {userPrediction && !isPredictionDisabled && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
-                     {isPredictionDisabled && !userPrediction && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
-                </Card>
-                )
-            }) : <p className="text-center text-muted-foreground pt-4">لا توجد مباريات قادمة للتوقع.</p>}
+            {upcomingFixtures.length > 0 ? upcomingFixtures.map(fixture => (
+                <PredictionCard 
+                    key={fixture.fixture.id}
+                    fixture={fixture}
+                    userPrediction={predictions[fixture.fixture.id]}
+                    onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
+                />
+            )) : <p className="text-center text-muted-foreground pt-4">لا توجد مباريات قادمة للتوقع.</p>}
         </div>
     );
 }
