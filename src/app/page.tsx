@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { User } from 'firebase/auth';
 import { BottomNav } from '@/components/BottomNav';
 import { MatchesScreen } from './screens/MatchesScreen';
@@ -15,13 +15,10 @@ import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
 import { CommentsScreen } from './screens/CommentsScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
-import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
-import { FirebaseProvider } from '@/firebase/provider';
+import { FirebaseProvider, useAuth } from '@/firebase/provider';
 import { ProfileButton } from '@/components/ProfileButton';
-import { Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { SearchSheet } from '@/components/SearchSheet';
-
+import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails' | 'AdminFavoriteTeamDetails' | 'Comments';
 export type ScreenProps = {
@@ -55,22 +52,15 @@ type StackItem = {
 
 function AppContent({ user }: { user: User | null }) {
   const [stack, setStack] = useState<StackItem[]>([{ key: 'Matches-0', screen: 'Matches' }]);
-  const [isAnimatingOut, setIsAnimatingOut] = useState<string | null>(null);
+  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+  const [isEntering, setIsEntering] = useState(false);
   
-  const screenInstances = useRef<Record<string, JSX.Element>>({});
-
   const goBack = useCallback(() => {
     if (stack.length > 1) {
-      const lastItemKey = stack[stack.length - 1].key;
-      setIsAnimatingOut(lastItemKey);
+      setIsAnimatingOut(true);
       setTimeout(() => {
-        setStack(prev => {
-            const newStack = prev.slice(0, -1);
-            // Clean up the instance of the screen we are leaving
-            delete screenInstances.current[lastItemKey];
-            return newStack;
-        });
-        setIsAnimatingOut(null);
+        setStack(prev => prev.slice(0, -1));
+        setIsAnimatingOut(false);
       }, 300);
     }
   }, [stack]);
@@ -80,47 +70,22 @@ function AppContent({ user }: { user: User | null }) {
     const newKey = `${screen}-${Date.now()}`;
     const newItem = { key: newKey, screen, props };
 
+    if (!isMainTab) {
+        setIsEntering(true);
+        setTimeout(() => setIsEntering(false), 300);
+    }
+
     setStack(prevStack => {
       if (isMainTab) {
         if (prevStack.length === 1 && prevStack[0].screen === screen) {
            return prevStack;
         }
-        // Clean up all screen instances when switching main tabs
-        screenInstances.current = {};
         return [newItem];
       } else {
         return [...prevStack, newItem];
       }
     });
   }, []);
-
-  const renderedStack = useMemo(() => {
-    const canGoBack = stack.length > 1;
-    
-    const navigationProps = { 
-      navigate, 
-      goBack, 
-      canGoBack,
-    };
-    
-    return stack.map((item) => {
-        const ScreenComponent = screens[item.screen as Exclude<ScreenKey, 'Search'>];
-        const headerActions = (
-          <ProfileButton navigate={navigate} />
-        );
-
-        if (!screenInstances.current[item.key]) {
-            screenInstances.current[item.key] = <ScreenComponent {...navigationProps} {...item.props} headerActions={headerActions} />;
-        } else {
-             // Re-render with potentially updated props, like headerActions
-            screenInstances.current[item.key] = React.cloneElement(screenInstances.current[item.key], { ...navigationProps, ...item.props, headerActions });
-        }
-        return {
-            ...item,
-            component: screenInstances.current[item.key]
-        };
-    });
-  }, [stack, navigate, goBack]);
 
   if (!stack || stack.length === 0) {
     return (
@@ -130,7 +95,20 @@ function AppContent({ user }: { user: User | null }) {
     );
   }
 
-  const activeScreenKey = stack[stack.length - 1].screen;
+  const activeStackItem = stack[stack.length - 1];
+  const previousStackItem = stack.length > 1 ? stack[stack.length - 2] : null;
+
+  const ActiveScreenComponent = screens[activeStackItem.screen as Exclude<ScreenKey, 'Search'>];
+  
+  const navigationProps = { 
+      navigate, 
+      goBack, 
+      canGoBack: stack.length > 1,
+  };
+  const headerActions = <ProfileButton navigate={navigate} />;
+
+
+  const activeScreenKey = activeStackItem.screen;
   const showBottomNav = user && mainTabs.includes(activeScreenKey);
 
   return (
@@ -139,35 +117,42 @@ function AppContent({ user }: { user: User | null }) {
           <div className='hidden'></div>
         </SearchSheet>
       <div className="relative flex-1 overflow-hidden">
-        {renderedStack.map((item, index) => {
-          const isTop = index === stack.length - 1;
-          const isAnimating = isAnimatingOut === item.key;
-          const isEntering = stack.length > 1 && index === stack.length - 1 && !mainTabs.includes(item.screen);
-          
-          return (
-            <div
-              key={item.key}
-              className={cn(
-                "absolute inset-0 bg-background flex flex-col",
-                 isEntering && 'animate-slide-in-from-right', 
-                 isAnimating && 'animate-slide-out-to-right'
-              )}
-              style={{
-                zIndex: index,
-                display: isTop || isAnimating ? 'flex' : 'none'
-              }}
-              aria-hidden={!isTop}
-            >
-              {item.component}
-            </div>
-          );
-        })}
+        {/* Previous screen for animation */}
+        {previousStackItem && isAnimatingOut && (
+             (() => {
+                const PreviousScreenComponent = screens[previousStackItem.screen as Exclude<ScreenKey, 'Search'>];
+                return (
+                     <div
+                        key={previousStackItem.key}
+                        className="absolute inset-0 bg-background flex flex-col"
+                        style={{ zIndex: stack.length - 2 }}
+                     >
+                        <PreviousScreenComponent {...navigationProps} {...previousStackItem.props} headerActions={headerActions} />
+                     </div>
+                )
+             })()
+        )}
+        
+        {/* Active screen */}
+        <div
+            key={activeStackItem.key}
+            className={cn(
+            "absolute inset-0 bg-background flex flex-col",
+            isEntering && !mainTabs.includes(activeStackItem.screen) && 'animate-slide-in-from-right',
+            isAnimatingOut && 'animate-slide-out-to-right'
+            )}
+            style={{ zIndex: stack.length -1 }}
+        >
+           <ActiveScreenComponent {...navigationProps} {...activeStackItem.props} headerActions={headerActions} />
+        </div>
+
       </div>
       
       {showBottomNav && <BottomNav activeScreen={activeScreenKey} onNavigate={navigate} />}
     </main>
   );
 }
+
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
