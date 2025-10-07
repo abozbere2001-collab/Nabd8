@@ -105,11 +105,22 @@ function useTeamData(teamId?: number) {
         const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
         const fixturesData = await fixturesRes.json();
         const fixtures: Fixture[] = fixturesData.response || [];
-
-        // Find the primary league by looking for the first "League" type fixture
-        const primaryLeagueFixture = fixtures.find(f => f.league.name === 'La Liga' || f.league.name.includes('League')); // Example logic, can be improved
-        const leagueIdForStandings = primaryLeagueFixture ? primaryLeagueFixture.league.id : (fixtures.length > 0 ? fixtures[0].league.id : null);
-
+        
+        // Intelligent league selection for standings
+        const worldCupFixture = fixtures.find(f => f.league.name.includes('World Cup'));
+        const continentalFixture = fixtures.find(f => f.league.name.includes('AFC Champions League') || f.league.name.includes('UEFA'));
+        const primaryLeagueFixture = fixtures.find(f => f.league.name.includes('League'));
+        
+        let leagueIdForStandings = null;
+        if (worldCupFixture) {
+            leagueIdForStandings = worldCupFixture.league.id;
+        } else if (continentalFixture) {
+            leagueIdForStandings = continentalFixture.league.id;
+        } else if (primaryLeagueFixture) {
+            leagueIdForStandings = primaryLeagueFixture.league.id;
+        } else if (fixtures.length > 0) {
+            leagueIdForStandings = fixtures[0].league.id;
+        }
 
         let standingsData = { response: [] };
         let scorersData = { response: [] };
