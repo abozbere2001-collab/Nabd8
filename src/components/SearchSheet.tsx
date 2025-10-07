@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenKey, ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
@@ -56,14 +56,26 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   const [noteTeam, setNoteTeam] = useState<{id: number, name: string, logo: string} | null>(null);
   const [isNoteOpen, setIsNoteOpen] = useState(false);
 
+  const fetchFavorites = useCallback(async () => {
+    if (!user) return;
+    try {
+        const docRef = doc(db, 'favorites', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            setFavorites(docSnap.data() as Favorites);
+        } else {
+            setFavorites({});
+        }
+    } catch (error) {
+        console.error("Error fetching favorites:", error);
+    }
+  }, [user, db]);
 
   useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
-      setFavorites(doc.data() as Favorites || {});
-    });
-    return () => unsub();
-  }, [user, db]);
+    if (isOpen && user) {
+        fetchFavorites();
+    }
+  }, [isOpen, user, fetchFavorites]);
 
   const getDisplayName = (type: 'team' | 'league', id: number, defaultName: string) => {
       if (type === 'team') {
@@ -71,9 +83,9 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
       }
       return customNames.leagues.get(id) || defaultName;
   }
-
-  useEffect(() => {
-    const fetchAllCustomNames = async () => {
+  
+  const fetchAllCustomNames = useCallback(async () => {
+    try {
         const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
             getDocs(collection(db, 'leagueCustomizations')),
             getDocs(collection(db, 'teamCustomizations'))
@@ -82,15 +94,21 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
         const leagueNames = new Map<number, string>();
         leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
         
-        const teamNames = new Map<number, string>();
+        const teamNames = new Map<string, string>();
         teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
         
         setCustomNames({ leagues: leagueNames, teams: teamNames });
-    };
+    } catch(error) {
+        console.error("Failed to fetch custom names for search:", error);
+    }
+  }, [db]);
+
+
+  useEffect(() => {
     if (isOpen) {
         fetchAllCustomNames();
     }
-  }, [isOpen, db]);
+  }, [isOpen, fetchAllCustomNames]);
 
   const handleSearch = useCallback(async (queryTerm: string) => {
     if (!queryTerm.trim() || queryTerm.length < 2) {
@@ -180,12 +198,8 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     const { id, type } = renameItem;
     let collectionName = type === 'league' ? 'leagueCustomizations' : 'teamCustomizations';
     await setDoc(doc(db, collectionName, String(id)), { customName: newName });
-    // Optimistically update custom names
-    if (type === 'league') {
-        setCustomNames(prev => ({...prev, leagues: new Map(prev.leagues).set(Number(id), newName)}));
-    } else {
-        setCustomNames(prev => ({...prev, teams: new Map(prev.teams).set(Number(id), newName)}));
-    }
+    // Manually refetch custom names to update UI
+    await fetchAllCustomNames();
   };
   
   const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
@@ -222,6 +236,8 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     } else {
         await setDoc(favRef, favoriteData, { merge: true });
     }
+    // Manually refetch favorites to update UI
+    await fetchFavorites();
   };
 
   const handleResultClick = (result: SearchResult) => {

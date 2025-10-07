@@ -23,7 +23,7 @@ export const FirebaseProvider = ({ children }: { children: React.ReactNode }) =>
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const { app, auth, db } = useMemo(() => {
+  const { auth, db } = useMemo(() => {
     const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
@@ -31,14 +31,16 @@ export const FirebaseProvider = ({ children }: { children: React.ReactNode }) =>
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
       setLoading(false);
     });
     return () => unsubscribe();
   }, [auth]);
-
-  const isAdmin = useMemo(() => user?.email === ADMIN_EMAIL, [user]);
+  
+  const isAdmin = useMemo(() => {
+    return user?.email === ADMIN_EMAIL;
+  }, [user]);
 
   const value = useMemo(() => ({
     auth,
