@@ -15,6 +15,13 @@ import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
+// Interfaces
+interface ApiLeague {
+  league: { id: number; name: string; type: string; logo: string; };
+  country: { name: string; code: string; flag: string | null; };
+  seasons: { year: number; }[];
+}
+
 interface ManagedCompetition {
     leagueId: number;
     name: string;
@@ -47,9 +54,7 @@ interface RenameState {
 }
 
 const countryToContinent: { [key: string]: string } = {
-    "World": "World",
-    // Europe
-    "England": "Europe", "Spain": "Europe", "Germany": "Europe", "Italy": "Europe", "France": "Europe",
+    "World": "World", "England": "Europe", "Spain": "Europe", "Germany": "Europe", "Italy": "Europe", "France": "Europe",
     "Netherlands": "Europe", "Portugal": "Europe", "Belgium": "Europe", "Russia": "Europe", "Turkey": "Europe",
     "Greece": "Europe", "Switzerland": "Europe", "Austria": "Europe", "Denmark": "Europe", "Scotland": "Europe",
     "Sweden": "Europe", "Norway": "Europe", "Poland": "Europe", "Ukraine": "Europe", "Czech-Republic": "Europe",
@@ -59,35 +64,32 @@ const countryToContinent: { [key: string]: string } = {
     "Faroe-Islands": "Europe", "Malta": "Europe", "Andorra": "Europe", "San-Marino": "Europe", "Gibraltar": "Europe", "Kosovo": "Europe",
     "Bosnia-and-Herzegovina": "Europe", "Slovakia": "Europe", "Slovenia": "Europe", "Bulgaria": "Europe", "Cyprus": "Europe", "Azerbaijan": "Europe",
     "Armenia": "Europe", "Belarus": "Europe", "Moldova": "Europe", "North-Macedonia": "Europe", "Montenegro": "Europe",
-    // Asia
     "Saudi-Arabia": "Asia", "Japan": "Asia", "South-Korea": "Asia", "China": "Asia", "Qatar": "Asia",
-    "UAE": "Asia", "Iran": "Asia", "Iraq": "Asia", "Uzbekistan": "Asia", "Australia": "Asia", // Australia is in AFC
+    "UAE": "Asia", "Iran": "Asia", "Iraq": "Asia", "Uzbekistan": "Asia", "Australia": "Asia",
     "Jordan": "Asia", "Syria": "Asia", "Lebanon": "Asia", "Oman": "Asia", "Kuwait": "Asia", "Bahrain": "Asia",
     "India": "Asia", "Thailand": "Asia", "Vietnam": "Asia", "Malaysia": "Asia", "Indonesia": "Asia", "Singapore": "Asia",
     "Philippines": "Asia", "Hong-Kong": "Asia", "Palestine": "Asia", "Tajikistan": "Asia", "Turkmenistan": "Asia",
     "Kyrgyzstan": "Asia", "Bangladesh": "Asia", "Maldives": "Asia", "Cambodia": "Asia", "Myanmar": "Asia",
-    // Africa
     "Egypt": "Africa", "Morocco": "Africa", "Tunisia": "Africa", "Algeria": "Africa", "Nigeria": "Africa",
     "Senegal": "Africa", "Ghana": "Africa", "Ivory-Coast": "Africa", "Cameroon": "Africa", "South-Africa": "Africa",
     "DR-Congo": "Africa", "Mali": "Africa", "Burkina-Faso": "Africa", "Guinea": "Africa", "Zambia": "Africa",
     "Cape-Verde": "Africa", "Uganda": "Africa", "Kenya": "Africa", "Tanzania": "Africa", "Sudan": "Africa",
     "Libya": "Africa", "Angola": "Africa", "Zimbabwe": "Africa", "Ethiopia": "Africa",
-    // North America
     "USA": "North America", "Mexico": "North America", "Canada": "North America", "Costa-Rica": "North America",
     "Honduras": "North America", "Panama": "North America", "Jamaica": "North America", "El-Salvador": "North America",
     "Trinidad-and-Tobago": "North America", "Guatemala": "North America", "Nicaragua": "North America", "Cuba": "North America",
-    // South America
     "Brazil": "South America", "Argentina": "South America", "Colombia": "South America", "Chile": "South America",
     "Uruguay": "South America", "Peru": "South America", "Ecuador": "South America", "Paraguay": "South America",
     "Venezuela": "South America", "Bolivia": "South America",
-    // Oceania
     "New-Zealand": "Oceania", "Fiji": "Oceania"
 };
 
 const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "North America", "Oceania"];
+const WORLD_LEAGUES_KEYWORDS = ["world", "uefa", "champions league", "europa", "copa libertadores", "copa sudamericana", "caf champions", "afc champions"];
+
 
 export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
-    const [competitions, setCompetitions] = useState<ManagedCompetition[] | null>(null);
+    const [managedCompetitions, setManagedCompetitions] = useState<ManagedCompetition[] | null>(null);
     const [loading, setLoading] = useState(true);
     const { isAdmin } = useAdmin();
     const { user } = useAuth();
@@ -133,12 +135,10 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
             setCustomCountryNames(countryNames);
 
             const continentNames = new Map<string, string>();
-            continentsSnapshot.forEach(doc => continentNames.set(doc.id, doc.data().customName));
+            continentsSnapshot.forEach(doc => continentsSnapshot.set(doc.id, doc.data().customName));
             setCustomContinentNames(continentNames);
         } catch (error) {
             console.error("Failed to fetch custom names:", error);
-            const permissionError = new FirestorePermissionError({ path: 'customizations collections', operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
         }
     }, [db]);
 
@@ -146,12 +146,18 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         setLoading(true);
         fetchAllCustomNames();
         const compsRef = collection(db, 'managedCompetitions');
-        const q = query(compsRef, orderBy('name', 'asc'));
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetition);
-            setCompetitions(fetchedCompetitions);
-            setLoading(false);
+        
+        const unsubscribe = onSnapshot(query(compsRef, orderBy('name', 'asc')), (snapshot) => {
+            if (snapshot.empty && isAdmin) {
+                 // If the collection is empty and user is admin, fetch all leagues from API and populate Firestore.
+                 // This is a one-time seeding process.
+                console.log("Managed competitions is empty. Seeding from API...");
+                fetchAllLeaguesAndSeedFirestore();
+            } else {
+                const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetition);
+                setManagedCompetitions(fetchedCompetitions);
+                setLoading(false);
+            }
         }, (error) => {
             console.error("Error fetching managed competitions:", error);
             const permissionError = new FirestorePermissionError({ path: compsRef.path, operation: 'list' });
@@ -159,8 +165,35 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
             setLoading(false);
         });
 
+        const fetchAllLeaguesAndSeedFirestore = async () => {
+            try {
+                const res = await fetch(`/api/football/leagues`);
+                const data = await res.json();
+                if (data.response) {
+                    const batch = writeBatch(db);
+                    data.response.forEach((item: ApiLeague) => {
+                        const newComp: ManagedCompetition = {
+                            leagueId: item.league.id,
+                            name: item.league.name,
+                            logo: item.league.logo,
+                            countryName: item.country.name,
+                            countryFlag: item.country.flag,
+                        };
+                        const docRef = doc(db, 'managedCompetitions', String(item.league.id));
+                        batch.set(docRef, newComp);
+                    });
+                    await batch.commit();
+                    console.log("Seeding complete.");
+                }
+            } catch (error) {
+                console.error("Failed to seed competitions from API:", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+
         return () => unsubscribe();
-    }, [db, fetchAllCustomNames]);
+    }, [db, isAdmin, fetchAllCustomNames]);
 
     const toggleLeagueFavorite = async (comp: ManagedCompetition) => {
         if (!user) return;
@@ -169,7 +202,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         const fieldPath = `leagues.${leagueId}`;
         const isFavorited = favorites?.leagues?.[leagueId];
         const leagueName = getLeagueName(comp);
-
         const favoriteData = { leagues: { [leagueId]: { leagueId: comp.leagueId, name: leagueName, logo: comp.logo } } };
 
         try {
@@ -193,17 +225,18 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
             errorEmitter.emit('permission-error', permissionError);
         }
     }
-
+    
     const sortedGroupedCompetitions = useMemo(() => {
-        if (!competitions) return null;
+        if (!managedCompetitions) return null;
 
         const grouped: GroupedCompetitions = {};
 
-        competitions.forEach(comp => {
+        managedCompetitions.forEach(comp => {
             const countryName = comp.countryName;
             const continent = countryToContinent[countryName] || "Other";
+            const isWorldLeague = WORLD_LEAGUES_KEYWORDS.some(keyword => comp.name.toLowerCase().includes(keyword));
 
-            if (continent === "World") {
+            if (continent === "World" || isWorldLeague) {
                 if (!grouped.World) grouped.World = { leagues: [] };
                 (grouped.World as { leagues: ManagedCompetition[] }).leagues.push(comp);
             } else {
@@ -215,57 +248,41 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                 continentGroup[countryName].leagues.push(comp);
             }
         });
-
+        
         const sortWithCustomPriority = (arr: string[], customNamesMap: Map<string, string>) => {
             return arr.sort((a, b) => {
-                const aHasCustom = customNamesMap.has(a);
-                const bHasCustom = customNamesMap.has(b);
-                if (aHasCustom && !bHasCustom) return -1;
-                if (!aHasCustom && bHasCustom) return 1;
-                return getContinentName(a).localeCompare(getContinentName(b));
+                const aIsCustom = customNamesMap.has(a);
+                const bIsCustom = customNamesMap.has(b);
+                if (aIsCustom && !bIsCustom) return -1;
+                if (!aIsCustom && bIsCustom) return 1;
+                return a.localeCompare(b);
             });
         };
-
+        
         const sortedGrouped: GroupedCompetitions = {};
-        const sortedContinents = continentOrder.filter(c => grouped[c]);
-        sortWithCustomPriority(sortedContinents, customContinentNames);
+        const continents = Object.keys(grouped).sort((a, b) => continentOrder.indexOf(a) - continentOrder.indexOf(b));
 
-        for (const continent of sortedContinents) {
-             if (continent === "World") {
-                const worldLeagues = (grouped.World as { leagues: ManagedCompetition[] }).leagues;
-                worldLeagues.sort((a,b) => {
-                    const aHasCustom = customLeagueNames.has(a.leagueId);
-                    const bHasCustom = customLeagueNames.has(b.leagueId);
-                    if (aHasCustom && !bHasCustom) return -1;
-                    if (!aHasCustom && bHasCustom) return 1;
-                    return getLeagueName(a).localeCompare(getLeagueName(b));
-                });
-                sortedGrouped.World = { leagues: worldLeagues };
+        for (const continent of continents) {
+            if (continent === "World") {
+                 const worldLeagues = (grouped.World as { leagues: ManagedCompetition[] }).leagues;
+                 worldLeagues.sort((a, b) => getLeagueName(a).localeCompare(getLeagueName(b)));
+                 sortedGrouped.World = { leagues: worldLeagues };
             } else {
                 const countries = grouped[continent] as CompetitionsByCountry;
-                const sortedCountries = Object.keys(countries);
-                sortWithCustomPriority(sortedCountries, customCountryNames);
+                const sortedCountries = sortWithCustomPriority(Object.keys(countries), customCountryNames);
                 
                 const sortedCountriesObj: CompetitionsByCountry = {};
                 for (const country of sortedCountries) {
-                    countries[country].leagues.sort((a, b) => {
-                       const aHasCustom = customLeagueNames.has(a.leagueId);
-                       const bHasCustom = customLeagueNames.has(b.leagueId);
-                       if (aHasCustom && !bHasCustom) return -1;
-                       if (!aHasCustom && bHasCustom) return 1;
-                       return getLeagueName(a).localeCompare(getLeagueName(b));
-                    });
+                    countries[country].leagues.sort((a, b) => getLeagueName(a).localeCompare(getLeagueName(b)));
                     sortedCountriesObj[country] = countries[country];
                 }
                 sortedGrouped[continent] = sortedCountriesObj;
             }
         }
         
-        if (grouped.Other) sortedGrouped.Other = grouped.Other;
-
         return sortedGrouped;
 
-    }, [competitions, customLeagueNames, customCountryNames, customContinentNames, getLeagueName, getContinentName]);
+    }, [managedCompetitions, getLeagueName, customCountryNames]);
 
     const handleSaveRename = async (newName: string) => {
         if (!renameState.type || !renameState.id) return;
@@ -335,7 +352,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                             </div>
                         ))}
                     </div>
-                ) : competitions && competitions.length > 0 ? (
+                ) : managedCompetitions && managedCompetitions.length > 0 ? (
                     <Accordion type="multiple" className="w-full space-y-4">
                         {Object.entries(sortedGroupedCompetitions || {}).map(([continent, content]) => (
                             <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
