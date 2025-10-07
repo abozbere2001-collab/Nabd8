@@ -14,6 +14,8 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+
 
 // Interfaces
 interface Fixture {
@@ -448,9 +450,14 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
   const screenHeaderActions = (
     <div className='flex items-center gap-2'>
-        <Button variant={showLiveOnly ? 'default' : 'outline'} className="h-8 px-2 text-xs" onClick={() => setShowLiveOnly(!showLiveOnly)}>
-            مباشر
-        </Button>
+        <div className="flex items-center space-x-2">
+            <Switch
+                id="live-mode"
+                checked={showLiveOnly}
+                onCheckedChange={setShowLiveOnly}
+            />
+            <Label htmlFor="live-mode" className="text-xs">مباشر</Label>
+        </div>
        <Button variant={showOdds ? 'default' : 'outline'} className="h-8 px-2 text-xs" onClick={toggleShowOdds} disabled={loadingOdds}>
             {loadingOdds ? <Loader2 className="h-4 w-4 animate-spin" /> : '1X2'}
         </Button>
