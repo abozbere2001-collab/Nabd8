@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from '@/components/ui/button';
-import { Search, Star, Pencil, Loader2 } from 'lucide-react';
+import { Search, Star, Pencil, Loader2, Heart } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenKey, ScreenProps } from '@/app/page';
@@ -18,6 +18,7 @@ import { useAdmin, useFirebase } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase-client';
 import { RenameDialog } from '@/components/RenameDialog';
+import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
 
 interface TeamResult {
@@ -50,6 +51,10 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   const [favorites, setFavorites] = useState<Favorites>({});
   const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
+  
+  const [noteTeam, setNoteTeam] = useState<{id: number, name: string, logo: string} | null>(null);
+  const [isNoteOpen, setIsNoteOpen] = useState(false);
+
 
   useEffect(() => {
     if (!user) return;
@@ -181,6 +186,21 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
         setCustomNames(prev => ({...prev, teams: new Map(prev.teams).set(Number(id), newName)}));
     }
   };
+  
+  const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
+    setNoteTeam(team);
+    setIsNoteOpen(true);
+  }
+
+  const handleSaveNote = async (note: string) => {
+    if (!noteTeam) return;
+    await setDoc(doc(db, "adminFavorites", String(noteTeam.id)), {
+      teamId: noteTeam.id,
+      name: noteTeam.name,
+      logo: noteTeam.logo,
+      note: note
+    });
+  }
 
   const handleFavorite = async (type: 'team' | 'league', item: any) => {
     if (!user) return;
@@ -252,6 +272,11 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
                             <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">{result.type === 'team' ? 'فريق' : 'بطولة'}</span>
                         </div>
                         <div className='flex items-center'>
+                            {isAdmin && result.type === 'team' && (
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenNote(item)}>
+                                    <Heart className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                            )}
                             <Button variant="ghost" size="icon" onClick={() => handleFavorite(result.type, item)}>
                                 <Star className={cn("h-5 w-5", isFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
                             </Button>
@@ -279,7 +304,14 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
             itemType={renameItem.type === 'team' ? 'الفريق' : 'البطولة'}
           />
         )}
+        {noteTeam && <NoteDialog
+            isOpen={isNoteOpen}
+            onOpenChange={setIsNoteOpen}
+            onSave={handleSaveNote}
+            teamName={noteTeam.name}
+        />}
       </SheetContent>
     </Sheet>
   );
 }
+

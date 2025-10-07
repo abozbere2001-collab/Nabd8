@@ -6,15 +6,17 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Star, Pencil, Shirt, Users, Trophy, BarChart2 } from 'lucide-react';
+import { Star, Pencil, Shirt, Users, Trophy, BarChart2, Heart } from 'lucide-react';
 import { useAdmin, useFirebase } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '@/lib/firebase-client';
 import { RenameDialog } from '@/components/RenameDialog';
+import { NoteDialog } from '@/components/NoteDialog';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import type { Fixture, Standing, TopScorer, Favorites } from '@/lib/types';
 
 
 // --- TYPE DEFINITIONS ---
@@ -33,26 +35,6 @@ interface Player {
 interface PlayerInfoFromApi {
     player: Player;
     statistics: any[];
-}
-interface Fixture {
-  fixture: { id: number; date: string; status: { short: string; }; };
-  teams: { home: { id: number; name: string; logo: string; }; away: { id: number; name: string; logo: string; }; };
-  goals: { home: number | null; away: number | null; };
-  league: any;
-}
-interface Standing {
-  rank: number;
-  team: { id: number; name: string; logo: string; };
-  points: number; all: { played: number; win: number; draw: number; lose: number; };
-}
-interface TopScorer {
-    player: { id: number; name: string; photo: string; };
-    statistics: { team: { id: number; name: string;}; goals: { total: number; }; assists: number | null; }[];
-}
-
-interface Favorites {
-    teams?: { [key: number]: any };
-    players?: { [key: number]: any };
 }
 type RenameType = 'team' | 'player';
 
@@ -168,6 +150,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
   const [favorites, setFavorites] = useState<Favorites>({});
   const [renameItem, setRenameItem] = useState<{ id: number; name: string; type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
+  const [noteTeam, setNoteTeam] = useState<{id: number, name: string, logo: string} | null>(null);
+  const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [displayTitle, setDisplayTitle] = useState(teamInfo?.team.name || "الفريق");
 
   useEffect(() => {
@@ -224,14 +208,34 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     }
   };
   
+  const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
+    setNoteTeam(team);
+    setIsNoteOpen(true);
+  }
+
+  const handleSaveNote = async (note: string) => {
+    if (!noteTeam) return;
+    await setDoc(doc(db, "adminFavorites", String(noteTeam.id)), {
+      teamId: noteTeam.id,
+      name: noteTeam.name,
+      logo: noteTeam.logo,
+      note: note
+    });
+  }
+
   const isTeamFavorited = !!favorites?.teams?.[teamId];
 
   const secondaryActions = teamInfo && (
     <div className="flex items-center gap-1">
       {isAdmin && (
-         <Button variant="ghost" size="icon" onClick={() => handleOpenRename('team', teamId, displayTitle)}>
-          <Pencil className="h-5 w-5" />
-        </Button>
+        <>
+          <Button variant="ghost" size="icon" onClick={() => handleOpenNote(teamInfo.team)}>
+            <Heart className="h-5 w-5 text-muted-foreground" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => handleOpenRename('team', teamId, displayTitle)}>
+            <Pencil className="h-5 w-5" />
+          </Button>
+        </>
       )}
         <Button variant="ghost" size="icon" onClick={() => handleFavorite('team', teamInfo.team)}>
             <Star className={cn("h-5 w-5 opacity-80", isTeamFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground")} />
@@ -243,6 +247,12 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title={displayTitle} onBack={goBack} canGoBack={canGoBack} actions={headerActions} secondaryActions={secondaryActions} />
       {renameItem && <RenameDialog isOpen={isRenameOpen} onOpenChange={setRenameOpen} currentName={renameItem.name} onSave={handleSaveRename} itemType={renameItem.type === 'team' ? 'الفريق' : 'اللاعب'} />}
+      {noteTeam && <NoteDialog
+        isOpen={isNoteOpen}
+        onOpenChange={setIsNoteOpen}
+        onSave={handleSaveNote}
+        teamName={noteTeam.name}
+      />}
       
       {loading ? <div className="p-4 space-y-4">
         <Skeleton className="h-24 w-full" />
@@ -370,3 +380,4 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     </div>
   );
 }
+

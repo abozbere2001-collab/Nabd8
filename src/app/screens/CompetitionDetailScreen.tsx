@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { useAdmin } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
-import { Star, Pencil, Shield, Users, Trophy, BarChart2 } from 'lucide-react';
+import { Star, Pencil, Shield, Users, Trophy, BarChart2, Heart } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,83 +14,10 @@ import { useFirebase } from '@/firebase/provider';
 import { db } from '@/lib/firebase-client';
 import { doc, setDoc, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
+import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
+import type { Fixture, Standing, TopScorer, Team, Favorites } from '@/lib/types';
 
-
-// Interfaces for API data
-interface Fixture {
-  fixture: {
-    id: number;
-    date: string;
-    status: {
-      long: string;
-      short: string;
-      elapsed: number;
-    };
-  };
-  league: {
-    name: string;
-  };
-  teams: {
-    home: { id: number; name: string; logo: string; winner: boolean };
-    away: { id: number; name: string; logo: string; winner: boolean };
-  };
-  goals: {
-    home: number | null;
-    away: number | null;
-  };
-}
-
-interface Standing {
-  rank: number;
-  team: {
-    id: number;
-    name: string;
-    logo: string;
-  };
-  points: number;
-  goalsDiff: number;
-  all: {
-    played: number;
-    win: number;
-    draw: number;
-    lose: number;
-  };
-}
-
-interface TopScorer {
-    player: {
-        id: number;
-        name: string;
-        photo: string;
-    };
-    statistics: {
-        team: {
-            id: number;
-            name: string;
-        };
-        goals: {
-            total: number;
-        };
-        penalty: {
-            scored: number;
-        }
-    }[];
-}
-
-interface Team {
-  team: {
-    id: number;
-    name: string;
-    logo: string;
-  };
-}
-
-interface Favorites {
-    leagues?: { [key: number]: any };
-    teams?: { [key: number]: any };
-    players?: { [key: number]: any };
-}
 
 type RenameType = 'league' | 'team' | 'player';
 
@@ -106,6 +33,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const [displayTitle, setDisplayTitle] = useState(initialTitle);
   const [isRenameOpen, setRenameOpen] = useState(false);
   const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, type: RenameType } | null>(null);
+
+  const [noteTeam, setNoteTeam] = useState<{id: number, name: string, logo: string} | null>(null);
+  const [isNoteOpen, setIsNoteOpen] = useState(false);
 
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
@@ -221,6 +151,21 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     await setDoc(doc(db, collectionName, String(id)), { customName: newName });
   };
   
+  const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
+    setNoteTeam(team);
+    setIsNoteOpen(true);
+  }
+
+  const handleSaveNote = async (note: string) => {
+    if (!noteTeam) return;
+    await setDoc(doc(db, "adminFavorites", String(noteTeam.id)), {
+      teamId: noteTeam.id,
+      name: noteTeam.name,
+      logo: noteTeam.logo,
+      note: note
+    });
+  }
+
   const secondaryActions = (
     <div className="flex items-center gap-1">
       {isAdmin && leagueId && (
@@ -250,6 +195,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
           onSave={handleSaveRename}
           itemType="العنصر"
         />}
+      {noteTeam && <NoteDialog
+        isOpen={isNoteOpen}
+        onOpenChange={setIsNoteOpen}
+        onSave={handleSaveNote}
+        teamName={noteTeam.name}
+      />}
        <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="matches" className="w-full">
            <div className="sticky top-0 bg-background z-10 border-b">
@@ -313,7 +264,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             <TableHead className="text-center">ت</TableHead>
                             <TableHead className="text-center">خ</TableHead>
                             <TableHead className="text-center">نقاط</TableHead>
-                             <TableHead className="text-left w-[90px]"></TableHead>
+                             <TableHead className="text-left w-[120px]"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -336,6 +287,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 <TableCell className="text-center font-bold">{s.points}</TableCell>
                                  <TableCell onClick={e => e.stopPropagation()}>
                                      <div className='flex items-center justify-end opacity-80'>
+                                        {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenNote(s.team)}>
+                                            <Heart className="h-4 w-4 text-muted-foreground" />
+                                        </Button>}
                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleFavorite('team', s.team)}>
                                             <Star className={cn("h-5 w-5", favorites?.teams?.[s.team.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                         </Button>
@@ -417,6 +371,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             </Avatar>
                             <span className="font-semibold text-sm">{team.name}</span>
                             <div className="absolute top-1 right-1 flex opacity-80">
+                                {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenNote(team);}}>
+                                    <Heart className="h-4 w-4 text-muted-foreground" />
+                                </Button>}
                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('team', team);}}>
                                     <Star className={cn("h-5 w-5", favorites?.teams?.[team.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
@@ -434,3 +391,4 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+

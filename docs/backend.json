@@ -44,6 +44,18 @@
             }
         }
     },
+    "AdminFavorite": {
+      "title": "Admin Favorite",
+      "description": "Represents a team and a note favorited by an admin.",
+      "type": "object",
+      "properties": {
+        "teamId": { "type": "number"},
+        "name": { "type": "string" },
+        "logo": { "type": "string", "format": "uri" },
+        "note": { "type": "string" }
+      },
+      "required": ["teamId", "name", "logo", "note"]
+    },
     "LeagueFavorite": {
       "title": "League Favorite",
       "type": "object",
@@ -144,6 +156,10 @@
       "schema": { "$ref": "#/entities/UserFavorites" },
       "description": "A single document containing all favorites for a user."
     },
+    "/adminFavorites/{teamId}": {
+      "schema": { "$ref": "#/entities/AdminFavorite" },
+      "description": "Stores admin-favorited teams and their notes, keyed by team ID."
+    },
     "/leagueCustomizations/{leagueId}": {
         "schema": { "$ref": "#/entities/LeagueCustomization" },
         "description": "Stores custom names for leagues, keyed by league ID."
@@ -170,3 +186,4 @@
     }
   }
 }
+

@@ -11,6 +11,7 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
+import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
@@ -21,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { SearchSheet } from '@/components/SearchSheet';
 
 
-export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails';
+export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails' | 'AdminFavoriteTeamDetails';
 export type ScreenProps = {
   navigate: (screen: ScreenKey, props?: Record<string, any>) => void;
   goBack: () => void;
@@ -39,6 +40,7 @@ const screens: Record<Exclude<ScreenKey, 'Search'>, React.ComponentType<any>> = 
   CompetitionDetails: CompetitionDetailScreen,
   MatchDetails: MatchDetailScreen,
   TeamDetails: TeamDetailScreen,
+  AdminFavoriteTeamDetails: AdminFavoriteTeamScreen,
 };
 
 const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
@@ -194,3 +196,4 @@ export default function Home() {
     </FirebaseProvider>
   );
 }
+
