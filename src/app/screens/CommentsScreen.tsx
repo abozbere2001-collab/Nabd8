@@ -244,11 +244,11 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   }, [db, matchId]);
   
  const fetchComments = useCallback(async () => {
-    if (!commentsColRef || !user) {
+    // If there's no user or no valid collection reference, stop.
+    if (!user || !commentsColRef) {
         setLoading(false);
-        // Ensure we don't proceed without a user
-        if(!user) setComments([]);
-        return () => {};
+        setComments([]);
+        return; // Return undefined, so the cleanup function doesn't try to call it.
     }
 
     setLoading(true);
@@ -290,11 +290,15 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         setLoading(false);
 
     }, (error) => {
-        const permissionError = new FirestorePermissionError({
-          path: commentsColRef.path,
-          operation: 'list',
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        // Only emit an error if a user is actually logged in.
+        // This prevents a permission error flash on logout.
+        if (user) {
+            const permissionError = new FirestorePermissionError({
+                path: commentsColRef.path,
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
         setLoading(false);
     });
 
@@ -304,8 +308,18 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
-    fetchComments().then(unsub => unsubscribe = unsub);
-    return () => unsubscribe && unsubscribe();
+    
+    fetchComments().then(unsub => {
+      if (unsub) {
+        unsubscribe = unsub;
+      }
+    });
+    
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [fetchComments]);
 
 
@@ -480,95 +494,89 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   const handleLikeComment = (commentId: string) => {
     if (!user || !db) return;
 
-    let pathSegments: string[] | null = null;
+    // Find the comment and its path
+    let parentCommentId: string | null = null;
     let originalComment: MatchComment | null = null;
 
-    // Find the comment and its path
     for (const parent of comments) {
         if (parent.id === commentId) {
-            pathSegments = ['matches', String(matchId), 'comments', commentId];
+            parentCommentId = null;
             originalComment = parent;
             break;
         }
         const reply = parent.replies.find(r => r.id === commentId);
         if (reply && parent.id) {
-            pathSegments = ['matches', String(matchId), 'comments', parent.id, 'replies', commentId];
+            parentCommentId = parent.id;
             originalComment = reply;
             break;
         }
     }
 
-    if (!pathSegments || !originalComment) return;
+    if (!originalComment) return;
+
+    const likeRef = parentCommentId
+        ? doc(db, 'matches', String(matchId), 'comments', parentCommentId, 'replies', commentId, 'likes', user.uid)
+        : doc(db, 'matches', String(matchId), 'comments', commentId, 'likes', user.uid);
 
     const hasLiked = originalComment.likes?.some(like => like.id === user.uid);
-    const likeRef = doc(db, ...pathSegments, 'likes', user.uid);
+    const likeData = { userId: user.uid };
 
     // Optimistic UI Update
-    setComments(prevComments => prevComments.map(parentComment => {
-        const updateLikes = (comment: MatchComment): MatchComment => {
-            if (comment.id !== commentId) {
-                // Recursively update replies if they exist
-                if (comment.replies && comment.replies.length > 0) {
-                    return { ...comment, replies: comment.replies.map(updateLikes) };
-                }
-                return comment;
+    setComments(prevComments => prevComments.map(p => {
+        const updateCommentLikes = (c: MatchComment): MatchComment => {
+            if (c.id === commentId) {
+                 const currentLikes = c.likes || [];
+                 const newLikes = hasLiked
+                    ? currentLikes.filter(l => l.id !== user.uid)
+                    : [...currentLikes, { id: user.uid, userId: user.uid }];
+                return { ...c, likes: newLikes };
             }
-
-            // This is the comment we want to update
-            const currentLikes = comment.likes || [];
-            const newLikes = hasLiked
-                ? currentLikes.filter(l => l.id !== user.uid)
-                : [...currentLikes, { id: user.uid, userId: user.uid }];
-            
-            return { ...comment, likes: newLikes };
+            if (c.replies && c.replies.length > 0) {
+                 return { ...c, replies: c.replies.map(updateCommentLikes) };
+            }
+            return c;
         };
-        return updateLikes(parentComment);
+        return updateCommentLikes(p);
     }));
 
+    // Firebase Operation
+    const operation = hasLiked ? deleteDoc(likeRef) : setDoc(likeRef, likeData);
 
-    if (hasLiked) {
-        deleteDoc(likeRef).catch((serverError) => {
-            const permissionError = new FirestorePermissionError({ path: likeRef.path, operation: 'delete' });
-            errorEmitter.emit('permission-error', permissionError);
-            fetchComments(); // Revert on error
-        });
-    } else {
-        const likeData = { userId: user.uid };
-        setDoc(likeRef, likeData)
-        .then(() => {
-            if (originalComment && originalComment.userId !== user.uid) {
-                const notificationsCollectionRef = collection(db, 'users', originalComment.userId, 'notifications');
-                const notificationData = {
-                    recipientId: originalComment.userId,
-                    senderId: user.uid,
-                    senderName: user.displayName,
-                    senderPhoto: user.photoURL,
-                    type: 'like' as 'like' | 'reply',
-                    matchId: matchId,
-                    commentId: commentId,
-                    commentText: originalComment.text,
-                    read: false,
-                    timestamp: serverTimestamp(),
-                };
-                addDoc(notificationsCollectionRef, notificationData).catch((serverError) => {
-                     const permissionError = new FirestorePermissionError({
-                        path: notificationsCollectionRef.path,
-                        operation: 'create',
-                        requestResourceData: notificationData
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
+    operation.then(() => {
+        if (!hasLiked && originalComment && originalComment.userId !== user.uid) {
+            const notificationsCollectionRef = collection(db, 'users', originalComment.userId, 'notifications');
+            const notificationData = {
+                recipientId: originalComment.userId,
+                senderId: user.uid,
+                senderName: user.displayName,
+                senderPhoto: user.photoURL,
+                type: 'like' as 'like' | 'reply',
+                matchId: matchId,
+                commentId: commentId,
+                commentText: originalComment.text,
+                read: false,
+                timestamp: serverTimestamp(),
+            };
+            addDoc(notificationsCollectionRef, notificationData).catch((serverError) => {
+                 const permissionError = new FirestorePermissionError({
+                    path: notificationsCollectionRef.path,
+                    operation: 'create',
+                    requestResourceData: notificationData
                 });
-            }
-        }).catch((serverError) => {
-            const permissionError = new FirestorePermissionError({
-                path: likeRef.path,
-                operation: 'create',
-                requestResourceData: likeData
+                errorEmitter.emit('permission-error', permissionError);
             });
-            errorEmitter.emit('permission-error', permissionError);
-            fetchComments(); // Revert on error
+        }
+    }).catch((serverError) => {
+        // Revert UI on error
+        setComments(prev => [...prev]); 
+        
+        const permissionError = new FirestorePermissionError({
+            path: likeRef.path,
+            operation: hasLiked ? 'delete' : 'create',
+            requestResourceData: hasLiked ? undefined : likeData
         });
-    }
+        errorEmitter.emit('permission-error', permissionError);
+    });
   };
 
   const renderCommentTree = (comment: MatchComment, isReply: boolean = false) => (
