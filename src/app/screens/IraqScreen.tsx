@@ -392,7 +392,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             unsubscribePreds();
         };
 
-    }, [user, db, fixtures]);
+    }, [user, db]);
 
     const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
         if (!user || homeGoalsStr === '' || awayGoalsStr === '' || !db) return;
