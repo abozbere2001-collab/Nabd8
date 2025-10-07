@@ -1,3 +1,5 @@
+
+
 // --- TYPE DEFINITIONS ---
 export interface Fixture {
   fixture: { id: number; date: string; timestamp: number; status: { short: string; long: string; elapsed: number | null; }; };
@@ -42,6 +44,7 @@ export interface MatchDetails {
 
 export interface Like {
     id: string; // User ID
+    userId: string;
 }
 
 export interface MatchComment {
@@ -51,8 +54,9 @@ export interface MatchComment {
     userPhoto: string;
     text: string;
     timestamp: any; // Firestore ServerTimestamp
-    likes: Like[]; // Now an array of Like objects
+    parentId?: string | null;
     replies: MatchComment[];
+    likes: Like[];
 }
 
 

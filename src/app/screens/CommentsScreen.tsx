@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Send, MoreVertical, Edit, Trash2, CornerDownRight, Heart } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, setDoc, where } from 'firebase/firestore';
 import type { MatchComment, Like } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -32,6 +32,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 interface CommentsScreenProps extends ScreenProps {
   matchId: number;
@@ -239,20 +241,17 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   
   const fetchComments = useCallback(async () => {
     setLoading(true);
-    const q = query(commentsColRef, orderBy('timestamp', 'asc'));
+    const q = query(commentsColRef, where('parentId', '==', null), orderBy('timestamp', 'asc'));
     
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-        // Use Promise.all to fetch subcollections concurrently
         const commentPromises = snapshot.docs.map(async (doc) => {
             const commentData = doc.data() as Omit<MatchComment, 'id' | 'replies' | 'likes'>;
             
-            // Fetch replies
             const repliesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies');
             const repliesQuery = query(repliesRef, orderBy('timestamp', 'asc'));
             const repliesSnapshot = await getDocs(repliesQuery);
             const replies = repliesSnapshot.docs.map(replyDoc => ({ id: replyDoc.id, ...replyDoc.data() } as MatchComment));
 
-            // Fetch likes
             const likesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'likes');
             const likesSnapshot = await getDocs(likesRef);
             const likes = likesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
@@ -269,8 +268,12 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         setComments(resolvedComments);
         setLoading(false);
 
-    }, (error) => {
-        console.error("Error fetching comments:", error);
+    }, async (error) => {
+        const permissionError = new FirestorePermissionError({
+          path: commentsColRef.path,
+          operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
         setLoading(false);
     });
 
@@ -295,49 +298,63 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     if (!text.trim() || !user || sending) return;
 
     setSending(true);
-    try {
-      const newCommentData = {
-        text: text.trim(),
-        userId: user.uid,
-        userName: user.displayName,
-        userPhoto: user.photoURL,
-        timestamp: serverTimestamp(),
-      };
-      
-      let collectionRef = commentsColRef;
-      if (parentId) {
-        collectionRef = collection(db, 'matches', String(matchId), 'comments', parentId, 'replies');
-      }
+    
+    const newCommentData = {
+      text: text.trim(),
+      userId: user.uid,
+      userName: user.displayName,
+      userPhoto: user.photoURL,
+      timestamp: serverTimestamp(),
+      parentId: parentId || null,
+    };
+    
+    let collectionRef = parentId 
+        ? collection(db, 'matches', String(matchId), 'comments', parentId, 'replies')
+        : commentsColRef;
 
-      const newDocRef = await addDoc(collectionRef, newCommentData);
-      
-      if (parentId) {
-        const parentComment = comments.find(c => c.id === parentId);
-        if (parentComment && parentComment.userId !== user.uid) {
-            const notificationRef = collection(db, 'users', parentComment.userId, 'notifications');
-            await addDoc(notificationRef, {
-                recipientId: parentComment.userId,
-                senderId: user.uid,
-                senderName: user.displayName,
-                senderPhoto: user.photoURL,
-                type: 'reply',
-                matchId: matchId,
-                commentId: parentId, // Notifying about the parent comment
-                commentText: text.trim(),
-                read: false,
-                timestamp: serverTimestamp(),
-            });
+    addDoc(collectionRef, newCommentData)
+    .then(async (newDocRef) => {
+        if (parentId) {
+            const parentComment = comments.find(c => c.id === parentId);
+            if (parentComment && parentComment.userId !== user.uid) {
+                const notificationsCollectionRef = collection(db, 'users', parentComment.userId, 'notifications');
+                const notificationData = {
+                    recipientId: parentComment.userId,
+                    senderId: user.uid,
+                    senderName: user.displayName,
+                    senderPhoto: user.photoURL,
+                    type: 'reply' as 'reply' | 'like',
+                    matchId: matchId,
+                    commentId: parentId,
+                    commentText: text.trim(),
+                    read: false,
+                    timestamp: serverTimestamp(),
+                };
+                addDoc(notificationsCollectionRef, notificationData)
+                .catch(async (serverError) => {
+                     const permissionError = new FirestorePermissionError({
+                        path: notificationsCollectionRef.path,
+                        operation: 'create',
+                        requestResourceData: notificationData
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
+                });
+            }
         }
-      }
-      
-      if (replyingTo) {
-          setReplyingTo(null);
-      }
-    } catch (error) {
-      console.error("Error sending comment:", error);
-    } finally {
+        if (replyingTo) {
+            setReplyingTo(null);
+        }
+    })
+    .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: collectionRef.path,
+            operation: 'create',
+            requestResourceData: newCommentData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    }).finally(() => {
       setSending(false);
-    }
+    });
   };
 
   const handleEditClick = (c: MatchComment) => {
@@ -361,44 +378,51 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     if (!editingCommentId || !editingText.trim() || sending) return;
     setSending(true);
     const commentDocRef = doc(db, 'matches', String(matchId), 'comments', editingCommentId);
-    try {
-      await updateDoc(commentDocRef, {
-        text: editingText.trim(),
-      });
+    
+    const updatedData = { text: editingText.trim() };
+    
+    updateDoc(commentDocRef, updatedData)
+    .then(() => {
       handleCancelEdit();
-    } catch (error) {
-      console.error("Error updating comment:", error);
-    } finally {
+    })
+    .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: commentDocRef.path,
+            operation: 'update',
+            requestResourceData: updatedData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    })
+    .finally(() => {
       setSending(false);
-    }
+    });
   };
   
   const handleDeleteComment = async (commentId: string) => {
     setIsDeleting(commentId);
-    try {
-        const batch = writeBatch(db);
-        const commentRef = doc(db, 'matches', String(matchId), 'comments', commentId);
+    const batch = writeBatch(db);
+    const commentRef = doc(db, 'matches', String(matchId), 'comments', commentId);
 
-        // Delete all replies
-        const repliesRef = collection(commentRef, 'replies');
-        const repliesSnapshot = await getDocs(repliesRef);
+    const repliesRef = collection(commentRef, 'replies');
+    const likesRef = collection(commentRef, 'likes');
+
+    Promise.all([getDocs(repliesRef), getDocs(likesRef)])
+    .then(([repliesSnapshot, likesSnapshot]) => {
         repliesSnapshot.forEach(replyDoc => batch.delete(replyDoc.ref));
-
-        // Delete all likes
-        const likesRef = collection(commentRef, 'likes');
-        const likesSnapshot = await getDocs(likesRef);
         likesSnapshot.forEach(likeDoc => batch.delete(likeDoc.ref));
-
-        // Delete the comment itself
         batch.delete(commentRef);
-
-        await batch.commit();
-
-    } catch(error) {
-      console.error("Error deleting comment and subcollections:", error);
-    } finally {
-      setIsDeleting(null);
-    }
+        return batch.commit();
+    })
+    .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: commentRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    })
+    .finally(() => {
+        setIsDeleting(null);
+    });
   }
 
   const handleLikeComment = async (commentId: string) => {
@@ -410,26 +434,48 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
       const hasLiked = comment.likes?.some(like => like.id === user.uid);
 
       if (hasLiked) {
-        await deleteDoc(likeRef);
-      } else {
-        await setDoc(likeRef, { userId: user.uid });
-        
-        // Create notification if liking and not the owner
-        if (comment.userId !== user.uid) {
-            const notificationRef = collection(db, 'users', comment.userId, 'notifications');
-            await addDoc(notificationRef, {
-                recipientId: comment.userId,
-                senderId: user.uid,
-                senderName: user.displayName,
-                senderPhoto: user.photoURL,
-                type: 'like',
-                matchId: matchId,
-                commentId: commentId,
-                commentText: comment.text,
-                read: false,
-                timestamp: serverTimestamp(),
+        deleteDoc(likeRef).catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: likeRef.path,
+                operation: 'delete',
             });
-        }
+            errorEmitter.emit('permission-error', permissionError);
+        });
+      } else {
+        const likeData = { userId: user.uid };
+        setDoc(likeRef, likeData)
+        .then(() => {
+            if (comment.userId !== user.uid) {
+                const notificationsCollectionRef = collection(db, 'users', comment.userId, 'notifications');
+                const notificationData = {
+                    recipientId: comment.userId,
+                    senderId: user.uid,
+                    senderName: user.displayName,
+                    senderPhoto: user.photoURL,
+                    type: 'like' as 'like' | 'reply',
+                    matchId: matchId,
+                    commentId: commentId,
+                    commentText: comment.text,
+                    read: false,
+                    timestamp: serverTimestamp(),
+                };
+                addDoc(notificationsCollectionRef, notificationData).catch(async (serverError) => {
+                     const permissionError = new FirestorePermissionError({
+                        path: notificationsCollectionRef.path,
+                        operation: 'create',
+                        requestResourceData: notificationData
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
+                });
+            }
+        }).catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: likeRef.path,
+                operation: 'create',
+                requestResourceData: likeData
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
       }
   };
 
