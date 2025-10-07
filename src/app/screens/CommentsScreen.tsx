@@ -243,9 +243,11 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
       return collection(db, 'matches', String(matchId), 'comments');
   }, [db, matchId]);
   
-  const fetchComments = useCallback(async () => {
-    if (!commentsColRef) {
+ const fetchComments = useCallback(async () => {
+    if (!commentsColRef || !user) {
         setLoading(false);
+        // Ensure we don't proceed without a user
+        if(!user) setComments([]);
         return () => {};
     }
 
@@ -253,8 +255,6 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     const q = query(commentsColRef, orderBy('timestamp', 'asc'));
     
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-        const topLevelComments: MatchComment[] = [];
-
         const commentPromises = snapshot.docs.map(async (doc) => {
             const commentData = { id: doc.id, ...doc.data() } as MatchComment;
             
@@ -271,7 +271,8 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
 
              // Fetch likes for each reply
             const repliesWithLikes = await Promise.all(replies.map(async (reply) => {
-                const replyLikesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies', reply.id!, 'likes');
+                if (!reply.id) return reply;
+                const replyLikesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies', reply.id, 'likes');
                 const replyLikesSnapshot = await getDocs(replyLikesRef);
                 const replyLikes = replyLikesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
                 return { ...reply, likes: replyLikes };
@@ -298,7 +299,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     });
 
     return unsubscribe;
-  }, [matchId, db, commentsColRef]);
+  }, [matchId, db, commentsColRef, user]);
 
 
   useEffect(() => {
@@ -432,6 +433,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   };
   
   const handleDeleteComment = (commentId: string) => {
+    if (!db) return;
     setIsDeleting(commentId);
     const batch = writeBatch(db);
 
@@ -476,65 +478,59 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   }
 
   const handleLikeComment = (commentId: string) => {
-    if (!user) return;
+    if (!user || !db) return;
 
-    let commentPath: string[] | null = null;
+    let pathSegments: string[] | null = null;
     let originalComment: MatchComment | null = null;
 
     // Find the comment and its path
     for (const parent of comments) {
         if (parent.id === commentId) {
-            commentPath = ['matches', String(matchId), 'comments', commentId];
+            pathSegments = ['matches', String(matchId), 'comments', commentId];
             originalComment = parent;
             break;
         }
         const reply = parent.replies.find(r => r.id === commentId);
-        if (reply) {
-            commentPath = ['matches', String(matchId), 'comments', parent.id, 'replies', commentId];
+        if (reply && parent.id) {
+            pathSegments = ['matches', String(matchId), 'comments', parent.id, 'replies', commentId];
             originalComment = reply;
             break;
         }
     }
 
-    if (!commentPath || !originalComment) return;
+    if (!pathSegments || !originalComment) return;
 
     const hasLiked = originalComment.likes?.some(like => like.id === user.uid);
-    const likeRef = doc(db, ...commentPath, 'likes', user.uid);
+    const likeRef = doc(db, ...pathSegments, 'likes', user.uid);
 
     // Optimistic UI Update
-    setComments(prevComments => {
-        return prevComments.map(c => {
-            if (c.id === originalComment?.parentId || c.id === originalComment?.id) {
-                const updateLikes = (comment: MatchComment): MatchComment => {
-                    if (comment.id !== commentId) {
-                        return {
-                            ...comment,
-                            replies: comment.replies.map(updateLikes)
-                        };
-                    }
-
-                    const currentLikes = comment.likes || [];
-                    const newLikes = hasLiked
-                        ? currentLikes.filter(l => l.id !== user.uid)
-                        : [...currentLikes, { id: user.uid, userId: user.uid }];
-
-                    return { ...comment, likes: newLikes };
-                };
-                return updateLikes(c);
+    setComments(prevComments => prevComments.map(parentComment => {
+        const updateLikes = (comment: MatchComment): MatchComment => {
+            if (comment.id !== commentId) {
+                // Recursively update replies if they exist
+                if (comment.replies && comment.replies.length > 0) {
+                    return { ...comment, replies: comment.replies.map(updateLikes) };
+                }
+                return comment;
             }
-            return c;
-        });
-    });
+
+            // This is the comment we want to update
+            const currentLikes = comment.likes || [];
+            const newLikes = hasLiked
+                ? currentLikes.filter(l => l.id !== user.uid)
+                : [...currentLikes, { id: user.uid, userId: user.uid }];
+            
+            return { ...comment, likes: newLikes };
+        };
+        return updateLikes(parentComment);
+    }));
+
 
     if (hasLiked) {
         deleteDoc(likeRef).catch((serverError) => {
-            const permissionError = new FirestorePermissionError({
-                path: likeRef.path,
-                operation: 'delete',
-            });
+            const permissionError = new FirestorePermissionError({ path: likeRef.path, operation: 'delete' });
             errorEmitter.emit('permission-error', permissionError);
-            // Revert optimistic update on error
-            fetchComments(); 
+            fetchComments(); // Revert on error
         });
     } else {
         const likeData = { userId: user.uid };
@@ -570,8 +566,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
                 requestResourceData: likeData
             });
             errorEmitter.emit('permission-error', permissionError);
-             // Revert optimistic update on error
-            fetchComments();
+            fetchComments(); // Revert on error
         });
     }
   };
@@ -645,7 +640,3 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     </div>
   );
 }
-
-    
-
-    
