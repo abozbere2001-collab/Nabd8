@@ -1,7 +1,6 @@
 "use client";
 import React, { createContext, useContext, useMemo } from 'react';
 import type { User } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase-client';
 
 interface FirebaseContextType {
   user: User | null;
@@ -20,8 +19,6 @@ export const FirebaseProvider = ({ children, user }: { children: React.ReactNode
 
   const value = useMemo(() => ({
     user,
-    auth,
-    db,
     isAdmin,
   }), [user, isAdmin]);
 
