@@ -102,14 +102,14 @@ function useTeamData(teamId?: number) {
           } while (currentPage < totalPages);
         }
 
-
         const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
         const fixturesData = await fixturesRes.json();
-        
-        let leagueIdForStandings: number | null = null;
-        if(fixturesData.response && fixturesData.response.length > 0) {
-            leagueIdForStandings = fixturesData.response[0].league.id;
-        }
+        const fixtures: Fixture[] = fixturesData.response || [];
+
+        // Find the primary league by looking for the first "League" type fixture
+        const primaryLeagueFixture = fixtures.find(f => f.league.name === 'La Liga' || f.league.name.includes('League')); // Example logic, can be improved
+        const leagueIdForStandings = primaryLeagueFixture ? primaryLeagueFixture.league.id : (fixtures.length > 0 ? fixtures[0].league.id : null);
+
 
         let standingsData = { response: [] };
         let scorersData = { response: [] };
@@ -125,7 +125,7 @@ function useTeamData(teamId?: number) {
         setData({
           teamInfo: teamData.response?.[0] || null,
           players: allPlayers,
-          fixtures: fixturesData.response || [],
+          fixtures: fixtures,
           standings: standingsData.response?.[0]?.league?.standings?.[0] || [],
           scorers: scorersData.response || [],
           leagueId: leagueIdForStandings,
@@ -235,7 +235,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         <div className="flex-1 overflow-y-auto">
             <Tabs defaultValue="details" className="w-full">
                  <div className="bg-card sticky top-0 z-10 border-b">
-                    <div className="px-4 pt-4 pb-2 flex items-center gap-4">
+                    <div className="p-4 flex items-center gap-4">
                         <Avatar className="h-20 w-20 border">
                             <AvatarImage src={teamInfo.team.logo} />
                             <AvatarFallback>{teamInfo.team.name.substring(0, 2)}</AvatarFallback>
@@ -246,13 +246,13 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                             <p className="text-sm text-muted-foreground">{teamInfo.venue.name} ({teamInfo.venue.city})</p>
                         </div>
                     </div>
-                    <TabsList className="grid w-full grid-cols-2 rounded-none h-auto p-0 border-t">
-                        <TabsTrigger value="details" className='rounded-none data-[state=active]:rounded-md'>التفاصيل</TabsTrigger>
-                        <TabsTrigger value="players" className='rounded-none data-[state=active]:rounded-md'>اللاعبون</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
+                        <TabsTrigger value="details" className='data-[state=active]:rounded-none'>التفاصيل</TabsTrigger>
+                        <TabsTrigger value="players" className='data-[state=active]:rounded-none'>اللاعبون</TabsTrigger>
                     </TabsList>
                 </div>
 
-                <TabsContent value="players" className="px-4 pt-4 mt-0">
+                <TabsContent value="players" className="p-4">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      {players?.map(({ player }) => (
                          <div key={player.id} className="flex items-center gap-3 p-2 rounded-lg border bg-card">
@@ -276,16 +276,16 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                      ))}
                    </div>
                 </TabsContent>
-                <TabsContent value="details" className="p-0 mt-0">
+                <TabsContent value="details" className="p-0">
                      <Tabs defaultValue="matches" className="w-full">
-                         <div className="bg-background sticky top-[152px] z-10 border-b">
-                            <TabsList className="grid w-full grid-cols-3 rounded-none h-auto p-0">
-                                <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'><Shirt className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
-                                <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
-                                <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'><BarChart2 className="w-4 h-4 ml-1"/>الإحصائيات</TabsTrigger>
+                         <div className="bg-card sticky top-[152px] z-10 border-b">
+                            <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none">
+                                <TabsTrigger value="matches" className='data-[state=active]:rounded-none'><Shirt className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
+                                <TabsTrigger value="standings" className='data-[state=active]:rounded-none'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
+                                <TabsTrigger value="scorers" className='data-[state=active]:rounded-none'><BarChart2 className="w-4 h-4 ml-1"/>الإحصائيات</TabsTrigger>
                             </TabsList>
                          </div>
-                         <TabsContent value="matches" className="p-4 mt-0">
+                         <TabsContent value="matches" className="p-4">
                              {fixtures && fixtures.length > 0 ? (
                                 <div className="space-y-2">
                                 {fixtures.map(({fixture, teams, goals, league}) => (
@@ -310,7 +310,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                 </div>
                              ) : <p className="text-center py-8 text-muted-foreground">لا توجد مباريات متاحة.</p>}
                          </TabsContent>
-                         <TabsContent value="standings" className="p-0 mt-0">
+                         <TabsContent value="standings" className="p-0">
                             {standings && standings.length > 0 ? (
                                 <Table>
                                     <TableHeader><TableRow><TableHead className="w-1/2 text-right">الفريق</TableHead><TableHead className="text-center">ل</TableHead><TableHead className="text-center">ف</TableHead><TableHead className="text-center">ت</TableHead><TableHead className="text-center">خ</TableHead><TableHead className="text-center">ن</TableHead></TableRow></TableHeader>
@@ -325,7 +325,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                 </Table>
                             ) : <p className="text-center py-8 text-muted-foreground">الترتيب غير متاح حاليًا.</p>}
                          </TabsContent>
-                         <TabsContent value="scorers" className="p-0 mt-0">
+                         <TabsContent value="scorers" className="p-0">
                              {scorers && scorers.length > 0 ? (
                                 <Table>
                                     <TableHeader><TableRow><TableHead className="text-right">اللاعب</TableHead><TableHead className="text-center">الأهداف</TableHead><TableHead className="text-center">صناعة</TableHead></TableRow></TableHeader>

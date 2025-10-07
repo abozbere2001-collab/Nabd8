@@ -107,7 +107,7 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg bg-card p-3 text-sm transition-colors hover:bg-accent cursor-pointer"
+        className="rounded-lg bg-muted p-3 text-sm transition-colors hover:bg-accent cursor-pointer"
         onClick={() => onSelect(fixture.fixture.id, fixture)}
       >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
@@ -134,7 +134,7 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
              </div>
              <div className={cn(
                 "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
-                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-muted"
+                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-card" : "bg-card"
                 )}>
                  {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
@@ -286,15 +286,16 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                         key={dateKey}
                         ref={isSelected ? selectedButtonRef : null}
                         className={cn(
-                            "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-md transition-colors",
+                            "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors",
                             "text-foreground/80 hover:text-primary",
-                            isSelected && "text-primary data-[state=active]:ring-2 data-[state=active]:ring-primary"
+                            isSelected && "text-primary"
                         )}
                         onClick={() => onDateSelect(dateKey)}
                         data-state={isSelected ? 'active' : 'inactive'}
                     >
                         <span className="text-xs font-normal">{getDayLabel(date)}</span>
                         <span className="font-bold text-sm">{format(date, 'd')}</span>
+                        {isSelected && <div className="absolute bottom-0 h-0.5 w-4 bg-primary rounded-full" />}
                     </button>
                 )
             })}
@@ -352,8 +353,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
       <div className="flex flex-1 flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
           
-          <div className="border-b bg-card">
-             <TabsList className="grid w-full grid-cols-2 h-auto p-0">
+          <div className="border-b bg-card flex flex-col">
+             <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
                 <TabsTrigger value="my-results">نتائجي</TabsTrigger>
                 <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
             </TabsList>
