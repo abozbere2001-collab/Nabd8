@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { useFirestore } from '@/firebase/provider';
 import type { Fixture, Standing, TopScorer, AdminFavorite } from '@/lib/types';
 import { CommentsButton } from '@/components/CommentsButton';
@@ -215,15 +215,22 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const { db } = useFirestore();
 
     useEffect(() => {
-        const unsub = onSnapshot(collection(db, 'adminFavorites'), (snapshot) => {
-            const fetchedTeams: AdminFavorite[] = [];
-            snapshot.forEach((doc) => {
-                fetchedTeams.push(doc.data() as AdminFavorite);
-            });
-            setTeams(fetchedTeams);
-            setLoading(false);
-        });
-        return () => unsub();
+        const fetchAdminFavorites = async () => {
+            setLoading(true);
+            try {
+                const snapshot = await getDocs(collection(db, 'adminFavorites'));
+                const fetchedTeams: AdminFavorite[] = [];
+                snapshot.forEach((doc) => {
+                    fetchedTeams.push(doc.data() as AdminFavorite);
+                });
+                setTeams(fetchedTeams);
+            } catch (error) {
+                console.error("Failed to fetch admin favorites:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchAdminFavorites();
     }, [db]);
 
     if (loading) {
