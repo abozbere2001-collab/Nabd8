@@ -333,7 +333,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                        <TabsList className="grid w-full grid-cols-4">
                            <TabsTrigger value="prizes">الجوائز</TabsTrigger>
                            <TabsTrigger value="leaderboard">الترتيب</TabsTrigger>
-                           <TabsTrigger value="season_predictions">توقعات الموسم</TabsTrigger>
+                           <TabsTrigger value="season_predictions">الموسم</TabsTrigger>
                            <TabsTrigger value="predictions">التصويت</TabsTrigger>
                        </TabsList>
                     </div>

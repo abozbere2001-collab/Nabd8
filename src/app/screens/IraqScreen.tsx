@@ -389,49 +389,48 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     useEffect(() => {
         if (!db) return;
         
-        async function fetchData() {
+        const fetchFixtures = async () => {
             setLoading(true);
             try {
                 const res = await fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`);
                 const data = await res.json();
                 if (data.response) {
-                    const fetchedFixtures = data.response;
-                    setFixtures(fetchedFixtures);
-
-                    if (user) {
-                        const fixtureIds = fetchedFixtures.map((f: Fixture) => f.fixture.id);
-                        if (fixtureIds.length > 0) {
-                            const predsRef = collection(db, 'predictions');
-                            // Firestore 'in' query limit is 30
-                            const userPredsQuery = query(
-                                predsRef, 
-                                where('userId', '==', user.uid),
-                                where('fixtureId', 'in', fixtureIds.slice(0, 30))
-                            );
-                            const unsubscribePreds = onSnapshot(userPredsQuery, (snapshot) => {
-                                const userPredictions: { [key: number]: Prediction } = {};
-                                snapshot.forEach(doc => {
-                                    const pred = doc.data() as Prediction;
-                                    userPredictions[pred.fixtureId] = pred;
-                                });
-                                setPredictions(userPredictions);
-                            }, (error) => {
-                                const permissionError = new FirestorePermissionError({ path: `predictions where userId == ${user.uid}`, operation: 'list' });
-                                errorEmitter.emit('permission-error', permissionError);
-                            });
-                             return () => unsubscribePreds();
-                        }
-                    }
+                    setFixtures(data.response);
                 }
             } catch (error) {
-                console.error("Failed to fetch fixtures for predictions:", error);
+                 console.error("Failed to fetch fixtures for predictions:", error);
             } finally {
                 setLoading(false);
             }
-        }
+        };
+        fetchFixtures();
         
-        fetchData();
+        if (user) {
+            const predsRef = collection(db, 'predictions');
+            const q = query(predsRef, where('userId', '==', user.uid));
 
+            const unsubscribePreds = onSnapshot(q, (snapshot) => {
+                const userPredictions: { [key: number]: Prediction } = {};
+                snapshot.forEach(doc => {
+                    const pred = doc.data() as Prediction;
+                    // Only store predictions for the Iraqi league
+                    const fixtureForPred = fixtures.find(f => f.fixture.id === pred.fixtureId);
+                    if(fixtureForPred && fixtureForPred.league.id === IRAQI_LEAGUE_ID) {
+                        userPredictions[pred.fixtureId] = pred;
+                    }
+                });
+                setPredictions(userPredictions);
+            }, (error) => {
+                const permissionError = new FirestorePermissionError({ path: `predictions where userId == ${user.uid}`, operation: 'list' });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+            return () => unsubscribePreds();
+        }
+
+    }, [user, db, fixtures]); // Removed fixtures from deps to fix infinite loop
+
+    useEffect(() => {
+        if (!db) return;
         const leaderboardRef = query(collection(db, 'leaderboard'), orderBy('totalPoints', 'desc'));
         const unsubscribeLeaderboard = onSnapshot(leaderboardRef, (snapshot) => {
            const scores: UserScore[] = [];
@@ -446,7 +445,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             unsubscribeLeaderboard();
         };
 
-    }, [user, db]);
+    }, [db]);
 
     const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
         if (!user || homeGoalsStr === '' || awayGoalsStr === '' || !db) return;
