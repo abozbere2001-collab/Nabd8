@@ -276,9 +276,19 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
             };
         });
 
-        const resolvedComments = await Promise.all(commentPromises);
-        setComments(resolvedComments);
-        setLoading(false);
+        try {
+            const resolvedComments = await Promise.all(commentPromises);
+            setComments(resolvedComments);
+        } catch(error) {
+            // This could be a permission error on subcollections
+            const permissionError = new FirestorePermissionError({
+                path: `${commentsColRef.path}/...`, // Indicative path
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        } finally {
+            setLoading(false);
+        }
 
     }, (error) => {
         if (!user) return;
@@ -304,7 +314,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   }, [comments, editingCommentId, replyingTo]);
 
   const handleSendComment = async (text: string) => {
-    if (!text.trim() || !user || sending || !commentsColRef) return;
+    if (!text.trim() || !user || sending || !commentsColRef || !db) return;
   
     setSending(true);
     
@@ -386,15 +396,13 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   }
 
   const handleUpdateComment = () => {
-    if (!editingCommentId || !editingText.trim() || sending) return;
+    if (!editingCommentId || !editingText.trim() || sending || !db) return;
     setSending(true);
     
     let commentDocRef;
-    let parentCommentIdForReply;
-
+    
     const parentComment = comments.find(c => c.replies.some(r => r.id === editingCommentId));
-    if (parentComment) {
-        parentCommentIdForReply = parentComment.id;
+    if (parentComment && parentComment.id) {
         commentDocRef = doc(db, 'matches', String(matchId), 'comments', parentComment.id, 'replies', editingCommentId);
     } else {
         commentDocRef = doc(db, 'matches', String(matchId), 'comments', editingCommentId);
@@ -422,39 +430,42 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   const handleDeleteComment = (commentId: string) => {
     if (!db) return;
     setIsDeleting(commentId);
-    const batch = writeBatch(db);
 
-    let isTopLevel = true;
-    let parentCommentId: string | undefined = undefined;
+    const batchDelete = async () => {
+        const batch = writeBatch(db);
 
-    const parentComment = comments.find(c => c.replies.some(r => r.id === commentId));
-    if (parentComment) {
-        isTopLevel = false;
-        parentCommentId = parentComment.id;
-    }
-    
-    const commentRef = isTopLevel 
-        ? doc(db, 'matches', String(matchId), 'comments', commentId)
-        : doc(db, 'matches', String(matchId), 'comments', parentCommentId!, 'replies', commentId);
+        let isTopLevel = true;
+        let parentCommentId: string | undefined = undefined;
 
-    const likesRef = collection(commentRef, 'likes');
-    const repliesRef = collection(commentRef, 'replies'); 
+        const parentComment = comments.find(c => c.replies.some(r => r.id === commentId));
+        if (parentComment && parentComment.id) {
+            isTopLevel = false;
+            parentCommentId = parentComment.id;
+        }
+        
+        const commentRef = isTopLevel 
+            ? doc(db, 'matches', String(matchId), 'comments', commentId)
+            : doc(db, 'matches', String(matchId), 'comments', parentCommentId!, 'replies', commentId);
 
-    const ops = [];
-    ops.push(getDocs(likesRef).then(snapshot => snapshot.forEach(doc => batch.delete(doc.ref))));
-    
-    if (isTopLevel) {
-        ops.push(getDocs(repliesRef).then(snapshot => snapshot.forEach(doc => batch.delete(doc.ref))));
-    }
+        const likesRef = collection(commentRef, 'likes');
+        const repliesRef = collection(commentRef, 'replies'); 
+        
+        const likesSnapshot = await getDocs(likesRef);
+        likesSnapshot.forEach(doc => batch.delete(doc.ref));
 
-    Promise.all(ops)
-    .then(() => {
+        if (isTopLevel) {
+            const repliesSnapshot = await getDocs(repliesRef);
+            repliesSnapshot.forEach(doc => batch.delete(doc.ref));
+        }
+
         batch.delete(commentRef);
-        return batch.commit();
-    })
+        await batch.commit();
+    };
+
+    batchDelete()
     .catch((serverError) => {
         const permissionError = new FirestorePermissionError({
-            path: commentRef.path,
+            path: `matches/${matchId}/comments/...`, // Indicative path
             operation: 'delete',
         });
         errorEmitter.emit('permission-error', permissionError);
@@ -472,7 +483,6 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
 
     for (const parent of comments) {
         if (parent.id === commentId) {
-            parentCommentId = null;
             originalComment = parent;
             break;
         }
