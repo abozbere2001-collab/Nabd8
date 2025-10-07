@@ -166,6 +166,11 @@
         "text": { "type": "string", "description": "The content of the comment." },
         "timestamp": { "type": "string", "format": "date-time", "description": "The timestamp when the comment was created." },
         "parentId": { "type": ["string", "null"], "description": "The ID of the parent comment if this is a reply." },
+        "likes": {
+          "type": "array",
+          "description": "A list of user IDs who liked this comment.",
+          "items": { "type": "string" }
+        },
         "replies": { 
             "type": "array", 
             "description": "A list of replies to this comment.",
@@ -175,6 +180,24 @@
         }
       },
       "required": ["userId", "userName", "text", "timestamp"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Represents a notification for a user.",
+      "type": "object",
+      "properties": {
+        "recipientId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderPhoto": { "type": "string", "format": "uri" },
+        "type": { "type": "string", "enum": ["like", "reply"] },
+        "matchId": { "type": "number" },
+        "commentId": { "type": "string" },
+        "commentText": { "type": "string" },
+        "read": { "type": "boolean" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["recipientId", "senderId", "senderName", "type", "matchId", "read", "timestamp"]
     }
   },
   "auth": {
@@ -184,6 +207,10 @@
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "Stores public profile information for each user."
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+        "schema": { "$ref": "#/entities/Notification" },
+        "description": "Stores notifications for a specific user."
     },
     "/favorites/{userId}": {
       "schema": { "$ref": "#/entities/UserFavorites" },
@@ -227,4 +254,5 @@
     }
   }
 }
+
     

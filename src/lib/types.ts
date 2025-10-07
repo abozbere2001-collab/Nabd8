@@ -48,7 +48,22 @@ export interface MatchComment {
     text: string;
     timestamp: any; // Firestore ServerTimestamp
     parentId: string | null;
+    likes?: string[];
     replies?: MatchComment[];
+}
+
+export interface Notification {
+    id?: string;
+    recipientId: string;
+    senderId: string;
+    senderName: string;
+    senderPhoto: string;
+    type: 'like' | 'reply';
+    matchId: number;
+    commentId: string;
+    commentText: string;
+    read: boolean;
+    timestamp: any; // Firestore ServerTimestamp
 }
 
     

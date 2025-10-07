@@ -13,14 +13,16 @@ import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
 import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
 import { CommentsScreen } from './screens/CommentsScreen';
+import { NotificationsScreen } from './screens/NotificationsScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { FirebaseProvider, useAuth } from '@/firebase/provider';
 import { ProfileButton } from '@/components/ProfileButton';
 import { SearchSheet } from '@/components/SearchSheet';
 import { onAuthStateChange } from '@/lib/firebase-client';
+import { NotificationsButton } from '@/components/NotificationsButton';
 
-export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails' | 'AdminFavoriteTeamDetails' | 'Comments';
+export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications';
 export type ScreenProps = {
   navigate: (screen: ScreenKey, props?: Record<string, any>) => void;
   goBack: () => void;
@@ -40,6 +42,7 @@ const screens: Record<Exclude<ScreenKey, 'Search'>, React.ComponentType<any>> = 
   TeamDetails: TeamDetailScreen,
   AdminFavoriteTeamDetails: AdminFavoriteTeamScreen,
   Comments: CommentsScreen,
+  Notifications: NotificationsScreen,
 };
 
 const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
@@ -82,6 +85,10 @@ function AppContent({ user }: { user: User | null }) {
         }
         return [newItem];
       } else {
+        // Prevent pushing the same screen twice
+        if (prevStack[prevStack.length - 1].screen === screen) {
+            return prevStack;
+        }
         return [...prevStack, newItem];
       }
     });
@@ -105,7 +112,12 @@ function AppContent({ user }: { user: User | null }) {
       goBack, 
       canGoBack: stack.length > 1,
   };
-  const headerActions = <ProfileButton navigate={navigate} />;
+  const headerActions = (
+    <>
+      <NotificationsButton navigate={navigate} />
+      <ProfileButton navigate={navigate} />
+    </>
+  );
 
 
   const activeScreenKey = activeStackItem.screen;
@@ -181,3 +193,5 @@ export default function Home() {
     </FirebaseProvider>
   );
 }
+
+    

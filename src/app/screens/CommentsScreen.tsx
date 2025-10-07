@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, Send, MoreVertical, Edit, Trash2, CornerDownRight } from 'lucide-react';
+import { Loader2, Send, MoreVertical, Edit, Trash2, CornerDownRight, Heart } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, where, arrayUnion, arrayRemove } from 'firebase/firestore';
 import type { MatchComment } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -108,6 +108,7 @@ const CommentItem = ({
     isEditing,
     onUpdate,
     onCancelEdit,
+    onLike,
     sending,
     editingText,
     setEditingText,
@@ -117,6 +118,7 @@ const CommentItem = ({
     onEdit: (comment: MatchComment) => void,
     onDelete: (commentId: string) => void,
     onReply: (commentId: string) => void,
+    onLike: (commentId: string) => void,
     isDeleting: string | null,
     isEditing: boolean,
     onUpdate: () => void,
@@ -125,6 +127,8 @@ const CommentItem = ({
     editingText: string,
     setEditingText: (text: string) => void,
 }) => {
+    const hasLiked = user && comment.likes?.includes(user.uid);
+    
     return (
         <div className="flex items-start gap-3">
           <Avatar>
@@ -164,6 +168,10 @@ const CommentItem = ({
                     <Button variant="ghost" size="sm" onClick={() => onReply(comment.id!)}>
                         <CornerDownRight className="w-3 h-3 ml-1" />
                         رد
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => onLike(comment.id!)}>
+                        <Heart className={cn("w-4 h-4 ml-1", hasLiked ? "text-red-500 fill-current" : "text-muted-foreground")} />
+                        <span className="text-xs">{comment.likes?.length || 0}</span>
                     </Button>
                 </div>
             )}
@@ -274,14 +282,42 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
 
     setSending(true);
     try {
-      await addDoc(commentsColRef, {
+      const newCommentData = {
         text: text.trim(),
         userId: user.uid,
         userName: user.displayName,
         userPhoto: user.photoURL,
         timestamp: serverTimestamp(),
         parentId: parentId,
-      });
+        likes: [],
+      };
+      
+      const newDocRef = await addDoc(commentsColRef, newCommentData);
+      
+      if (parentId) {
+        // Find parent comment to notify its owner
+        const q = query(commentsColRef, orderBy('timestamp', 'asc'));
+        const querySnapshot = await getDocs(q);
+        const allComments = querySnapshot.docs.map(d => ({id: d.id, ...d.data()}));
+        const parentComment = allComments.find(c => c.id === parentId);
+
+        if (parentComment && parentComment.userId !== user.uid) {
+            const notificationRef = collection(db, 'users', parentComment.userId, 'notifications');
+            await addDoc(notificationRef, {
+                recipientId: parentComment.userId,
+                senderId: user.uid,
+                senderName: user.displayName,
+                senderPhoto: user.photoURL,
+                type: 'reply',
+                matchId: matchId,
+                commentId: newDocRef.id,
+                commentText: text.trim(),
+                read: false,
+                timestamp: serverTimestamp(),
+            });
+        }
+      }
+      
       if (replyingTo) {
           setReplyingTo(null);
       }
@@ -330,20 +366,18 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     try {
         const batch = writeBatch(db);
 
-        // 1. Find all replies (and sub-replies) to delete
+        // This is a simplified deletion. For deeply nested replies, a recursive function would be better.
+        // For now, it handles one level of replies.
         const allToDelete = new Set<string>([commentId]);
         const q = query(commentsColRef, where("parentId", "==", commentId));
         const repliesSnapshot = await getDocs(q);
         repliesSnapshot.forEach(doc => allToDelete.add(doc.id));
-        // Note: This only handles one level of replies for deletion. A recursive function would be needed for deeper nesting.
 
-        // 2. Add all documents to the batch delete
         allToDelete.forEach(id => {
             const docRef = doc(db, 'matches', String(matchId), 'comments', id);
             batch.delete(docRef);
         });
 
-        // 3. Commit the batch
         await batch.commit();
 
     } catch(error) {
@@ -352,6 +386,80 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
       setIsDeleting(null);
     }
   }
+
+  const handleLikeComment = async (commentId: string) => {
+      if (!user) return;
+      const commentDocRef = doc(db, 'matches', String(matchId), 'comments', commentId);
+      const q = query(commentsColRef, orderBy('timestamp', 'asc'));
+      const querySnapshot = await getDocs(q);
+      const allComments = querySnapshot.docs.map(d => ({id: d.id, ...d.data()}));
+      const comment = allComments.find(c => c.id === commentId);
+
+      if (!comment) return;
+
+      const hasLiked = comment.likes?.includes(user.uid);
+
+      await updateDoc(commentDocRef, {
+          likes: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid)
+      });
+      
+      // Create notification if liking and not the owner
+      if (!hasLiked && comment.userId !== user.uid) {
+          const notificationRef = collection(db, 'users', comment.userId, 'notifications');
+          await addDoc(notificationRef, {
+              recipientId: comment.userId,
+              senderId: user.uid,
+              senderName: user.displayName,
+              senderPhoto: user.photoURL,
+              type: 'like',
+              matchId: matchId,
+              commentId: commentId,
+              commentText: comment.text,
+              read: false,
+              timestamp: serverTimestamp(),
+          });
+      }
+  };
+
+  const renderCommentTree = (comment: MatchComment) => (
+    <div key={comment.id}>
+        <CommentItem
+            comment={comment}
+            user={user}
+            onEdit={handleEditClick}
+            onDelete={handleDeleteComment}
+            onReply={handleReplyClick}
+            onLike={handleLikeComment}
+            isDeleting={isDeleting}
+            isEditing={editingCommentId === comment.id}
+            onUpdate={handleUpdateComment}
+            onCancelEdit={handleCancelEdit}
+            sending={sending && editingCommentId === comment.id}
+            editingText={editingText}
+            setEditingText={setEditingText}
+        />
+        
+        {replyingTo === comment.id && (
+             <div className="ml-8 mt-2 pl-4 border-r-2">
+                <CommentInput 
+                    user={user}
+                    sending={sending && !editingCommentId}
+                    onSend={handleSendComment}
+                    parentId={comment.id}
+                    onCancel={() => setReplyingTo(null)}
+                    autoFocus
+                />
+             </div>
+        )}
+        
+        {comment.replies && comment.replies.length > 0 && (
+            <div className="ml-8 mt-4 space-y-4 pl-4 border-r-2">
+                {comment.replies.map(reply => renderCommentTree(reply))}
+            </div>
+        )}
+    </div>
+  );
+
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -369,71 +477,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
             </div>
           ))
         ) : comments.length > 0 ? (
-          comments.map((c) => (
-            <div key={c.id}>
-                <CommentItem
-                    comment={c}
-                    user={user}
-                    onEdit={handleEditClick}
-                    onDelete={handleDeleteComment}
-                    onReply={handleReplyClick}
-                    isDeleting={isDeleting}
-                    isEditing={editingCommentId === c.id}
-                    onUpdate={handleUpdateComment}
-                    onCancelEdit={handleCancelEdit}
-                    sending={sending}
-                    editingText={editingText}
-                    setEditingText={setEditingText}
-                />
-                
-                {replyingTo === c.id && (
-                     <div className="ml-8 mt-2 pl-4 border-r-2">
-                        <CommentInput 
-                            user={user}
-                            sending={sending}
-                            onSend={handleSendComment}
-                            parentId={c.id}
-                            onCancel={() => setReplyingTo(null)}
-                            autoFocus
-                        />
-                     </div>
-                )}
-                
-                {c.replies && c.replies.length > 0 && (
-                    <div className="ml-8 mt-4 space-y-4 pl-4 border-r-2">
-                        {c.replies.map(reply => (
-                             <CommentItem
-                                key={reply.id}
-                                comment={reply}
-                                user={user}
-                                onEdit={handleEditClick}
-                                onDelete={handleDeleteComment}
-                                onReply={handleReplyClick}
-                                isDeleting={isDeleting}
-                                isEditing={editingCommentId === reply.id}
-                                onUpdate={handleUpdateComment}
-                                onCancelEdit={handleCancelEdit}
-                                sending={sending}
-                                editingText={editingText}
-                                setEditingText={setEditingText}
-                            />
-                        ))}
-                        {replyingTo && c.replies.some(r => r.id === replyingTo) && (
-                            <div className="mt-2">
-                               <CommentInput 
-                                  user={user}
-                                  sending={sending}
-                                  onSend={handleSendComment}
-                                  parentId={replyingTo}
-                                  onCancel={() => setReplyingTo(null)}
-                                  autoFocus
-                               />
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-          ))
+          comments.map((c) => renderCommentTree(c))
         ) : (
           <p className="text-center text-muted-foreground pt-8">لا توجد تعليقات بعد. كن أول من يعلق!</p>
         )}
@@ -441,7 +485,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
       </div>
 
       {!editingCommentId && !replyingTo && (
-        <CommentInput user={user} sending={sending} onSend={handleSendComment} />
+        <CommentInput user={user} sending={sending && !editingCommentId} onSend={handleSendComment} />
       )}
     </div>
   );
