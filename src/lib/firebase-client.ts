@@ -16,6 +16,8 @@ import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { firebaseConfig } from "./firebase";
 import type { UserProfile, UserScore } from './types';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -29,22 +31,34 @@ const handleNewUser = async (user: User) => {
     const userDoc = await getDoc(userRef);
 
     if (!userDoc.exists()) {
-        // Create user profile document
-        const userProfile: UserProfile = {
+        const userProfileData: UserProfile = {
             displayName: user.displayName || 'مستخدم جديد',
             email: user.email!,
             photoURL: user.photoURL || '',
         };
-        await setDoc(userRef, userProfile);
+        setDoc(userRef, userProfileData).catch(serverError => {
+            const permissionError = new FirestorePermissionError({
+                path: userRef.path,
+                operation: 'create',
+                requestResourceData: userProfileData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
 
-        // Create leaderboard entry
         const leaderboardEntry: UserScore = {
             userId: user.uid,
             userName: user.displayName || 'مستخدم جديد',
             userPhoto: user.photoURL || '',
             totalPoints: 0,
         };
-        await setDoc(leaderboardRef, leaderboardEntry);
+        setDoc(leaderboardRef, leaderboardEntry).catch(serverError => {
+            const permissionError = new FirestorePermissionError({
+                path: leaderboardRef.path,
+                operation: 'create',
+                requestResourceData: leaderboardEntry,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
     }
 }
 
@@ -87,13 +101,33 @@ export const checkRedirectResult = async (): Promise<User | null> => {
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {
     if (!user) throw new Error("User not authenticated.");
 
-    // Update Firebase Auth display name first
     await updateProfile(user, { displayName: newDisplayName });
 
-    // Then, update the name in both Firestore documents
     const userRef = doc(db, 'users', user.uid);
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
+    
+    const userProfileUpdateData = { displayName: newDisplayName };
+    const leaderboardUpdateData = { userName: newDisplayName };
 
-    await setDoc(userRef, { displayName: newDisplayName }, { merge: true });
-    await setDoc(leaderboardRef, { userName: newDisplayName }, { merge: true });
+    // Update user profile
+    setDoc(userRef, userProfileUpdateData, { merge: true })
+        .catch(serverError => {
+            const permissionError = new FirestorePermissionError({
+                path: userRef.path,
+                operation: 'update',
+                requestResourceData: userProfileUpdateData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
+
+    // Update leaderboard entry
+    setDoc(leaderboardRef, leaderboardUpdateData, { merge: true })
+        .catch(serverError => {
+            const permissionError = new FirestorePermissionError({
+                path: leaderboardRef.path,
+                operation: 'update',
+                requestResourceData: leaderboardUpdateData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
 };
