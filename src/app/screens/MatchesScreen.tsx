@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -8,7 +9,7 @@ import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -74,6 +75,10 @@ interface GroupedFixtures {
     }
 }
 
+interface MatchDetails {
+    commentsEnabled: boolean;
+}
+
 
 // Helper functions
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -123,7 +128,7 @@ const LiveTimer = ({ startTime, status, elapsed }: { startTime: number, status: 
 };
 
 // Fixture Item Component
-const FixtureItem = React.memo(({ fixture, navigate, odds }: { fixture: Fixture, navigate: ScreenProps['navigate'], odds?: Odds['bookmakers'][0]['bets'][0]['values'] }) => {
+const FixtureItem = React.memo(({ fixture, navigate, odds, commentsEnabled }: { fixture: Fixture, navigate: ScreenProps['navigate'], odds?: Odds['bookmakers'][0]['bets'][0]['values'], commentsEnabled?: boolean }) => {
     
     const homeOdd = odds?.find(o => o.value === 'Home')?.odd;
     const drawOdd = odds?.find(o => o.value === 'Draw')?.odd;
@@ -194,7 +199,7 @@ const FixtureItem = React.memo(({ fixture, navigate, odds }: { fixture: Fixture,
             </div>
          )}
          <div className="mt-2 pt-2 border-t border-border/50">
-            <CommentsButton matchId={fixture.fixture.id} navigate={navigate} />
+            <CommentsButton matchId={fixture.fixture.id} navigate={navigate} commentsEnabled={commentsEnabled} />
          </div>
       </div>
     );
@@ -212,6 +217,7 @@ const FixturesList = ({
     favoritedLeagueIds,
     favoritedTeamIds,
     odds,
+    matchDetails,
     navigate,
 }: { 
     fixtures: Fixture[], 
@@ -222,6 +228,7 @@ const FixturesList = ({
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
     odds: { [fixtureId: number]: Odds['bookmakers'][0]['bets'][0]['values'] },
+    matchDetails: { [matchId: string]: MatchDetails },
     navigate: ScreenProps['navigate'],
 }) => {
     
@@ -307,7 +314,7 @@ const FixturesList = ({
                     <div key={leagueName} className="space-y-2">
                         <h3 className="font-bold text-foreground px-1 py-2">{leagueName}</h3>
                         <div className="space-y-2">
-                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} odds={odds[f.fixture.id]} />)}
+                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} odds={odds[f.fixture.id]} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} />)}
                         </div>
                     </div>
                 )
@@ -391,6 +398,43 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   const [showOdds, setShowOdds] = useState(false);
   const [loadingOdds, setLoadingOdds] = useState(false);
   const [showLiveOnly, setShowLiveOnly] = useState(false);
+
+  const [matchDetails, setMatchDetails] = useState<{ [matchId: string]: MatchDetails }>({});
+
+
+  useEffect(() => {
+      const fetchMatchDetails = async () => {
+          if (!db) return;
+          const matchesColRef = collection(db, 'matches');
+          try {
+              const snapshot = await getDocs(matchesColRef);
+              const details: { [matchId: string]: MatchDetails } = {};
+              snapshot.forEach(doc => {
+                  details[doc.id] = doc.data() as MatchDetails;
+              });
+              setMatchDetails(details);
+          } catch (error) {
+                const permissionError = new FirestorePermissionError({
+                    path: matchesColRef.path,
+                    operation: 'list',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+          }
+      };
+      fetchMatchDetails();
+
+      // Also set up a listener for real-time updates
+      const unsubscribe = onSnapshot(collection(db, 'matches'), (snapshot) => {
+        const details: { [matchId: string]: MatchDetails } = {};
+        snapshot.forEach(doc => {
+            details[doc.id] = doc.data() as MatchDetails;
+        });
+        setMatchDetails(prevDetails => ({...prevDetails, ...details}));
+      });
+
+      return () => unsubscribe();
+  }, [db]);
+
 
   useEffect(() => {
     try {
@@ -534,6 +578,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
             favoritedTeamIds={favoritedTeamIds}
             hasAnyFavorites={hasAnyFavorites}
             odds={odds}
+            matchDetails={matchDetails}
             navigate={navigate}
         />
         </div>
