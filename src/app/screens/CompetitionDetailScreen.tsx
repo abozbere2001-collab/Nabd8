@@ -320,10 +320,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             </Avatar>
                                             {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(s.team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
                                         </div>
-                                        <span className="truncate">
+                                        <p className="truncate">
                                             {getDisplayName('team', s.team.id, s.team.name)}
                                             {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {s.team.id})</span>}
-                                        </span>
+                                        </p>
                                     </div>
                                 </TableCell>
                                 <TableCell className="text-center">{s.all.played}</TableCell>
@@ -449,3 +449,5 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+
+    

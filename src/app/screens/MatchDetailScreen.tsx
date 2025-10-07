@@ -112,7 +112,7 @@ function useMatchData(fixture?: Fixture) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const isNational = teams.home.winner !== null; // A simple heuristic
+        const isNational = teams.home.winner !== null && teams.away.winner !== null;
         const seasonForStandings = isNational ? new Date(date).getFullYear() : CURRENT_SEASON;
 
         const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.all([
@@ -173,7 +173,7 @@ const MatchHeader = ({ fixture, onBack, headerActions, navigate, isAdmin, onCopy
       <div className="text-center">
          <div className={cn("text-4xl font-bold tracking-tight", ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) && "text-2xl")}>
           {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
-            ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
+            ? `${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`
             : format(new Date(fixture.fixture.date), "HH:mm")}
         </div>
         <div className="text-xs text-muted-foreground mt-1">{fixture.fixture.status.long}</div>
@@ -239,10 +239,10 @@ const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isA
                 </div>
                  {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(player.player.photo); }}><Copy className="h-3 w-3 text-white" /></Button>}
             </div>
-            <span className="text-[10px] font-semibold bg-black/50 text-white rounded-sm px-1 py-0.5 mt-1 whitespace-nowrap shadow-lg truncate w-full">
+            <p className="text-[10px] font-semibold bg-black/50 text-white rounded-sm px-1 py-0.5 mt-1 whitespace-nowrap shadow-lg truncate w-full">
                 {player.player.name}
-            </span>
-             {isAdmin && <span className="text-[8px] text-white/50 bg-black/50 rounded-sm px-1">ID: {player.player.id}</span>}
+                {isAdmin && <span className="text-[8px] text-white/50 ml-1">(ID: {player.player.id})</span>}
+            </p>
         </div>
     );
 };
@@ -279,10 +279,10 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
                 </Avatar>
                 {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(playerInfo.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
             </div>
-            <span className="font-medium truncate flex-1">
+            <p className="font-medium truncate flex-1">
                 {playerInfo.name}
                 {isAdmin && <span className="text-xs text-muted-foreground/70 ml-2">(ID: {playerInfo.id})</span>}
-            </span>
+            </p>
             <div className='flex opacity-80'>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onFavorite('player', playerInfo)}>
                     <Star className={cn("h-4 w-4", favorites?.players?.[playerInfo.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
@@ -667,3 +667,5 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
     </div>
   );
 }
+
+    

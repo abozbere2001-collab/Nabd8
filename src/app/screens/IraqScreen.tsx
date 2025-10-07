@@ -18,8 +18,8 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
 
-const IRAQI_LEAGUE_ID = 542;
-const CURRENT_SEASON = 2025;
+const IRAQI_LEAGUE_ID = 239;
+const CURRENT_SEASON = new Date().getFullYear();
 
 
 const FixtureItem = React.memo(({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
@@ -310,3 +310,5 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
     </div>
   );
 }
+
+    

@@ -69,25 +69,10 @@ function useTeamData(teamId?: number) {
         const teamData = await teamRes.json();
         const teamInfo: TeamInfo | null = teamData.response?.[0] || null;
 
-        // Fetch all pages of players
-        let allPlayers: PlayerInfoFromApi[] = [];
-        let currentPage = 1;
-        let totalPages = 1;
-        if(teamId) {
-          do {
-              const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}&page=${currentPage}`);
-              const playersData = await playersRes.json();
-              if (playersData.response) {
-                  allPlayers = allPlayers.concat(playersData.response);
-              }
-              if (playersData.paging && playersData.paging.current < playersData.paging.total) {
-                  currentPage++;
-                  totalPages = playersData.paging.total;
-              } else {
-                  totalPages = currentPage; // stop loop
-              }
-          } while (currentPage <= totalPages);
-        }
+        // Fetch players for the current season
+        const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`);
+        const playersData = await playersRes.json();
+        const allPlayers: PlayerInfoFromApi[] = playersData.response || [];
         
         // Fetch fixtures for the current season only for performance
         const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
@@ -103,7 +88,7 @@ function useTeamData(teamId?: number) {
         let standingsData = { response: [] };
         let scorersData = { response: [] };
         if (leagueIdForStandings) {
-            const seasonForStandings = teamInfo?.team.type === 'National' ? CURRENT_SEASON -1 : CURRENT_SEASON; // Adjust for national teams if needed
+            const seasonForStandings = teamInfo?.team.type === 'National' ? new Date(fixtures[0].fixture.date).getFullYear() : CURRENT_SEASON;
             const [standingsRes, scorersRes] = await Promise.all([
                  fetch(`/api/football/standings?league=${leagueIdForStandings}&season=${seasonForStandings}`),
                  fetch(`/api/football/players/topscorers?league=${leagueIdForStandings}&season=${seasonForStandings}`)
@@ -464,3 +449,5 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     </div>
   );
 }
+
+    
