@@ -15,7 +15,9 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
 import type { Fixture, UserScore } from '@/lib/types';
-import { collection, query, orderBy, onSnapshot, doc, setDoc, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 
 const AdminMatchSelector = () => {
@@ -36,15 +38,34 @@ const AdminMatchSelector = () => {
 
 export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
     const { isAdmin } = useAdmin();
+    const { db } = useFirestore();
     const [loading, setLoading] = useState(true);
     const [selectedMatches, setSelectedMatches] = useState<Fixture[]>([]);
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
 
     useEffect(() => {
-        // In a real implementation, this would fetch the matches selected by the admin or the auto-selector.
-        // For now, we'll just show a loading skeleton and placeholder text.
-        setLoading(false);
-    }, []);
+        setLoading(true);
+
+        // Fetch leaderboard data
+        const leaderboardRef = query(collection(db, 'leaderboard'), orderBy('totalPoints', 'desc'));
+        const unsubscribeLeaderboard = onSnapshot(leaderboardRef, (snapshot) => {
+            const scores: UserScore[] = [];
+            snapshot.forEach(doc => scores.push(doc.data() as UserScore));
+            setLeaderboard(scores);
+            setLoading(false); // Consider loading finished once leaderboard is fetched
+        }, (error) => {
+            const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
+            setLoading(false);
+        });
+        
+        // In a future stage, we'll fetch the selected matches for the day here.
+        // For now, we leave it empty.
+
+        return () => {
+            unsubscribeLeaderboard();
+        };
+    }, [db]);
 
 
     return (
@@ -62,7 +83,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                         </div>
                     ) : selectedMatches.length > 0 ? (
                         <div className="space-y-4">
-                            {/* Map through selectedMatches here */}
+                            {/* Map through selectedMatches here in a future stage */}
                         </div>
                     ) : (
                         <Card>
@@ -125,4 +146,3 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
-
