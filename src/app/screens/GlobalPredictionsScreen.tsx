@@ -21,8 +21,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { useDebounce } from '@/hooks/use-debounce';
 
 
-const AdminMatchSelector = () => {
-    // This is a placeholder for the admin-specific UI to select matches.
+const AdminMatchSelector = ({ navigate }: { navigate: ScreenProps['navigate'] }) => {
     return (
         <Card>
             <CardContent className="p-4">
@@ -33,7 +32,7 @@ const AdminMatchSelector = () => {
                             هنا يمكن للمدير اختيار ما يصل إلى 15 مباراة لليوم. إذا لم يتم اختيار أي شيء، سيقوم النظام تلقائيًا باختيار ما يصل إلى 10 مباريات مهمة.
                         </p>
                     </div>
-                    <Button>إدارة المباريات</Button>
+                    <Button onClick={() => navigate('AdminMatchSelection')}>إدارة المباريات</Button>
                 </div>
             </CardContent>
         </Card>
@@ -216,7 +215,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             <ScreenHeader title="التوقعات العالمية" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
 
-                {isAdmin && <AdminMatchSelector />}
+                {isAdmin && <AdminMatchSelector navigate={navigate} />}
 
                 <div>
                     <h3 className="text-xl font-bold mb-3">مباريات اليوم للتوقع</h3>

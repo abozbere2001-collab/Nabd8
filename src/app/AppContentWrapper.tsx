@@ -15,6 +15,7 @@ import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
 import { CommentsScreen } from './screens/CommentsScreen';
 import { NotificationsScreen } from './screens/NotificationsScreen';
 import { GlobalPredictionsScreen } from './screens/GlobalPredictionsScreen';
+import { AdminMatchSelectionScreen } from './screens/AdminMatchSelectionScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { ProfileButton } from '@/components/ProfileButton';
@@ -34,6 +35,7 @@ const screens: Record<Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp'>, React.C
   Comments: CommentsScreen,
   Notifications: NotificationsScreen,
   GlobalPredictions: GlobalPredictionsScreen,
+  AdminMatchSelection: AdminMatchSelectionScreen,
 };
 
 const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
