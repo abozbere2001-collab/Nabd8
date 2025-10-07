@@ -10,12 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { addDays, format, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import type { Fixture, DailyGlobalPredictions, GlobalPredictionMatch } from '@/lib/types';
+import { useFirestore, useAdmin } from '@/firebase/provider';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import type { Fixture, DailyGlobalPredictions, GlobalPredictionMatch, AdminFavorite } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -65,40 +65,40 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
 
 const FixtureSelectionItem = ({ fixture, isSelected, onSelectionChange }: { fixture: Fixture, isSelected: boolean, onSelectionChange: (checked: boolean) => void }) => {
     return (
-        <Card>
-            <CardContent className="p-3">
-                <div className="flex items-center gap-4">
-                    <Checkbox
-                        id={`fixture-${fixture.fixture.id}`}
-                        checked={isSelected}
-                        onCheckedChange={onSelectionChange}
-                        className="h-5 w-5"
-                    />
-                    <Label htmlFor={`fixture-${fixture.fixture.id}`} className="flex-1 cursor-pointer">
-                        <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                                <span className="font-semibold truncate">{fixture.teams.home.name}</span>
-                                <Avatar className="h-8 w-8">
-                                    <AvatarImage src={fixture.teams.home.logo} />
-                                </Avatar>
-                            </div>
-                            <div className="font-bold text-sm px-2 bg-muted rounded-md min-w-[70px] text-center">
-                                {format(new Date(fixture.fixture.date), "HH:mm")}
-                            </div>
-                            <div className="flex items-center gap-2 flex-1 truncate">
-                                <Avatar className="h-8 w-8">
-                                    <AvatarImage src={fixture.teams.away.logo} />
-                                </Avatar>
-                                <span className="font-semibold truncate">{fixture.teams.away.name}</span>
-                            </div>
-                        </div>
-                        <div className="text-center text-xs text-muted-foreground mt-1">
-                            {fixture.league.name}
-                        </div>
-                    </Label>
+      <Card>
+        <CardContent className="p-3">
+          <div className="flex items-center gap-3">
+            <Checkbox
+              id={`fixture-${fixture.fixture.id}`}
+              checked={isSelected}
+              onCheckedChange={onSelectionChange}
+              className="h-5 w-5"
+            />
+            <Label htmlFor={`fixture-${fixture.fixture.id}`} className="flex-1 cursor-pointer">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1 justify-end truncate">
+                  <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={fixture.teams.home.logo} />
+                  </Avatar>
                 </div>
-            </CardContent>
-        </Card>
+                <div className="font-bold text-sm px-2 bg-muted rounded-md min-w-[70px] text-center">
+                  {format(new Date(fixture.fixture.date), "HH:mm")}
+                </div>
+                <div className="flex items-center gap-2 flex-1 truncate">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={fixture.teams.away.logo} />
+                  </Avatar>
+                  <span className="font-semibold truncate">{fixture.teams.away.name}</span>
+                </div>
+              </div>
+              <div className="text-center text-xs text-muted-foreground mt-1">
+                {fixture.league.name}
+              </div>
+            </Label>
+          </div>
+        </CardContent>
+      </Card>
     );
 };
 
@@ -106,6 +106,7 @@ const FixtureSelectionItem = ({ fixture, isSelected, onSelectionChange }: { fixt
 export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
     const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
     const [allFixtures, setAllFixtures] = useState<Fixture[]>([]);
+    const [filteredFixtures, setFilteredFixtures] = useState<Fixture[]>([]);
     const [selectedFixtureIds, setSelectedFixtureIds] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -114,23 +115,45 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
 
     const MAX_SELECTIONS = 15;
 
-    // Fetch available fixtures for the selected date from the API
+    // Fetch admin's favorite teams and then filter fixtures
     useEffect(() => {
-        const fetchFixtures = async () => {
+        const fetchAndFilter = async () => {
             setLoading(true);
             try {
+                // 1. Fetch Admin Favorite Teams
+                const adminFavsRef = collection(db, 'adminFavorites');
+                const adminFavsSnapshot = await getDocs(adminFavsRef);
+                const adminFavoriteTeamIds = new Set<number>();
+                adminFavsSnapshot.forEach(doc => {
+                    adminFavoriteTeamIds.add((doc.data() as AdminFavorite).teamId);
+                });
+
+                // 2. Fetch all fixtures for the date
                 const res = await fetch(`/api/football/fixtures?date=${selectedDateKey}`);
                 const data = await res.json();
-                setAllFixtures(data.response || []);
+                const allFetchedFixtures = data.response || [];
+                setAllFixtures(allFetchedFixtures);
+
+                // 3. Filter fixtures based on admin favorites
+                if (adminFavoriteTeamIds.size > 0) {
+                    const filtered = allFetchedFixtures.filter((f: Fixture) =>
+                        adminFavoriteTeamIds.has(f.teams.home.id) ||
+                        adminFavoriteTeamIds.has(f.teams.away.id)
+                    );
+                    setFilteredFixtures(filtered);
+                } else {
+                    setFilteredFixtures(allFetchedFixtures); // If no favs, show all
+                }
+
             } catch (error) {
-                console.error("Failed to fetch fixtures:", error);
+                console.error("Failed to fetch fixtures or admin favorites:", error);
                 toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب المباريات." });
             } finally {
                 setLoading(false);
             }
         };
-        fetchFixtures();
-    }, [selectedDateKey, toast]);
+        fetchAndFilter();
+    }, [selectedDateKey, toast, db]);
 
     // Fetch existing selections for the selected date from Firestore
     useEffect(() => {
@@ -143,6 +166,8 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
                     if (dailyData.selectedByAdmin) {
                         const ids = new Set(dailyData.selectedMatches.map(m => m.fixtureId));
                         setSelectedFixtureIds(ids);
+                    } else {
+                        setSelectedFixtureIds(new Set());
                     }
                 } else {
                     setSelectedFixtureIds(new Set());
@@ -217,9 +242,9 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {loading ? (
-                    Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)
-                ) : allFixtures.length > 0 ? (
-                    allFixtures.map(fixture => (
+                    Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
+                ) : filteredFixtures.length > 0 ? (
+                    filteredFixtures.map(fixture => (
                         <FixtureSelectionItem
                             key={fixture.fixture.id}
                             fixture={fixture}
@@ -230,7 +255,7 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
                 ) : (
                     <Card>
                         <CardContent className="p-6 text-center text-muted-foreground">
-                            <p>لا توجد مباريات متاحة في هذا اليوم.</p>
+                            <p>لا توجد مباريات لفرقك المفضلة في هذا اليوم.</p>
                         </CardContent>
                     </Card>
                 )}
@@ -247,3 +272,5 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
         </div>
     );
 }
+
+    

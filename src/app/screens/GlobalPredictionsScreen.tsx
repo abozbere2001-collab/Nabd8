@@ -27,9 +27,9 @@ const AdminMatchSelector = ({ navigate }: { navigate: ScreenProps['navigate'] })
             <CardContent className="p-4">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h3 className="font-bold text-lg mb-2">لوحة تحكم المدير: اختيار المباريات</h3>
+                        <h3 className="font-bold text-lg mb-2">لوحة تحكم المدير</h3>
                         <p className="text-sm text-muted-foreground">
-                            هنا يمكن للمدير اختيار ما يصل إلى 15 مباراة لليوم. إذا لم يتم اختيار أي شيء، سيقوم النظام تلقائيًا باختيار ما يصل إلى 10 مباريات مهمة.
+                            اختر مباريات اليوم المتاحة للمستخدمين للتوقع.
                         </p>
                     </div>
                     <Button onClick={() => navigate('AdminMatchSelection')}>إدارة المباريات</Button>
@@ -48,10 +48,11 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
     const debouncedAway = useDebounce(awayValue, 500);
 
     useEffect(() => {
-        if (debouncedHome !== '' && debouncedAway !== '') {
+        // Only save if the fields are not empty and a change was made
+        if (debouncedHome !== '' && debouncedAway !== '' && (debouncedHome !== userPrediction?.homeGoals?.toString() || debouncedAway !== userPrediction?.awayGoals?.toString())) {
             onSave(debouncedHome, debouncedAway);
         }
-    }, [debouncedHome, debouncedAway, onSave]);
+    }, [debouncedHome, debouncedAway, onSave, userPrediction]);
 
     const handleHomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setHomeValue(e.target.value);
@@ -60,50 +61,61 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
     const handleAwayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setAwayValue(e.target.value);
     }
+    
+    useEffect(() => {
+        setHomeValue(userPrediction?.homeGoals?.toString() ?? '');
+        setAwayValue(userPrediction?.awayGoals?.toString() ?? '');
+    },[userPrediction]);
 
     return (
-        <Card className="p-4">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-1">
-                    <Avatar><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                    <span className="font-semibold">{fixture.teams.home.name}</span>
+        <Card>
+            <CardContent className="p-3">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1 justify-end truncate">
+                        <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+                        <Avatar className="h-8 w-8">
+                            <AvatarImage src={fixture.teams.home.logo} />
+                        </Avatar>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <Input 
+                            type="number" 
+                            className="w-12 h-10 text-center text-lg font-bold" 
+                            min="0" 
+                            value={homeValue}
+                            onChange={handleHomeChange}
+                            id={`home-${fixture.fixture.id}`}
+                            disabled={isPredictionDisabled}
+                        />
+                        <span className='font-bold'>-</span>
+                        <Input 
+                            type="number" 
+                            className="w-12 h-10 text-center text-lg font-bold" 
+                            min="0"
+                            value={awayValue}
+                            onChange={handleAwayChange}
+                            id={`away-${fixture.fixture.id}`}
+                            disabled={isPredictionDisabled}
+                        />
+                    </div>
+                    <div className="flex items-center gap-2 flex-1 truncate">
+                        <Avatar className="h-8 w-8">
+                            <AvatarImage src={fixture.teams.away.logo} />
+                        </Avatar>
+                        <span className="font-semibold truncate">{fixture.teams.away.name}</span>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Input 
-                        type="number" 
-                        className="w-14 h-8 text-center" 
-                        min="0" 
-                        value={homeValue}
-                        onChange={handleHomeChange}
-                        id={`home-${fixture.fixture.id}`}
-                        disabled={isPredictionDisabled}
-                    />
-                    <span>-</span>
-                    <Input 
-                        type="number" 
-                        className="w-14 h-8 text-center" 
-                        min="0"
-                        value={awayValue}
-                        onChange={handleAwayChange}
-                        id={`away-${fixture.fixture.id}`}
-                        disabled={isPredictionDisabled}
-                    />
+                 <div className="text-center text-xs text-muted-foreground mt-2">
+                    <span>{fixture.league.name}</span> - <span>{format(new Date(fixture.fixture.date), "EEE, d MMM, HH:mm", { locale: ar })}</span>
                 </div>
-                <div className="flex items-center gap-2 flex-1 justify-end">
-                    <span className="font-semibold">{fixture.teams.away.name}</span>
-                    <Avatar><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                </div>
-            </div>
-            <div className="text-center text-xs text-muted-foreground mt-2">
-                <span>{fixture.league.name}</span> - <span>{format(new Date(fixture.fixture.date), "EEE, d MMM, HH:mm", { locale: ar })}</span>
-            </div>
-            {isPredictionDisabled && userPrediction?.points !== undefined && (
-                 <p className="text-center text-primary font-bold text-sm mt-2">
-                    +{userPrediction.points} نقاط
-                </p>
-            )}
-            {userPrediction && !isPredictionDisabled && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
-            {isPredictionDisabled && !userPrediction && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
+                {isPredictionDisabled && userPrediction?.points !== undefined && (
+                     <p className="text-center text-primary font-bold text-sm mt-2">
+                        +{userPrediction.points} نقاط
+                    </p>
+                )}
+                {userPrediction && !isPredictionDisabled && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
+                {isPredictionDisabled && !userPrediction && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
+            </CardContent>
         </Card>
     );
 };
@@ -145,7 +157,11 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                         if (data.response) {
                              setSelectedMatches(data.response);
                         }
+                    } else {
+                        setSelectedMatches([]);
                     }
+                } else {
+                   setSelectedMatches([]);
                 }
             } catch (error) {
                  const permissionError = new FirestorePermissionError({ path: dailyDocRef.path, operation: 'get' });
@@ -221,7 +237,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     <h3 className="text-xl font-bold mb-3">مباريات اليوم للتوقع</h3>
                     {loading ? (
                          <div className="space-y-4">
-                            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
+                            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
                         </div>
                     ) : selectedMatches.length > 0 ? (
                         <div className="space-y-4">
@@ -295,3 +311,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    
