@@ -20,6 +20,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useDebounce } from '@/hooks/use-debounce';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from '@/lib/utils';
 
 
 const AdminMatchSelector = ({ navigate }: { navigate: ScreenProps['navigate'] }) => {
@@ -47,6 +48,15 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
     
     const debouncedHome = useDebounce(homeValue, 500);
     const debouncedAway = useDebounce(awayValue, 500);
+
+    const isMatchFinished = ['FT', 'AET', 'PEN'].includes(fixture.fixture.status.short);
+
+    const getPointsColor = () => {
+        if (!isMatchFinished || userPrediction?.points === undefined) return 'text-primary';
+        if (userPrediction.points === 3) return 'text-green-500'; // Correct score
+        if (userPrediction.points === 1) return 'text-yellow-500'; // Correct winner
+        return 'text-foreground'; // Wrong prediction
+    };
 
     useEffect(() => {
         // Only save if the fields are not empty and a change was made
@@ -88,7 +98,14 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                             id={`home-${fixture.fixture.id}`}
                             disabled={isPredictionDisabled}
                         />
-                        <span className='font-bold'>-</span>
+                         <div className={cn(
+                            "font-bold text-lg px-2 rounded-md min-w-[70px] text-center",
+                             !isMatchFinished && "text-sm"
+                            )}>
+                             {isMatchFinished
+                               ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
+                               : format(new Date(fixture.fixture.date), "HH:mm")}
+                         </div>
                         <Input 
                             type="number" 
                             className="w-12 h-10 text-center text-lg font-bold" 
@@ -107,15 +124,18 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                     </div>
                 </div>
                  <div className="text-center text-xs text-muted-foreground mt-2">
-                    <span>{fixture.league.name}</span> - <span>{format(new Date(fixture.fixture.date), "EEE, d MMM, HH:mm", { locale: ar })}</span>
+                    <span>{fixture.league.name}</span> - <span>{format(new Date(fixture.fixture.date), "EEE, d MMM", { locale: ar })}</span>
                 </div>
-                {isPredictionDisabled && userPrediction?.points !== undefined && (
-                     <p className="text-center text-primary font-bold text-sm mt-2">
+
+                {isMatchFinished && userPrediction?.points !== undefined && (
+                     <p className={cn("text-center font-bold text-sm mt-2", getPointsColor())}>
                         +{userPrediction.points} نقاط
                     </p>
                 )}
-                {userPrediction && !isPredictionDisabled && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
-                {isPredictionDisabled && !userPrediction && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
+                
+                {!isMatchFinished && userPrediction && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
+                
+                {isPredictionDisabled && !userPrediction && !isMatchFinished && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
             </CardContent>
         </Card>
     );
