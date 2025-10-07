@@ -127,7 +127,7 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg bg-card border p-3 text-sm transition-colors hover:bg-accent/50 cursor-pointer"
+        className="rounded-lg bg-muted border p-3 text-sm transition-colors hover:bg-accent/50 cursor-pointer"
         onClick={() => onSelect(fixture.fixture.id, fixture)}
       >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
@@ -154,7 +154,7 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
              </div>
              <div className={cn(
                 "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
-                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-muted"
+                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-card"
                 )}>
                  {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
@@ -172,15 +172,15 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
             <div className="flex justify-between items-center text-center mt-3 pt-3 border-t border-dashed">
                 <div className="flex-1 space-y-1">
                     <span className="text-xs text-muted-foreground">1</span>
-                    <p className="font-bold text-sm bg-muted rounded-md p-1">{homeOdd}</p>
+                    <p className="font-bold text-sm bg-card rounded-md p-1">{homeOdd}</p>
                 </div>
-                <div className="flex-1 space-y-1">
+                 <div className="flex-1 space-y-1">
                     <span className="text-xs text-muted-foreground">X</span>
-                    <p className="font-bold text-sm bg-muted rounded-md p-1">{drawOdd}</p>
+                    <p className="font-bold text-sm bg-card rounded-md p-1">{drawOdd}</p>
                 </div>
                 <div className="flex-1 space-y-1">
                     <span className="text-xs text-muted-foreground">2</span>
-                    <p className="font-bold text-sm bg-muted rounded-md p-1">{awayOdd}</p>
+                    <p className="font-bold text-sm bg-card rounded-md p-1">{awayOdd}</p>
                 </div>
             </div>
          )}
@@ -344,14 +344,17 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                         className={cn(
                             "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors",
                             "text-foreground/80 hover:text-primary",
-                             isSelected && "text-primary"
+                            isSelected && "text-primary"
                         )}
                         onClick={() => onDateSelect(dateKey)}
                         data-state={isSelected ? 'active' : 'inactive'}
                     >
                         <span className="text-xs font-normal">{getDayLabel(date)}</span>
                         <span className="font-bold text-sm">{format(date, 'd')}</span>
-                        {isSelected && <div className="absolute bottom-0 h-0.5 w-4 bg-primary rounded-full" />}
+                        <span className={cn(
+                            "absolute bottom-0 h-0.5 w-4 rounded-full bg-primary transition-transform scale-x-0",
+                            isSelected && "scale-x-100"
+                        )} />
                     </button>
                 )
             })}
@@ -360,7 +363,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
 }
 
 // Main Screen Component
-export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
+export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: baseHeaderActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   const { user } = useFirebase();
   const [favorites, setFavorites] = useState<Favorites>({});
   const [activeTab, setActiveTab] = useState<'my-results' | 'all-matches'>('all-matches');
@@ -444,34 +447,30 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
     }
   }
 
+  const screenHeaderActions = (
+    <div className='flex items-center gap-4'>
+        <div className="flex items-center space-x-2 space-x-reverse">
+            <Switch id="live-filter" checked={showLiveOnly} onCheckedChange={setShowLiveOnly} />
+        </div>
+       <Button variant={showOdds ? 'default' : 'outline'} size="sm" onClick={toggleShowOdds} disabled={loadingOdds}>
+            {loadingOdds ? <Loader2 className="h-4 w-4 animate-spin" /> : '1X2'}
+        </Button>
+        {baseHeaderActions}
+    </div>
+  )
+
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="المباريات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+      <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={screenHeaderActions} />
       <div className="flex flex-1 flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
           
           <div className="border-b bg-card">
              <div className="flex flex-col">
-              <div className="flex items-center border-b">
-                 <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
-                    <TabsTrigger value="my-results">نتائجي</TabsTrigger>
-                    <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
-                </TabsList>
-              </div>
-
-              <div className='flex items-center justify-between px-4 py-2 gap-4 border-b'>
-                  <div className="flex items-center space-x-2 space-x-reverse">
-                      <div className="relative">
-                          <Switch id="live-filter" checked={showLiveOnly} onCheckedChange={setShowLiveOnly} />
-                           <Label htmlFor="live-filter" className={cn("absolute text-[10px] font-bold pointer-events-none", showLiveOnly ? "text-primary-foreground left-1.5" : "text-primary right-1.5")}>
-                                مباشر
-                           </Label>
-                      </div>
-                  </div>
-                 <Button variant={showOdds ? 'default' : 'outline'} size="sm" onClick={toggleShowOdds} disabled={loadingOdds}>
-                      {loadingOdds ? <Loader2 className="h-4 w-4 animate-spin" /> : '1X2'}
-                  </Button>
-              </div>
+               <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
+                  <TabsTrigger value="my-results">نتائجي</TabsTrigger>
+                  <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
+              </TabsList>
             
               <div className="py-2">
                  <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
