@@ -1,6 +1,8 @@
 "use client";
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SearchSheet } from './SearchSheet';
+import type { ScreenProps } from '@/app/page';
 
 interface ScreenHeaderProps {
   title: string;

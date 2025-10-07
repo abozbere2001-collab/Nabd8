@@ -10,11 +10,12 @@ import { ar } from 'date-fns/locale';
 import { useFirebase } from '@/firebase/provider';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase-client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { SearchSheet } from '@/components/SearchSheet';
 
 
 // Interfaces
@@ -420,11 +421,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   useEffect(() => {
     async function fetchFixturesForDate(dateKey: string) {
         setLoading(true);
-        // Do not reset odds here, let them persist until new ones are fetched
         if(showOdds) {
             fetchOddsForDate(dateKey);
         } else {
-            setOdds({}); // Clear odds if the feature is turned off
+            setOdds({});
         }
         try {
             const response = await fetch(`/api/football/fixtures?date=${dateKey}`);
@@ -439,7 +439,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
         }
     }
     fetchFixturesForDate(selectedDateKey);
-  }, [selectedDateKey, showOdds]); // Re-fetch if showOdds changes to get the odds data
+  }, [selectedDateKey, showOdds]);
   
   useEffect(() => {
     if (!user) return;
@@ -465,6 +465,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
   const screenHeaderActions = (
     <div className='flex items-center gap-2'>
+        <SearchSheet navigate={navigate}>
+            <Button variant="ghost" size="icon">
+                <Search className="h-5 w-5" />
+            </Button>
+        </SearchSheet>
         <Switch
             id="live-mode"
             checked={showLiveOnly}

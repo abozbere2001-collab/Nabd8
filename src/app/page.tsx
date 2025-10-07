@@ -64,8 +64,6 @@ function AppContent({ user }: { user: User | null }) {
       setTimeout(() => {
         setStack(prev => {
             const newStack = prev.slice(0, -1);
-            // We don't delete the instance to keep it alive if needed later.
-            // A more robust keep-alive implementation would manage memory.
             return newStack;
         });
         setIsAnimatingOut(null);
@@ -97,26 +95,24 @@ function AppContent({ user }: { user: User | null }) {
       navigate, 
       goBack, 
       canGoBack,
-      headerActions: (
-        <>
-           <SearchSheet navigate={navigate}>
-              <Button variant="ghost" size="icon">
-                  <Search className="h-5 w-5" />
-              </Button>
-          </SearchSheet>
-           <ProfileButton navigate={navigate} />
-        </>
-    )
     };
     
-    return stack.map((item, index) => {
+    return stack.map((item) => {
         const ScreenComponent = screens[item.screen as Exclude<ScreenKey, 'Search'>];
+        const headerActions = (
+          <>
+            <ProfileButton navigate={navigate} />
+          </>
+        );
+
         if (!screenInstances.current[item.key]) {
-            screenInstances.current[item.key] = <ScreenComponent {...navigationProps} {...item.props} />;
+            screenInstances.current[item.key] = <ScreenComponent {...navigationProps} {...item.props} headerActions={headerActions} />;
+        } else {
+             // Re-render with potentially updated props, like headerActions
+            screenInstances.current[item.key] = React.cloneElement(screenInstances.current[item.key], { ...navigationProps, ...item.props, headerActions });
         }
         return {
             ...item,
-            isEntering: stack.length > 1 && index === stack.length - 1 && !mainTabs.includes(item.screen),
             component: screenInstances.current[item.key]
         };
     });
@@ -135,22 +131,26 @@ function AppContent({ user }: { user: User | null }) {
 
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
+       <SearchSheet navigate={navigate}>
+          <div className='hidden'></div>
+        </SearchSheet>
       <div className="relative flex-1 overflow-hidden">
         {renderedStack.map((item, index) => {
           const isTop = index === stack.length - 1;
           const isAnimating = isAnimatingOut === item.key;
+          const isEntering = stack.length > 1 && index === stack.length - 1 && !mainTabs.includes(item.screen);
           
           return (
             <div
               key={item.key}
               className={cn(
                 "absolute inset-0 bg-background flex flex-col",
-                item.isEntering && 'animate-slide-in-from-right',
-                isAnimating && 'animate-slide-out-to-right'
+                isEntering && 'animate-slide-in-from-left', // Changed from right
+                isAnimating && 'animate-slide-out-to-left' // Changed from right
               )}
               style={{
                 zIndex: index,
-                display: isTop ? 'flex' : 'none'
+                display: isTop || isAnimating ? 'flex' : 'none'
               }}
               aria-hidden={!isTop}
             >

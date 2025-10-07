@@ -205,7 +205,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         <Tabs defaultValue="matches" className="w-full">
            <div className="sticky top-0 bg-background z-10 border-b">
              <p className="text-center text-xs text-muted-foreground pt-2 pb-2">جميع البيانات تخص موسم {CURRENT_SEASON}</p>
-             <TabsList className="grid w-full grid-cols-4 rounded-none h-auto p-0 border-t flex-row-reverse">
+             <TabsList className="grid w-full grid-cols-4 rounded-none h-auto p-0 border-t">
               <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
               <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
               <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'><BarChart2 className="w-4 h-4 ml-1"/>الهدافين</TabsTrigger>
