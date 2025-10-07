@@ -219,7 +219,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={headerActions} secondaryActions={secondaryActions} />
+      <ScreenHeader title={displayTitle || ''} onBack={goBack} canGoBack={canGoBack} actions={headerActions} secondaryActions={secondaryActions} />
       {renameItem && <RenameDialog 
           isOpen={isRenameOpen}
           onOpenChange={setRenameOpen}
@@ -309,7 +309,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             <AvatarImage src={s.team.logo} alt={s.team.name} />
                                             <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
                                         </Avatar>
-                                        <span className="truncate">{getDisplayName('team', s.team.id, s.team.name)}</span>
+                                        <span className="truncate">
+                                            {getDisplayName('team', s.team.id, s.team.name)}
+                                            {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {s.team.id})</span>}
+                                        </span>
                                     </div>
                                 </TableCell>
                                 <TableCell className="text-center">{s.all.played}</TableCell>
@@ -360,7 +363,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             <AvatarImage src={player.photo} alt={player.name} />
                                             <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
                                         </Avatar>
-                                        <p className="font-semibold">{getDisplayName('player', player.id, player.name)}</p>
+                                        <p className="font-semibold">
+                                            {getDisplayName('player', player.id, player.name)}
+                                            {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {player.id})</span>}
+                                        </p>
                                     </div>
                                 </TableCell>
                                 <TableCell className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: statistics[0]?.team.id })}>
@@ -401,7 +407,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 <AvatarImage src={team.logo} alt={team.name} />
                                 <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
                             </Avatar>
-                            <span className="font-semibold text-sm">{getDisplayName('team', team.id, team.name)}</span>
+                            <span className="font-semibold text-sm">
+                                {getDisplayName('team', team.id, team.name)}
+                                {isAdmin && <span className="block text-xs text-muted-foreground">(ID: {team.id})</span>}
+                            </span>
                             <div className="absolute top-1 left-1 flex opacity-80">
                                 {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, getDisplayName('team', team.id, team.name))}}>
                                     <Pencil className="h-4 w-4 text-muted-foreground" />

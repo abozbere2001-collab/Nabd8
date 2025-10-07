@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -85,7 +86,7 @@ const countryToContinent: { [key: string]: string } = {
 };
 
 const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "North America", "Oceania"];
-const WORLD_LEAGUES_KEYWORDS = ["world", "uefa", "champions league", "europa", "copa libertadores", "copa sudamericana", "caf champions", "afc champions"];
+const WORLD_LEAGUES_KEYWORDS = ["world", "uefa", "champions league", "europa", "copa libertadores", "copa sudamericana", "caf champions", "afc champions", "conmebol", "concacaf"];
 
 
 export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
@@ -137,6 +138,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
             const continentNames = new Map<string, string>();
             continentsSnapshot.forEach(doc => continentNames.set(doc.id, doc.data().customName));
             setCustomContinentNames(continentNames);
+
         } catch (error) {
             console.error("Failed to fetch custom names:", error);
         }
@@ -147,10 +149,42 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         fetchAllCustomNames();
         const compsRef = collection(db, 'managedCompetitions');
         
+        const fetchAllLeaguesAndSeedFirestore = async () => {
+            try {
+                const res = await fetch(`/api/football/leagues`);
+                const data = await res.json();
+                if (data.response) {
+                    const batch = writeBatch(db);
+                    data.response.forEach((item: ApiLeague) => {
+                        // Filter for top-tier leagues and cups
+                        const isCup = item.league.type.toLowerCase() === 'cup';
+                        const isTopLeague = item.league.type.toLowerCase() === 'league' && item.seasons.some(s => s.year === new Date().getFullYear());
+                        const isInternational = item.country.name.toLowerCase() === 'world';
+
+                        if (isCup || isTopLeague || isInternational) {
+                           const newComp: ManagedCompetition = {
+                                leagueId: item.league.id,
+                                name: item.league.name,
+                                logo: item.league.logo,
+                                countryName: item.country.name,
+                                countryFlag: item.country.flag,
+                            };
+                            const docRef = doc(db, 'managedCompetitions', String(item.league.id));
+                            batch.set(docRef, newComp);
+                        }
+                    });
+                    await batch.commit();
+                    console.log("Seeding complete.");
+                }
+            } catch (error) {
+                console.error("Failed to seed competitions from API:", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        
         const unsubscribe = onSnapshot(query(compsRef, orderBy('name', 'asc')), (snapshot) => {
             if (snapshot.empty && isAdmin) {
-                 // If the collection is empty and user is admin, fetch all leagues from API and populate Firestore.
-                 // This is a one-time seeding process.
                 console.log("Managed competitions is empty. Seeding from API...");
                 fetchAllLeaguesAndSeedFirestore();
             } else {
@@ -165,32 +199,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
             setLoading(false);
         });
 
-        const fetchAllLeaguesAndSeedFirestore = async () => {
-            try {
-                const res = await fetch(`/api/football/leagues`);
-                const data = await res.json();
-                if (data.response) {
-                    const batch = writeBatch(db);
-                    data.response.forEach((item: ApiLeague) => {
-                        const newComp: ManagedCompetition = {
-                            leagueId: item.league.id,
-                            name: item.league.name,
-                            logo: item.league.logo,
-                            countryName: item.country.name,
-                            countryFlag: item.country.flag,
-                        };
-                        const docRef = doc(db, 'managedCompetitions', String(item.league.id));
-                        batch.set(docRef, newComp);
-                    });
-                    await batch.commit();
-                    console.log("Seeding complete.");
-                }
-            } catch (error) {
-                console.error("Failed to seed competitions from API:", error);
-            } finally {
-                setLoading(false);
-            }
-        }
 
         return () => unsubscribe();
     }, [db, isAdmin, fetchAllCustomNames]);
@@ -234,9 +242,9 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         managedCompetitions.forEach(comp => {
             const countryName = comp.countryName;
             const continent = countryToContinent[countryName] || "Other";
-            const isWorldLeague = WORLD_LEAGUES_KEYWORDS.some(keyword => comp.name.toLowerCase().includes(keyword));
+            const isWorldLeague = WORLD_LEAGUES_KEYWORDS.some(keyword => comp.name.toLowerCase().includes(keyword)) || continent === 'World';
 
-            if (continent === "World" || isWorldLeague) {
+            if (isWorldLeague) {
                 if (!grouped.World) grouped.World = { leagues: [] };
                 (grouped.World as { leagues: ManagedCompetition[] }).leagues.push(comp);
             } else {
@@ -319,7 +327,10 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
             <div className="flex w-full items-center justify-between p-3 hover:bg-accent transition-colors rounded-md cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: getLeagueName(comp), leagueId: comp.leagueId, logo: comp.logo })}>
                 <div className="flex items-center gap-3">
                     <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
-                    <div className="text-sm">{getLeagueName(comp)}</div>
+                    <div className="text-sm">
+                        {getLeagueName(comp)}
+                        {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {comp.leagueId})</span>}
+                    </div>
                 </div>
                 <div className="flex items-center gap-1">
                     {isAdmin && (<>
@@ -410,5 +421,3 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         </div>
     );
 }
-
-    

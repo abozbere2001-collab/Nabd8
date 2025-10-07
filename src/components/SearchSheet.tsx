@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -82,10 +83,8 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   }, [isOpen, user, fetchFavorites]);
 
   const getDisplayName = (type: 'team' | 'league', id: number, defaultName: string) => {
-      if (type === 'team') {
-          return customNames.teams.get(id) || defaultName;
-      }
-      return customNames.leagues.get(id) || defaultName;
+      const key = `${type}s` as 'teams' | 'leagues';
+      return customNames[key]?.get(id) || defaultName;
   }
   
   const fetchAllCustomNames = useCallback(async () => {
@@ -108,7 +107,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
         const leagueNames = new Map<number, string>();
         leaguesSnapshot?.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
         
-        const teamNames = new Map<string, string>();
+        const teamNames = new Map<number, string>();
         teamsSnapshot?.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
         
         setCustomNames({ leagues: leagueNames, teams: teamNames as any });
@@ -336,7 +335,10 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
                                 <AvatarImage src={item.logo} alt={displayName} />
                                 <AvatarFallback>{displayName.substring(0, 2)}</AvatarFallback>
                             </Avatar>
-                            <span className="font-semibold">{displayName}</span>
+                            <div className="font-semibold">
+                                {displayName}
+                                {isAdmin && <span className="block text-xs text-muted-foreground font-normal">(ID: {item.id})</span>}
+                            </div>
                             <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">{result.type === 'team' ? 'فريق' : 'بطولة'}</span>
                         </div>
                         <div className='flex items-center'>
@@ -345,7 +347,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
                                     <Heart className="h-4 w-4 text-muted-foreground" />
                                 </Button>
                             )}
-                            <Button variant="ghost" size="icon" onClick={() => handleFavorite(result.type, item)}>
+                            <Button variant="ghost" size="icon" onClick={() => handleFavorite(result.type, {...item, name: displayName })}>
                                 <Star className={cn("h-5 w-5", isFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
                             </Button>
                             {isAdmin && (

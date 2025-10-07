@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -226,6 +227,7 @@ const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isA
             <span className="text-[10px] font-semibold bg-black/50 text-white rounded-sm px-1 py-0.5 mt-1 whitespace-nowrap shadow-lg truncate w-full">
                 {player.player.name}
             </span>
+             {isAdmin && <span className="text-[8px] text-white/50 bg-black/50 rounded-sm px-1">ID: {player.player.id}</span>}
         </div>
     );
 };
@@ -259,7 +261,10 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
                 <AvatarImage src={playerInfo.photo} />
                 <AvatarFallback>{playerInfo.name.substring(0,1)}</AvatarFallback>
             </Avatar>
-            <span className="font-medium truncate flex-1">{playerInfo.name}</span>
+            <span className="font-medium truncate flex-1">
+                {playerInfo.name}
+                {isAdmin && <span className="text-xs text-muted-foreground/70 ml-2">(ID: {playerInfo.id})</span>}
+            </span>
             <div className='flex opacity-80'>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onFavorite('player', playerInfo)}>
                     <Star className={cn("h-4 w-4", favorites?.players?.[playerInfo.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
@@ -334,7 +339,10 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
                 </Avatar>
                 <div className='flex-1'>
                     <p className="font-medium">{lineupToShow.coach.name}</p>
-                    <p className="text-xs text-muted-foreground">المدرب</p>
+                    <p className="text-xs text-muted-foreground">
+                        المدرب
+                        {isAdmin && <span className="text-xs text-muted-foreground/70 ml-2">(ID: {lineupToShow.coach.id})</span>}
+                    </p>
                 </div>
                  <div className='flex opacity-80'>
                     {/* Favorite for coach can be added if needed */}

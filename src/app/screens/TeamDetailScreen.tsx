@@ -85,7 +85,7 @@ function useTeamData(teamId?: number) {
               } else {
                   totalPages = currentPage; // stop loop
               }
-          } while (currentPage < totalPages);
+          } while (currentPage <= totalPages);
         }
         
         // Fetch all fixtures for the team, regardless of season
@@ -352,7 +352,10 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                             </Avatar>
                             <div className="flex-1">
                                 <p className="font-bold">{player.name}</p>
-                                <p className="text-sm text-muted-foreground">{player.position}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {player.position}
+                                    {isAdmin && <span className="text-xs text-muted-foreground/70 ml-2">(ID: {player.id})</span>}
+                                </p>
                             </div>
                             <div className='flex items-center opacity-80'>
                                 <Button variant="ghost" size="icon" onClick={() => handleFavorite('player', player)}>
