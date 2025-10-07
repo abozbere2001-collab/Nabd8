@@ -112,9 +112,9 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
         <Tabs defaultValue="matches" className="w-full">
             <div className="sticky top-0 bg-background z-10 border-b -mx-4 px-4">
                 <TabsList className="grid w-full grid-cols-3 rounded-none h-auto p-0 border-t flex-row-reverse">
-                    <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>المباريات</TabsTrigger>
-                    <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'>الترتيب</TabsTrigger>
                     <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'>الهدافين</TabsTrigger>
+                    <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'>الترتيب</TabsTrigger>
+                    <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>المباريات</TabsTrigger>
                 </TabsList>
             </div>
             <TabsContent value="matches" className="p-4 mt-0 -mx-4">
