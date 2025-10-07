@@ -11,9 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { ar } from 'date-fns/locale';
+import { collection, getDocs, doc, setDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
-import type { Fixture, Standing, TopScorer, AdminFavorite } from '@/lib/types';
+import type { Fixture, Standing, TopScorer, AdminFavorite, Prediction, UserScore } from '@/lib/types';
 import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -291,12 +292,14 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
     const { db } = useFirestore();
+    const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
+    const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
 
     useEffect(() => {
         async function fetchData() {
             setLoading(true);
             try {
-                const res = await fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}&status=NS`); // Not Started
+                const res = await fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`); // Fetch all, filter on client
                 const data = await res.json();
                 if (data.response) setFixtures(data.response);
             } catch (error) {
@@ -306,12 +309,41 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             }
         }
         fetchData();
-    }, []);
 
-    const handleSavePrediction = async (fixtureId: number, homeGoals: number, awayGoals: number) => {
-        if (!user) return;
+        if (user) {
+            const predsRef = collection(db, 'predictions');
+            const userPredsQuery = query(predsRef, orderBy('userId'), where('userId', '==', user.uid));
+            const unsubscribePreds = onSnapshot(userPredsQuery, (snapshot) => {
+                const userPredictions: { [key: number]: Prediction } = {};
+                snapshot.forEach(doc => {
+                    const pred = doc.data() as Prediction;
+                    userPredictions[pred.fixtureId] = pred;
+                });
+                setPredictions(userPredictions);
+            });
+
+             const leaderboardRef = query(collection(db, 'leaderboard'), orderBy('totalPoints', 'desc'));
+             const unsubscribeLeaderboard = onSnapshot(leaderboardRef, (snapshot) => {
+                const scores: UserScore[] = [];
+                snapshot.forEach(doc => scores.push(doc.data() as UserScore));
+                setLeaderboard(scores);
+            });
+
+            return () => {
+                unsubscribePreds();
+                unsubscribeLeaderboard();
+            };
+        }
+    }, [user, db]);
+
+    const handleSavePrediction = async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
+        if (!user || homeGoalsStr === '' || awayGoalsStr === '') return;
+        const homeGoals = parseInt(homeGoalsStr, 10);
+        const awayGoals = parseInt(awayGoalsStr, 10);
+        if (isNaN(homeGoals) || isNaN(awayGoals)) return;
+
         const predictionRef = doc(db, 'predictions', `${user.uid}_${fixtureId}`);
-        const predictionData = {
+        const predictionData: Partial<Prediction> = {
             userId: user.uid,
             fixtureId,
             homeGoals,
@@ -319,8 +351,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             timestamp: new Date()
         };
         try {
-            await setDoc(predictionRef, predictionData);
-            // Optionally, give user feedback
+            await setDoc(predictionRef, predictionData, { merge: true });
         } catch (error) {
             console.error("Error saving prediction:", error);
         }
@@ -333,6 +364,8 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             </div>
         );
     }
+
+    const upcomingFixtures = fixtures.filter(f => f.fixture.status.short === 'NS');
     
     return (
         <div className="space-y-4 pt-4">
@@ -347,33 +380,53 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {/* Placeholder data */}
-                        <TableRow>
-                            <TableCell>1</TableCell>
-                            <TableCell>المستخدم الأول</TableCell>
-                            <TableCell className="text-center">150</TableCell>
-                        </TableRow>
-                         <TableRow>
-                            <TableCell>2</TableCell>
-                            <TableCell>المستخدم الثاني</TableCell>
-                            <TableCell className="text-center">125</TableCell>
-                        </TableRow>
+                        {leaderboard.length > 0 ? leaderboard.map((score, index) => (
+                            <TableRow key={score.userId}>
+                                <TableCell>{index + 1}</TableCell>
+                                <TableCell>
+                                    <div className="flex items-center gap-2">
+                                        <Avatar className="h-6 w-6">
+                                            <AvatarImage src={score.userPhoto}/>
+                                            <AvatarFallback>{score.userName.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        {score.userName}
+                                    </div>
+                                </TableCell>
+                                <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
+                            </TableRow>
+                        )) : (
+                             <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">لا توجد بيانات بعد.</TableCell></TableRow>
+                        )}
                     </TableBody>
                 </Table>
               </Card>
 
             <h3 className="text-lg font-bold mt-6">المباريات القادمة</h3>
-            {fixtures.length > 0 ? fixtures.map(fixture => (
+            {upcomingFixtures.length > 0 ? upcomingFixtures.map(fixture => (
                 <Card key={fixture.fixture.id} className="p-4">
-                    <div className="flex items-center justify-between">
+                     <div className="flex items-center justify-between">
                          <div className="flex items-center gap-2 flex-1">
                             <Avatar><AvatarImage src={fixture.teams.home.logo} /></Avatar>
                             <span className="font-semibold">{fixture.teams.home.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Input type="number" className="w-14 h-8 text-center" min="0" />
+                            <Input 
+                                type="number" 
+                                className="w-14 h-8 text-center" 
+                                min="0" 
+                                defaultValue={predictions[fixture.fixture.id]?.homeGoals}
+                                onChange={(e) => handleSavePrediction(fixture.fixture.id, e.target.value, (document.getElementById(`away-${fixture.fixture.id}`) as HTMLInputElement)?.value || '')}
+                                id={`home-${fixture.fixture.id}`}
+                            />
                             <span>-</span>
-                            <Input type="number" className="w-14 h-8 text-center" min="0" />
+                            <Input 
+                                type="number" 
+                                className="w-14 h-8 text-center" 
+                                min="0"
+                                defaultValue={predictions[fixture.fixture.id]?.awayGoals}
+                                onChange={(e) => handleSavePrediction(fixture.fixture.id, (document.getElementById(`home-${fixture.fixture.id}`) as HTMLInputElement)?.value || '', e.target.value)}
+                                id={`away-${fixture.fixture.id}`}
+                            />
                         </div>
                          <div className="flex items-center gap-2 flex-1 justify-end">
                             <span className="font-semibold">{fixture.teams.away.name}</span>
@@ -381,9 +434,9 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                         </div>
                     </div>
                     <div className="text-center text-xs text-muted-foreground mt-2">
-                        {format(new Date(fixture.fixture.date), "EEE, d MMM, HH:mm", { locale: require('date-fns/locale/ar') })}
+                        {format(new Date(fixture.fixture.date), "EEE, d MMM, HH:mm", { locale: ar })}
                     </div>
-                    <Button size="sm" className="w-full mt-3">حفظ التوقع</Button>
+                    {predictions[fixture.fixture.id] && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
                 </Card>
             )) : <p className="text-center text-muted-foreground pt-4">لا توجد مباريات قادمة للتوقع.</p>}
         </div>
