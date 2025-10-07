@@ -35,15 +35,16 @@ service cloud.firestore {
     // المفضلات (Favorites)
     // --------------------------
     match /favorites/{favoriteId} {
-      allow read, write: if request.auth.uid == favoriteId;
+      // Corrected Rule: Check against the document ID (which is the user's UID)
+      allow read, write: if request.auth != null && request.auth.uid == favoriteId;
     }
 
     // --------------------------
     // الإشعارات
     // --------------------------
-    match /users/{userId}/notifications/{notificationId} {
-        allow read, update: if request.auth != null && request.auth.uid == userId;
-        allow create: if request.auth != null;
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.targetUserId;
+      allow create: if request.auth != null;
     }
 
     // --------------------------
@@ -61,47 +62,6 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create, delete: if request.auth != null && request.auth.uid == request.resource.data.userId;
     }
-     match /matches/{matchId} {
-      allow read, write: if request.auth != null;
-    }
-     match /leagueCustomizations/{leagueId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.token.email == "sagralnarey@gmail.com";
-    }
-
-    match /teamCustomizations/{teamId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.token.email == "sagralnarey@gmail.com";
-    }
-
-    match /playerCustomizations/{playerId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.token.email == "sagralnarey@gmail.com";
-    }
-
-     match /coachCustomizations/{coachId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.token.email == "sagralnarey@gmail.com";
-    }
-
-    match /adminFavorites/{teamId} {
-        allow read: if true;
-        allow write: if request.auth != null && request.auth.token.email == "sagralnarey@gmail.com";
-    }
-     match /countryCustomizations/{countryName} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.token.email == "sagralnarey@gmail.com";
-    }
-
-    match /continentCustomizations/{continentName} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.token.email == "sagralnarey@gmail.com";
-    }
-    match /users/{userId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-
 
   }
 }
