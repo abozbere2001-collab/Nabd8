@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { collection, getDocs, doc, setDoc, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
@@ -413,7 +413,10 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
               </Card>
 
             <h3 className="text-lg font-bold mt-6">المباريات القادمة</h3>
-            {upcomingFixtures.length > 0 ? upcomingFixtures.map(fixture => (
+            {upcomingFixtures.length > 0 ? upcomingFixtures.map(fixture => {
+                const userPrediction = predictions[fixture.fixture.id];
+                const isPredictionDisabled = isPast(new Date(fixture.fixture.date));
+                return (
                 <Card key={fixture.fixture.id} className="p-4">
                      <div className="flex items-center justify-between">
                          <div className="flex items-center gap-2 flex-1">
@@ -425,18 +428,20 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                                 type="number" 
                                 className="w-14 h-8 text-center" 
                                 min="0" 
-                                defaultValue={predictions[fixture.fixture.id]?.homeGoals}
+                                defaultValue={userPrediction?.homeGoals}
                                 onChange={(e) => handleSavePrediction(fixture.fixture.id, e.target.value, (document.getElementById(`away-${fixture.fixture.id}`) as HTMLInputElement)?.value || '')}
                                 id={`home-${fixture.fixture.id}`}
+                                disabled={isPredictionDisabled}
                             />
                             <span>-</span>
                             <Input 
                                 type="number" 
                                 className="w-14 h-8 text-center" 
                                 min="0"
-                                defaultValue={predictions[fixture.fixture.id]?.awayGoals}
+                                defaultValue={userPrediction?.awayGoals}
                                 onChange={(e) => handleSavePrediction(fixture.fixture.id, (document.getElementById(`home-${fixture.fixture.id}`) as HTMLInputElement)?.value || '', e.target.value)}
                                 id={`away-${fixture.fixture.id}`}
+                                disabled={isPredictionDisabled}
                             />
                         </div>
                          <div className="flex items-center gap-2 flex-1 justify-end">
@@ -447,9 +452,16 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                     <div className="text-center text-xs text-muted-foreground mt-2">
                         {format(new Date(fixture.fixture.date), "EEE, d MMM, HH:mm", { locale: ar })}
                     </div>
-                    {predictions[fixture.fixture.id] && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
+                    {isPredictionDisabled && userPrediction?.points !== undefined && (
+                        <p className="text-center text-primary font-bold text-sm mt-2">
+                           +{userPrediction.points} نقاط
+                        </p>
+                    )}
+                    {userPrediction && !isPredictionDisabled && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
+                     {isPredictionDisabled && !userPrediction && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
                 </Card>
-            )) : <p className="text-center text-muted-foreground pt-4">لا توجد مباريات قادمة للتوقع.</p>}
+                )
+            }) : <p className="text-center text-muted-foreground pt-4">لا توجد مباريات قادمة للتوقع.</p>}
         </div>
     );
 }

@@ -74,6 +74,11 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
             <div className="text-center text-xs text-muted-foreground mt-2">
                 <span>{fixture.league.name}</span> - <span>{format(new Date(fixture.fixture.date), "EEE, d MMM, HH:mm", { locale: ar })}</span>
             </div>
+            {isPredictionDisabled && userPrediction?.points !== undefined && (
+                 <p className="text-center text-primary font-bold text-sm mt-2">
+                    +{userPrediction.points} نقاط
+                </p>
+            )}
             {userPrediction && !isPredictionDisabled && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
             {isPredictionDisabled && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
         </Card>
