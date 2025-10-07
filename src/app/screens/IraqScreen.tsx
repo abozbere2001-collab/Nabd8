@@ -19,7 +19,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 
 
 const IRAQI_LEAGUE_ID = 548;
-const CURRENT_SEASON = 2024;
+const CURRENT_SEASON = new Date().getFullYear();
 
 
 const FixtureItem = React.memo(({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
@@ -286,7 +286,7 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
   
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="العراق" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+      <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
       <div className="flex-1 overflow-y-auto px-4">
         <Tabs defaultValue="our-league" className="w-full">
           <div className="sticky top-0 bg-background z-10">

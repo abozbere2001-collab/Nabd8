@@ -21,7 +21,7 @@ import type { Fixture, Standing, TopScorer, Team, Favorites } from '@/lib/types'
 
 type RenameType = 'league' | 'team' | 'player';
 
-const CURRENT_SEASON = 2024;
+const CURRENT_SEASON = new Date().getFullYear();
 
 export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo, headerActions }: ScreenProps & { title?: string, leagueId?: number, logo?: string, headerActions?: React.ReactNode }) {
   const { isAdmin } = useAdmin();
@@ -219,7 +219,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title={displayTitle || "البطولة"} onBack={goBack} canGoBack={canGoBack} actions={headerActions} secondaryActions={secondaryActions} />
+      <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={headerActions} secondaryActions={secondaryActions} />
       {renameItem && <RenameDialog 
           isOpen={isRenameOpen}
           onOpenChange={setRenameOpen}
