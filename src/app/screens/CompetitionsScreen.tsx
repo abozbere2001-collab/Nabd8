@@ -135,7 +135,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
             setCustomCountryNames(countryNames);
 
             const continentNames = new Map<string, string>();
-            continentsSnapshot.forEach(doc => continentsSnapshot.set(doc.id, doc.data().customName));
+            continentsSnapshot.forEach(doc => continentNames.set(doc.id, doc.data().customName));
             setCustomContinentNames(continentNames);
         } catch (error) {
             console.error("Failed to fetch custom names:", error);
