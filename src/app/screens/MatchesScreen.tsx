@@ -433,6 +433,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
             details[doc.id] = doc.data() as MatchDetails;
         });
         setMatchDetails(prevDetails => ({...prevDetails, ...details}));
+      }, (error) => {
+          const permissionError = new FirestorePermissionError({ path: 'matches', operation: 'list' });
+          errorEmitter.emit('permission-error', permissionError);
       });
 
       return () => unsubscribe();
@@ -450,8 +453,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   
   const fetchOddsForDate = async (dateKey: string) => {
       setLoadingOdds(true);
+      const url = `/api/football/odds?date=${dateKey}&bookmaker=8&bet=1`;
       try {
-          const response = await fetch(`/api/football/odds?date=${dateKey}&bookmaker=8&bet=1`); // Bet365, Match Winner
+          const response = await fetch(url);
           if (!response.ok) throw new Error('Failed to fetch odds');
           const data = await response.json();
           const oddsByFixture: { [fixtureId: number]: any } = {};
@@ -464,8 +468,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
           });
           setOdds(oddsByFixture);
       } catch (error) {
+          console.error("Error fetching odds:", error);
           const permissionError = new FirestorePermissionError({
-            path: `/api/football/odds?date=${dateKey}`,
+            path: url,
             operation: 'get',
           });
           errorEmitter.emit('permission-error', permissionError);
@@ -487,13 +492,16 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
         } else {
             setOdds({});
         }
+        const url = `/api/football/fixtures?date=${dateKey}`;
         try {
-            const response = await fetch(`/api/football/fixtures?date=${dateKey}`);
+            const response = await fetch(url);
             if (!response.ok) throw new Error('Failed to fetch');
             const data = await response.json();
             setFixtures(data.response || []);
         } catch (error) {
             console.error(`Failed to fetch fixtures for ${dateKey}:`, error);
+            const permissionError = new FirestorePermissionError({ path: url, operation: 'get' });
+            errorEmitter.emit('permission-error', permissionError);
             setFixtures([]);
         } finally {
             setLoading(false);

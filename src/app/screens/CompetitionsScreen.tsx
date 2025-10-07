@@ -126,11 +126,12 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     };
 
     useEffect(() => {
-        if (!user) return;
+        if (!user || !db) return;
         const docRef = doc(db, 'favorites', user.uid);
         const unsubscribe = onSnapshot(docRef, (doc) => {
             setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {} });
         }, (error) => {
+            console.error("Error in favorites onSnapshot:", error);
             const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
             errorEmitter.emit('permission-error', permissionError);
         });
@@ -138,6 +139,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     }, [user, db]);
 
     const fetchAllCustomNames = useCallback(async () => {
+        if (!db) return;
         try {
             const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
                 getDocs(collection(db, 'leagueCustomizations')),
@@ -159,10 +161,13 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
 
         } catch (error) {
             console.error("Failed to fetch custom names:", error);
+            const permissionError = new FirestorePermissionError({ path: 'customizations collections', operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
         }
     }, [db]);
 
     useEffect(() => {
+        if (!db) return;
         setLoading(true);
         fetchAllCustomNames();
         const compsRef = collection(db, 'managedCompetitions');
@@ -220,7 +225,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     }, [db, isAdmin, fetchAllCustomNames]);
 
     const toggleLeagueFavorite = async (comp: ManagedCompetition) => {
-        if (!user) return;
+        if (!user || !db) return;
         const leagueId = comp.leagueId;
         const favRef = doc(db, 'favorites', user.uid);
         const fieldPath = `leagues.${leagueId}`;
@@ -235,17 +240,20 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                 await setDoc(favRef, { ...favoriteData, userId: user.uid }, { merge: true });
             }
         } catch (error) {
+            console.error("Error toggling favorite:", error);
             const permissionError = new FirestorePermissionError({ path: favRef.path, operation: isFavorited ? 'update' : 'create', requestResourceData: favoriteData });
             errorEmitter.emit('permission-error', permissionError);
         }
     };
 
     const handleDeleteCompetition = async (leagueId: number) => {
+        if (!db) return;
         const docRef = doc(db, 'managedCompetitions', String(leagueId));
         try {
             await deleteDoc(docRef);
              toast({ title: 'نجاح', description: `تم حذف البطولة بنجاح.` });
         } catch (error) {
+            console.error("Error deleting competition:", error);
             const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
             errorEmitter.emit('permission-error', permissionError);
              toast({ variant: 'destructive', title: 'فشل', description: `فشل حذف البطولة.` });
@@ -311,7 +319,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     }, [managedCompetitions, getLeagueName, customCountryNames]);
 
     const handleSaveRename = async (newName: string) => {
-        if (!renameState.type || !renameState.id) return;
+        if (!renameState.type || !renameState.id || !db) return;
         
         let collectionName = '';
         let docId = renameState.id;
@@ -329,6 +337,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                 await setDoc(docRef, data);
                 await fetchAllCustomNames();
             } catch (error) {
+                console.error("Error saving rename:", error);
                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
                 errorEmitter.emit('permission-error', permissionError);
             }
@@ -459,5 +468,3 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         </div>
     );
 }
-
-    

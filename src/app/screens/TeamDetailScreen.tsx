@@ -107,8 +107,9 @@ function useTeamData(teamId?: number) {
         });
 
       } catch (error) {
+        console.error("Error in useTeamData:", error);
         const permissionError = new FirestorePermissionError({
-            path: `/api/football/teams?id=${teamId}`,
+            path: `/api/football/teams?id=${teamId}`, // Example path, adjust as needed
             operation: 'get',
         });
         errorEmitter.emit('permission-error', permissionError);
@@ -156,6 +157,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
         setCustomPlayerNames(playerNames);
     } catch (error) {
+        console.error("Error in fetchCustomNames:", error);
         const permissionError = new FirestorePermissionError({
           path: `teamCustomizations/${teamId} or playerCustomizations`,
           operation: 'get',
@@ -178,11 +180,12 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
 
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !db) return;
     const docRef = doc(db, 'favorites', user.uid);
     const unsub = onSnapshot(docRef, (doc) => {
         setFavorites(doc.data() as Favorites || { userId: user.uid });
     }, (error) => {
+        console.error("Error in favorites onSnapshot:", error);
         const permissionError = new FirestorePermissionError({
           path: docRef.path,
           operation: 'get',
@@ -198,7 +201,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
   };
 
   const handleSaveRename = async (newName: string) => {
-    if (!renameItem) return;
+    if (!renameItem || !db) return;
     const { id, type } = renameItem;
     const collectionName = type === 'player' ? 'playerCustomizations' : 'teamCustomizations';
     const docRef = doc(db, collectionName, String(id));
@@ -207,6 +210,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         await setDoc(docRef, data);
         await fetchCustomNames();
     } catch (error) {
+        console.error("Error in handleSaveRename:", error);
         const permissionError = new FirestorePermissionError({
           path: docRef.path,
           operation: 'create',
@@ -217,7 +221,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
   };
 
   const handleFavorite = async (type: 'team' | 'player', item: any) => {
-    if (!user) return;
+    if (!user || !db) return;
     const favRef = doc(db, 'favorites', user.uid);
     const itemPath = type === 'team' ? 'teams' : 'players';
     const fieldPath = `${itemPath}.${item.id}`;
@@ -237,6 +241,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
             await setDoc(favRef, favoriteData, { merge: true });
         }
     } catch (error) {
+        console.error("Error in handleFavorite:", error);
         const permissionError = new FirestorePermissionError({
           path: favRef.path,
           operation: 'update',
@@ -252,7 +257,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
   }
 
   const handleSaveNote = async (note: string) => {
-    if (!noteTeam) return;
+    if (!noteTeam || !db) return;
     const docRef = doc(db, "adminFavorites", String(noteTeam.id));
     const data = {
       teamId: noteTeam.id,
@@ -263,6 +268,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     try {
         await setDoc(docRef, data);
     } catch (error) {
+        console.error("Error in handleSaveNote:", error);
         const permissionError = new FirestorePermissionError({
           path: docRef.path,
           operation: 'create',
