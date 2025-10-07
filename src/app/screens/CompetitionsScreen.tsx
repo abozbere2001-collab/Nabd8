@@ -9,7 +9,7 @@ import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, deleteDoc, collection, onSnapshot, writeBatch, getDocs, query, orderBy } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, collection, onSnapshot, writeBatch, getDocs, query, orderBy, updateDoc, deleteField } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -393,3 +393,5 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         </div>
     );
 }
+
+    
