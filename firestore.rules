@@ -2,142 +2,112 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ------------------------------
-    // 🔹 تعريف المدير
-    // ------------------------------
+    // ---------------------------------------------------
+    // Helper Functions and Global Rules
+    // ---------------------------------------------------
+
     function isAdmin() {
+      // IMPORTANT: Replace with the actual admin's email address
       return request.auth != null && request.auth.token.email == "sagralnarey@gmail.com";
     }
 
-    // ------------------------------
-    // 🔹 صلاحيات عامة للمدير
-    // ------------------------------
+    // This rule must come first: Admins can do anything.
     match /{document=**} {
       allow read, write: if isAdmin();
     }
     
-    match /matches/{matchId} {
-        allow read: if request.auth != null;
-    }
-    
-    match /matches/{path=**} {
-        allow read: if request.auth != null;
+    // ---------------------------------------------------
+    // App-Specific Rules for Regular Users
+    // ---------------------------------------------------
+
+    match /users/{userId} {
+        // Only the authenticated user can read or write to their own profile
+        allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // ------------------------------
-    // 🔹 توقعات المستخدمين
-    // ------------------------------
-    match /predictions/{predictionId} {
-      // قراءة وتصفح التوقعات الخاصة بالمستخدم فقط
-      allow read, list: if request.auth != null && (
-        predictionId.startsWith(request.auth.uid)
-      );
-      // إنشاء أو تعديل أو حذف توقع فقط من قبل المستخدم نفسه
-      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
-    }
-
-    // ------------------------------
-    // 🔹 التوقعات العالمية اليومية
-    // ------------------------------
-    match /dailyGlobalPredictions/{date} {
-      // يمكن لجميع المستخدمين قراءة هذه البيانات
-      allow read, list: if request.auth != null;
-      // فقط المدير يمكنه الإضافة أو التعديل
-      allow write: if isAdmin();
-    }
-
-    // ------------------------------
-    // 🔹 الإشعارات
-    // ------------------------------
     match /users/{userId}/notifications/{notificationId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
+        // A user can read, update, or delete their own notifications.
+        allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+        // A user can create a notification for another user (e.g., on like/reply).
+        // The senderId must match the authenticated user.
+        allow create: if request.auth != null && request.resource.data.senderId == request.auth.uid;
     }
 
-    // ------------------------------
-    // 🔹 التعليقات
-    // ------------------------------
-    match /matches/{matchId}/comments/{commentId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && (
-        resource.data.userId == request.auth.uid || isAdmin()
-      );
-    }
-
-    // ------------------------------
-    // 🔹 ردود التعليقات
-    // ------------------------------
-    match /matches/{matchId}/comments/{commentId}/replies/{replyId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && (
-        resource.data.userId == request.auth.uid || isAdmin()
-      );
-    }
-
-    // ------------------------------
-    // 🔹 الإعجابات
-    // ------------------------------
-    match /matches/{matchId}/comments/{commentId}/likes/{userId} {
-      allow read: if request.auth != null;
-      allow create, delete: if request.auth != null && request.auth.uid == userId;
-    }
-
-    match /matches/{matchId}/comments/{commentId}/replies/{replyId}/likes/{userId} {
-      allow read: if request.auth != null;
-      allow create, delete: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // ------------------------------
-    // 🔹 المفضلة
-    // ------------------------------
     match /favorites/{userId} {
+      // A user can only manage their own favorites document.
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // ------------------------------
-    // 🔹 لوحات التوقعات والمنافسات
-    // ------------------------------
-    match /leaderboard/{userId} {
+    match /adminFavorites/{teamId} {
+      // All authenticated users can read the admin favorites.
       allow read: if request.auth != null;
+    }
+    
+    // Customization collections are public to read for all users
+    match /leagueCustomizations/{leagueId}      { allow read: if request.auth != null; }
+    match /countryCustomizations/{countryName}  { allow read: if request.auth != null; }
+    match /continentCustomizations/{continent} { allow read: if request.auth != null; }
+    match /teamCustomizations/{teamId}          { allow read: if request.auth != null; }
+    match /playerCustomizations/{playerId}      { allow read: if request.auth != null; }
+    match /coachCustomizations/{coachId}        { allow read: if request.auth != null; }
+
+    match /matches/{matchId} {
+      // Any authenticated user can read match metadata (like commentsEnabled).
+      allow get: if request.auth != null;
+
+      match /comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+
+        // Likes on comments
+        match /likes/{userId} {
+            allow read: if request.auth != null;
+            // A user can only like with their own ID.
+            allow create, delete: if request.auth.uid == userId;
+        }
+
+        // Replies under comments
+        match /replies/{replyId} {
+            allow read: if request.auth != null;
+            allow create: if request.auth != null;
+            allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+
+            // Likes on replies
+            match /likes/{userId} {
+                allow read: if request.auth != null;
+                allow create, delete: if request.auth.uid == userId;
+            }
+        }
+      }
+    }
+    
+    match /matches {
+        allow list: if request.auth != null;
     }
 
     match /managedCompetitions/{leagueId} {
+      // All authenticated users can read the list of managed competitions.
       allow read: if request.auth != null;
     }
     
-    match /adminFavorites/{teamId} {
+    match /leaderboard/{userId} {
+      // All authenticated users can read the leaderboard.
       allow read: if request.auth != null;
     }
     
-    match /leagueCustomizations/{leagueId} {
+    match /dailyGlobalPredictions/{date} {
+      // All authenticated users can read the daily list of matches for prediction.
       allow read: if request.auth != null;
-    }
-    
-    match /countryCustomizations/{countryName} {
-      allow read: if request.auth != null;
-    }
-    
-    match /continentCustomizations/{continentName} {
-      allow read: if request.auth != null;
-    }
-    
-    match /teamCustomizations/{teamId} {
-      allow read: if request.auth != null;
-    }
-    
-    match /playerCustomizations/{playerId} {
-      allow read: if request.auth != null;
-    }
-    
-    match /coachCustomizations/{coachId} {
-      allow read: if request.auth != null;
-    }
-    
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
+    match /predictions/{predictionId} {
+        // A user can write to their own prediction document.
+        allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        // A user can read their own prediction via get().
+        allow get: if request.auth != null && predictionId.startsWith(request.auth.uid);
+        // A user can list their own predictions.
+        allow list: if request.auth != null && request.query.where.to_list()[0][2] == request.auth.uid;
+    }
   }
 }
