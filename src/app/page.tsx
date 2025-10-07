@@ -92,13 +92,18 @@ function AppContent({ user }: { user: User | null }) {
 
   const renderedStack = useMemo(() => {
     const canGoBack = stack.length > 1;
+    const handleSearch = () => {
+        // TODO: Implement search functionality
+        console.log("Search button clicked");
+    };
+
     const navigationProps = { 
       navigate, 
       goBack, 
       canGoBack,
       headerActions: (
           <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={() => { /* TODO: Implement search */ }}>
+              <Button variant="ghost" size="icon" onClick={handleSearch}>
                   <Search className="h-5 w-5" />
               </Button>
               <ProfileButton navigate={navigate} />

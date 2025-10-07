@@ -47,6 +47,14 @@ interface Favorites {
     teams?: { [key:string]: any };
 }
 
+interface GroupedFixtures {
+    [leagueName: string]: {
+        league: Fixture['league'];
+        fixtures: Fixture[];
+    }
+}
+
+
 // Helper functions
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
 
@@ -126,7 +134,7 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
              </div>
              <div className={cn(
                 "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
-                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-card"
+                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : ""
                 )}>
                  {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
@@ -176,6 +184,17 @@ const FixturesList = ({
         );
     }, [fixtures, activeTab, favoritedTeamIds, favoritedLeagueIds]);
 
+    const groupedFixtures = useMemo(() => {
+        return filteredFixtures.reduce((acc, fixture) => {
+            const leagueName = fixture.league.name;
+            if (!acc[leagueName]) {
+                acc[leagueName] = { league: fixture.league, fixtures: [] };
+            }
+            acc[leagueName].fixtures.push(fixture);
+            return acc;
+        }, {} as GroupedFixtures);
+    }, [filteredFixtures]);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -201,7 +220,7 @@ const FixturesList = ({
         );
     }
 
-    if (filteredFixtures.length === 0) {
+    if (Object.keys(groupedFixtures).length === 0) {
         return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
                 <p>لا توجد مباريات لهذا اليوم.</p>
@@ -210,8 +229,21 @@ const FixturesList = ({
     }
 
     return (
-        <div className="space-y-3">
-            {filteredFixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} onSelect={onSelectFixture} />)}
+        <div className="space-y-6">
+            {Object.entries(groupedFixtures).map(([leagueName, { league, fixtures }]) => (
+                <div key={leagueName}>
+                    <div className="flex items-center gap-3 mb-3 px-1">
+                        <Avatar className="h-6 w-6">
+                            <AvatarImage src={league.logo} alt={league.name} />
+                            <AvatarFallback>{league.name.substring(0,1)}</AvatarFallback>
+                        </Avatar>
+                        <h3 className="font-bold text-foreground">{leagueName}</h3>
+                    </div>
+                    <div className="space-y-2">
+                        {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} onSelect={onSelectFixture} />)}
+                    </div>
+                </div>
+            ))}
         </div>
     );
 };
@@ -316,7 +348,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
       <div className="flex flex-1 flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
           
-          <div className="px-4 pt-2 border-b">
+          <div className="px-4 pt-2 border-b bg-card">
              <div className="mb-2">
                  <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="my-results">نتائجي</TabsTrigger>

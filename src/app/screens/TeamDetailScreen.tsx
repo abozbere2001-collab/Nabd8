@@ -75,13 +75,29 @@ function useTeamData(teamId?: number) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [teamRes, playersRes, fixturesRes] = await Promise.all([
-          fetch(`/api/football/teams?id=${teamId}`),
-          fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`),
-          fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`),
-        ]);
+        const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
         const teamData = await teamRes.json();
-        const playersData = await playersRes.json();
+
+        // Fetch all pages of players
+        let allPlayers: PlayerInfoFromApi[] = [];
+        let currentPage = 1;
+        let totalPages = 1;
+        do {
+            const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}&page=${currentPage}`);
+            const playersData = await playersRes.json();
+            if (playersData.response) {
+                allPlayers = allPlayers.concat(playersData.response);
+            }
+            if (playersData.paging) {
+                currentPage = playersData.paging.current + 1;
+                totalPages = playersData.paging.total;
+            } else {
+                totalPages = currentPage -1; // stop loop
+            }
+        } while (currentPage <= totalPages);
+
+
+        const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
         const fixturesData = await fixturesRes.json();
         
         let leagueIdForStandings: number | null = null;
@@ -102,7 +118,7 @@ function useTeamData(teamId?: number) {
         
         setData({
           teamInfo: teamData.response?.[0] || null,
-          players: playersData.response || [],
+          players: allPlayers,
           fixtures: fixturesData.response || [],
           standings: standingsData.response?.[0]?.league?.standings?.[0] || [],
           scorers: scorersData.response || [],
@@ -212,8 +228,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
       </div> : teamInfo ? (
         <div className="flex-1 overflow-y-auto">
             <Tabs defaultValue="details" className="w-full">
-                <Card className="m-4 mb-0 border-b-0 rounded-b-none shadow-lg sticky top-0 bg-background z-10">
-                    <CardContent className="p-4 flex items-center gap-4">
+                 <div className="bg-card sticky top-0 z-10">
+                    <div className="p-4 flex items-center gap-4">
                         <Avatar className="h-20 w-20 border">
                             <AvatarImage src={teamInfo.team.logo} />
                             <AvatarFallback>{teamInfo.team.name.substring(0, 2)}</AvatarFallback>
@@ -223,14 +239,14 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                             <p className="text-sm text-muted-foreground">{teamInfo.team.country} - تأسس {teamInfo.team.founded}</p>
                             <p className="text-sm text-muted-foreground">{teamInfo.venue.name} ({teamInfo.venue.city})</p>
                         </div>
-                    </CardContent>
-                    <div className="px-4 pb-0">
+                    </div>
+                    <div className="px-4">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="details">التفاصيل</TabsTrigger>
                             <TabsTrigger value="players">اللاعبون</TabsTrigger>
                         </TabsList>
                     </div>
-                </Card>
+                </div>
 
                 <TabsContent value="players" className="p-4">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -258,7 +274,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                 </TabsContent>
                 <TabsContent value="details">
                      <Tabs defaultValue="matches" className="w-full">
-                         <div className="px-4 pt-2">
+                         <div className="px-4 pt-2 bg-background sticky top-[152px] z-10">
                             <TabsList className="grid w-full grid-cols-3">
                                 <TabsTrigger value="matches"><Shirt className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
                                 <TabsTrigger value="standings"><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
