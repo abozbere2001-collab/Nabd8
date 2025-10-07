@@ -98,15 +98,15 @@ function AppContent({ user }: { user: User | null }) {
       goBack, 
       canGoBack,
       headerActions: (
-          <div className="flex items-center gap-1">
-             <SearchSheet navigate={navigate}>
-                <Button variant="ghost" size="icon">
-                    <Search className="h-5 w-5" />
-                </Button>
-            </SearchSheet>
-             <ProfileButton navigate={navigate} />
-          </div>
-      )
+        <>
+           <SearchSheet navigate={navigate}>
+              <Button variant="ghost" size="icon">
+                  <Search className="h-5 w-5" />
+              </Button>
+          </SearchSheet>
+           <ProfileButton navigate={navigate} />
+        </>
+    )
     };
     
     return stack.map((item, index) => {
@@ -196,4 +196,3 @@ export default function Home() {
     </FirebaseProvider>
   );
 }
-
