@@ -8,6 +8,8 @@ import { useAdmin, useFirestore } from '@/firebase/provider';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { ScreenProps } from '@/app/page';
 import type { MatchDetails } from '@/lib/types';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 interface CommentsButtonProps {
   matchId: number;
@@ -23,9 +25,13 @@ export function CommentsButton({ matchId, navigate }: CommentsButtonProps) {
 
   useEffect(() => {
     const fetchMatchDetails = async () => {
+      if (!isAdmin) {
+          setLoading(false);
+          return;
+      }
       setLoading(true);
+      const matchDocRef = doc(db, 'matches', String(matchId));
       try {
-        const matchDocRef = doc(db, 'matches', String(matchId));
         const docSnap = await getDoc(matchDocRef);
         if (docSnap.exists()) {
           setMatchDetails(docSnap.data() as MatchDetails);
@@ -33,24 +39,33 @@ export function CommentsButton({ matchId, navigate }: CommentsButtonProps) {
           setMatchDetails(null);
         }
       } catch (error) {
-        console.error("Error fetching match details:", error);
+        const permissionError = new FirestorePermissionError({
+            path: matchDocRef.path,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
       } finally {
         setLoading(false);
       }
     };
     
     fetchMatchDetails();
-  }, [matchId, db]);
+  }, [matchId, db, isAdmin]);
 
   const handleActivateComments = async () => {
     setActivating(true);
+    const matchDocRef = doc(db, 'matches', String(matchId));
+    const data = { commentsEnabled: true };
     try {
-      const matchDocRef = doc(db, 'matches', String(matchId));
-      await setDoc(matchDocRef, { commentsEnabled: true }, { merge: true });
-      setMatchDetails({ commentsEnabled: true }); // Optimistically update state
+      await setDoc(matchDocRef, data, { merge: true });
+      setMatchDetails(data); // Optimistically update state
     } catch (error) {
-      console.error("Error activating comments:", error);
-      // Optionally show a toast notification for the error
+        const permissionError = new FirestorePermissionError({
+            path: matchDocRef.path,
+            operation: 'create',
+            requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
     } finally {
       setActivating(false);
     }
