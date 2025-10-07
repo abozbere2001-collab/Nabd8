@@ -203,10 +203,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         teamName={noteTeam.name}
       />}
        <div className="flex-1 overflow-y-auto">
-        <Tabs defaultValue="teams" className="w-full">
+        <Tabs defaultValue="matches" className="w-full">
            <div className="sticky top-0 bg-background z-10 border-b">
              <p className="text-center text-xs text-muted-foreground pt-2 pb-2">جميع البيانات تخص موسم {CURRENT_SEASON}</p>
-             <TabsList className="grid w-full grid-cols-4 rounded-none h-auto p-0 border-t flex-row-reverse">
+             <TabsList className="grid w-full grid-cols-4 rounded-none h-auto p-0 border-t">
               <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
               <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
               <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'><BarChart2 className="w-4 h-4 ml-1"/>الهدافين</TabsTrigger>
@@ -259,18 +259,33 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="text-left w-[120px]"></TableHead>
-                            <TableHead className="text-center">نقاط</TableHead>
-                            <TableHead className="text-center">خ</TableHead>
-                            <TableHead className="text-center">ت</TableHead>
-                            <TableHead className="text-center">ف</TableHead>
-                            <TableHead className="text-center">لعب</TableHead>
                             <TableHead className="text-right w-1/2">الفريق</TableHead>
+                            <TableHead className="text-center">لعب</TableHead>
+                            <TableHead className="text-center">ف</TableHead>
+                            <TableHead className="text-center">ت</TableHead>
+                            <TableHead className="text-center">خ</TableHead>
+                            <TableHead className="text-center">نقاط</TableHead>
+                            <TableHead className="text-left w-[120px]"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {standings.map((s) => (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
+                                <TableCell className="font-medium">
+                                    <div className="flex items-center gap-2 justify-end">
+                                        <span>{s.rank}</span>
+                                        <Avatar className="h-6 w-6">
+                                            <AvatarImage src={s.team.logo} alt={s.team.name} />
+                                            <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
+                                        </Avatar>
+                                        <span className="truncate">{s.team.name}</span>
+                                    </div>
+                                </TableCell>
+                                <TableCell className="text-center">{s.all.played}</TableCell>
+                                <TableCell className="text-center">{s.all.win}</TableCell>
+                                <TableCell className="text-center">{s.all.draw}</TableCell>
+                                <TableCell className="text-center">{s.all.lose}</TableCell>
+                                <TableCell className="text-center font-bold">{s.points}</TableCell>
                                 <TableCell onClick={e => e.stopPropagation()}>
                                      <div className='flex items-center justify-start opacity-80'>
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('team', s.team.id, s.team.name)}>
@@ -283,21 +298,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             <Heart className="h-4 w-4 text-muted-foreground" />
                                         </Button>}
                                      </div>
-                                </TableCell>
-                                <TableCell className="text-center font-bold">{s.points}</TableCell>
-                                <TableCell className="text-center">{s.all.lose}</TableCell>
-                                <TableCell className="text-center">{s.all.draw}</TableCell>
-                                <TableCell className="text-center">{s.all.win}</TableCell>
-                                <TableCell className="text-center">{s.all.played}</TableCell>
-                                <TableCell className="font-medium">
-                                    <div className="flex items-center gap-2 justify-end">
-                                        <span className="truncate">{s.team.name}</span>
-                                        <Avatar className="h-6 w-6">
-                                            <AvatarImage src={s.team.logo} alt={s.team.name} />
-                                            <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
-                                        </Avatar>
-                                        <span>{s.rank}</span>
-                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -314,15 +314,28 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="text-left w-[90px]"></TableHead>
-                            <TableHead className="text-center">الأهداف</TableHead>
-                            <TableHead className="text-right">الفريق</TableHead>
                             <TableHead className="text-right">اللاعب</TableHead>
+                            <TableHead className="text-right">الفريق</TableHead>
+                            <TableHead className="text-center">الأهداف</TableHead>
+                            <TableHead className="text-left w-[90px]"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {topScorers.map(({ player, statistics }) => (
                             <TableRow key={player.id}>
+                                <TableCell>
+                                    <div className="flex items-center gap-3 justify-end">
+                                        <Avatar className="h-10 w-10">
+                                            <AvatarImage src={player.photo} alt={player.name} />
+                                            <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
+                                        </Avatar>
+                                        <p className="font-semibold">{player.name}</p>
+                                    </div>
+                                </TableCell>
+                                <TableCell className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: statistics[0]?.team.id })}>
+                                     <p className="text-xs text-muted-foreground text-right">{statistics[0]?.team.name}</p>
+                                </TableCell>
+                                <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
                                 <TableCell>
                                     <div className='flex items-center justify-start opacity-80'>
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('player', player.id, player.name)}>
@@ -332,19 +345,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             <Star className={cn("h-5 w-5", favorites?.players?.[player.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                         </Button>
                                      </div>
-                                </TableCell>
-                                <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
-                                <TableCell className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: statistics[0]?.team.id })}>
-                                     <p className="text-xs text-muted-foreground text-right">{statistics[0]?.team.name}</p>
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-3 justify-end">
-                                        <p className="font-semibold">{player.name}</p>
-                                        <Avatar className="h-10 w-10">
-                                            <AvatarImage src={player.photo} alt={player.name} />
-                                            <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
-                                        </Avatar>
-                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -392,5 +392,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+
+    
 
     
