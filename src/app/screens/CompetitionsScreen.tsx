@@ -223,7 +223,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
       }
     }
     fetchCompetitions();
-  }, [customNames]);
+  }, []);
 
   const handleSaveRename = async (newName: string) => {
     if (!renameState.league) return;
