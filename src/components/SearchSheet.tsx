@@ -87,7 +87,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   }, [isOpen]);
 
   const handleSearch = useCallback(async (queryTerm: string) => {
-    if (!queryTerm.trim() || queryTerm.length < 3) {
+    if (!queryTerm.trim() || queryTerm.length < 2) {
       setResults([]);
       return;
     }
@@ -111,7 +111,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
             leaguesData.response.forEach((r: LeagueResult) => resultsMap.set(`league-${r.league.id}`, { ...r, type: 'league' }));
         }
 
-        // 2. Search Firestore for custom names (case-insensitive for Arabic)
+        // 2. Search Firestore for custom names
         const teamCustomQuery = query(collection(db, "teamCustomizations"), where("customName", ">=", queryTerm), where("customName", "<=", queryTerm + '\uf8ff'), limit(10));
         const leagueCustomQuery = query(collection(db, "leagueCustomizations"), where("customName", ">=", queryTerm), where("customName", "<=", queryTerm + '\uf8ff'), limit(10));
 
@@ -119,34 +119,35 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
             getDocs(teamCustomQuery),
             getDocs(leagueCustomQuery),
         ]);
-
-        const firestoreTeamIds = teamCustomSnap.docs.map(d => d.id);
-        const firestoreLeagueIds = leagueCustomSnap.docs.map(d => d.id);
-
-        if (firestoreTeamIds.length > 0) {
-            const teamDetailsRes = await fetch(`/api/football/teams?id=${firestoreTeamIds.join('-')}`);
-            const teamDetailsData = await teamDetailsRes.json();
-            if (teamDetailsData.response) {
-                 teamDetailsData.response.forEach((r: TeamResult) => {
-                    if (!resultsMap.has(`team-${r.team.id}`)) {
-                        resultsMap.set(`team-${r.team.id}`, { ...r, type: 'team' });
-                    }
-                });
-            }
-        }
         
-        if (firestoreLeagueIds.length > 0) {
-            // API doesn't support multiple league IDs, fetch one by one
-             for (const leagueId of firestoreLeagueIds) {
-                if (!resultsMap.has(`league-${leagueId}`)) {
-                    const leagueDetailsRes = await fetch(`/api/football/leagues?id=${leagueId}`);
-                    const leagueDetailsData = await leagueDetailsRes.json();
-                    if (leagueDetailsData.response?.[0]) {
-                        resultsMap.set(`league-${leagueId}`, { ...leagueDetailsData.response[0], type: 'league' });
-                    }
+        const firestoreTeamIds: string[] = [];
+        teamCustomSnap.forEach(doc => firestoreTeamIds.push(doc.id));
+        
+        const firestoreLeagueIds: string[] = [];
+        leagueCustomSnap.forEach(doc => firestoreLeagueIds.push(doc.id));
+
+
+        const teamPromises = firestoreTeamIds.map(async teamId => {
+            if (!resultsMap.has(`team-${teamId}`)) {
+                const res = await fetch(`/api/football/teams?id=${teamId}`);
+                const data = await res.json();
+                if (data.response?.[0]) {
+                    resultsMap.set(`team-${teamId}`, { ...data.response[0], type: 'team' });
                 }
             }
-        }
+        });
+
+        const leaguePromises = firestoreLeagueIds.map(async leagueId => {
+            if (!resultsMap.has(`league-${leagueId}`)) {
+                const res = await fetch(`/api/football/leagues?id=${leagueId}`);
+                const data = await res.json();
+                if (data.response?.[0]) {
+                    resultsMap.set(`league-${leagueId}`, { ...data.response[0], type: 'league' });
+                }
+            }
+        });
+
+        await Promise.all([...teamPromises, ...leaguePromises]);
       
       setResults(Array.from(resultsMap.values()));
     } catch (error) {

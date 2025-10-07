@@ -91,7 +91,7 @@ const countryToContinent: { [key: string]: string } = {
 const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "North America", "Oceania"];
 
 export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
-  const [competitions, setCompetitions] = useState<GroupedCompetitions | null>(null);
+  const [competitions, setCompetitions] = useState<Competition[] | null>(null);
   const [loading, setLoading] = useState(true);
   const { isAdmin } = useAdmin();
   const { user } = useFirebase();
@@ -132,8 +132,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
       const continentNames = new Map<string, string>();
       continentsSnapshot.forEach(doc => continentNames.set(doc.id, doc.data().customName));
       setCustomContinentNames(continentNames);
-
-      return { leagueNames, countryNames, continentNames };
   }, []);
 
   const toggleLeagueFavorite = async (comp: Competition) => {
@@ -163,10 +161,8 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     async function fetchCompetitions() {
       try {
         setLoading(true);
-        const [leaguesResponse] = await Promise.all([
-            fetch('/api/football/leagues'),
-            fetchAllCustomNames()
-        ]);
+        await fetchAllCustomNames();
+        const leaguesResponse = await fetch('/api/football/leagues');
         
         if (!leaguesResponse.ok) {
             const errorBody = await leaguesResponse.text();
@@ -180,55 +176,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
             throw new Error("API returned errors. Check your API key or request parameters.");
         }
         
-        const groupedByContinent: GroupedCompetitions = {};
-
-        (data.response as Competition[]).forEach(comp => {
-            const countryName = comp.country.name;
-            const continent = countryToContinent[countryName] || "Other";
-
-            if (continent === "World") {
-                if (!groupedByContinent.World) {
-                    groupedByContinent.World = { leagues: [] };
-                }
-                (groupedByContinent.World as { leagues: Competition[] }).leagues.push(comp);
-            } else {
-                if (!groupedByContinent[continent]) {
-                    groupedByContinent[continent] = {};
-                }
-                const continentGroup = groupedByContinent[continent] as LeaguesByCountry;
-                if (!continentGroup[countryName]) {
-                    continentGroup[countryName] = { flag: comp.country.flag, leagues: [] };
-                }
-                continentGroup[countryName].leagues.push(comp);
-            }
-        });
-        
-        const sortedGrouped: GroupedCompetitions = {};
-        continentOrder.forEach(continent => {
-            if (groupedByContinent[continent]) {
-                if (continent === "World") {
-                    const worldLeagues = (groupedByContinent.World as { leagues: Competition[] }).leagues;
-                    worldLeagues.sort((a,b) => a.league.name.localeCompare(b.league.name));
-                    sortedGrouped.World = { leagues: worldLeagues };
-                } else {
-                    const countries = groupedByContinent[continent] as LeaguesByCountry;
-                    const sortedCountries = Object.keys(countries).sort((a,b) => a.localeCompare(b));
-                    
-                    const sortedCountriesObj: LeaguesByCountry = {};
-                    for (const country of sortedCountries) {
-                        countries[country].leagues.sort((a,b) => a.league.name.localeCompare(b.league.name));
-                        sortedCountriesObj[country] = countries[country];
-                    }
-                    sortedGrouped[continent] = sortedCountriesObj;
-                }
-            }
-        });
-
-        if (groupedByContinent.Other) {
-             sortedGrouped.Other = groupedByContinent.Other;
-        }
-
-        setCompetitions(sortedGrouped);
+        setCompetitions(data.response as Competition[]);
 
       } catch (error) {
         console.error("Error fetching competitions:", error);
@@ -238,6 +186,81 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     }
     fetchCompetitions();
   }, [fetchAllCustomNames]);
+
+    const sortedGroupedCompetitions = useMemo(() => {
+        if (!competitions) return null;
+
+        const grouped: GroupedCompetitions = {};
+
+        competitions.forEach(comp => {
+            const countryName = comp.country.name;
+            const continent = countryToContinent[countryName] || "Other";
+
+            if (continent === "World") {
+                if (!grouped.World) grouped.World = { leagues: [] };
+                (grouped.World as { leagues: Competition[] }).leagues.push(comp);
+            } else {
+                if (!grouped[continent]) grouped[continent] = {};
+                const continentGroup = grouped[continent] as LeaguesByCountry;
+                if (!continentGroup[countryName]) {
+                    continentGroup[countryName] = { flag: comp.country.flag, leagues: [] };
+                }
+                continentGroup[countryName].leagues.push(comp);
+            }
+        });
+
+        // Smart sorting logic
+        const sortWithCustomPriority = (arr: string[], customNamesMap: Map<string, string>) => {
+            return arr.sort((a, b) => {
+                const aHasCustom = customNamesMap.has(a);
+                const bHasCustom = customNamesMap.has(b);
+                if (aHasCustom && !bHasCustom) return -1;
+                if (!aHasCustom && bHasCustom) return 1;
+                return getContinentName(a).localeCompare(getContinentName(b));
+            });
+        };
+
+        const sortedGrouped: GroupedCompetitions = {};
+        
+        const sortedContinents = continentOrder.filter(c => grouped[c]);
+        sortWithCustomPriority(sortedContinents, customContinentNames);
+
+        for (const continent of sortedContinents) {
+             if (continent === "World") {
+                const worldLeagues = (grouped.World as { leagues: Competition[] }).leagues;
+                worldLeagues.sort((a,b) => {
+                    const aHasCustom = customLeagueNames.has(a.league.id);
+                    const bHasCustom = customLeagueNames.has(b.league.id);
+                    if (aHasCustom && !bHasCustom) return -1;
+                    if (!aHasCustom && bHasCustom) return 1;
+                    return getLeagueName(a).localeCompare(getLeagueName(b));
+                });
+                sortedGrouped.World = { leagues: worldLeagues };
+            } else {
+                const countries = grouped[continent] as LeaguesByCountry;
+                const sortedCountries = Object.keys(countries);
+                sortWithCustomPriority(sortedCountries, customCountryNames);
+                
+                const sortedCountriesObj: LeaguesByCountry = {};
+                for (const country of sortedCountries) {
+                    countries[country].leagues.sort((a, b) => {
+                       const aHasCustom = customLeagueNames.has(a.league.id);
+                       const bHasCustom = customLeagueNames.has(b.league.id);
+                       if (aHasCustom && !bHasCustom) return -1;
+                       if (!aHasCustom && bHasCustom) return 1;
+                       return getLeagueName(a).localeCompare(getLeagueName(b));
+                    });
+                    sortedCountriesObj[country] = countries[country];
+                }
+                sortedGrouped[continent] = sortedCountriesObj;
+            }
+        }
+        
+        if (grouped.Other) sortedGrouped.Other = grouped.Other;
+
+        return sortedGrouped;
+
+    }, [competitions, customLeagueNames, customCountryNames, customContinentNames, getLeagueName, getContinentName]);
 
   const handleSaveRename = async (newName: string) => {
     if (!renameState.type || !renameState.id) return;
@@ -258,17 +281,9 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     }
     
     if (collectionName) {
-        const customNameRef = doc(db, collectionName, docId);
-        await setDoc(customNameRef, { customName: newName });
-    
-        // Optimistically update UI
-        if (renameState.type === 'league') {
-             setCustomLeagueNames(prev => new Map(prev).set(Number(docId), newName));
-        } else if (renameState.type === 'country') {
-             setCustomCountryNames(prev => new Map(prev).set(docId, newName));
-        } else if (renameState.type === 'continent') {
-             setCustomContinentNames(prev => new Map(prev).set(docId, newName));
-        }
+        await setDoc(doc(db, collectionName, docId), { customName: newName });
+        // Re-fetch names to update UI and sorting
+        await fetchAllCustomNames();
     }
 
     setRenameState({ isOpen: false, type: null, id: '', currentName: '' });
@@ -277,14 +292,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
   const openRenameDialog = (type: RenameState['type'], id: string, currentName: string) => {
       setRenameState({ isOpen: true, type, id, currentName });
   };
-
-  const sortedCompetitions = useMemo(() => {
-    if (!competitions) return null;
-    // This is a simplified sort. For a real "float to top" feature on edit,
-    // we would need to track recently edited items and adjust the sorting logic.
-    // For now, we just apply the custom names to the existing structure.
-    return competitions;
-  }, [competitions, customLeagueNames, customCountryNames, customContinentNames]);
 
 
   const renderLeagueItem = (comp: Competition) => (
@@ -336,50 +343,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     continent: 'القارة'
   };
 
-  const renderContinentHeader = (continent: string) => (
-    <div className="flex w-full items-center justify-between">
-        <AccordionTrigger className="px-4 text-lg font-bold flex-1 hover:no-underline">
-           {getContinentName(continent)}
-        </AccordionTrigger>
-        {isAdmin && (
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 mr-2"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    openRenameDialog('continent', continent, getContinentName(continent));
-                }}
-            >
-                <Pencil className="h-4 w-4 text-muted-foreground/80" />
-            </Button>
-        )}
-   </div>
-  )
-
-  const renderCountryHeader = (country: string, flag: string | null) => (
-    <div className="flex w-full items-center justify-between">
-        <AccordionTrigger className="px-4 text-base font-semibold flex-1 hover:no-underline">
-            <div className="flex items-center gap-3">
-                {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
-                <span>{getCountryName(country)}</span>
-            </div>
-        </AccordionTrigger>
-        {isAdmin && (
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 mr-2"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    openRenameDialog('country', country, getCountryName(country));
-                }}
-            >
-                <Pencil className="h-4 w-4 text-muted-foreground/80" />
-            </Button>
-        )}
-    </div>
-  )
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -393,10 +356,10 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
               </div>
             ))}
           </div>
-        ) : sortedCompetitions ? (
+        ) : sortedGroupedCompetitions ? (
           <>
           <Accordion type="multiple" className="w-full space-y-4" defaultValue={['World', 'Europe', 'Asia']}>
-            {Object.entries(sortedCompetitions).map(([continent, content]) => (
+            {Object.entries(sortedGroupedCompetitions).map(([continent, content]) => (
               <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
                 <div className="flex w-full items-center justify-between">
                     <AccordionTrigger className="px-4 text-lg font-bold flex-1 hover:no-underline">
