@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -83,8 +82,8 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   }, [isOpen, user, fetchFavorites]);
 
   const getDisplayName = (type: 'team' | 'league', id: number, defaultName: string) => {
-    const key = `${type}s` as 'teams' | 'leagues';
-    return customNames[key]?.get(id) || defaultName;
+      const key = `${type}s` as 'teams' | 'leagues';
+      return customNames[key]?.get(id) || defaultName;
   }
   
   const fetchAllCustomNames = useCallback(async () => {
@@ -107,10 +106,10 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
         const leagueNames = new Map<number, string>();
         leaguesSnapshot?.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
         
-        const teamNames = new Map<string, string>();
+        const teamNames = new Map<number, string>();
         teamsSnapshot?.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
         
-        setCustomNames({ leagues: leagueNames, teams: teamNames as any });
+        setCustomNames({ leagues: leagueNames, teams: teamNames });
     } catch(error) {
          const permissionError = new FirestorePermissionError({
             path: 'customizations',
@@ -381,3 +380,5 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     </Sheet>
   );
 }
+
+    
