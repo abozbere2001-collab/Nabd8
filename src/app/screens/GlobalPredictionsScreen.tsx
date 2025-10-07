@@ -139,7 +139,8 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             snapshot.forEach(doc => scores.push(doc.data() as UserScore));
             setLeaderboard(scores);
         }, (error) => {
-            console.error("Leaderboard fetch error:", error);
+            const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
         });
         return () => unsubscribeLeaderboard();
     }, [db]);
@@ -165,21 +166,29 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     if (dailyData.selectedMatches && dailyData.selectedMatches.length > 0) {
                         fixtureIds = dailyData.selectedMatches.map(m => m.fixtureId);
                     }
-                }
-                
-                // 2. Fetch details for those fixtures from the API
-                if (fixtureIds.length > 0) {
-                    const res = await fetch(`/api/football/fixtures?ids=${fixtureIds.join('-')}`);
-                    const data = await res.json();
-                    setSelectedMatches(data.response || []);
                 } else {
                     setSelectedMatches([]);
+                    setLoading(false);
+                    return; // No matches for today, exit early.
                 }
+                
+                if (fixtureIds.length === 0) {
+                    setSelectedMatches([]);
+                    setLoading(false);
+                    return; // No matches for today, exit early.
+                }
+
+                // 2. Fetch details for those fixtures from the API
+                const res = await fetch(`/api/football/fixtures?ids=${fixtureIds.join('-')}`);
+                const data = await res.json();
+                const fetchedFixtures = data.response || [];
+                setSelectedMatches(fetchedFixtures);
                 
                 // 3. Fetch ALL of the user's predictions with a simple query
                 const predsRef = collection(db, 'predictions');
                 const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
                 const userPredsSnapshot = await getDocs(userPredsQuery);
+
                 const allUserPredictions: { [key: number]: Prediction } = {};
                 userPredsSnapshot.forEach(doc => {
                     const pred = doc.data() as Prediction;
@@ -320,6 +329,3 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
-
-
-    
