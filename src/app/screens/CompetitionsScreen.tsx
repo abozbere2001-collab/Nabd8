@@ -421,7 +421,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                                             {Object.entries(content as CompetitionsByCountry).map(([country, { flag, leagues }]) => (
                                                 <AccordionItem value={country} key={country} className="rounded-lg border bg-background">
                                                     <div className="flex w-full items-center justify-between">
-                                                        <AccordionTrigger className="px-4 text-base font-semibold flex-1 hover:no-underline">
+                                                        <AccordionTrigger asChild className="px-4 text-base font-semibold flex-1 hover:no-underline">
                                                             <div className="flex items-center gap-3">
                                                                 {flag && (
                                                                      <div className="relative">
