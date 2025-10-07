@@ -239,7 +239,7 @@ const FixturesList = ({
             fixturesToFilter = fixturesToFilter.filter(f => ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(f.fixture.status.short));
         }
 
-        if (activeTab === 'all-matches') {
+        if (activeTab === 'all-matches' || activeTab === 'global-predictions') {
             return fixturesToFilter;
         }
         return fixturesToFilter.filter(f => 
@@ -388,7 +388,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   const { user } = useAuth();
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
-  const [activeTab, setActiveTab] = useState<'all-matches' | 'my-results'>('my-results');
+  const [activeTab, setActiveTab] = useState<'all-matches' | 'my-results' | 'global-predictions'>('my-results');
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
@@ -474,6 +474,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
 
   useEffect(() => {
+    if (activeTab === 'global-predictions') {
+      navigate('GlobalPredictions');
+      return;
+    }
     async function fetchFixturesForDate(dateKey: string) {
         setLoading(true);
         if(showOdds) {
@@ -494,7 +498,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
         }
     }
     fetchFixturesForDate(selectedDateKey);
-  }, [selectedDateKey, showOdds]);
+  }, [selectedDateKey, showOdds, activeTab, navigate]);
   
   useEffect(() => {
     if (!user) {
@@ -559,8 +563,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
       <div className="flex flex-1 flex-col min-h-0">
         <div className="flex flex-col border-b bg-card">
             <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
+              <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none">
                   <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
+                  <TabsTrigger value="global-predictions">التوقعات العالمية</TabsTrigger>
                   <TabsTrigger value="my-results">نتائجي</TabsTrigger>
               </TabsList>
             </Tabs>

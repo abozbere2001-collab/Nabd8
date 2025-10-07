@@ -90,3 +90,14 @@ export interface UserScore {
     userPhoto: string;
     totalPoints: number;
 }
+
+export interface GlobalPredictionMatch {
+  fixtureId: number;
+  leagueId: number;
+  date: string;
+}
+
+export interface DailyGlobalPredictions {
+  selectedByAdmin: boolean;
+  selectedMatches: GlobalPredictionMatch[];
+}
