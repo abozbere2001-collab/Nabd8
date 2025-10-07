@@ -13,6 +13,8 @@ import { db } from '@/lib/firebase-client';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 // Interfaces
 interface Fixture {
@@ -40,6 +42,19 @@ interface Fixture {
     home: number | null;
     away: number | null;
   };
+}
+
+interface Odds {
+    fixture: { id: number };
+    bookmakers: {
+        id: number;
+        name: string;
+        bets: {
+            id: number;
+            name: string;
+            values: { value: string; odd: string }[];
+        }[];
+    }[];
 }
 
 interface Favorites {
@@ -103,11 +118,16 @@ const LiveTimer = ({ startTime, status, elapsed }: { startTime: number, status: 
 };
 
 // Fixture Item Component
-const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSelect: (fixtureId: number, fixture: Fixture) => void }) => {
+const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture, onSelect: (fixtureId: number, fixture: Fixture) => void, odds?: Odds['bookmakers'][0]['bets'][0]['values'] }) => {
+    
+    const homeOdd = odds?.find(o => o.value === 'Home')?.odd;
+    const drawOdd = odds?.find(o => o.value === 'Draw')?.odd;
+    const awayOdd = odds?.find(o => o.value === 'Away')?.odd;
+
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg bg-muted p-3 text-sm transition-colors hover:bg-accent cursor-pointer"
+        className="rounded-lg bg-card border p-3 text-sm transition-colors hover:bg-accent/50 cursor-pointer"
         onClick={() => onSelect(fixture.fixture.id, fixture)}
       >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
@@ -134,7 +154,7 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
              </div>
              <div className={cn(
                 "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
-                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-card" : "bg-card"
+                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-muted"
                 )}>
                  {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
@@ -148,6 +168,22 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
                  <span className="font-semibold truncate">{fixture.teams.away.name}</span>
              </div>
          </div>
+         {odds && (
+            <div className="flex justify-between items-center text-center mt-3 pt-3 border-t border-dashed">
+                <div className="flex-1 space-y-1">
+                    <span className="text-xs text-muted-foreground">1</span>
+                    <p className="font-bold text-sm bg-muted rounded-md p-1">{homeOdd}</p>
+                </div>
+                <div className="flex-1 space-y-1">
+                    <span className="text-xs text-muted-foreground">X</span>
+                    <p className="font-bold text-sm bg-muted rounded-md p-1">{drawOdd}</p>
+                </div>
+                <div className="flex-1 space-y-1">
+                    <span className="text-xs text-muted-foreground">2</span>
+                    <p className="font-bold text-sm bg-muted rounded-md p-1">{awayOdd}</p>
+                </div>
+            </div>
+         )}
       </div>
     );
 });
@@ -159,30 +195,40 @@ const FixturesList = ({
     fixtures, 
     loading,
     activeTab, 
+    showLiveOnly,
     hasAnyFavorites,
     favoritedLeagueIds,
     favoritedTeamIds,
+    odds,
     onSelectFixture,
 }: { 
     fixtures: Fixture[], 
     loading: boolean,
     activeTab: string, 
+    showLiveOnly: boolean,
     hasAnyFavorites: boolean,
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
+    odds: { [fixtureId: number]: Odds['bookmakers'][0]['bets'][0]['values'] },
     onSelectFixture: (fixtureId: number, fixture: Fixture) => void
 }) => {
     
     const filteredFixtures = useMemo(() => {
-        if (activeTab === 'all-matches') {
-            return fixtures;
+        let fixturesToFilter = fixtures;
+
+        if (showLiveOnly) {
+            fixturesToFilter = fixturesToFilter.filter(f => ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(f.fixture.status.short));
         }
-        return fixtures.filter(f => 
+
+        if (activeTab === 'all-matches') {
+            return fixturesToFilter;
+        }
+        return fixturesToFilter.filter(f => 
             favoritedTeamIds.includes(f.teams.home.id) ||
             favoritedTeamIds.includes(f.teams.away.id) ||
             favoritedLeagueIds.includes(f.league.id)
         );
-    }, [fixtures, activeTab, favoritedTeamIds, favoritedLeagueIds]);
+    }, [fixtures, activeTab, favoritedTeamIds, favoritedLeagueIds, showLiveOnly]);
 
     const groupedFixtures = useMemo(() => {
         return filteredFixtures.reduce((acc, fixture) => {
@@ -210,6 +256,16 @@ const FixturesList = ({
                 <p className="text-sm">أضف فرقا أو بطولات لترى مبارياتها هنا.</p>
             </div>
         );
+    }
+    
+    const liveMatchesCount = fixtures.filter(f => ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(f.fixture.status.short)).length;
+
+    if (showLiveOnly && liveMatchesCount === 0) {
+        return (
+             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
+                <p>لا توجد مباريات مباشرة حاليًا.</p>
+            </div>
+        )
     }
 
     if (fixtures.length > 0 && filteredFixtures.length === 0) {
@@ -239,7 +295,7 @@ const FixturesList = ({
                     <div key={leagueName} className="space-y-2">
                         <h3 className="font-bold text-foreground px-1 py-2">{leagueName}</h3>
                         <div className="space-y-2">
-                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} onSelect={onSelectFixture} />)}
+                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} onSelect={onSelectFixture} odds={odds[f.fixture.id]} />)}
                         </div>
                     </div>
                 )
@@ -288,7 +344,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                         className={cn(
                             "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors",
                             "text-foreground/80 hover:text-primary",
-                            isSelected && "text-primary"
+                             isSelected && "text-primary"
                         )}
                         onClick={() => onDateSelect(dateKey)}
                         data-state={isSelected ? 'active' : 'inactive'}
@@ -312,14 +368,47 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const [odds, setOdds] = useState<{ [fixtureId: number]: any }>({});
+  const [showOdds, setShowOdds] = useState(false);
+  const [loadingOdds, setLoadingOdds] = useState(false);
+  const [showLiveOnly, setShowLiveOnly] = useState(false);
 
   const handleSelectFixture = (fixtureId: number, fixture: Fixture) => {
     navigate('MatchDetails', { fixtureId, fixture });
   };
+  
+  const fetchOddsForDate = async (dateKey: string) => {
+      setLoadingOdds(true);
+      try {
+          const response = await fetch(`/api/football/odds?date=${dateKey}&bookmaker=8&bet=1`); // Bet365, Match Winner
+          if (!response.ok) throw new Error('Failed to fetch odds');
+          const data = await response.json();
+          const oddsByFixture: { [fixtureId: number]: any } = {};
+          (data.response as Odds[]).forEach(item => {
+              // Find the "Match Winner" bet
+              const matchWinnerBet = item.bookmakers[0]?.bets.find(b => b.id === 1);
+              if (matchWinnerBet) {
+                  oddsByFixture[item.fixture.id] = matchWinnerBet.values;
+              }
+          });
+          setOdds(oddsByFixture);
+      } catch (error) {
+          console.error(`Failed to fetch odds for ${dateKey}:`, error);
+          setOdds({});
+      } finally {
+          setLoadingOdds(false);
+      }
+  };
+
 
   useEffect(() => {
     async function fetchFixturesForDate(dateKey: string) {
         setLoading(true);
+        setOdds({}); // Reset odds when date changes
+        if(showOdds) {
+            fetchOddsForDate(dateKey);
+        }
         try {
             const response = await fetch(`/api/football/fixtures?date=${dateKey}`);
             if (!response.ok) throw new Error('Failed to fetch');
@@ -333,7 +422,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
         }
     }
     fetchFixturesForDate(selectedDateKey);
-  }, [selectedDateKey]);
+  }, [selectedDateKey, showOdds]); // Re-fetch if showOdds changes to get the odds data
   
   useEffect(() => {
     if (!user) return;
@@ -347,30 +436,59 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
     
+  const toggleShowOdds = () => {
+    const newShowOdds = !showOdds;
+    setShowOdds(newShowOdds);
+    if(newShowOdds && Object.keys(odds).length === 0) { // Fetch if turning on and odds are not loaded
+        fetchOddsForDate(selectedDateKey);
+    }
+  }
+
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="المباريات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
       <div className="flex flex-1 flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
           
-          <div className="border-b bg-card flex flex-col">
-             <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
-                <TabsTrigger value="my-results">نتائجي</TabsTrigger>
-                <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
-            </TabsList>
-            <div className="py-2">
-               <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
-            </div>
+          <div className="border-b bg-card">
+             <div className="flex flex-col">
+              <div className="flex items-center border-b">
+                 <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
+                    <TabsTrigger value="my-results">نتائجي</TabsTrigger>
+                    <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
+                </TabsList>
+              </div>
+
+              <div className='flex items-center justify-between px-4 py-2 gap-4 border-b'>
+                  <div className="flex items-center space-x-2 space-x-reverse">
+                      <div className="relative">
+                          <Switch id="live-filter" checked={showLiveOnly} onCheckedChange={setShowLiveOnly} />
+                           <Label htmlFor="live-filter" className={cn("absolute text-[10px] font-bold pointer-events-none", showLiveOnly ? "text-primary-foreground left-1.5" : "text-primary right-1.5")}>
+                                مباشر
+                           </Label>
+                      </div>
+                  </div>
+                 <Button variant={showOdds ? 'default' : 'outline'} size="sm" onClick={toggleShowOdds} disabled={loadingOdds}>
+                      {loadingOdds ? <Loader2 className="h-4 w-4 animate-spin" /> : '1X2'}
+                  </Button>
+              </div>
+            
+              <div className="py-2">
+                 <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
+              </div>
+             </div>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <FixturesList 
                 fixtures={fixtures}
-                loading={loading}
-                activeTab={activeTab} 
+                loading={loading || loadingOdds}
+                activeTab={activeTab}
+                showLiveOnly={showLiveOnly} 
                 favoritedLeagueIds={favoritedLeagueIds}
                 favoritedTeamIds={favoritedTeamIds}
                 hasAnyFavorites={hasAnyFavorites}
+                odds={odds}
                 onSelectFixture={handleSelectFixture}
             />
           </div>
