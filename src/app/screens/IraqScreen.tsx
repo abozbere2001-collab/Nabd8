@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { collection, getDocs, doc, setDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
 import type { Fixture, Standing, TopScorer, AdminFavorite, Prediction, UserScore } from '@/lib/types';
 import { CommentsButton } from '@/components/CommentsButton';
@@ -24,7 +24,7 @@ import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
 
-const IRAQI_LEAGUE_ID = 239;
+const IRAQI_LEAGUE_ID = 542;
 const CURRENT_SEASON = new Date().getFullYear();
 
 
@@ -312,7 +312,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
 
         if (user) {
             const predsRef = collection(db, 'predictions');
-            const userPredsQuery = query(predsRef, orderBy('userId'), where('userId', '==', user.uid));
+            const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
             const unsubscribePreds = onSnapshot(userPredsQuery, (snapshot) => {
                 const userPredictions: { [key: number]: Prediction } = {};
                 snapshot.forEach(doc => {
@@ -348,7 +348,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             fixtureId,
             homeGoals,
             awayGoals,
-            timestamp: new Date()
+            timestamp: new Date().toISOString()
         };
         try {
             await setDoc(predictionRef, predictionData, { merge: true });
