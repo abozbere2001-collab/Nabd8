@@ -235,7 +235,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent side="left" className="flex flex-col">
+      <SheetContent side="right" className="flex flex-col">
         <SheetHeader>
           <SheetTitle>البحث</SheetTitle>
         </SheetHeader>
@@ -314,4 +314,3 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     </Sheet>
   );
 }
-

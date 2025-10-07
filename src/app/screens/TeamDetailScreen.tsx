@@ -85,11 +85,8 @@ function useTeamData(teamId?: number) {
           } while (currentPage < totalPages);
         }
         
-        const fixturesUrl = teamInfo?.team.type === 'National' 
-          ? `/api/football/fixtures?team=${teamId}`
-          : `/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
-
-        const fixturesRes = await fetch(fixturesUrl);
+        // Fetch all fixtures for the team, regardless of season
+        const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}`);
         const fixturesData = await fixturesRes.json();
         const fixtures: Fixture[] = fixturesData.response || [];
         
@@ -380,4 +377,3 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     </div>
   );
 }
-
