@@ -42,11 +42,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const [standings, setStandings] = useState<Standing[]>([]);
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [customNames, setCustomNames] = useState({ teams: new Map<number, string>(), players: new Map<number, string>() });
+  const [customNames, setCustomNames] = useState<{ teams: Map<number, string>, players: Map<number, string> }>({ teams: new Map(), players: new Map() });
 
   
   const getDisplayName = useCallback((type: 'team' | 'player', id: number, defaultName: string) => {
-    return customNames[type].get(id) || defaultName;
+    const key = `${type}s` as 'teams' | 'players';
+    return customNames[key]?.get(id) || defaultName;
   }, [customNames]);
 
   

@@ -83,10 +83,8 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   }, [isOpen, user, fetchFavorites]);
 
   const getDisplayName = (type: 'team' | 'league', id: number, defaultName: string) => {
-      if (type === 'team') {
-          return customNames.teams.get(id) || defaultName;
-      }
-      return customNames.leagues.get(id) || defaultName;
+    const key = `${type}s` as 'teams' | 'leagues';
+    return customNames[key]?.get(id) || defaultName;
   }
   
   const fetchAllCustomNames = useCallback(async () => {
