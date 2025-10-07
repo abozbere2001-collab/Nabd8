@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { collection, getDocs } from 'firebase/firestore';
-import { useFirestore } from '@/firebase/provider';
+import { useFirestore, useAdmin } from '@/firebase/provider';
 import type { Fixture, Standing, TopScorer, AdminFavorite } from '@/lib/types';
 import { CommentsButton } from '@/components/CommentsButton';
 
@@ -213,9 +213,14 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const [teams, setTeams] = useState<AdminFavorite[]>([]);
     const [loading, setLoading] = useState(true);
     const { db } = useFirestore();
+    const { isAdmin } = useAdmin();
 
     useEffect(() => {
         const fetchAdminFavorites = async () => {
+            if (!isAdmin) {
+                setLoading(false);
+                return;
+            }
             setLoading(true);
             try {
                 const snapshot = await getDocs(collection(db, 'adminFavorites'));
@@ -231,7 +236,7 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             }
         };
         fetchAdminFavorites();
-    }, [db]);
+    }, [db, isAdmin]);
 
     if (loading) {
         return (
@@ -239,6 +244,10 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
             </div>
         )
+    }
+
+    if (!isAdmin) {
+        return <p className="pt-4 text-center text-muted-foreground">هذه الميزة متاحة للمدير فقط.</p>
     }
 
     if (teams.length === 0) {
@@ -294,3 +303,5 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
     </div>
   );
 }
+
+    
