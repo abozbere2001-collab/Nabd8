@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -366,7 +367,7 @@ useEffect(() => {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="البطولات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+      <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
           <div className="space-y-4">
@@ -378,7 +379,7 @@ useEffect(() => {
           </div>
         ) : sortedGroupedCompetitions ? (
           <>
-          <Accordion type="multiple" className="w-full space-y-4" defaultValue={['World', 'Europe', 'Asia']}>
+          <Accordion type="multiple" className="w-full space-y-4">
             {Object.entries(sortedGroupedCompetitions).map(([continent, content]) => (
               <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
                 <div className="flex w-full items-center justify-between">
