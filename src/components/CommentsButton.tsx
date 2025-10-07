@@ -1,14 +1,25 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, MessageSquarePlus, Loader2 } from 'lucide-react';
+import { MessageSquare, MessageSquarePlus, MessageSquareX, Loader2 } from 'lucide-react';
 import { useAdmin, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import type { ScreenProps } from '@/app/page';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface CommentsButtonProps {
   matchId: number;
@@ -19,19 +30,19 @@ interface CommentsButtonProps {
 export function CommentsButton({ matchId, navigate, commentsEnabled }: CommentsButtonProps) {
   const { isAdmin } = useAdmin();
   const { db } = useFirestore();
-  const [isActivating, setIsActivating] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isDeactivateAlertOpen, setDeactivateAlertOpen] = useState(false);
+  const pressTimer = useRef<NodeJS.Timeout | null>(null);
 
   const handleActivateComments = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent navigation
+    e.stopPropagation();
     if (!isAdmin) return;
     
-    setIsActivating(true);
+    setIsProcessing(true);
     const matchDocRef = doc(db, 'matches', String(matchId));
     const data = { commentsEnabled: true };
     try {
       await setDoc(matchDocRef, data, { merge: true });
-      // The parent component (MatchesScreen) will get the update via its snapshot listener
-      // and re-render this component with the new `commentsEnabled` prop.
     } catch (error) {
         const permissionError = new FirestorePermissionError({
             path: matchDocRef.path,
@@ -40,22 +51,85 @@ export function CommentsButton({ matchId, navigate, commentsEnabled }: CommentsB
         });
         errorEmitter.emit('permission-error', permissionError);
     } finally {
-      setIsActivating(false);
+      setIsProcessing(false);
     }
   };
+  
+  const handleDeactivateComments = async () => {
+    if (!isAdmin) return;
+    
+    setIsProcessing(true);
+    const matchDocRef = doc(db, 'matches', String(matchId));
+    const data = { commentsEnabled: false };
+     try {
+      await setDoc(matchDocRef, data, { merge: true });
+    } catch (error) {
+        const permissionError = new FirestorePermissionError({
+            path: matchDocRef.path,
+            operation: 'update',
+            requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    } finally {
+      setIsProcessing(false);
+      setDeactivateAlertOpen(false);
+    }
+  }
+
+  const handleTouchStart = () => {
+    pressTimer.current = setTimeout(() => {
+        setDeactivateAlertOpen(true);
+    }, 700); // 700ms for long press
+  };
+
+  const handleTouchEnd = () => {
+    if (pressTimer.current) {
+        clearTimeout(pressTimer.current);
+        pressTimer.current = null;
+    }
+  };
+  
+  const handleClick = () => {
+    // This ensures that the click event doesn't fire if a long press was detected.
+    if(pressTimer.current === null) {
+      navigate('Comments', { matchId });
+    }
+  }
+
 
   // Admin View
   if (isAdmin) {
     if (commentsEnabled) {
       return (
-        <Button 
-          variant="outline" 
-          className="w-full"
-          onClick={() => navigate('Comments', { matchId })}
-        >
-          <MessageSquare className="h-4 w-4 mr-2" />
-          عرض التعليقات
-        </Button>
+         <AlertDialog open={isDeactivateAlertOpen} onOpenChange={setDeactivateAlertOpen}>
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={handleClick}
+              onMouseDown={handleTouchStart}
+              onMouseUp={handleTouchEnd}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
+              <MessageSquare className="h-4 w-4 mr-2" />
+              عرض التعليقات (اضغط مطولاً للإلغاء)
+            </Button>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    سيؤدي هذا الإجراء إلى إلغاء تفعيل التعليقات لهذه المباراة.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeactivateComments} disabled={isProcessing}>
+                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <MessageSquareX className="h-4 w-4 ml-2"/>}
+                    تأكيد الإلغاء
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+        </AlertDialog>
       );
     }
     return (
@@ -63,9 +137,9 @@ export function CommentsButton({ matchId, navigate, commentsEnabled }: CommentsB
         variant="secondary" 
         className="w-full" 
         onClick={handleActivateComments}
-        disabled={isActivating}
+        disabled={isProcessing}
       >
-        {isActivating ? (
+        {isProcessing ? (
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
         ) : (
             <MessageSquarePlus className="h-4 w-4 mr-2" />
