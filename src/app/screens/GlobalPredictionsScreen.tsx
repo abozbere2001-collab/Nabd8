@@ -155,7 +155,17 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         const fetchDailyMatchesAndPredictions = async () => {
             setLoading(true);
             try {
-                // 1. Fetch today's global matches from Firestore
+                // 1. Fetch ALL of the user's predictions with a simple query
+                const predsRef = collection(db, 'predictions');
+                const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
+                const userPredsSnapshot = await getDocs(userPredsQuery);
+                const allUserPredictions: { [key: number]: Prediction } = {};
+                userPredsSnapshot.forEach(doc => {
+                    const pred = doc.data() as Prediction;
+                    allUserPredictions[pred.fixtureId] = pred;
+                });
+
+                // 2. Fetch today's global matches from Firestore
                 const today = format(new Date(), 'yyyy-MM-dd');
                 const dailyDocRef = doc(db, 'dailyGlobalPredictions', today);
                 const docSnap = await getDoc(dailyDocRef);
@@ -168,7 +178,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     }
                 }
                 
-                // Fetch details for those fixtures from the API
+                // 3. Fetch details for those fixtures from the API
                 if (fixtureIds.length > 0) {
                     const res = await fetch(`/api/football/fixtures?ids=${fixtureIds.join('-')}`);
                     const data = await res.json();
@@ -176,24 +186,13 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 } else {
                     setSelectedMatches([]);
                 }
-
-                // 2. Fetch ALL of the user's predictions with a simple query
-                const predsRef = collection(db, 'predictions');
-                const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
-                const querySnapshot = await getDocs(userPredsQuery);
-
-                const userPredictions: { [key: number]: Prediction } = {};
-                querySnapshot.forEach(doc => {
-                    const pred = doc.data() as Prediction;
-                    userPredictions[pred.fixtureId] = pred;
-                });
                 
-                // 3. Filter predictions locally to only include today's matches
+                // 4. Filter allUserPredictions locally to only include today's matches
                 const todaysFixtureIds = new Set(fixtureIds);
                 const todaysPredictions: { [key: number]: Prediction } = {};
-                for (const fixtureId in userPredictions) {
+                for (const fixtureId in allUserPredictions) {
                     if (todaysFixtureIds.has(Number(fixtureId))) {
-                        todaysPredictions[fixtureId] = userPredictions[fixtureId];
+                        todaysPredictions[fixtureId] = allUserPredictions[fixtureId];
                     }
                 }
                 setPredictions(todaysPredictions);
@@ -322,5 +321,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
 
     
