@@ -356,15 +356,15 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
           
           <div className="border-b bg-card">
              <TabsList className="grid w-full grid-cols-2 rounded-none h-auto p-0">
-                <TabsTrigger value="my-results" className='rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground'>نتائجي</TabsTrigger>
-                <TabsTrigger value="all-matches" className='rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground'>كل المباريات</TabsTrigger>
+                <TabsTrigger value="my-results" className='rounded-none'>نتائجي</TabsTrigger>
+                <TabsTrigger value="all-matches" className='rounded-none'>كل المباريات</TabsTrigger>
             </TabsList>
             <div className="py-2">
                <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto px-4">
+          <div className="flex-1 overflow-y-auto px-4 mt-4">
             <FixturesList 
                 fixtures={fixtures}
                 loading={loading}
