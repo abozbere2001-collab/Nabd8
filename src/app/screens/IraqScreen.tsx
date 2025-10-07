@@ -285,13 +285,41 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
     const debouncedHome = useDebounce(homeValue, 500);
     const debouncedAway = useDebounce(awayValue, 500);
 
+    const isMatchLiveOrFinished = ['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short);
     const isMatchFinished = ['FT', 'AET', 'PEN'].includes(fixture.fixture.status.short);
+
+    const getPredictionStatusColors = () => {
+        if (!isMatchLiveOrFinished || !userPrediction) {
+            return "bg-card text-foreground";
+        }
+
+        const actualHome = fixture.goals.home;
+        const actualAway = fixture.goals.away;
+        const predHome = userPrediction.homeGoals;
+        const predAway = userPrediction.awayGoals;
+        
+        if (actualHome === null || actualAway === null) return "bg-card text-foreground";
+
+        const correctScore = actualHome === predHome && actualAway === predAway;
+        if (correctScore) {
+            return "bg-green-500/20 text-green-500";
+        }
+
+        const actualWinner = actualHome > actualAway ? 'home' : actualHome < actualAway ? 'away' : 'draw';
+        const predWinner = predHome > predAway ? 'home' : predHome < predAway ? 'away' : 'draw';
+        
+        if (actualWinner === predWinner) {
+            return "bg-yellow-500/20 text-yellow-500";
+        }
+
+        return "bg-card text-foreground";
+    };
 
     const getPointsColor = () => {
         if (!isMatchFinished || userPrediction?.points === undefined) return 'text-primary';
-        if (userPrediction.points === 3) return 'text-green-500'; // Correct score
-        if (userPrediction.points === 1) return 'text-yellow-500'; // Correct winner
-        return 'text-foreground'; // Wrong prediction
+        if (userPrediction.points === 5) return 'text-green-500';
+        if (userPrediction.points === 3) return 'text-yellow-500';
+        return 'text-foreground';
     };
     
     useEffect(() => {
@@ -319,10 +347,10 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                     <div className="flex items-center gap-1">
                         <Input type="number" className="w-12 h-10 text-center text-lg font-bold" min="0" value={homeValue} onChange={handleHomeChange} id={`home-${fixture.fixture.id}`} disabled={isPredictionDisabled} />
                         <div className={cn(
-                            "font-bold text-lg px-2 rounded-md min-w-[70px] text-center",
-                             !isMatchFinished && "text-sm"
+                            "font-bold text-lg px-2 rounded-md min-w-[70px] text-center transition-colors",
+                             isMatchLiveOrFinished ? getPredictionStatusColors() : "text-sm",
                             )}>
-                             {isMatchFinished
+                             {isMatchLiveOrFinished
                                ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
                                : format(new Date(fixture.fixture.date), "HH:mm")}
                          </div>
@@ -357,10 +385,6 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
     
-    const iraqiLeagueFixtureIds = useMemo(() => {
-        return fixtures.filter(f => f.league.id === IRAQI_LEAGUE_ID).map(f => f.fixture.id);
-    }, [fixtures]);
-
     useEffect(() => {
         if (!db) return;
         
@@ -369,13 +393,42 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             try {
                 const res = await fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`);
                 const data = await res.json();
-                if (data.response) setFixtures(data.response);
+                if (data.response) {
+                    const fetchedFixtures = data.response;
+                    setFixtures(fetchedFixtures);
+
+                    if (user) {
+                        const fixtureIds = fetchedFixtures.map((f: Fixture) => f.fixture.id);
+                        if (fixtureIds.length > 0) {
+                            const predsRef = collection(db, 'predictions');
+                            // Firestore 'in' query limit is 30
+                            const userPredsQuery = query(
+                                predsRef, 
+                                where('userId', '==', user.uid),
+                                where('fixtureId', 'in', fixtureIds.slice(0, 30))
+                            );
+                            const unsubscribePreds = onSnapshot(userPredsQuery, (snapshot) => {
+                                const userPredictions: { [key: number]: Prediction } = {};
+                                snapshot.forEach(doc => {
+                                    const pred = doc.data() as Prediction;
+                                    userPredictions[pred.fixtureId] = pred;
+                                });
+                                setPredictions(userPredictions);
+                            }, (error) => {
+                                const permissionError = new FirestorePermissionError({ path: `predictions where userId == ${user.uid}`, operation: 'list' });
+                                errorEmitter.emit('permission-error', permissionError);
+                            });
+                             return () => unsubscribePreds();
+                        }
+                    }
+                }
             } catch (error) {
                 console.error("Failed to fetch fixtures for predictions:", error);
             } finally {
                 setLoading(false);
             }
         }
+        
         fetchData();
 
         const leaderboardRef = query(collection(db, 'leaderboard'), orderBy('totalPoints', 'desc'));
@@ -388,33 +441,11 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
            errorEmitter.emit('permission-error', permissionError);
         });
 
-        let unsubscribePreds = () => {};
-        if (user && iraqiLeagueFixtureIds.length > 0) {
-            const predsRef = collection(db, 'predictions');
-            const userPredsQuery = query(
-                predsRef, 
-                where('userId', '==', user.uid),
-                where('fixtureId', 'in', iraqiLeagueFixtureIds.slice(0, 30)) // Firestore 'in' query limit
-            );
-            unsubscribePreds = onSnapshot(userPredsQuery, (snapshot) => {
-                const userPredictions: { [key: number]: Prediction } = {};
-                snapshot.forEach(doc => {
-                    const pred = doc.data() as Prediction;
-                    userPredictions[pred.fixtureId] = pred;
-                });
-                setPredictions(userPredictions);
-            }, (error) => {
-                const permissionError = new FirestorePermissionError({ path: `predictions where userId == ${user.uid}`, operation: 'list' });
-                errorEmitter.emit('permission-error', permissionError);
-            });
-        }
-        
         return () => {
             unsubscribeLeaderboard();
-            unsubscribePreds();
         };
 
-    }, [user, db, iraqiLeagueFixtureIds.length]);
+    }, [user, db]);
 
     const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
         if (!user || homeGoalsStr === '' || awayGoalsStr === '' || !db) return;

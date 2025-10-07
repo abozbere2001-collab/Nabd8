@@ -49,12 +49,40 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
     const debouncedHome = useDebounce(homeValue, 500);
     const debouncedAway = useDebounce(awayValue, 500);
 
+    const isMatchLiveOrFinished = ['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short);
     const isMatchFinished = ['FT', 'AET', 'PEN'].includes(fixture.fixture.status.short);
 
+    const getPredictionStatusColors = () => {
+        if (!isMatchLiveOrFinished || !userPrediction) {
+            return "bg-card text-foreground";
+        }
+
+        const actualHome = fixture.goals.home;
+        const actualAway = fixture.goals.away;
+        const predHome = userPrediction.homeGoals;
+        const predAway = userPrediction.awayGoals;
+        
+        if (actualHome === null || actualAway === null) return "bg-card text-foreground";
+
+        const correctScore = actualHome === predHome && actualAway === predAway;
+        if (correctScore) {
+            return "bg-green-500/20 text-green-500";
+        }
+
+        const actualWinner = actualHome > actualAway ? 'home' : actualHome < actualAway ? 'away' : 'draw';
+        const predWinner = predHome > predAway ? 'home' : predHome < predAway ? 'away' : 'draw';
+        
+        if (actualWinner === predWinner) {
+            return "bg-yellow-500/20 text-yellow-500";
+        }
+
+        return "bg-card text-foreground";
+    };
+    
     const getPointsColor = () => {
         if (!isMatchFinished || userPrediction?.points === undefined) return 'text-primary';
-        if (userPrediction.points === 3) return 'text-green-500'; // Correct score
-        if (userPrediction.points === 1) return 'text-yellow-500'; // Correct winner
+        if (userPrediction.points === 5) return 'text-green-500'; // Correct score
+        if (userPrediction.points === 3) return 'text-yellow-500'; // Correct winner
         return 'text-foreground'; // Wrong prediction
     };
 
@@ -99,10 +127,10 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                             disabled={isPredictionDisabled}
                         />
                          <div className={cn(
-                            "font-bold text-lg px-2 rounded-md min-w-[70px] text-center",
-                             !isMatchFinished && "text-sm"
+                            "font-bold text-lg px-2 rounded-md min-w-[70px] text-center transition-colors",
+                             isMatchLiveOrFinished ? getPredictionStatusColors() : "text-sm",
                             )}>
-                             {isMatchFinished
+                             {isMatchLiveOrFinished
                                ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
                                : format(new Date(fixture.fixture.date), "HH:mm")}
                          </div>

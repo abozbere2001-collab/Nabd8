@@ -107,3 +107,13 @@ export interface DailyGlobalPredictions {
   selectedByAdmin: boolean;
   selectedMatches: GlobalPredictionMatch[];
 }
+
+export interface SeasonPrediction {
+    userId: string;
+    leagueId: number;
+    season: number;
+    predictedChampionId: number;
+    predictedTopScorerId: number;
+    championPoints?: number;
+    topScorerPoints?: number;
+}
