@@ -162,35 +162,39 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             try {
                 const docSnap = await getDoc(dailyDocRef);
                 let fetchedMatches: Fixture[] = [];
+                let fixtureIds: number[] = [];
 
                 if (docSnap.exists()) {
                     const dailyData = docSnap.data() as DailyGlobalPredictions;
                     if (dailyData.selectedMatches && dailyData.selectedMatches.length > 0) {
-                        const fixtureIds = dailyData.selectedMatches.map(m => m.fixtureId);
+                        fixtureIds = dailyData.selectedMatches.map(m => m.fixtureId);
                         const res = await fetch(`/api/football/fixtures?ids=${fixtureIds.join('-')}`);
                         const data = await res.json();
                         fetchedMatches = data.response || [];
-                        
-                        // Now that we have the matches, fetch predictions for them
-                        if (fixtureIds.length > 0) {
-                             const predsRef = collection(db, 'predictions');
-                             const userPredsQuery = query(predsRef, where('userId', '==', user.uid), where('fixtureId', 'in', fixtureIds));
-                             
-                             unsubscribePredictions = onSnapshot(userPredsQuery, (snapshot) => {
-                                const userPredictions: { [key: number]: Prediction } = {};
-                                snapshot.forEach(doc => {
-                                    const pred = doc.data() as Prediction;
-                                    userPredictions[pred.fixtureId] = pred;
-                                });
-                                setPredictions(userPredictions);
-                             }, (error) => {
-                                 const permissionError = new FirestorePermissionError({ path: `predictions where userId == ${user.uid}`, operation: 'list' });
-                                 errorEmitter.emit('permission-error', permissionError);
-                             });
-                        }
                     }
                 }
                 setSelectedMatches(fetchedMatches);
+
+                // Now that we have the matches, fetch all user's predictions
+                const predsRef = collection(db, 'predictions');
+                const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
+                
+                unsubscribePredictions = onSnapshot(userPredsQuery, (snapshot) => {
+                    const userPredictions: { [key: number]: Prediction } = {};
+                    const todaysFixtureIds = new Set(fixtureIds);
+                    snapshot.forEach(doc => {
+                        const pred = doc.data() as Prediction;
+                        // Filter predictions for today's matches locally
+                        if (todaysFixtureIds.has(pred.fixtureId)) {
+                            userPredictions[pred.fixtureId] = pred;
+                        }
+                    });
+                    setPredictions(userPredictions);
+                }, (error) => {
+                    const permissionError = new FirestorePermissionError({ path: `predictions where userId == ${user.uid}`, operation: 'list' });
+                    errorEmitter.emit('permission-error', permissionError);
+                });
+
             } catch (error) {
                  const permissionError = new FirestorePermissionError({ path: dailyDocRef.path, operation: 'get' });
                  errorEmitter.emit('permission-error', permissionError);
