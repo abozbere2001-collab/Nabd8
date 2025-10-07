@@ -11,7 +11,6 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
-import { SearchScreen } from './screens/SearchScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
@@ -19,16 +18,17 @@ import { FirebaseProvider } from '@/firebase/provider';
 import { ProfileButton } from '@/components/ProfileButton';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SearchSheet } from '@/components/SearchSheet';
 
 
-export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails' | 'Search';
+export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails';
 export type ScreenProps = {
   navigate: (screen: ScreenKey, props?: Record<string, any>) => void;
   goBack: () => void;
   canGoBack: boolean;
 };
 
-const screens: Record<ScreenKey, React.ComponentType<any>> = {
+const screens: Record<Exclude<ScreenKey, 'Search'>, React.ComponentType<any>> = {
   Login: LoginScreen,
   SignUp: LoginScreen, 
   Matches: MatchesScreen,
@@ -39,7 +39,6 @@ const screens: Record<ScreenKey, React.ComponentType<any>> = {
   CompetitionDetails: CompetitionDetailScreen,
   MatchDetails: MatchDetailScreen,
   TeamDetails: TeamDetailScreen,
-  Search: SearchScreen,
 };
 
 const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
@@ -63,9 +62,8 @@ function AppContent({ user }: { user: User | null }) {
       setTimeout(() => {
         setStack(prev => {
             const newStack = prev.slice(0, -1);
-            if (screenInstances.current[lastItemKey]) {
-              // We keep the instance in memory for KeepAlive
-            }
+            // We don't delete the instance to keep it alive if needed later.
+            // A more robust keep-alive implementation would manage memory.
             return newStack;
         });
         setIsAnimatingOut(null);
@@ -80,14 +78,11 @@ function AppContent({ user }: { user: User | null }) {
 
     setStack(prevStack => {
       if (isMainTab) {
-        // If it's a main tab, check if it's already the current one
         if (prevStack.length === 1 && prevStack[0].screen === screen) {
            return prevStack;
         }
-        // Replace the stack with the new main tab screen
         return [newItem];
       } else {
-        // For other screens, push to the stack
         return [...prevStack, newItem];
       }
     });
@@ -102,24 +97,26 @@ function AppContent({ user }: { user: User | null }) {
       canGoBack,
       headerActions: (
           <div className="flex items-center gap-1">
-             <Button variant="ghost" size="icon" onClick={() => navigate('Search')}>
-                <Search className="h-5 w-5" />
-             </Button>
+             <SearchSheet navigate={navigate}>
+                <Button variant="ghost" size="icon">
+                    <Search className="h-5 w-5" />
+                </Button>
+            </SearchSheet>
              <ProfileButton navigate={navigate} />
           </div>
       )
     };
     
     return stack.map((item, index) => {
-      if (!screenInstances.current[item.key]) {
-        const ScreenComponent = screens[item.screen];
-        screenInstances.current[item.key] = <ScreenComponent {...navigationProps} {...item.props} />;
-      }
-      return {
-        ...item,
-        isEntering: index === stack.length - 1 && stack.length > 1 && !mainTabs.includes(item.screen),
-        component: screenInstances.current[item.key]
-      };
+        const ScreenComponent = screens[item.screen as Exclude<ScreenKey, 'Search'>];
+        if (!screenInstances.current[item.key]) {
+            screenInstances.current[item.key] = <ScreenComponent {...navigationProps} {...item.props} />;
+        }
+        return {
+            ...item,
+            isEntering: stack.length > 1 && index === stack.length - 1 && !mainTabs.includes(item.screen),
+            component: screenInstances.current[item.key]
+        };
     });
   }, [stack, navigate, goBack]);
 
@@ -146,12 +143,12 @@ function AppContent({ user }: { user: User | null }) {
               key={item.key}
               className={cn(
                 "absolute inset-0 bg-background flex flex-col",
-                item.isEntering && !isAnimating ? 'animate-slide-in-from-right' : '',
-                isAnimating ? 'animate-slide-out-to-right' : ''
+                item.isEntering && 'animate-slide-in-from-right',
+                isAnimating && 'animate-slide-out-to-right'
               )}
-              style={{ 
+              style={{
                 zIndex: index,
-                display: isTop ? 'flex' : 'none',
+                display: isTop ? 'flex' : 'none'
               }}
               aria-hidden={!isTop}
             >
@@ -171,23 +168,15 @@ export default function Home() {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
-    // This effect runs once on mount
-    
-    // First, check if we're coming back from a redirect
     checkRedirectResult().catch(err => {
-        // This will catch any errors from getRedirectResult, although onAuthStateChanged
-        // will still be the final source of truth.
         console.error("Redirect check failed:", err);
     });
 
-    // Then, set up the listener that will handle all auth state changes,
-    // including the one from the redirect result.
     const unsubscribe = onAuthStateChange((currentUser) => {
       setUser(currentUser);
-      setLoadingAuth(false); // Auth state is now determined, stop loading.
+      setLoadingAuth(false);
     });
     
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
 
@@ -199,7 +188,6 @@ export default function Home() {
     );
   }
 
-  // Pass user to FirebaseProvider, it can be null
   return (
     <FirebaseProvider user={user}>
       {user ? <AppContent user={user} /> : <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />}

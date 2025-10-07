@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { ScreenHeader } from '@/components/ScreenHeader';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from '@/components/ui/button';
 import { Search, Star, Pencil, Loader2 } from 'lucide-react';
@@ -31,11 +37,12 @@ interface Favorites {
 }
 type RenameType = 'league' | 'team';
 
-export function SearchScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
+export function SearchSheet({ children, navigate }: { children: React.ReactNode, navigate: ScreenProps['navigate'] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   const { isAdmin, user } = useAdmin();
   const [favorites, setFavorites] = useState<Favorites>({});
@@ -81,8 +88,10 @@ export function SearchScreen({ navigate, goBack, canGoBack, headerActions }: Scr
   }, []);
 
   useEffect(() => {
-    handleSearch(debouncedSearchTerm);
-  }, [debouncedSearchTerm, handleSearch]);
+    if (isOpen) {
+      handleSearch(debouncedSearchTerm);
+    }
+  }, [debouncedSearchTerm, handleSearch, isOpen]);
 
   const handleOpenRename = (type: RenameType, id: string | number, name: string) => {
     setRenameItem({ id, name, type });
@@ -123,72 +132,76 @@ export function SearchScreen({ navigate, goBack, canGoBack, headerActions }: Scr
     } else {
       navigate('CompetitionDetails', { leagueId: result.league.id, title: result.league.name, logo: result.league.logo });
     }
+    setIsOpen(false);
   }
   
   return (
-    <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="البحث" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
-        <div className="p-4 space-y-4 flex flex-col flex-1">
-            <div className="flex w-full items-center space-x-2 space-x-reverse">
-                <Input
-                    type="text"
-                    placeholder="اكتب هنا للبحث عن فريق أو بطولة..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="flex-1"
-                    dir="rtl"
-                    autoFocus
-                />
-                <Button onClick={() => handleSearch(searchTerm)} disabled={loading}>
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                </Button>
-            </div>
-            <div className="mt-4 flex-1 overflow-y-auto">
-                {loading && <div className="flex justify-center items-center h-full"><Loader2 className="h-6 w-6 animate-spin" /></div>}
-                {!loading && results.length > 0 && (
-                    <ul className="space-y-2">
-                    {results.map(result => {
-                        const item = result.type === 'team' ? result.team : result.league;
-                        const isFavorited = result.type === 'team' ? !!favorites?.teams?.[item.id] : !!favorites?.leagues?.[item.id];
-                        return (
-                            <li key={`${result.type}-${item.id}`} className="flex items-center gap-3 p-2 border rounded-md bg-card cursor-pointer hover:bg-accent">
-                            <div className='flex-1 flex items-center gap-3' onClick={() => handleResultClick(result)}>
-                                <Avatar>
-                                    <AvatarImage src={item.logo} alt={item.name} />
-                                    <AvatarFallback>{item.name.substring(0, 2)}</AvatarFallback>
-                                </Avatar>
-                                <span className="font-semibold">{item.name}</span>
-                                <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">{result.type === 'team' ? 'فريق' : 'بطولة'}</span>
-                            </div>
-                            <div className='flex items-center'>
-                                <Button variant="ghost" size="icon" onClick={() => handleFavorite(result.type, item)}>
-                                    <Star className={cn("h-5 w-5", isFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
-                                </Button>
-                                {isAdmin && (
-                                    <Button variant="ghost" size="icon" onClick={() => handleOpenRename(result.type, item.id, item.name)}>
-                                        <Pencil className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
-                                )}
-                            </div>
-                            </li>
-                        )
-                    })}
-                    </ul>
-                )}
-                {!loading && results.length === 0 && debouncedSearchTerm.length > 2 && (
-                    <p className="text-muted-foreground text-center pt-8">لا توجد نتائج بحث.</p>
-                )}
-            </div>
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      <SheetTrigger asChild>{children}</SheetTrigger>
+      <SheetContent side="left" className="flex flex-col">
+        <SheetHeader>
+          <SheetTitle>البحث</SheetTitle>
+        </SheetHeader>
+        <div className="flex w-full items-center space-x-2 space-x-reverse">
+            <Input
+                type="text"
+                placeholder="اكتب هنا للبحث عن فريق أو بطولة..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="flex-1"
+                dir="rtl"
+                autoFocus
+            />
+            <Button onClick={() => handleSearch(searchTerm)} disabled={loading} size="icon">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            </Button>
         </div>
-      {renameItem && (
-        <RenameDialog 
-          isOpen={isRenameOpen}
-          onOpenChange={setRenameOpen}
-          currentName={renameItem.name}
-          onSave={handleSaveRename}
-          itemType={renameItem.type === 'team' ? 'الفريق' : 'البطولة'}
-        />
-      )}
-    </div>
+        <div className="mt-4 flex-1 overflow-y-auto">
+            {loading && <div className="flex justify-center items-center h-full"><Loader2 className="h-6 w-6 animate-spin" /></div>}
+            {!loading && results.length > 0 && (
+                <ul className="space-y-2">
+                {results.map(result => {
+                    const item = result.type === 'team' ? result.team : result.league;
+                    const isFavorited = result.type === 'team' ? !!favorites?.teams?.[item.id] : !!favorites?.leagues?.[item.id];
+                    return (
+                        <li key={`${result.type}-${item.id}`} className="flex items-center gap-3 p-2 border rounded-md bg-card hover:bg-accent">
+                        <div className='flex-1 flex items-center gap-3 cursor-pointer' onClick={() => handleResultClick(result)}>
+                            <Avatar>
+                                <AvatarImage src={item.logo} alt={item.name} />
+                                <AvatarFallback>{item.name.substring(0, 2)}</AvatarFallback>
+                            </Avatar>
+                            <span className="font-semibold">{item.name}</span>
+                            <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">{result.type === 'team' ? 'فريق' : 'بطولة'}</span>
+                        </div>
+                        <div className='flex items-center'>
+                            <Button variant="ghost" size="icon" onClick={() => handleFavorite(result.type, item)}>
+                                <Star className={cn("h-5 w-5", isFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
+                            </Button>
+                            {isAdmin && (
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenRename(result.type, item.id, item.name)}>
+                                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                            )}
+                        </div>
+                        </li>
+                    )
+                })}
+                </ul>
+            )}
+            {!loading && results.length === 0 && debouncedSearchTerm.length > 2 && (
+                <p className="text-muted-foreground text-center pt-8">لا توجد نتائج بحث.</p>
+            )}
+        </div>
+        {renameItem && (
+          <RenameDialog 
+            isOpen={isRenameOpen}
+            onOpenChange={setRenameOpen}
+            currentName={renameItem.name}
+            onSave={handleSaveRename}
+            itemType={renameItem.type === 'team' ? 'الفريق' : 'البطولة'}
+          />
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
