@@ -128,7 +128,7 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg bg-card border p-3 text-sm transition-colors hover:bg-accent/50 cursor-pointer"
+        className="rounded-lg bg-card border p-3 text-sm transition-all duration-300 hover:bg-accent/50 cursor-pointer"
         onClick={() => onSelect(fixture.fixture.id, fixture)}
       >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
@@ -147,7 +147,10 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
          </div>
          <div className="flex items-center justify-between gap-2">
              <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                 <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+                  <div className="text-right truncate">
+                    <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+                    {homeOdd && <p className="text-xs text-muted-foreground font-mono">{homeOdd}</p>}
+                  </div>
                  <Avatar className="h-8 w-8">
                      <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
                      <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
@@ -160,31 +163,19 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
                  {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
                    : format(new Date(fixture.fixture.date), "HH:mm")}
+                   {drawOdd && <p className="text-xs text-muted-foreground font-mono">{drawOdd}</p>}
              </div>
              <div className="flex items-center gap-2 flex-1 truncate">
                   <Avatar className="h-8 w-8">
                      <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
                      <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
                   </Avatar>
-                 <span className="font-semibold truncate">{fixture.teams.away.name}</span>
+                 <div className="text-left truncate">
+                    <span className="font-semibold truncate">{fixture.teams.away.name}</span>
+                    {awayOdd && <p className="text-xs text-muted-foreground font-mono">{awayOdd}</p>}
+                 </div>
              </div>
          </div>
-         {odds && (
-            <div className="flex justify-between items-center text-center mt-3 pt-3 border-t border-dashed">
-                <div className="flex-1 space-y-1 px-1">
-                    <span className="text-xs text-muted-foreground">1</span>
-                    <p className="font-bold text-sm bg-muted rounded-md p-1">{homeOdd}</p>
-                </div>
-                 <div className="flex-1 space-y-1 px-1">
-                    <span className="text-xs text-muted-foreground">X</span>
-                    <p className="font-bold text-sm bg-muted rounded-md p-1">{drawOdd}</p>
-                </div>
-                <div className="flex-1 space-y-1 px-1">
-                    <span className="text-xs text-muted-foreground">2</span>
-                    <p className="font-bold text-sm bg-muted rounded-md p-1">{awayOdd}</p>
-                </div>
-            </div>
-         )}
       </div>
     );
 });
@@ -458,13 +449,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
   const screenHeaderActions = (
     <div className='flex items-center gap-2'>
-        <div className="flex items-center space-x-2">
-            <Switch
-                id="live-mode"
-                checked={showLiveOnly}
-                onCheckedChange={setShowLiveOnly}
-            />
-        </div>
+        <Switch
+            id="live-mode"
+            checked={showLiveOnly}
+            onCheckedChange={setShowLiveOnly}
+        />
         <Button
             variant={showOdds ? "default" : "secondary"}
             className="h-7 px-2 text-xs"
