@@ -287,13 +287,14 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                         ref={isSelected ? selectedButtonRef : null}
                         className={cn(
                             "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-md transition-colors",
-                            isSelected ? "text-primary" : "text-foreground/80 hover:text-primary"
+                            "text-foreground/80 hover:text-primary",
+                            isSelected && "text-primary data-[state=active]:ring-2 data-[state=active]:ring-primary"
                         )}
                         onClick={() => onDateSelect(dateKey)}
+                        data-state={isSelected ? 'active' : 'inactive'}
                     >
                         <span className="text-xs font-normal">{getDayLabel(date)}</span>
                         <span className="font-bold text-sm">{format(date, 'd')}</span>
-                         {isSelected && <div className="absolute inset-0 rounded-md ring-2 ring-primary"></div>}
                     </button>
                 )
             })}
@@ -351,10 +352,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
       <div className="flex flex-1 flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
           
-          <div className="border-b bg-card pt-2">
-             <TabsList className="grid w-full grid-cols-2 rounded-none h-auto p-0">
-                <TabsTrigger value="my-results" className='rounded-none'>نتائجي</TabsTrigger>
-                <TabsTrigger value="all-matches" className='rounded-none'>كل المباريات</TabsTrigger>
+          <div className="border-b bg-card">
+             <TabsList className="grid w-full grid-cols-2 h-auto p-0">
+                <TabsTrigger value="my-results">نتائجي</TabsTrigger>
+                <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
             </TabsList>
             <div className="py-2">
                <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
