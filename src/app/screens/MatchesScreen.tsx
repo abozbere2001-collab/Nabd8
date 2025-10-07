@@ -448,10 +448,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
   const screenHeaderActions = (
     <div className='flex items-center gap-2'>
-        <Button variant={showLiveOnly ? 'default' : 'outline'} size="sm" className="h-8 px-2" onClick={() => setShowLiveOnly(!showLiveOnly)}>
+        <Button variant={showLiveOnly ? 'default' : 'outline'} className="h-8 px-2 text-xs" onClick={() => setShowLiveOnly(!showLiveOnly)}>
             مباشر
         </Button>
-       <Button variant={showOdds ? 'default' : 'outline'} size="sm" className="h-8 px-2" onClick={toggleShowOdds} disabled={loadingOdds}>
+       <Button variant={showOdds ? 'default' : 'outline'} className="h-8 px-2 text-xs" onClick={toggleShowOdds} disabled={loadingOdds}>
             {loadingOdds ? <Loader2 className="h-4 w-4 animate-spin" /> : '1X2'}
         </Button>
         {baseHeaderActions}
@@ -462,35 +462,30 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={screenHeaderActions} />
       <div className="flex flex-1 flex-col min-h-0">
-        <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
-          
-          <div className="border-b bg-card">
-             <div className="flex flex-col">
-               <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
+        <div className="flex flex-col border-b bg-card">
+            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
                   <TabsTrigger value="my-results">نتائجي</TabsTrigger>
                   <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
               </TabsList>
-            
-              <div className="py-2">
-                 <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
-              </div>
-             </div>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <FixturesList 
-                fixtures={fixtures}
-                loading={loading || loadingOdds}
-                activeTab={activeTab}
-                showLiveOnly={showLiveOnly} 
-                favoritedLeagueIds={favoritedLeagueIds}
-                favoritedTeamIds={favoritedTeamIds}
-                hasAnyFavorites={hasAnyFavorites}
-                odds={odds}
-                onSelectFixture={handleSelectFixture}
-            />
-          </div>
-        </Tabs>
+            </Tabs>
+            <div className="py-2">
+                <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
+            </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <FixturesList 
+            fixtures={fixtures}
+            loading={loading || loadingOdds}
+            activeTab={activeTab}
+            showLiveOnly={showLiveOnly} 
+            favoritedLeagueIds={favoritedLeagueIds}
+            favoritedTeamIds={favoritedTeamIds}
+            hasAnyFavorites={hasAnyFavorites}
+            odds={odds}
+            onSelectFixture={handleSelectFixture}
+        />
+        </div>
       </div>
     </div>
   );
