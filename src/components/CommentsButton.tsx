@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, MessageSquarePlus, Loader2 } from 'lucide-react';
 import { useAdmin, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { ScreenProps } from '@/app/page';
 import type { MatchDetails } from '@/lib/types';
 
@@ -22,20 +22,24 @@ export function CommentsButton({ matchId, navigate }: CommentsButtonProps) {
   const [activating, setActivating] = useState(false);
 
   useEffect(() => {
-    const matchDocRef = doc(db, 'matches', String(matchId));
-    const unsubscribe = onSnapshot(matchDocRef, (doc) => {
-      if (doc.exists()) {
-        setMatchDetails(doc.data() as MatchDetails);
-      } else {
-        setMatchDetails(null);
+    const fetchMatchDetails = async () => {
+      setLoading(true);
+      try {
+        const matchDocRef = doc(db, 'matches', String(matchId));
+        const docSnap = await getDoc(matchDocRef);
+        if (docSnap.exists()) {
+          setMatchDetails(docSnap.data() as MatchDetails);
+        } else {
+          setMatchDetails(null);
+        }
+      } catch (error) {
+        console.error("Error fetching match details:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching match details:", error);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    };
+    
+    fetchMatchDetails();
   }, [matchId, db]);
 
   const handleActivateComments = async () => {
@@ -43,6 +47,7 @@ export function CommentsButton({ matchId, navigate }: CommentsButtonProps) {
     try {
       const matchDocRef = doc(db, 'matches', String(matchId));
       await setDoc(matchDocRef, { commentsEnabled: true }, { merge: true });
+      setMatchDetails({ commentsEnabled: true }); // Optimistically update state
     } catch (error) {
       console.error("Error activating comments:", error);
       // Optionally show a toast notification for the error
