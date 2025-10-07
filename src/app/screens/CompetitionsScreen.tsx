@@ -114,23 +114,27 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
   }, [user, db]);
 
   const fetchAllCustomNames = useCallback(async () => {
-      const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
-          getDocs(collection(db, 'leagueCustomizations')),
-          getDocs(collection(db, 'countryCustomizations')),
-          getDocs(collection(db, 'continentCustomizations'))
-      ]);
-      
-      const leagueNames = new Map<number, string>();
-      leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
-      setCustomLeagueNames(leagueNames);
+      try {
+        const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
+            getDocs(collection(db, 'leagueCustomizations')),
+            getDocs(collection(db, 'countryCustomizations')),
+            getDocs(collection(db, 'continentCustomizations'))
+        ]);
+        
+        const leagueNames = new Map<number, string>();
+        leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+        setCustomLeagueNames(leagueNames);
 
-      const countryNames = new Map<string, string>();
-      countriesSnapshot.forEach(doc => countryNames.set(doc.id, doc.data().customName));
-      setCustomCountryNames(countryNames);
+        const countryNames = new Map<string, string>();
+        countriesSnapshot.forEach(doc => countryNames.set(doc.id, doc.data().customName));
+        setCustomCountryNames(countryNames);
 
-      const continentNames = new Map<string, string>();
-      continentsSnapshot.forEach(doc => continentNames.set(doc.id, doc.data().customName));
-      setCustomContinentNames(continentNames);
+        const continentNames = new Map<string, string>();
+        continentsSnapshot.forEach(doc => continentNames.set(doc.id, doc.data().customName));
+        setCustomContinentNames(continentNames);
+      } catch (error) {
+          console.error("Failed to fetch custom names:", error);
+      }
   }, [db]);
 
   const toggleLeagueFavorite = async (comp: Competition) => {

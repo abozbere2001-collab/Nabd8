@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Star, Pencil, Shirt, Users, Trophy, BarChart2, Heart } from 'lucide-react';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, deleteField, getDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -153,18 +153,30 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [displayTitle, setDisplayTitle] = useState(teamInfo?.team.name || "الفريق");
 
-  useEffect(() => {
+  const fetchCustomTeamName = React.useCallback(async () => {
     if (teamId) {
-        const unsub = onSnapshot(doc(db, "teamCustomizations", String(teamId)), (doc) => {
-            if (doc.exists()) {
-                setDisplayTitle(doc.data().customName);
+        try {
+            const docRef = doc(db, "teamCustomizations", String(teamId));
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                setDisplayTitle(docSnap.data().customName);
             } else if (teamInfo?.team.name) {
                 setDisplayTitle(teamInfo.team.name);
             }
-        });
-        return () => unsub();
+        } catch (error) {
+            console.error("Error fetching custom team name:", error);
+             if (teamInfo?.team.name) {
+                setDisplayTitle(teamInfo.team.name);
+            }
+        }
     }
-  }, [teamId, teamInfo, db]);
+  }, [db, teamId, teamInfo?.team.name]);
+
+
+  useEffect(() => {
+    fetchCustomTeamName();
+  }, [fetchCustomTeamName]);
+
 
   useEffect(() => {
     if (!user) return;
@@ -184,6 +196,9 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     const { id, type } = renameItem;
     const collectionName = type === 'player' ? 'playerCustomizations' : 'teamCustomizations';
     await setDoc(doc(db, collectionName, String(id)), { customName: newName });
+    if(type === 'team') {
+        fetchCustomTeamName();
+    }
   };
 
   const handleFavorite = async (type: 'team' | 'player', item: any) => {
@@ -395,4 +410,5 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
 }
 
     
+
 
