@@ -139,13 +139,14 @@ function AppContent({ user }: { user: User | null }) {
         {renderedStack.map((item, index) => {
           const isTop = index === stack.length - 1;
           const isAnimating = isAnimatingOut === item.key;
+          const isMainTab = mainTabs.includes(item.screen);
           
           return (
             <div
               key={item.key}
               className={cn(
                 "absolute inset-0 bg-background transition-transform duration-300 ease-out flex flex-col",
-                stack.length > 1 && index > 0 && isTop && !isAnimating ? 'animate-slide-in-from-right' : '',
+                stack.length > 1 && index === stack.length -1 && !isMainTab && !isAnimating ? 'animate-slide-in-from-right' : '',
                 isAnimating ? 'animate-slide-out-to-right' : '',
                 !isTop ? 'pointer-events-none' : ''
               )}
