@@ -49,7 +49,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack, headerActions }: S
 
   const settingsItems = [
     { label: 'اللغة', icon: Languages, detail: 'العربية', action: () => {} },
-    { label: 'الإشعارات', icon: Bell, detail: 'مفعلة', action: () => {} },
+    { label: 'الإشعارات', icon: Bell, detail: '', action: () => navigate('Notifications') },
   ]
 
 

@@ -20,7 +20,6 @@ import { FirebaseProvider } from '@/firebase/provider';
 import { ProfileButton } from '@/components/ProfileButton';
 import { SearchSheet } from '@/components/SearchSheet';
 import { onAuthStateChange } from '@/lib/firebase-client';
-import { NotificationsButton } from '@/components/NotificationsButton';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications';
 export type ScreenProps = {
@@ -114,7 +113,6 @@ function AppContent() {
   };
   const headerActions = (
     <>
-      <NotificationsButton navigate={navigate} />
       <ProfileButton navigate={navigate} />
     </>
   );
