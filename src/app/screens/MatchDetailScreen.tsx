@@ -6,10 +6,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Share2, Star, Clock, User, ArrowLeftRight, RectangleVertical, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Share2, Star, Clock, User, ArrowLeftRight, RectangleVertical, ShieldAlert, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import Image from 'next/image';
+import { useAdmin, useFirebase } from '@/firebase/provider';
+import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { db } from '@/lib/firebase-client';
+import { RenameDialog } from '@/components/RenameDialog';
 
 // --- TYPE DEFINITIONS ---
 interface Fixture {
@@ -26,8 +29,16 @@ interface Fixture {
   goals: { home: number | null; away: number | null; };
 }
 
+interface LineupPlayerInfo { 
+    id: number; 
+    name: string; 
+    number: number; 
+    pos: string; 
+    grid: string | null; 
+    photo: string; 
+}
 interface LineupPlayer {
-    player: { id: number; name: string; number: number; pos: string; grid: string | null; photo: string; };
+    player: LineupPlayerInfo;
 }
 interface Lineup {
   team: { id: number; name: string; logo: string; };
@@ -68,6 +79,14 @@ interface Standing {
   description: string | null;
   all: { played: number; win: number; draw: number; lose: number; goals: { for: number; against: number; }; };
 }
+
+interface Favorites {
+    leagues?: { [key: number]: any };
+    teams?: { [key: number]: any };
+    players?: { [key: number]: any };
+}
+
+type RenameType = 'team' | 'player' | 'coach';
 
 type EventFilter = "all" | "highlights";
 
@@ -120,7 +139,7 @@ function useMatchData(fixtureId?: number, leagueId?: number) {
 }
 
 // --- SUB-COMPONENTS ---
-const MatchHeader = ({ fixture, onBack, headerActions }: { fixture: Fixture; onBack: () => void, headerActions?: React.ReactNode }) => (
+const MatchHeader = ({ fixture, onBack, headerActions, navigate }: { fixture: Fixture; onBack: () => void, headerActions?: React.ReactNode, navigate: ScreenProps['navigate'] }) => (
   <header className="relative bg-card text-foreground pt-10 pb-6 px-4 shadow-lg border-b">
     <div className="absolute top-4 right-4">
       <Button variant="ghost" size="icon" onClick={onBack} className="text-foreground/80 hover:bg-accent">
@@ -130,11 +149,11 @@ const MatchHeader = ({ fixture, onBack, headerActions }: { fixture: Fixture; onB
     <div className="absolute top-2 left-2 flex gap-1">
        {headerActions}
     </div>
-    <div className="text-center text-sm text-muted-foreground mb-4">
+    <div className="text-center text-sm text-muted-foreground mb-4 cursor-pointer" onClick={() => navigate('CompetitionDetails', { leagueId: fixture.league.id, title: fixture.league.name, logo: fixture.league.logo })}>
         {fixture.league.name} - {fixture.league.round}
     </div>
     <div className="flex justify-around items-center">
-      <div className="flex flex-col items-center gap-2 w-1/3 text-center">
+      <div className="flex flex-col items-center gap-2 w-1/3 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
         <Avatar className="w-16 h-16 border-2 border-border">
           <AvatarImage src={fixture.teams.home.logo} />
           <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
@@ -147,7 +166,7 @@ const MatchHeader = ({ fixture, onBack, headerActions }: { fixture: Fixture; onB
         </div>
         <div className="text-xs text-muted-foreground mt-1">{fixture.fixture.status.long}</div>
       </div>
-      <div className="flex flex-col items-center gap-2 w-1/3 text-center">
+      <div className="flex flex-col items-center gap-2 w-1/3 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
         <Avatar className="w-16 h-16 border-2 border-border">
           <AvatarImage src={fixture.teams.away.logo} />
           <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
@@ -158,34 +177,33 @@ const MatchHeader = ({ fixture, onBack, headerActions }: { fixture: Fixture; onB
   </header>
 );
 
-const PlayerIcon = ({ player, isHomeTeam }: { player: LineupPlayer, isHomeTeam: boolean }) => {
+const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isAdmin }: { player: LineupPlayer, isHomeTeam: boolean, onRename: () => void, onFavorite: () => void, isFavorited: boolean, isAdmin: boolean }) => {
     if (!player.player.grid) return null;
 
     const [row, col] = player.player.grid.split(':').map(Number);
     
-    // Default alignment
-    let top = '50%';
-    let left = '50%';
+    let top, left;
 
-    // Normalize grid positions.
-    const xPos = (col / 5) * 100;
-    const yPos = (row / 11) * 100;
+    // Normalize grid positions to a 0-100 scale, with some padding
+    const padding = 5; // 5% padding from edges
+    const fieldHeight = 100 - (2 * padding);
+    const fieldWidth = 100 - (2 * padding);
     
-    top = `${yPos}%`;
-    left = `${xPos}%`;
+    top = padding + ( (row - 1) / 10 ) * fieldHeight;
+    left = padding + ( (col - 1) / 4 ) * fieldWidth;
     
     if (!isHomeTeam) {
-       top = `${100 - yPos}%`;
-       left = `${100 - xPos}%`;
+       top = 100 - top;
+       left = 100 - left;
     }
 
 
     return (
         <div 
-          className="absolute text-center flex flex-col items-center transition-all duration-300" 
+          className="absolute text-center flex flex-col items-center transition-all duration-300 group/player" 
           style={{ 
-            top: top, 
-            left: left,
+            top: `${top}%`, 
+            left: `${left}%`,
             width: '60px',
             transform: 'translate(-50%, -50%)',
           }}
@@ -201,6 +219,14 @@ const PlayerIcon = ({ player, isHomeTeam }: { player: LineupPlayer, isHomeTeam: 
                   )}>
                     {player.player.number}
                 </span>
+                <div className='absolute -bottom-1 -left-1 opacity-0 group-hover/player:opacity-100 transition-opacity'>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {e.stopPropagation(); onFavorite(); }}>
+                        <Star className={cn("h-4 w-4", isFavorited ? "text-yellow-400 fill-current" : "text-white")} />
+                    </Button>
+                    {isAdmin && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename(); }}>
+                        <Pencil className="h-4 w-4 text-white" />
+                    </Button>}
+                </div>
             </div>
             <span className="text-[10px] font-semibold bg-black/50 text-white rounded-sm px-1 py-0.5 mt-1 whitespace-nowrap shadow-lg truncate w-full">
                 {player.player.name}
@@ -210,7 +236,7 @@ const PlayerIcon = ({ player, isHomeTeam }: { player: LineupPlayer, isHomeTeam: 
 };
 
 
-const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, loading: boolean, fixture: Fixture }) => {
+const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite, isAdmin }: { lineups: Lineup[] | null, loading: boolean, fixture: Fixture, favorites: Favorites, onRename: (type: RenameType, id: number, name: string) => void, onFavorite: (type: 'player' | 'coach', item: any) => void, isAdmin: boolean }) => {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(fixture.teams.home.id);
 
   if (loading) {
@@ -230,6 +256,26 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
       return <p className="text-center text-muted-foreground p-8">تشكيلة الفريق المحدد غير متاحة.</p>;
   }
   
+  const renderPlayerRow = (playerInfo: LineupPlayerInfo) => {
+    return (
+         <div key={playerInfo.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted group/sub">
+            <span className="text-muted-foreground w-6 text-center font-mono">{playerInfo.number}</span>
+            <Avatar className="w-6 h-6">
+                <AvatarImage src={playerInfo.photo} />
+                <AvatarFallback>{playerInfo.name.substring(0,1)}</AvatarFallback>
+            </Avatar>
+            <span className="font-medium truncate flex-1">{playerInfo.name}</span>
+            <div className='flex opacity-0 group-hover/sub:opacity-100 transition-opacity'>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onFavorite('player', playerInfo)}>
+                    <Star className={cn("h-4 w-4", favorites?.players?.[playerInfo.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
+                </Button>
+                {isAdmin && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRename('player', playerInfo.id, playerInfo.name)}>
+                    <Pencil className="h-4 w-4 text-muted-foreground/60" />
+                </Button>}
+            </div>
+        </div>
+    );
+  }
 
   return (
     <div className="p-4 space-y-6">
@@ -265,7 +311,15 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
             }}
         >
           {lineupToShow?.startXI.map(p => (
-              <PlayerIcon key={p.player.id} player={p} isHomeTeam={lineupToShow.team.id === fixture.teams.home.id} />
+              <PlayerIcon 
+                key={p.player.id} 
+                player={p} 
+                isHomeTeam={lineupToShow.team.id === fixture.teams.home.id}
+                onRename={() => onRename('player', p.player.id, p.player.name)}
+                onFavorite={() => onFavorite('player', p.player)}
+                isFavorited={!!favorites?.players?.[p.player.id]}
+                isAdmin={isAdmin}
+              />
           ))}
           <div className="absolute bottom-2 right-2 bg-black/50 text-white text-sm font-bold px-2 py-1 rounded">
              {lineupToShow?.formation}
@@ -276,14 +330,20 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
       <div className="p-2 rounded-lg bg-card border">
         <h4 className="font-bold mb-2 text-base px-2">طاقم التدريب</h4>
         <div className="space-y-2">
-            <div className="flex items-center gap-3 p-2 rounded-md">
+            <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted group/coach">
                 <Avatar className="w-10 h-10">
                 <AvatarImage src={lineupToShow.coach.photo} alt={lineupToShow.coach.name} />
                 <AvatarFallback>{lineupToShow.coach.name.substring(0,1)}</AvatarFallback>
                 </Avatar>
-                <div>
+                <div className='flex-1'>
                     <p className="font-medium">{lineupToShow.coach.name}</p>
                     <p className="text-xs text-muted-foreground">المدرب</p>
+                </div>
+                 <div className='flex opacity-0 group-hover/coach:opacity-100 transition-opacity'>
+                    {/* Favorite for coach can be added if needed */}
+                    {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onRename('coach', lineupToShow.coach.id, lineupToShow.coach.name)}>
+                        <Pencil className="h-4 w-4 text-muted-foreground/60" />
+                    </Button>}
                 </div>
             </div>
         </div>
@@ -292,16 +352,7 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
       <div className="p-2 rounded-lg bg-card border">
          <h4 className="font-bold mb-2 text-base px-2">البدلاء</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            {lineupToShow.substitutes.map(s => (
-            <div key={s.player.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted">
-                <span className="text-muted-foreground w-6 text-center font-mono">{s.player.number}</span>
-                <Avatar className="w-6 h-6">
-                    <AvatarImage src={s.player.photo} />
-                    <AvatarFallback>{s.player.name.substring(0,1)}</AvatarFallback>
-                </Avatar>
-                <span className="font-medium truncate">{s.player.name}</span>
-            </div>
-            ))}
+            {lineupToShow.substitutes.map(s => renderPlayerRow(s.player))}
         </div>
       </div>
     </div>
@@ -362,7 +413,7 @@ const StatsTab = ({ stats, loading, fixture }: { stats: MatchStats[] | null, loa
     );
 };
 
-const StandingsTab = ({ standings, loading, fixture }: { standings: Standing[][] | null, loading: boolean, fixture: Fixture }) => {
+const StandingsTab = ({ standings, loading, fixture, navigate }: { standings: Standing[][] | null, loading: boolean, fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
     if (loading) return <Skeleton className="w-full h-96 m-4" />;
     if (!standings || standings.length === 0) return <p className="text-center p-8">الترتيب غير متاح.</p>;
 
@@ -384,7 +435,7 @@ const StandingsTab = ({ standings, loading, fixture }: { standings: Standing[][]
                         </TableHeader>
                         <TableBody>
                             {group.map((s) => (
-                                <TableRow key={s.team.id} className={s.team.id === fixture.teams.home.id || s.team.id === fixture.teams.away.id ? 'bg-primary/10' : ''}>
+                                <TableRow key={s.team.id} className={cn('cursor-pointer', s.team.id === fixture.teams.home.id || s.team.id === fixture.teams.away.id ? 'bg-primary/10' : '')} onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
                                     <TableCell className="font-medium">
                                         <div className="flex items-center gap-2">
                                             <span>{s.rank}</span>
@@ -431,7 +482,6 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
     const getEventIcon = (event: Event) => {
         switch (event.type) {
             case 'Goal':
-                 // Placeholder for a soccer ball icon, using User for now.
                  return <User className="text-green-500" size={14} />;
             case 'Card':
                 if (event.detail === 'Yellow Card') return <RectangleVertical className="text-yellow-400 fill-yellow-400" size={14} />;
@@ -485,13 +535,61 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
 
 
 // --- MAIN SCREEN COMPONENT ---
-export function MatchDetailScreen({ goBack, fixtureId, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: Fixture, headerActions?: React.ReactNode }) {
+export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: Fixture, headerActions?: React.ReactNode }) {
   const { lineups, events, stats, standings, loading } = useMatchData(fixtureId, fixture.league.id);
+  const { isAdmin, user } = useAdmin();
+  const [favorites, setFavorites] = useState<Favorites>({});
+  const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, type: RenameType } | null>(null);
+  const [isRenameOpen, setRenameOpen] = useState(false);
   const [eventFilter, setEventFilter] = useState<EventFilter>("highlights");
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
+        setFavorites(doc.data() as Favorites || {});
+    });
+    return () => unsub();
+  }, [user]);
+
+  const handleOpenRename = (type: RenameType, id: number, name: string) => {
+    setRenameItem({ id, name, type });
+    setRenameOpen(true);
+  };
+  
+  const handleFavorite = async (type: 'player' | 'coach', item: any) => {
+    if (!user) return;
+    const favRef = doc(db, 'favorites', user.uid);
+    
+    let fieldPath = `players.${item.id}`; // Assuming coaches are also identified by an id in a 'players' or similar map
+    let isFavorited = !!favorites?.players?.[item.id];
+    let favoriteData = { players: { [item.id]: { playerId: item.id, name: item.name, photo: item.photo }}};
+    
+    if (isFavorited) {
+        await updateDoc(favRef, { [fieldPath]: deleteField() });
+    } else {
+        await setDoc(favRef, favoriteData, { merge: true });
+    }
+  };
+
+  const handleSaveRename = async (newName: string) => {
+    if (!renameItem) return;
+    const { id, type } = renameItem;
+    let collectionName = type === 'player' ? 'playerCustomizations' : 'coachCustomizations';
+    await setDoc(doc(db, collectionName, String(id)), { customName: newName });
+    // TODO: Need a way to refresh the view with the new name
+  };
+
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <MatchHeader fixture={fixture} onBack={goBack} headerActions={headerActions} />
+      <MatchHeader fixture={fixture} onBack={goBack} headerActions={headerActions} navigate={navigate} />
+      {renameItem && <RenameDialog 
+          isOpen={isRenameOpen}
+          onOpenChange={setRenameOpen}
+          currentName={renameItem.name}
+          onSave={handleSaveRename}
+          itemType="العنصر"
+        />}
       <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="lineups" className="w-full">
           <div className="p-4 pb-0 sticky top-0 bg-background z-10 border-b">
@@ -519,13 +617,13 @@ export function MatchDetailScreen({ goBack, fixtureId, fixture, headerActions }:
             </Tabs>
           </TabsContent>
           <TabsContent value="lineups">
-            <LineupsTab lineups={lineups} loading={loading} fixture={fixture} />
+            <LineupsTab lineups={lineups} loading={loading} fixture={fixture} favorites={favorites} onRename={handleOpenRename} onFavorite={handleFavorite} isAdmin={isAdmin} />
           </TabsContent>
           <TabsContent value="stats">
             <StatsTab stats={stats} loading={loading} fixture={fixture} />
           </TabsContent>
           <TabsContent value="standings">
-            <StandingsTab standings={standings} loading={loading} fixture={fixture} />
+            <StandingsTab standings={standings} loading={loading} fixture={fixture} navigate={navigate} />
           </TabsContent>
         </Tabs>
       </div>

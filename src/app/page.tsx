@@ -10,6 +10,7 @@ import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { MatchDetailScreen } from './screens/MatchDetailScreen';
+import { TeamDetailScreen } from './screens/TeamDetailScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
@@ -18,7 +19,7 @@ import { ProfileButton } from '@/components/ProfileButton';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 
-export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails';
+export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails';
 export type ScreenProps = {
   navigate: (screen: ScreenKey, props?: Record<string, any>) => void;
   goBack: () => void;
@@ -35,6 +36,7 @@ const screens: Record<ScreenKey, React.ComponentType<any>> = {
   Settings: SettingsScreen,
   CompetitionDetails: CompetitionDetailScreen,
   MatchDetails: MatchDetailScreen,
+  TeamDetails: TeamDetailScreen,
 };
 
 const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];

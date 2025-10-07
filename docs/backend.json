@@ -24,36 +24,55 @@
     },
     "UserFavorites": {
         "title": "User Favorites",
-        "description": "Represents a user's favorite leagues and teams.",
+        "description": "Represents a user's favorite leagues, teams, and players.",
         "type": "object",
         "properties": {
             "leagues": {
                 "type": "object",
                 "description": "A map of favorite league IDs to league data.",
-                "additionalProperties": {
-                    "type": "object",
-                    "properties": {
-                        "leagueId": { "type": "number" },
-                        "name": { "type": "string" },
-                        "logo": { "type": "string", "format": "uri" }
-                    },
-                    "required": ["leagueId", "name", "logo"]
-                }
+                "additionalProperties": { "$ref": "#/entities/LeagueFavorite" }
             },
             "teams": {
                 "type": "object",
                 "description": "A map of favorite team IDs to team data.",
-                "additionalProperties": {
-                    "type": "object",
-                    "properties": {
-                        "teamId": { "type": "number" },
-                        "name": { "type": "string" },
-                        "logo": { "type": "string", "format": "uri" }
-                    },
-                    "required": ["teamId", "name", "logo"]
-                }
+                "additionalProperties": { "$ref": "#/entities/TeamFavorite" }
+            },
+            "players": {
+                "type": "object",
+                "description": "A map of favorite player IDs to player data.",
+                "additionalProperties": { "$ref": "#/entities/PlayerFavorite" }
             }
         }
+    },
+    "LeagueFavorite": {
+      "title": "League Favorite",
+      "type": "object",
+      "properties": {
+        "leagueId": { "type": "number" },
+        "name": { "type": "string" },
+        "logo": { "type": "string", "format": "uri" }
+      },
+      "required": ["leagueId", "name", "logo"]
+    },
+    "TeamFavorite": {
+      "title": "Team Favorite",
+      "type": "object",
+      "properties": {
+        "teamId": { "type": "number" },
+        "name": { "type": "string" },
+        "logo": { "type": "string", "format": "uri" }
+      },
+      "required": ["teamId", "name", "logo"]
+    },
+     "PlayerFavorite": {
+      "title": "Player Favorite",
+      "type": "object",
+      "properties": {
+        "playerId": { "type": "number" },
+        "name": { "type": "string" },
+        "photo": { "type": "string", "format": "uri" }
+      },
+      "required": ["playerId", "name", "photo"]
     },
     "LeagueCustomization": {
         "title": "League Customization",
@@ -90,6 +109,27 @@
             }
         },
         "required": ["customName"]
+    },
+    "TeamCustomization": {
+      "title": "Team Customization",
+      "description": "Stores user-defined names for teams.",
+      "type": "object",
+      "properties": { "customName": { "type": "string" } },
+      "required": ["customName"]
+    },
+    "PlayerCustomization": {
+      "title": "Player Customization",
+      "description": "Stores user-defined names for players.",
+      "type": "object",
+      "properties": { "customName": { "type": "string" } },
+      "required": ["customName"]
+    },
+    "CoachCustomization": {
+      "title": "Coach Customization",
+      "description": "Stores user-defined names for coaches.",
+      "type": "object",
+      "properties": { "customName": { "type": "string" } },
+      "required": ["customName"]
     }
   },
   "auth": {
@@ -97,34 +137,36 @@
   },
   "firestore": {
     "/users/{userId}": {
-      "schema": {
-        "$ref": "#/entities/UserProfile"
-      },
+      "schema": { "$ref": "#/entities/UserProfile" },
       "description": "Stores public profile information for each user."
     },
     "/favorites/{userId}": {
-      "schema": {
-        "$ref": "#/entities/UserFavorites"
-      },
-      "description": "A single document containing all favorites (leagues and teams) for a user."
+      "schema": { "$ref": "#/entities/UserFavorites" },
+      "description": "A single document containing all favorites for a user."
     },
     "/leagueCustomizations/{leagueId}": {
-        "schema": {
-            "$ref": "#/entities/LeagueCustomization"
-        },
+        "schema": { "$ref": "#/entities/LeagueCustomization" },
         "description": "Stores custom names for leagues, keyed by league ID."
     },
     "/countryCustomizations/{countryName}": {
-        "schema": {
-            "$ref": "#/entities/CountryCustomization"
-        },
+        "schema": { "$ref": "#/entities/CountryCustomization" },
         "description": "Stores custom names for countries, keyed by the English country name."
     },
     "/continentCustomizations/{continentName}": {
-        "schema": {
-            "$ref": "#/entities/ContinentCustomization"
-        },
+        "schema": { "$ref": "#/entities/ContinentCustomization" },
         "description": "Stores custom names for continents, keyed by the English continent name."
+    },
+    "/teamCustomizations/{teamId}": {
+      "schema": { "$ref": "#/entities/TeamCustomization" },
+      "description": "Stores custom names for teams, keyed by team ID."
+    },
+    "/playerCustomizations/{playerId}": {
+      "schema": { "$ref": "#/entities/PlayerCustomization" },
+      "description": "Stores custom names for players, keyed by player ID."
+    },
+    "/coachCustomizations/{coachId}": {
+      "schema": { "$ref": "#/entities/CoachCustomization" },
+      "description": "Stores custom names for coaches, keyed by coach ID."
     }
   }
 }
