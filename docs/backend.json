@@ -237,6 +237,30 @@
             "points": { "type": "number" }
         },
         "required": ["userId", "userName", "points"]
+    },
+    "GlobalPredictionMatch": {
+      "title": "Global Prediction Match",
+      "description": "Represents a single match selected for global predictions.",
+      "type": "object",
+      "properties": {
+        "fixtureId": { "type": "number" },
+        "leagueId": { "type": "number" },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["fixtureId", "leagueId", "date"]
+    },
+    "DailyGlobalPredictions": {
+      "title": "Daily Global Predictions",
+      "description": "A document containing the list of globally selected matches for a specific day.",
+      "type": "object",
+      "properties": {
+        "selectedByAdmin": { "type": "boolean" },
+        "selectedMatches": {
+          "type": "array",
+          "items": { "$ref": "#/entities/GlobalPredictionMatch" }
+        }
+      },
+      "required": ["selectedByAdmin", "selectedMatches"]
     }
   },
   "auth": {
@@ -302,6 +326,12 @@
     "/leaderboard/{userId}": {
       "schema": { "$ref": "#/entities/LeaderboardEntry" },
       "description": "Stores user scores for the prediction leaderboard."
+    },
+    "/dailyGlobalPredictions/{date}": {
+        "schema": { "$ref": "#/entities/DailyGlobalPredictions" },
+        "description": "Stores the list of globally-predictable matches for a given day (date format YYYY-MM-DD)."
     }
   }
 }
+
+    

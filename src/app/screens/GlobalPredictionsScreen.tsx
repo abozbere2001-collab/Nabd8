@@ -11,11 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
-import type { Fixture, UserScore } from '@/lib/types';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import type { Fixture, UserScore, Prediction, DailyGlobalPredictions } from '@/lib/types';
+import { collection, query, orderBy, onSnapshot, doc, getDoc, where, setDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
@@ -35,37 +35,151 @@ const AdminMatchSelector = () => {
     )
 }
 
+const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture, userPrediction?: Prediction, onSave: (home: string, away: string) => void }) => {
+    const isPredictionDisabled = isPast(new Date(fixture.fixture.date));
+
+    return (
+        <Card className="p-4">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 flex-1">
+                    <Avatar><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                    <span className="font-semibold">{fixture.teams.home.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Input 
+                        type="number" 
+                        className="w-14 h-8 text-center" 
+                        min="0" 
+                        defaultValue={userPrediction?.homeGoals}
+                        onChange={(e) => onSave(e.target.value, (document.getElementById(`away-${fixture.fixture.id}`) as HTMLInputElement)?.value || '')}
+                        id={`home-${fixture.fixture.id}`}
+                        disabled={isPredictionDisabled}
+                    />
+                    <span>-</span>
+                    <Input 
+                        type="number" 
+                        className="w-14 h-8 text-center" 
+                        min="0"
+                        defaultValue={userPrediction?.awayGoals}
+                        onChange={(e) => onSave((document.getElementById(`home-${fixture.fixture.id}`) as HTMLInputElement)?.value || '', e.target.value)}
+                        id={`away-${fixture.fixture.id}`}
+                        disabled={isPredictionDisabled}
+                    />
+                </div>
+                <div className="flex items-center gap-2 flex-1 justify-end">
+                    <span className="font-semibold">{fixture.teams.away.name}</span>
+                    <Avatar><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                </div>
+            </div>
+            <div className="text-center text-xs text-muted-foreground mt-2">
+                <span>{fixture.league.name}</span> - <span>{format(new Date(fixture.fixture.date), "EEE, d MMM, HH:mm", { locale: ar })}</span>
+            </div>
+            {userPrediction && !isPredictionDisabled && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
+            {isPredictionDisabled && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
+        </Card>
+    );
+};
+
 
 export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
     const { isAdmin } = useAdmin();
+    const { user } = useAuth();
     const { db } = useFirestore();
     const [loading, setLoading] = useState(true);
     const [selectedMatches, setSelectedMatches] = useState<Fixture[]>([]);
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
+    const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
 
     useEffect(() => {
         setLoading(true);
 
-        // Fetch leaderboard data
         const leaderboardRef = query(collection(db, 'leaderboard'), orderBy('totalPoints', 'desc'));
         const unsubscribeLeaderboard = onSnapshot(leaderboardRef, (snapshot) => {
             const scores: UserScore[] = [];
             snapshot.forEach(doc => scores.push(doc.data() as UserScore));
             setLeaderboard(scores);
-            setLoading(false); // Consider loading finished once leaderboard is fetched
         }, (error) => {
             const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
             errorEmitter.emit('permission-error', permissionError);
-            setLoading(false);
         });
         
-        // In a future stage, we'll fetch the selected matches for the day here.
-        // For now, we leave it empty.
+        const fetchDailyMatches = async () => {
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const dailyDocRef = doc(db, 'dailyGlobalPredictions', today);
+            try {
+                const docSnap = await getDoc(dailyDocRef);
+                if (docSnap.exists()) {
+                    const dailyData = docSnap.data() as DailyGlobalPredictions;
+                    if (dailyData.selectedMatches && dailyData.selectedMatches.length > 0) {
+                        const fixtureIds = dailyData.selectedMatches.map(m => m.fixtureId).join('-');
+                        const res = await fetch(`/api/football/fixtures?ids=${fixtureIds}`);
+                        const data = await res.json();
+                        if (data.response) {
+                             setSelectedMatches(data.response);
+                        }
+                    }
+                }
+            } catch (error) {
+                 const permissionError = new FirestorePermissionError({ path: dailyDocRef.path, operation: 'get' });
+                 errorEmitter.emit('permission-error', permissionError);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDailyMatches();
+        
+        if (user) {
+            const predsRef = collection(db, 'predictions');
+            const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
+            const unsubscribePreds = onSnapshot(userPredsQuery, (snapshot) => {
+                const userPredictions: { [key: number]: Prediction } = {};
+                snapshot.forEach(doc => {
+                    const pred = doc.data() as Prediction;
+                    userPredictions[pred.fixtureId] = pred;
+                });
+                setPredictions(userPredictions);
+            }, (error) => {
+                 const permissionError = new FirestorePermissionError({ path: 'predictions', operation: 'list' });
+                 errorEmitter.emit('permission-error', permissionError);
+            });
+             return () => { 
+                unsubscribeLeaderboard();
+                unsubscribePreds();
+            };
+        }
+
 
         return () => {
             unsubscribeLeaderboard();
         };
-    }, [db]);
+    }, [db, user]);
+
+    const handleSavePrediction = async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
+        if (!user || homeGoalsStr === '' || awayGoalsStr === '') return;
+        const homeGoals = parseInt(homeGoalsStr, 10);
+        const awayGoals = parseInt(awayGoalsStr, 10);
+        if (isNaN(homeGoals) || isNaN(awayGoals)) return;
+
+        const predictionRef = doc(db, 'predictions', `${user.uid}_${fixtureId}`);
+        const predictionData: Prediction = {
+            userId: user.uid,
+            fixtureId,
+            homeGoals,
+            awayGoals,
+            timestamp: new Date().toISOString()
+        };
+        try {
+            await setDoc(predictionRef, predictionData, { merge: true });
+        } catch (error) {
+            const permissionError = new FirestorePermissionError({
+              path: predictionRef.path,
+              operation: 'create',
+              requestResourceData: predictionData
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    };
 
 
     return (
@@ -83,7 +197,14 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                         </div>
                     ) : selectedMatches.length > 0 ? (
                         <div className="space-y-4">
-                            {/* Map through selectedMatches here in a future stage */}
+                           {selectedMatches.map(fixture => (
+                               <PredictionCard 
+                                 key={fixture.fixture.id}
+                                 fixture={fixture}
+                                 userPrediction={predictions[fixture.fixture.id]}
+                                 onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
+                               />
+                           ))}
                         </div>
                     ) : (
                         <Card>
@@ -107,7 +228,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {loading ? (
+                                {loading && leaderboard.length === 0 ? (
                                     Array.from({ length: 5 }).map((_, i) => (
                                         <TableRow key={i}>
                                             <TableCell><Skeleton className="h-4 w-4" /></TableCell>
@@ -146,3 +267,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    
