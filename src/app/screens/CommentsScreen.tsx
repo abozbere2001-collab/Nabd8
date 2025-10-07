@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Send, MoreVertical, Edit, Trash2, CornerDownRight, Heart } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, setDoc, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, setDoc } from 'firebase/firestore';
 import type { MatchComment, Like } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -45,7 +45,7 @@ const CommentInput = ({
     sending,
     onSend,
     initialText = '',
-    parentId = null,
+    isReply = false,
     onCancel,
     autoFocus = false,
 }: {
@@ -53,7 +53,7 @@ const CommentInput = ({
     sending: boolean,
     onSend: (text: string, parentId?: string | null) => Promise<void>,
     initialText?: string,
-    parentId?: string | null,
+    isReply?: boolean,
     onCancel?: () => void,
     autoFocus?: boolean,
 }) => {
@@ -61,13 +61,14 @@ const CommentInput = ({
 
     const handleSend = async () => {
         if (!text.trim()) return;
-        await onSend(text, parentId);
+        // The parentId logic is handled by the main component's onSend function
+        await onSend(text);
         setText('');
     };
 
     return (
-         <div className={cn("flex items-start gap-2", onCancel ? 'mt-2' : 'sticky bottom-0 bg-background border-t p-4')}>
-            {onCancel && (
+         <div className={cn("flex items-start gap-2", isReply ? 'mt-2' : 'sticky bottom-0 bg-background border-t p-4')}>
+            {isReply && (
                 <Avatar className="h-8 w-8">
                     <AvatarImage src={user?.photoURL} />
                     <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
@@ -77,7 +78,7 @@ const CommentInput = ({
                 <Textarea
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder={parentId ? "اكتب ردك..." : "اكتب تعليقك..."}
+                    placeholder={isReply ? "اكتب ردك..." : "اكتب تعليقك..."}
                     className="flex-1 bg-card border-none focus-visible:ring-1 focus-visible:ring-ring"
                     rows={1}
                     autoFocus={autoFocus}
@@ -90,8 +91,8 @@ const CommentInput = ({
                 />
                  <div className="flex justify-end gap-2">
                     {onCancel && <Button variant="ghost" size="sm" onClick={onCancel}>إلغاء</Button>}
-                    <Button onClick={handleSend} disabled={sending || !text.trim()} size={onCancel ? "sm" : "icon"}>
-                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : onCancel ? 'رد' : <Send className="h-4 w-4" />}
+                    <Button onClick={handleSend} disabled={sending || !text.trim()} size={isReply ? "sm" : "icon"}>
+                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : isReply ? 'رد' : <Send className="h-4 w-4" />}
                     </Button>
                 </div>
             </div>
@@ -241,25 +242,36 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   
   const fetchComments = useCallback(async () => {
     setLoading(true);
-    const q = query(commentsColRef, where('parentId', '==', null), orderBy('timestamp', 'asc'));
+    const q = query(commentsColRef, orderBy('timestamp', 'asc'));
     
     const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const topLevelComments: MatchComment[] = [];
+
         const commentPromises = snapshot.docs.map(async (doc) => {
-            const commentData = doc.data() as Omit<MatchComment, 'id' | 'replies' | 'likes'>;
+            const commentData = { id: doc.id, ...doc.data() } as MatchComment;
             
+            // Fetch replies for each top-level comment
             const repliesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies');
             const repliesQuery = query(repliesRef, orderBy('timestamp', 'asc'));
             const repliesSnapshot = await getDocs(repliesQuery);
             const replies = repliesSnapshot.docs.map(replyDoc => ({ id: replyDoc.id, ...replyDoc.data() } as MatchComment));
 
+            // Fetch likes for each top-level comment
             const likesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'likes');
             const likesSnapshot = await getDocs(likesRef);
             const likes = likesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
 
+             // Fetch likes for each reply
+            const repliesWithLikes = await Promise.all(replies.map(async (reply) => {
+                const replyLikesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies', reply.id, 'likes');
+                const replyLikesSnapshot = await getDocs(replyLikesRef);
+                const replyLikes = replyLikesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
+                return { ...reply, likes: replyLikes };
+            }));
+
             return {
-                id: doc.id,
                 ...commentData,
-                replies,
+                replies: repliesWithLikes,
                 likes
             };
         });
@@ -294,11 +306,13 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     }
   }, [comments, editingCommentId, replyingTo]);
 
-  const handleSendComment = async (text: string, parentId?: string | null) => {
+  const handleSendComment = async (text: string) => {
     if (!text.trim() || !user || sending) return;
-
+  
     setSending(true);
     
+    const parentId = replyingTo;
+
     const newCommentData = {
       text: text.trim(),
       userId: user.uid,
@@ -308,7 +322,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
       parentId: parentId || null,
     };
     
-    let collectionRef = parentId 
+    const collectionRef = parentId 
         ? collection(db, 'matches', String(matchId), 'comments', parentId, 'replies')
         : commentsColRef;
 
@@ -377,8 +391,19 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   const handleUpdateComment = async () => {
     if (!editingCommentId || !editingText.trim() || sending) return;
     setSending(true);
-    const commentDocRef = doc(db, 'matches', String(matchId), 'comments', editingCommentId);
     
+    // Determine if it's a top-level comment or a reply
+    let commentDocRef;
+    let parentCommentIdForReply;
+
+    const parentComment = comments.find(c => c.replies.some(r => r.id === editingCommentId));
+    if (parentComment) {
+        parentCommentIdForReply = parentComment.id;
+        commentDocRef = doc(db, 'matches', String(matchId), 'comments', parentComment.id, 'replies', editingCommentId);
+    } else {
+        commentDocRef = doc(db, 'matches', String(matchId), 'comments', editingCommentId);
+    }
+
     const updatedData = { text: editingText.trim() };
     
     updateDoc(commentDocRef, updatedData)
@@ -401,15 +426,32 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   const handleDeleteComment = async (commentId: string) => {
     setIsDeleting(commentId);
     const batch = writeBatch(db);
-    const commentRef = doc(db, 'matches', String(matchId), 'comments', commentId);
 
-    const repliesRef = collection(commentRef, 'replies');
+    let isTopLevel = true;
+    let parentCommentId: string | undefined = undefined;
+
+    const parentComment = comments.find(c => c.replies.some(r => r.id === commentId));
+    if (parentComment) {
+        isTopLevel = false;
+        parentCommentId = parentComment.id;
+    }
+    
+    const commentRef = isTopLevel 
+        ? doc(db, 'matches', String(matchId), 'comments', commentId)
+        : doc(db, 'matches', String(matchId), 'comments', parentCommentId!, 'replies', commentId);
+
     const likesRef = collection(commentRef, 'likes');
+    const repliesRef = collection(commentRef, 'replies'); // Only for top-level
 
-    Promise.all([getDocs(repliesRef), getDocs(likesRef)])
-    .then(([repliesSnapshot, likesSnapshot]) => {
-        repliesSnapshot.forEach(replyDoc => batch.delete(replyDoc.ref));
-        likesSnapshot.forEach(likeDoc => batch.delete(likeDoc.ref));
+    const ops = [];
+    ops.push(getDocs(likesRef).then(snapshot => snapshot.forEach(doc => batch.delete(doc.ref))));
+    
+    if (isTopLevel) {
+        ops.push(getDocs(repliesRef).then(snapshot => snapshot.forEach(doc => batch.delete(doc.ref))));
+    }
+
+    Promise.all(ops)
+    .then(() => {
         batch.delete(commentRef);
         return batch.commit();
     })
@@ -427,11 +469,31 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
 
   const handleLikeComment = async (commentId: string) => {
       if (!user) return;
-      const comment = comments.find(c => c.id === commentId);
-      if (!comment) return;
+      
+      let commentToLike: MatchComment | undefined;
+      let parentCommentId: string | undefined;
 
-      const likeRef = doc(db, 'matches', String(matchId), 'comments', commentId, 'likes', user.uid);
-      const hasLiked = comment.likes?.some(like => like.id === user.uid);
+      // Find the comment (could be top-level or a reply)
+      for (const parent of comments) {
+          if (parent.id === commentId) {
+              commentToLike = parent;
+              break;
+          }
+          const reply = parent.replies.find(r => r.id === commentId);
+          if (reply) {
+              commentToLike = reply;
+              parentCommentId = parent.id;
+              break;
+          }
+      }
+
+      if (!commentToLike) return;
+
+      const likeRef = parentCommentId
+        ? doc(db, 'matches', String(matchId), 'comments', parentCommentId, 'replies', commentId, 'likes', user.uid)
+        : doc(db, 'matches', String(matchId), 'comments', commentId, 'likes', user.uid);
+
+      const hasLiked = commentToLike.likes?.some(like => like.id === user.uid);
 
       if (hasLiked) {
         deleteDoc(likeRef).catch(async (serverError) => {
@@ -445,17 +507,17 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         const likeData = { userId: user.uid };
         setDoc(likeRef, likeData)
         .then(() => {
-            if (comment.userId !== user.uid) {
-                const notificationsCollectionRef = collection(db, 'users', comment.userId, 'notifications');
+            if (commentToLike && commentToLike.userId !== user.uid) {
+                const notificationsCollectionRef = collection(db, 'users', commentToLike.userId, 'notifications');
                 const notificationData = {
-                    recipientId: comment.userId,
+                    recipientId: commentToLike.userId,
                     senderId: user.uid,
                     senderName: user.displayName,
                     senderPhoto: user.photoURL,
                     type: 'like' as 'like' | 'reply',
                     matchId: matchId,
                     commentId: commentId,
-                    commentText: comment.text,
+                    commentText: commentToLike.text,
                     read: false,
                     timestamp: serverTimestamp(),
                 };
@@ -497,13 +559,13 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
             setEditingText={setEditingText}
         />
         
-        {replyingTo === comment.id && (
+        {replyingTo === comment.id && !isReply && (
              <div className="ml-8 mt-2 pl-4 border-r-2">
                 <CommentInput 
                     user={user}
                     sending={sending && !editingCommentId}
                     onSend={handleSendComment}
-                    parentId={comment.id}
+                    isReply={true}
                     onCancel={() => setReplyingTo(null)}
                     autoFocus
                 />
@@ -548,3 +610,5 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     </div>
   );
 }
+
+    
