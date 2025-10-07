@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -208,7 +209,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     const fieldPath = `${itemPath}.${item.id}`;
     const isFavorited = !!favorites?.[itemPath]?.[item.id];
     
-    let favoriteData: Partial<Favorites> = { userId: user.uid };
+    let favoriteData: any = { userId: user.uid };
     if (type === 'team') {
        favoriteData.teams = { [item.id]: { teamId: item.id, name: item.name, logo: item.logo }};
     } else {
@@ -387,7 +388,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                     <TableBody>
                                     {scorers.filter(scorer => scorer.statistics[0].team.id === teamId).map(({ player, statistics }) => (
                                         <TableRow key={player.id}>
-                                            <TableCell className="text-center font-bold text-lg">{statistics[0]?.assists || 0}</TableCell>
+                                            <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.assists || 0}</TableCell>
                                             <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total || 0}</TableCell>
                                             <TableCell><div className="flex items-center gap-3 justify-end"><p className="font-semibold">{player.name}</p><Avatar className="h-10 w-10"><AvatarImage src={player.photo} /></Avatar></div></TableCell>
                                         </TableRow>
@@ -408,8 +409,3 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     </div>
   );
 }
-
-    
-
-
-

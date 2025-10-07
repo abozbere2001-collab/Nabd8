@@ -18,7 +18,7 @@ export interface Standing {
 
 export interface TopScorer {
     player: { id: number; name: string; photo: string; };
-    statistics: { team: { id: number; name: string; }; goals: { total: number; }; penalty: { scored: number; } }[];
+    statistics: { team: { id: number; name: string; }; goals: { total: number; assists: number | null; }; penalty: { scored: number; } }[];
 }
 
 export interface Team {

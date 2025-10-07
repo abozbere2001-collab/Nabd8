@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -111,7 +112,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     
     let fieldPath = '';
     let isFavorited = false;
-    let favoriteData: Partial<Favorites> = { userId: user.uid };
+    let favoriteData: any = { userId: user.uid };
 
     if (type === 'league' && leagueId) {
         fieldPath = `leagues.${leagueId}`;
@@ -391,7 +392,3 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
-
-    
-
-    

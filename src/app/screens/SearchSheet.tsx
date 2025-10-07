@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -221,7 +222,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     const fieldPath = `${itemPath}.${item.id}`;
     const isFavorited = !!favorites?.[itemPath]?.[item.id];
     
-    let favoriteData: Partial<Favorites> = { userId: user.uid };
+    let favoriteData: any = { userId: user.uid };
      if (type === 'team') {
        favoriteData.teams = { [item.id]: { teamId: item.id, name: item.name, logo: item.logo }};
     } else {
