@@ -146,7 +146,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
   const { isAdmin } = useAdmin();
   const { user } = useAuth();
   const { db } = useFirestore();
-  const [favorites, setFavorites] = useState<Favorites>({});
+  const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || '' });
   const [renameItem, setRenameItem] = useState<{ id: number; name: string; type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
   const [noteTeam, setNoteTeam] = useState<{id: number, name: string, logo: string} | null>(null);
@@ -181,7 +181,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
-        setFavorites(doc.data() as Favorites || {});
+        setFavorites(doc.data() as Favorites || { userId: user.uid });
     });
     return () => unsub();
   }, [user, db]);
@@ -208,11 +208,11 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     const fieldPath = `${itemPath}.${item.id}`;
     const isFavorited = !!favorites?.[itemPath]?.[item.id];
     
-    let favoriteData: any = {};
+    let favoriteData: Partial<Favorites> = { userId: user.uid };
     if (type === 'team') {
-       favoriteData = { teams: { [item.id]: { teamId: item.id, name: item.name, logo: item.logo }}};
+       favoriteData.teams = { [item.id]: { teamId: item.id, name: item.name, logo: item.logo }};
     } else {
-       favoriteData = { players: { [item.id]: { playerId: item.id, name: item.name, photo: item.photo }}};
+       favoriteData.players = { [item.id]: { playerId: item.id, name: item.name, photo: item.photo }};
     }
 
     if (isFavorited) {
@@ -410,5 +410,6 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
 }
 
     
+
 
 

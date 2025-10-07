@@ -27,7 +27,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const { user } = useAuth();
   const { db } = useFirestore();
 
-  const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {}, players: {} });
+  const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || '', leagues: {}, teams: {}, players: {} });
 
   const [loading, setLoading] = useState(true);
   const [displayTitle, setDisplayTitle] = useState(initialTitle);
@@ -47,7 +47,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
-        setFavorites(doc.data() as Favorites || { leagues: {}, teams: {}, players: {} });
+        setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {}, teams: {}, players: {} });
     });
     return () => unsub();
   }, [user, db]);
@@ -111,20 +111,20 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     
     let fieldPath = '';
     let isFavorited = false;
-    let favoriteData: any = {};
+    let favoriteData: Partial<Favorites> = { userId: user.uid };
 
     if (type === 'league' && leagueId) {
         fieldPath = `leagues.${leagueId}`;
         isFavorited = !!favorites?.leagues?.[leagueId];
-        favoriteData = { leagues: { [leagueId]: { leagueId, name: displayTitle, logo }}};
+        favoriteData.leagues = { [leagueId]: { leagueId, name: displayTitle, logo }};
     } else if (type === 'team') {
         fieldPath = `teams.${item.id}`;
         isFavorited = !!favorites?.teams?.[item.id];
-        favoriteData = { teams: { [item.id]: { teamId: item.id, name: item.name, logo: item.logo }}};
+        favoriteData.teams = { [item.id]: { teamId: item.id, name: item.name, logo: item.logo }};
     } else if (type === 'player') {
         fieldPath = `players.${item.id}`;
         isFavorited = !!favorites?.players?.[item.id];
-        favoriteData = { players: { [item.id]: { playerId: item.id, name: item.name, photo: item.photo }}};
+        favoriteData.players = { [item.id]: { playerId: item.id, name: item.name, photo: item.photo }};
     }
 
     if (isFavorited) {

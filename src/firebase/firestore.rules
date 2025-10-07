@@ -1,226 +1,146 @@
 /**
- * @fileoverview Firestore Security Rules for the application.
+ * @file firestore.rules
+ * @version 2
  *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for personal data and provides public read access where appropriate, with owner-only writes.
- *
- * Data Structure:
- * - /users/{userId}: Stores public user profile information.
- * - /users/{userId}/notifications/{notificationId}: Stores private notifications for each user.
- * - /favorites/{userId}: Stores user's favorite leagues, teams and players.
- * - /adminFavorites/{teamId}: Stores admin-curated favorites.
- * - /{entity}Customizations/{id}: Stores user customizations for leagues, countries, teams, etc.
- * - /matches/{matchId}: Stores match metadata (e.g., comment settings).
- * - /matches/{matchId}/comments/{commentId}: Stores comments for a specific match.
- *
- * Key Security Decisions:
- * - Users can only read and write their own profile data, favorites, customizations, and notifications.
- * - Admin favorites are publicly readable, but only admins can create/update/delete them (currently not implemented, as admin roles are not specified).
- * - Match details are publicly readable.
- * - Match comments can be created by any authenticated user. Update and delete operations on comments are disallowed.
- * - List operations are generally allowed only for user-owned subcollections.
- *
- * Denormalization for Authorization:
- * - User-specific data (favorites, customizations, notifications) is nested under /users/{userId} or /favorites/{userId} to simplify ownership checks.
- * - Match comments include userId, userName, and userPhoto to avoid additional lookups when displaying comments.
- *
- * Structural Segregation:
- * - User profiles are stored in a dedicated /users/{userId} collection to avoid mixing public and private data.
+ * @core_philosophy This ruleset enforces a combination of role-based access for administrators and user-based ownership for personal data.
+ *   General read access is granted to authenticated users for certain collections, while writes are restricted based on user roles or ownership.
+ * @data_structure The Firestore data is structured with top-level collections like "matches," "news," and "likes."
+ *   User-specific data is stored under the `/users/{userId}` path. Some collections, like "favorites" and "notifications" are stored under the user's document using the document ID.
+ *   Comments are stored under the matches document in a subcollection.
+ * @key_security_decisions
+ *   - Only the admin can create, update, or delete news.
+ *   - Users can only read notifications that are targeted to them.
+ *   - Listing of notifications is not supported to prevent unintended data exposure.
+ *   - Data shape validation is relaxed during this prototyping phase. Only authorization-critical fields are checked.
+ * @denormalization_for_authorization The `userId` field is used to enforce ownership for comments and favorites. For notifications, the `targetUserId` field is used to control read access.
+ *   This denormalization avoids complex queries in security rules.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows users to read and write their own profile data.
-     * @path /users/{userId}
-     * @allow (create, update, delete) if request.auth.uid == userId
-     * @allow (get, list) if true
-     * @deny (create) if request.auth.uid != userId
-     * @principle Enforces document ownership for writes. Allows public read access.
+     * @description Allows the administrator (sagralnarey@gmail.com) full read and write access to the entire database.
+     * @path /{document=**}
+     * @allow (read, write) - If the authenticated user is the administrator.
+     * @deny (read, write) - If the authenticated user is not the administrator.
+     * @principle Enforces role-based access control for administrative privileges.
      */
-    match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
-      allow get, list: if true;
-      allow create: if isOwner(userId) && request.resource.data.email == request.auth.token.email;
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId) && resource != null;
-
-      /**
-       * @description Allows users to read and write their own notifications.
-       * @path /users/{userId}/notifications/{notificationId}
-       * @allow (create) if request.auth.uid == userId && request.resource.data.recipientId == userId
-       * @allow (get, list) if request.auth.uid == userId
-       * @deny (create) if request.auth.uid != userId
-       * @principle Enforces document ownership.
-       */
-      match /notifications/{notificationId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && request.resource.data.recipientId == userId;
-        allow update: if false;
-        allow delete: if false;
-      }
+    match /{document=**} {
+      allow read, write: if isSignedIn() && request.auth.token.email == "sagralnarey@gmail.com";
     }
 
     /**
-     * @description Allows users to read and write their own favorites.
-     * @path /favorites/{userId}
-     * @allow (create, update, delete) if request.auth.uid == userId
-     * @allow (get) if request.auth.uid == userId
-     * @deny (create) if request.auth.uid != userId
-     * @principle Enforces document ownership.
+     * @description Allows authenticated users to read and create comments within a specific match. Users can only update or delete their own comments.
+     * @path /matches/{matchId}/comments/{commentId}
+     * @allow (read) - If the user is authenticated.
+     * @allow (create) - If the user is authenticated.
+     * @allow (update, delete) - If the authenticated user is the owner of the comment.
+     * @deny (update, delete) - If the authenticated user is not the owner of the comment.
+     * @principle Enforces a combination of general read access with owner-only write access within a specific data structure.
      */
-    match /favorites/{userId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
+    match /matches/{matchId}/comments/{commentId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isExistingOwner(resource.data.userId);
+    }
 
-      allow get: if isOwner(userId);
+    /**
+     * @description Allows authenticated users to read and create replies to comments within a specific match. Users can only update or delete their own replies.
+     * @path /matches/{matchId}/comments/{commentId}/replies/{replyId}
+     * @allow (read) - If the user is authenticated.
+     * @allow (create) - If the user is authenticated.
+     * @allow (update, delete) - If the authenticated user is the owner of the reply.
+     * @deny (update, delete) - If the authenticated user is not the owner of the reply.
+     * @principle Enforces a combination of general read access with owner-only write access within a nested data structure.
+     */
+    match /matches/{matchId}/comments/{commentId}/replies/{replyId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isExistingOwner(resource.data.userId);
+    }
+
+    /**
+     * @description Allows authenticated users to create and delete likes for comments. Only the user who created the like can delete it.
+     * @path /matches/{matchId}/comments/{commentId}/likes/{likeId}
+     * @allow (read) - If the user is authenticated.
+     * @allow (create, delete) - If the authenticated user is the owner of the like.
+     * @deny (create, delete) - If the authenticated user is not the owner of the like.
+     * @principle Enforces owner-only write access for like operations.
+     */
+    match /matches/{matchId}/comments/{commentId}/likes/{likeId} {
+      allow get, list: if isSignedIn();
+      allow create, delete: if isSignedIn() && request.auth.uid == request.resource.data.userId;
+    }
+
+    /**
+     * @description Allows authenticated users to read, create, update, and delete their own favorites.
+     * @path /favorites/{favoriteId}
+     * @allow (read) - If the authenticated user is the owner of the favorites document.
+     * @allow (create, update, delete) - If the authenticated user is creating, updating, or deleting their own favorites.
+     * @deny (read) - If the authenticated user is not the owner of the favorites document.
+     * @deny (create, update, delete) - If the authenticated user is not creating, updating, or deleting their own favorites.
+     * @principle Enforces owner-only access to the "favorites" collection.
+     */
+    match /favorites/{favoriteId} {
+      allow get: if isSignedIn() && request.auth.uid == resource.data.userId;
       allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId) && resource != null;
+      allow create, update, delete: if isSignedIn() && request.auth.uid == request.resource.data.userId;
     }
 
     /**
-     * @description Allows anyone to read admin favorites, but only admins can create, update, or delete them.
-     * @path /adminFavorites/{teamId}
-     * @allow (get, list) if true
-     * @deny (create, update, delete) if true
-     * @principle Allows public read access. Restricts writes to admins (not implemented).
+     * @description Allows users to read notifications targeted to them. Allows anyone to create notifications.
+     * @path /notifications/{notificationId}
+     * @allow (read) - If the authenticated user is the target of the notification.
+     * @allow (create) - If the user is authenticated.
+     * @deny (read) - If the authenticated user is not the target of the notification.
+     * @principle Enforces target-based access for reading notifications.
      */
-    match /adminFavorites/{teamId} {
-      allow get, list: if true;
-      allow create: if false;
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && request.auth.uid == resource.data.targetUserId;
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    /**
+     * @description Allows authenticated users to read news articles. Only the administrator can create, update, or delete news articles.
+     * @path /news/{newsId}
+     * @allow (read) - If the user is authenticated.
+     * @allow (create, update, delete) - If the authenticated user is the administrator.
+     * @deny (create, update, delete) - If the authenticated user is not the administrator.
+     * @principle Enforces role-based access control for managing news content.
+     */
+    match /news/{newsId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && request.auth.token.email == "sagralnarey@gmail.com";
+    }
+
+    /**
+     * @description Allows authenticated users to read public likes. Only the user who created the like can delete it.
+     * @path /likes/{likeId}
+     * @allow (read) - If the user is authenticated.
+     * @allow (create, delete) - If the authenticated user is the owner of the like.
+     * @deny (create, delete) - If the authenticated user is not the owner of the like.
+     * @principle Enforces owner-only write access for like operations.
+     */
+    match /likes/{likeId} {
+      allow get, list: if isSignedIn();
+      allow create, delete: if isSignedIn() && request.auth.uid == request.resource.data.userId;
       allow update: if false;
-      allow delete: if false;
     }
 
-     /**
-      * @description Allows users to read and write their own league customizations.
-      * @path /leagueCustomizations/{leagueId}
-      * @allow (create, update, delete) if request.auth.uid == userId
-      * @allow (get) if request.auth.uid == userId
-      * @deny (create) if request.auth.uid != userId
-      * @principle Enforces document ownership.
-      */
-    match /leagueCustomizations/{leagueId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if request.auth != null;
-        allow update: if request.auth != null && resource != null;
-        allow delete: if request.auth != null && resource != null;
-    }
+  }
 
-    /**
-     * @description Allows users to read and write their own country customizations.
-     * @path /countryCustomizations/{countryName}
-     * @allow (create, update, delete) if request.auth.uid == userId
-     * @allow (get) if request.auth.uid == userId
-     * @deny (create) if request.auth.uid != userId
-     * @principle Enforces document ownership.
-     */
-    match /countryCustomizations/{countryName} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if request.auth != null;
-        allow update: if request.auth != null && resource != null;
-        allow delete: if request.auth != null && resource != null;
-    }
+  function isSignedIn() {
+    return request.auth != null;
+  }
 
-    /**
-     * @description Allows users to read and write their own continent customizations.
-     * @path /continentCustomizations/{continentName}
-     * @allow (create, update, delete) if request.auth.uid == userId
-     * @allow (get) if request.auth.uid == userId
-     * @deny (create) if request.auth.uid != userId
-     * @principle Enforces document ownership.
-     */
-    match /continentCustomizations/{continentName} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if request.auth != null;
-        allow update: if request.auth != null && resource != null;
-        allow delete: if request.auth != null && resource != null;
-    }
+  function isOwner(userId) {
+    return isSignedIn() && request.auth.uid == userId;
+  }
 
-    /**
-     * @description Allows users to read and write their own team customizations.
-     * @path /teamCustomizations/{teamId}
-     * @allow (create, update, delete) if request.auth.uid == userId
-     * @allow (get) if request.auth.uid == userId
-     * @deny (create) if request.auth.uid != userId
-     * @principle Enforces document ownership.
-     */
-    match /teamCustomizations/{teamId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && resource != null;
-      allow delete: if request.auth != null && resource != null;
-    }
-
-    /**
-     * @description Allows users to read and write their own player customizations.
-     * @path /playerCustomizations/{playerId}
-     * @allow (create, update, delete) if request.auth.uid == userId
-     * @allow (get) if request.auth.uid == userId
-     * @deny (create) if request.auth.uid != userId
-     * @principle Enforces document ownership.
-     */
-    match /playerCustomizations/{playerId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && resource != null;
-      allow delete: if request.auth != null && resource != null;
-    }
-
-    /**
-     * @description Allows users to read and write their own coach customizations.
-     * @path /coachCustomizations/{coachId}
-     * @allow (create, update, delete) if request.auth.uid == userId
-     * @allow (get) if request.auth.uid == userId
-     * @deny (create) if request.auth.uid != userId
-     * @principle Enforces document ownership.
-     */
-    match /coachCustomizations/{coachId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && resource != null;
-      allow delete: if request.auth != null && resource != null;
-    }
-
-    /**
-     * @description Allows anyone to read match details, but only admins can update them.
-     * @path /matches/{matchId}
-     * @allow (get, list) if true
-     * @deny (create, update, delete) if true
-     * @principle Allows public read access. Restricts writes to admins (not implemented).
-     */
-    match /matches/{matchId} {
-      allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-
-      /**
-       * @description Allows authenticated users to create match comments. Update and delete are disallowed.
-       * @path /matches/{matchId}/comments/{commentId}
-       * @allow (create) if request.auth != null
-       * @deny (update, delete) if true
-       * @principle Allows public create access for authenticated users.
-       */
-      match /comments/{commentId} {
-        allow get, list: if true;
-        allow create: if request.auth != null;
-        allow update: if false;
-        allow delete: if false;
-      }
-    }
+  function isExistingOwner(userId) {
+    return isOwner(userId) && resource != null;
   }
 }

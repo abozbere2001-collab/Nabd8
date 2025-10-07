@@ -165,18 +165,21 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     const isFavorited = favorites?.leagues?.[leagueId];
     const leagueName = getLeagueName(comp);
 
+    const favoriteData = {
+        userId: user.uid,
+        leagues: { 
+            [leagueId]: {
+                leagueId: comp.league.id,
+                name: leagueName,
+                logo: comp.league.logo,
+            }
+        } 
+    };
+
     if (isFavorited) {
         await updateDoc(favRef, { [fieldPath]: deleteField() });
     } else {
-        await setDoc(favRef, { 
-            leagues: { 
-                [leagueId]: {
-                    leagueId: comp.league.id,
-                    name: leagueName,
-                    logo: comp.league.logo,
-                }
-            } 
-        }, { merge: true });
+        await setDoc(favRef, favoriteData, { merge: true });
     }
     await fetchFavorites(); // Refetch to update UI
   };

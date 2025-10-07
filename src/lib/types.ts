@@ -26,6 +26,7 @@ export interface Team {
 }
 
 export interface Favorites {
+    userId: string;
     leagues?: { [key: number]: any };
     teams?: { [key:string]: any };
     players?: { [key: number]: any };

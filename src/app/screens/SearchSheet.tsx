@@ -15,10 +15,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenKey, ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
+import type { Favorites } from '@/lib/types';
 
 interface TeamResult {
   team: { id: number; name: string; logo: string; };
@@ -31,10 +32,6 @@ interface LeagueResult {
 
 type SearchResult = (TeamResult & { type: 'team' }) | (LeagueResult & { type: 'league' });
 
-interface Favorites {
-    leagues?: { [key: number]: any };
-    teams?: { [key: number]: any };
-}
 type RenameType = 'league' | 'team';
 
 export function SearchSheet({ children, navigate }: { children: React.ReactNode, navigate: ScreenProps['navigate'] }) {
@@ -49,21 +46,33 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   const { isAdmin } = useAdmin();
   const { user } = useAuth();
   const { db } = useFirestore();
-  const [favorites, setFavorites] = useState<Favorites>({});
+  const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || ''});
   const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
   
   const [noteTeam, setNoteTeam] = useState<{id: number, name: string, logo: string} | null>(null);
   const [isNoteOpen, setIsNoteOpen] = useState(false);
 
+  const fetchFavorites = useCallback(async () => {
+    if (!user) return;
+    try {
+        const docRef = doc(db, 'favorites', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            setFavorites(docSnap.data() as Favorites);
+        } else {
+            setFavorites({ userId: user.uid });
+        }
+    } catch (error) {
+        console.error("Error fetching favorites:", error);
+    }
+  }, [user, db]);
 
   useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
-      setFavorites(doc.data() as Favorites || {});
-    });
-    return () => unsub();
-  }, [user, db]);
+    if (isOpen && user) {
+        fetchFavorites();
+    }
+  }, [isOpen, user, fetchFavorites]);
 
   const getDisplayName = (type: 'team' | 'league', id: number, defaultName: string) => {
       if (type === 'team') {
@@ -85,7 +94,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
         const teamNames = new Map<string, string>();
         teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
         
-        setCustomNames({ leagues: leagueNames, teams: teamNames });
+        setCustomNames({ leagues: leagueNames, teams: teamNames as any });
     } catch(error) {
         console.error("Failed to fetch custom names for search:", error);
     }
@@ -212,11 +221,11 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     const fieldPath = `${itemPath}.${item.id}`;
     const isFavorited = !!favorites?.[itemPath]?.[item.id];
     
-    let favoriteData: any = {};
+    let favoriteData: Partial<Favorites> = { userId: user.uid };
      if (type === 'team') {
-       favoriteData = { teams: { [item.id]: { teamId: item.id, name: item.name, logo: item.logo }}};
+       favoriteData.teams = { [item.id]: { teamId: item.id, name: item.name, logo: item.logo }};
     } else {
-       favoriteData = { leagues: { [item.id]: { leagueId: item.id, name: item.name, logo: item.logo }}};
+       favoriteData.leagues = { [item.id]: { leagueId: item.id, name: item.name, logo: item.logo }};
     }
 
     if (isFavorited) {
@@ -224,6 +233,8 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     } else {
         await setDoc(favRef, favoriteData, { merge: true });
     }
+    // Manually refetch favorites to update UI
+    await fetchFavorites();
   };
 
   const handleResultClick = (result: SearchResult) => {
