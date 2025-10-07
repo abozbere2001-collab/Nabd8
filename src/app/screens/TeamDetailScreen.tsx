@@ -89,34 +89,24 @@ function useTeamData(teamId?: number) {
           } while (currentPage <= totalPages);
         }
         
-        // Fetch all fixtures for the team, regardless of season
-        const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}`);
+        // Fetch fixtures for the current season only for performance
+        const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
         const fixturesData = await fixturesRes.json();
         const fixtures: Fixture[] = fixturesData.response || [];
         
-        // Intelligent league selection for standings
-        const worldCupFixture = fixtures.find(f => f.league.name.includes('World Cup'));
-        const continentalFixture = fixtures.find(f => f.league.name.includes('AFC Champions League') || f.league.name.includes('UEFA'));
-        const primaryLeagueFixture = fixtures.find(f => f.league.name.includes('League'));
-        
         let leagueIdForStandings = null;
-        if (worldCupFixture) {
-            leagueIdForStandings = worldCupFixture.league.id;
-        } else if (continentalFixture) {
-            leagueIdForStandings = continentalFixture.league.id;
-        } else if (primaryLeagueFixture) {
-            leagueIdForStandings = primaryLeagueFixture.league.id;
-        } else if (fixtures.length > 0) {
-            leagueIdForStandings = fixtures[0].league.id;
+        if (fixtures.length > 0) {
+            const primaryLeague = fixtures.find(f => f.league.name.toLowerCase().includes('league')) || fixtures[0];
+            leagueIdForStandings = primaryLeague.league.id;
         }
 
         let standingsData = { response: [] };
         let scorersData = { response: [] };
         if (leagueIdForStandings) {
-            const standingsSeason = teamInfo?.team.type === 'National' ? (new Date(worldCupFixture?.fixture.date || Date.now()).getFullYear()) : CURRENT_SEASON;
+            const seasonForStandings = teamInfo?.team.type === 'National' ? CURRENT_SEASON -1 : CURRENT_SEASON; // Adjust for national teams if needed
             const [standingsRes, scorersRes] = await Promise.all([
-                 fetch(`/api/football/standings?league=${leagueIdForStandings}&season=${standingsSeason}`),
-                 fetch(`/api/football/players/topscorers?league=${leagueIdForStandings}&season=${CURRENT_SEASON}`)
+                 fetch(`/api/football/standings?league=${leagueIdForStandings}&season=${seasonForStandings}`),
+                 fetch(`/api/football/players/topscorers?league=${leagueIdForStandings}&season=${seasonForStandings}`)
             ]);
             standingsData = await standingsRes.json();
             scorersData = await scorersRes.json();
@@ -395,21 +385,21 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                          <TabsContent value="matches" className="p-4">
                              {fixtures && fixtures.length > 0 ? (
                                 <div className="space-y-2">
-                                {fixtures.map(({fixture, teams, goals, league}) => (
-                                    <div key={fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.id, fixture: { fixture, teams, goals, league } })}>
+                                {fixtures.map((fixture) => (
+                                    <div key={fixture.fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}>
                                         <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
-                                            <span>{format(new Date(fixture.date), 'EEE, d MMM yyyy')}</span>
-                                            <span>{fixture.status.short}</span>
+                                            <span>{format(new Date(fixture.fixture.date), 'EEE, d MMM yyyy')}</span>
+                                            <span>{fixture.fixture.status.short}</span>
                                         </div>
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                                                <span className="font-semibold truncate">{teams.home.name}</span>
-                                                <Avatar className="h-6 w-6"><AvatarImage src={teams.home.logo} /></Avatar>
+                                                <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+                                                <Avatar className="h-6 w-6"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
                                             </div>
-                                            <div className="font-bold text-base px-2 bg-muted rounded-md">{goals.home ?? ''} - {goals.away ?? ''}</div>
+                                            <div className="font-bold text-base px-2 bg-muted rounded-md">{fixture.goals.home ?? ''} - {fixture.goals.away ?? ''}</div>
                                             <div className="flex items-center gap-2 flex-1 truncate">
-                                                <Avatar className="h-6 w-6"><AvatarImage src={teams.away.logo} /></Avatar>
-                                                <span className="font-semibold truncate">{teams.away.name}</span>
+                                                <Avatar className="h-6 w-6"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                                                <span className="font-semibold truncate">{fixture.teams.away.name}</span>
                                             </div>
                                         </div>
                                     </div>

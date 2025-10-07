@@ -15,6 +15,7 @@ import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 // --- TYPE DEFINITIONS ---
 interface Fixture {
@@ -43,7 +44,7 @@ interface LineupPlayer {
     player: LineupPlayerInfo;
 }
 interface Lineup {
-  team: { id: number; name: string; logo: string; };
+  team: { id: number; name: string; logo: string; isNational: boolean; };
   coach: { id: number; name: string; photo: string; };
   formation: string;
   startXI: LineupPlayer[];
@@ -95,7 +96,7 @@ type EventFilter = "all" | "highlights";
 const CURRENT_SEASON = new Date().getFullYear();
 
 // --- API FETCH HOOK ---
-function useMatchData(fixtureId?: number, leagueId?: number) {
+function useMatchData(fixture?: Fixture) {
   const [data, setData] = useState<{
     lineups: Lineup[] | null;
     events: Event[] | null;
@@ -105,16 +106,20 @@ function useMatchData(fixtureId?: number, leagueId?: number) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!fixtureId || !leagueId) return;
+    if (!fixture) return;
+    const { fixture: { id: fixtureId, date }, league, teams } = fixture;
 
     const fetchData = async () => {
       setLoading(true);
       try {
+        const isNational = teams.home.winner !== null; // A simple heuristic
+        const seasonForStandings = isNational ? new Date(date).getFullYear() : CURRENT_SEASON;
+
         const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.all([
           fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
-          fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
+          fetch(`/api/football/standings?league=${league.id}&season=${seasonForStandings}`),
         ]);
 
         const lineupsData = await lineupsRes.json();
@@ -135,7 +140,7 @@ function useMatchData(fixtureId?: number, leagueId?: number) {
       }
     };
     fetchData();
-  }, [fixtureId, leagueId]);
+  }, [fixture]);
 
   return { ...data, loading };
 }
@@ -166,8 +171,10 @@ const MatchHeader = ({ fixture, onBack, headerActions, navigate, isAdmin, onCopy
         <span className="font-bold">{fixture.teams.home.name}</span>
       </div>
       <div className="text-center">
-        <div className="text-4xl font-bold tracking-tight">
-          {fixture.goals.home ?? '-'} : {fixture.goals.away ?? '-'}
+         <div className={cn("text-4xl font-bold tracking-tight", ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) && "text-2xl")}>
+          {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
+            ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
+            : format(new Date(fixture.fixture.date), "HH:mm")}
         </div>
         <div className="text-xs text-muted-foreground mt-1">{fixture.fixture.status.long}</div>
       </div>
@@ -556,7 +563,7 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
 
 // --- MAIN SCREEN COMPONENT ---
 export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: Fixture, headerActions?: React.ReactNode }) {
-  const { lineups, events, stats, standings, loading } = useMatchData(fixtureId, fixture.league.id);
+  const { lineups, events, stats, standings, loading } = useMatchData(fixture);
   const { isAdmin } = useAdmin();
   const { user } = useAuth();
   const { db } = useFirestore();
