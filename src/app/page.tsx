@@ -11,15 +11,17 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
+import { SearchScreen } from './screens/SearchScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
 import { FirebaseProvider } from '@/firebase/provider';
 import { ProfileButton } from '@/components/ProfileButton';
 import { Search } from 'lucide-react';
-import { SearchSheet } from '@/components/SearchSheet';
+import { Button } from '@/components/ui/button';
 
-export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails';
+
+export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails' | 'Search';
 export type ScreenProps = {
   navigate: (screen: ScreenKey, props?: Record<string, any>) => void;
   goBack: () => void;
@@ -37,6 +39,7 @@ const screens: Record<ScreenKey, React.ComponentType<any>> = {
   CompetitionDetails: CompetitionDetailScreen,
   MatchDetails: MatchDetailScreen,
   TeamDetails: TeamDetailScreen,
+  Search: SearchScreen,
 };
 
 const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
@@ -99,9 +102,9 @@ function AppContent({ user }: { user: User | null }) {
       canGoBack,
       headerActions: (
           <div className="flex items-center gap-1">
-             <SearchSheet navigate={navigate}>
+             <Button variant="ghost" size="icon" onClick={() => navigate('Search')}>
                 <Search className="h-5 w-5" />
-             </SearchSheet>
+             </Button>
              <ProfileButton navigate={navigate} />
           </div>
       )
