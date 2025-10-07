@@ -37,6 +37,18 @@ const AdminMatchSelector = () => {
 
 const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture, userPrediction?: Prediction, onSave: (home: string, away: string) => void }) => {
     const isPredictionDisabled = isPast(new Date(fixture.fixture.date));
+    const [homeValue, setHomeValue] = useState(userPrediction?.homeGoals?.toString() ?? '');
+    const [awayValue, setAwayValue] = useState(userPrediction?.awayGoals?.toString() ?? '');
+
+    const handleHomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setHomeValue(e.target.value);
+        onSave(e.target.value, awayValue);
+    }
+
+    const handleAwayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setAwayValue(e.target.value);
+        onSave(homeValue, e.target.value);
+    }
 
     return (
         <Card className="p-4">
@@ -50,8 +62,8 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                         type="number" 
                         className="w-14 h-8 text-center" 
                         min="0" 
-                        defaultValue={userPrediction?.homeGoals}
-                        onChange={(e) => onSave(e.target.value, (document.getElementById(`away-${fixture.fixture.id}`) as HTMLInputElement)?.value || '')}
+                        value={homeValue}
+                        onChange={handleHomeChange}
                         id={`home-${fixture.fixture.id}`}
                         disabled={isPredictionDisabled}
                     />
@@ -60,8 +72,8 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                         type="number" 
                         className="w-14 h-8 text-center" 
                         min="0"
-                        defaultValue={userPrediction?.awayGoals}
-                        onChange={(e) => onSave((document.getElementById(`home-${fixture.fixture.id}`) as HTMLInputElement)?.value || '', e.target.value)}
+                        value={awayValue}
+                        onChange={handleAwayChange}
                         id={`away-${fixture.fixture.id}`}
                         disabled={isPredictionDisabled}
                     />
@@ -80,7 +92,7 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                 </p>
             )}
             {userPrediction && !isPredictionDisabled && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
-            {isPredictionDisabled && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
+            {isPredictionDisabled && !userPrediction && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
         </Card>
     );
 };
