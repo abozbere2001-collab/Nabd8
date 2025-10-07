@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useFirebase } from '@/firebase/provider';
 import { db } from '@/lib/firebase-client';
-import { doc, setDoc, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, updateDoc, deleteField, getDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 
 
@@ -88,13 +88,14 @@ interface Favorites {
 
 const CURRENT_SEASON = 2024;
 
-export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, leagueId, logo }: ScreenProps & { title?: string, leagueId?: number, logo?: string }) {
+export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo }: ScreenProps & { title?: string, leagueId?: number, logo?: string }) {
   const { isAdmin } = useAdmin();
   const { user } = useFirebase();
 
   const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
 
   const [loading, setLoading] = useState(true);
+  const [title, setTitle] = useState(initialTitle);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
@@ -110,6 +111,18 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
     });
     return () => unsub();
   }, [user]);
+
+  useEffect(() => {
+    async function fetchCustomName() {
+        if (leagueId) {
+            const customNameDoc = await getDoc(doc(db, 'leagueCustomizations', String(leagueId)));
+            if (customNameDoc.exists()) {
+                setTitle(customNameDoc.data().customName);
+            }
+        }
+    }
+    fetchCustomName();
+  }, [leagueId]);
 
 
   useEffect(() => {
@@ -187,9 +200,11 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title, le
     }
   };
 
-  const handleSaveRename = (newName: string) => {
-    console.log(`Saving new name for league ${leagueId}: ${newName}`);
-    // Here you would typically update your backend/database
+  const handleSaveRename = async (newName: string) => {
+    if (!leagueId) return;
+    const customNameRef = doc(db, 'leagueCustomizations', String(leagueId));
+    await setDoc(customNameRef, { customName: newName });
+    setTitle(newName);
   };
   
   const headerActions = (

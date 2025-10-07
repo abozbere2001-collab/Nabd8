@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin } from '@/firebase/provider';
 import { useFirebase } from '@/firebase/provider';
 import { db } from '@/lib/firebase-client';
-import { doc, setDoc, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, updateDoc, deleteField, collection, getDocs } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 
 
@@ -24,6 +24,11 @@ interface Competition {
     name: string;
     flag: string | null;
   };
+}
+
+interface CustomLeagueName {
+    id: string;
+    customName: string;
 }
 
 interface Favorites {
@@ -94,6 +99,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
   const { user } = useFirebase();
   const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
   const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, league: null });
+  const [customNames, setCustomNames] = useState<Map<number, string>>(new Map());
 
 
   useEffect(() => {
@@ -111,6 +117,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     const favRef = doc(db, 'favorites', user.uid);
     const fieldPath = `leagues.${leagueId}`;
     const isFavorited = favorites?.leagues?.[leagueId];
+    const leagueName = customNames.get(leagueId) || comp.league.name;
 
     if (isFavorited) {
         await updateDoc(favRef, { [fieldPath]: deleteField() });
@@ -119,7 +126,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             leagues: { 
                 [leagueId]: {
                     leagueId: comp.league.id,
-                    name: comp.league.name,
+                    name: leagueName,
                     logo: comp.league.logo,
                 }
             } 
@@ -131,13 +138,23 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     async function fetchCompetitions() {
       try {
         setLoading(true);
-        const response = await fetch('/api/football/leagues');
-        if (!response.ok) {
-            const errorBody = await response.text();
+        const [leaguesResponse, customNamesSnapshot] = await Promise.all([
+            fetch('/api/football/leagues'),
+            getDocs(collection(db, 'leagueCustomizations'))
+        ]);
+        
+        const customNamesMap = new Map<number, string>();
+        customNamesSnapshot.forEach(doc => {
+            customNamesMap.set(Number(doc.id), doc.data().customName);
+        });
+        setCustomNames(customNamesMap);
+
+        if (!leaguesResponse.ok) {
+            const errorBody = await leaguesResponse.text();
             console.error('Failed to fetch competitions:', errorBody);
-            throw new Error(`Failed to fetch competitions. Status: ${response.status}`);
+            throw new Error(`Failed to fetch competitions. Status: ${leaguesResponse.status}`);
         }
-        const data = await response.json();
+        const data = await leaguesResponse.json();
         
         if (data.errors && Object.keys(data.errors).length > 0) {
             console.error("API Errors:", data.errors);
@@ -147,6 +164,11 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         const groupedByContinent: GroupedCompetitions = {};
 
         (data.response as Competition[]).forEach(comp => {
+            const customName = customNamesMap.get(comp.league.id);
+            if (customName) {
+                comp.league.name = customName;
+            }
+
             const countryName = comp.country.name;
             const continent = countryToContinent[countryName] || "Other";
 
@@ -201,25 +223,34 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
       }
     }
     fetchCompetitions();
-  }, []);
+  }, [customNames]);
 
-  const handleSaveRename = (newName: string) => {
+  const handleSaveRename = async (newName: string) => {
     if (!renameState.league) return;
-    console.log(`Saving new name for league ${renameState.league.league.id}: ${newName}`);
-    // Here you would typically update your backend/database.
-    // For now, we'll just close the dialog.
+    const leagueId = renameState.league.league.id;
+
+    const customNameRef = doc(db, 'leagueCustomizations', String(leagueId));
+    await setDoc(customNameRef, { customName: newName });
+    
+    // Optimistically update the UI
+    setCustomNames(prev => new Map(prev).set(leagueId, newName));
+
     setRenameState({ isOpen: false, league: null });
   };
+  
+  const getLeagueName = (comp: Competition) => {
+      return customNames.get(comp.league.id) || comp.league.name;
+  }
 
   const renderLeagueItem = (comp: Competition) => (
     <li key={comp.league.id}>
       <div
         className="flex w-full items-center justify-between p-3 hover:bg-accent transition-colors rounded-md cursor-pointer"
-        onClick={() => navigate('CompetitionDetails', { title: comp.league.name, leagueId: comp.league.id, logo: comp.league.logo })}
+        onClick={() => navigate('CompetitionDetails', { title: getLeagueName(comp), leagueId: comp.league.id, logo: comp.league.logo })}
       >
         <div className="flex items-center gap-3">
           <img src={comp.league.logo} alt={comp.league.name} className="h-6 w-6 object-contain" />
-          <span className="text-sm">{comp.league.name}</span>
+          <span className="text-sm">{getLeagueName(comp)}</span>
         </div>
         <div className="flex items-center gap-1">
             {isAdmin && (
@@ -303,7 +334,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             <RenameDialog
                 isOpen={renameState.isOpen}
                 onOpenChange={(isOpen) => setRenameState({ isOpen, league: isOpen ? renameState.league : null })}
-                currentName={renameState.league.league.name}
+                currentName={getLeagueName(renameState.league)}
                 onSave={handleSaveRename}
                 itemType="البطولة"
             />

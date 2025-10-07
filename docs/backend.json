@@ -54,6 +54,18 @@
                 }
             }
         }
+    },
+    "LeagueCustomization": {
+        "title": "League Customization",
+        "description": "Stores user-defined names for leagues.",
+        "type": "object",
+        "properties": {
+            "customName": {
+                "type": "string",
+                "description": "The custom name for the league."
+            }
+        },
+        "required": ["customName"]
     }
   },
   "auth": {
@@ -71,6 +83,12 @@
         "$ref": "#/entities/UserFavorites"
       },
       "description": "A single document containing all favorites (leagues and teams) for a user."
+    },
+    "/leagueCustomizations/{leagueId}": {
+        "schema": {
+            "$ref": "#/entities/LeagueCustomization"
+        },
+        "description": "Stores custom names for leagues, keyed by league ID."
     }
   }
 }
