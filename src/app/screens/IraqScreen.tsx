@@ -291,8 +291,8 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
         <Tabs defaultValue="our-league" className="w-full">
           <div className="sticky top-0 bg-background z-10">
             <TabsList className="grid w-full grid-cols-3 flex-row-reverse">
-              <TabsTrigger value="our-league">دورينا</TabsTrigger>
               <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
+              <TabsTrigger value="our-league">دورينا</TabsTrigger>
               <TabsTrigger value="predictions">التوقعات</TabsTrigger>
             </TabsList>
           </div>
