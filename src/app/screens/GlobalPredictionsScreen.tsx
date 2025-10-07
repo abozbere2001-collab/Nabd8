@@ -166,10 +166,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     if (dailyData.selectedMatches && dailyData.selectedMatches.length > 0) {
                         fixtureIds = dailyData.selectedMatches.map(m => m.fixtureId);
                     }
-                } else {
-                    setSelectedMatches([]);
-                    setLoading(false);
-                    return; // No matches for today, exit early.
                 }
                 
                 if (fixtureIds.length === 0) {
@@ -194,19 +190,9 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     const pred = doc.data() as Prediction;
                     allUserPredictions[pred.fixtureId] = pred;
                 });
-                
-                // 4. Filter allUserPredictions locally to only include today's matches
-                const todaysFixtureIds = new Set(fixtureIds);
-                const todaysPredictions: { [key: number]: Prediction } = {};
-                for (const fixtureId in allUserPredictions) {
-                    if (todaysFixtureIds.has(Number(fixtureId))) {
-                        todaysPredictions[fixtureId] = allUserPredictions[fixtureId];
-                    }
-                }
-                setPredictions(todaysPredictions);
+                setPredictions(allUserPredictions);
 
             } catch (error) {
-                 // This will catch getDoc and getDocs permission errors
                  const permissionError = new FirestorePermissionError({ path: `dailyGlobalPredictions or predictions where userId == ${user.uid}`, operation: 'list' });
                  errorEmitter.emit('permission-error', permissionError);
             } finally {
@@ -329,3 +315,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+  
