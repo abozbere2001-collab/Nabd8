@@ -225,10 +225,6 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
 
     useEffect(() => {
         const fetchAdminFavorites = async () => {
-            if (!isAdmin) {
-                setLoading(false);
-                return;
-            }
             setLoading(true);
             const favsRef = collection(db, 'adminFavorites');
             try {
@@ -249,7 +245,7 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             }
         };
         fetchAdminFavorites();
-    }, [db, isAdmin]);
+    }, [db]);
 
     if (loading) {
         return (
@@ -257,10 +253,6 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
             </div>
         )
-    }
-
-    if (!isAdmin) {
-        return <p className="pt-4 text-center text-muted-foreground">هذه الميزة متاحة للمدير فقط.</p>
     }
 
     if (teams.length === 0) {
