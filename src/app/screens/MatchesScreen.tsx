@@ -456,7 +456,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
                 checked={showLiveOnly}
                 onCheckedChange={setShowLiveOnly}
             />
-            <Label htmlFor="live-mode" className="text-xs">مباشر</Label>
         </div>
        <Button variant={showOdds ? 'default' : 'outline'} className="h-7 px-2 text-xs" onClick={toggleShowOdds} disabled={loadingOdds}>
             {loadingOdds ? <Loader2 className="h-4 w-4 animate-spin" /> : '1X2'}
