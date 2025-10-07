@@ -8,7 +8,7 @@ import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -447,10 +447,16 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
-      setFavorites(doc.data() as Favorites || {});
-    });
-    return () => unsub();
+    const fetchFavorites = async () => {
+        const docRef = doc(db, 'favorites', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            setFavorites(docSnap.data() as Favorites);
+        } else {
+            setFavorites({});
+        }
+    };
+    fetchFavorites();
   }, [user, db]);
 
   const favoritedTeamIds = useMemo(() => favorites?.teams ? Object.keys(favorites.teams).map(Number) : [], [favorites.teams]);
