@@ -5,14 +5,12 @@ import React, { useEffect, useState } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
-import { useAdmin } from '@/firebase/provider';
+import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { Star, Pencil, Shield, Users, Trophy, BarChart2, Heart } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useFirebase } from '@/firebase/provider';
-import { db } from '@/lib/firebase-client';
 import { doc, setDoc, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
@@ -26,7 +24,8 @@ const CURRENT_SEASON = 2024;
 
 export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo, headerActions }: ScreenProps & { title?: string, leagueId?: number, logo?: string, headerActions?: React.ReactNode }) {
   const { isAdmin } = useAdmin();
-  const { user } = useFirebase();
+  const { user } = useAuth();
+  const { db } = useFirestore();
 
   const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {}, players: {} });
 
@@ -51,7 +50,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         setFavorites(doc.data() as Favorites || { leagues: {}, teams: {}, players: {} });
     });
     return () => unsub();
-  }, [user]);
+  }, [user, db]);
 
  useEffect(() => {
     if (leagueId) {
@@ -64,7 +63,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         });
         return () => unsub();
     }
-  }, [leagueId, initialTitle]);
+  }, [leagueId, initialTitle, db]);
 
 
   useEffect(() => {

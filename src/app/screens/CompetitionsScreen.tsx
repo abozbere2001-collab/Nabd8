@@ -7,9 +7,7 @@ import { Star, Pencil } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAdmin } from '@/firebase/provider';
-import { useFirebase } from '@/firebase/provider';
-import { db } from '@/lib/firebase-client';
+import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, setDoc, onSnapshot, updateDoc, deleteField, collection, getDocs } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 
@@ -94,7 +92,8 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
   const [competitions, setCompetitions] = useState<Competition[] | null>(null);
   const [loading, setLoading] = useState(true);
   const { isAdmin } = useAdmin();
-  const { user } = useFirebase();
+  const { user } = useAuth();
+  const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
   const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, type: null, id: '', currentName: '' });
   
@@ -112,7 +111,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         setFavorites(doc.data() as Favorites || { leagues: {}, teams: {} });
     });
     return () => unsub();
-  }, [user]);
+  }, [user, db]);
 
   const fetchAllCustomNames = useCallback(async () => {
       const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
@@ -132,7 +131,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
       const continentNames = new Map<string, string>();
       continentsSnapshot.forEach(doc => continentNames.set(doc.id, doc.data().customName));
       setCustomContinentNames(continentNames);
-  }, []);
+  }, [db]);
 
   const toggleLeagueFavorite = async (comp: Competition) => {
     if (!user) return;

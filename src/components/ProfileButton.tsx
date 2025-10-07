@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { useFirebase } from '@/firebase/provider';
+import { useAuth } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -21,7 +21,7 @@ interface ProfileButtonProps {
 }
 
 export function ProfileButton({ navigate }: ProfileButtonProps) {
-  const { user } = useFirebase();
+  const { user } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();

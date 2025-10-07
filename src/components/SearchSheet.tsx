@@ -14,9 +14,8 @@ import { Search, Star, Pencil, Loader2, Heart } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenKey, ScreenProps } from '@/app/page';
-import { useAdmin, useFirebase } from '@/firebase/provider';
+import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
@@ -47,7 +46,9 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>}>({leagues: new Map(), teams: new Map()});
 
 
-  const { isAdmin, user } = useAdmin();
+  const { isAdmin } = useAdmin();
+  const { user } = useAuth();
+  const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({});
   const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
@@ -62,7 +63,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
       setFavorites(doc.data() as Favorites || {});
     });
     return () => unsub();
-  }, [user]);
+  }, [user, db]);
 
   const getDisplayName = (type: 'team' | 'league', id: number, defaultName: string) => {
       if (type === 'team') {
@@ -89,7 +90,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     if (isOpen) {
         fetchAllCustomNames();
     }
-  }, [isOpen]);
+  }, [isOpen, db]);
 
   const handleSearch = useCallback(async (queryTerm: string) => {
     if (!queryTerm.trim() || queryTerm.length < 2) {
@@ -161,7 +162,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [db]);
 
   useEffect(() => {
     if (isOpen) {

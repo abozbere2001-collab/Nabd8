@@ -10,15 +10,16 @@ import {
   type User, 
   type Auth, 
 } from "firebase/auth";
-import { initializeFirebase } from './firebase';
-import { getFirestore } from "firebase/firestore";
+import { initializeApp } from "firebase/app";
+import { firebaseConfig } from "./firebase";
 
-const app = initializeFirebase();
-const auth: Auth = getAuth(app);
-const db = getFirestore(app);
-const provider = new GoogleAuthProvider();
+// This is the correct way to initialize, but it was being done in multiple places.
+// We will centralize it in the provider.
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 
 export const signInWithGoogle = async (): Promise<void> => {
+  const provider = new GoogleAuthProvider();
   await signInWithRedirect(auth, provider);
 };
 
@@ -34,8 +35,6 @@ export const checkRedirectResult = async (): Promise<User | null> => {
     try {
         const result = await getRedirectResult(auth);
         if (result) {
-            // User signed in or linked.
-            // You can get the user's info here.
             return result.user;
         }
         return null;
@@ -44,5 +43,3 @@ export const checkRedirectResult = async (): Promise<User | null> => {
         return null;
     }
 }
-
-export { auth, db };

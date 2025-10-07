@@ -4,9 +4,8 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, MessageSquarePlus, Loader2 } from 'lucide-react';
-import { useAdmin } from '@/firebase/provider';
+import { useAdmin, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
 import type { ScreenProps } from '@/app/page';
 import type { MatchDetails } from '@/lib/types';
 
@@ -17,13 +16,13 @@ interface CommentsButtonProps {
 
 export function CommentsButton({ matchId, navigate }: CommentsButtonProps) {
   const { isAdmin } = useAdmin();
+  const { db } = useFirestore();
   const [matchDetails, setMatchDetails] = useState<MatchDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
 
-  const matchDocRef = doc(db, 'matches', String(matchId));
-
   useEffect(() => {
+    const matchDocRef = doc(db, 'matches', String(matchId));
     const unsubscribe = onSnapshot(matchDocRef, (doc) => {
       if (doc.exists()) {
         setMatchDetails(doc.data() as MatchDetails);
@@ -37,11 +36,12 @@ export function CommentsButton({ matchId, navigate }: CommentsButtonProps) {
     });
 
     return () => unsubscribe();
-  }, [matchId]);
+  }, [matchId, db]);
 
   const handleActivateComments = async () => {
     setActivating(true);
     try {
+      const matchDocRef = doc(db, 'matches', String(matchId));
       await setDoc(matchDocRef, { commentsEnabled: true }, { merge: true });
     } catch (error) {
       console.error("Error activating comments:", error);

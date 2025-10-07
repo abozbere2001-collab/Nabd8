@@ -10,9 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Share2, Star, Clock, User, ArrowLeftRight, RectangleVertical, ShieldAlert, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useAdmin, useFirebase } from '@/firebase/provider';
+import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
 import { RenameDialog } from '@/components/RenameDialog';
 
 // --- TYPE DEFINITIONS ---
@@ -535,7 +534,9 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
 // --- MAIN SCREEN COMPONENT ---
 export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: Fixture, headerActions?: React.ReactNode }) {
   const { lineups, events, stats, standings, loading } = useMatchData(fixtureId, fixture.league.id);
-  const { isAdmin, user } = useAdmin();
+  const { isAdmin } = useAdmin();
+  const { user } = useAuth();
+  const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({});
   const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
@@ -547,7 +548,7 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
         setFavorites(doc.data() as Favorites || {});
     });
     return () => unsub();
-  }, [user]);
+  }, [user, db]);
 
   const handleOpenRename = (type: RenameType, id: number, name: string) => {
     setRenameItem({ id, name, type });

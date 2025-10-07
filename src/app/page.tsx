@@ -149,8 +149,8 @@ function AppContent({ user }: { user: User | null }) {
               key={item.key}
               className={cn(
                 "absolute inset-0 bg-background flex flex-col",
-                isEntering && 'animate-slide-in-from-right', 
-                isAnimating && 'animate-slide-out-to-right' 
+                 isEntering && 'animate-slide-in-from-right', 
+                 isAnimating && 'animate-slide-out-to-right'
               )}
               style={{
                 zIndex: index,
@@ -195,7 +195,7 @@ export default function Home() {
   }
 
   return (
-    <FirebaseProvider user={user}>
+    <FirebaseProvider>
       {user ? <AppContent user={user} /> : <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />}
     </FirebaseProvider>
   );

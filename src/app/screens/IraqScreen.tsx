@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
+import { useFirestore } from '@/firebase/provider';
 import type { Fixture, Standing, TopScorer, AdminFavorite } from '@/lib/types';
 import { CommentsButton } from '@/components/CommentsButton';
 
@@ -212,6 +212,7 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
 function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const [teams, setTeams] = useState<AdminFavorite[]>([]);
     const [loading, setLoading] = useState(true);
+    const { db } = useFirestore();
 
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'adminFavorites'), (snapshot) => {
@@ -223,7 +224,7 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             setLoading(false);
         });
         return () => unsub();
-    }, []);
+    }, [db]);
 
     if (loading) {
         return (

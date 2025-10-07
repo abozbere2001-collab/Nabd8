@@ -7,9 +7,8 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { useFirebase } from '@/firebase/provider';
+import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
 import { Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -376,7 +375,8 @@ const ODDS_STORAGE_KEY = 'goalstack-showOdds';
 
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: baseHeaderActions }: ScreenProps & { headerActions?: React.ReactNode }) {
-  const { user } = useFirebase();
+  const { user } = useAuth();
+  const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({});
   const [activeTab, setActiveTab] = useState<'all-matches' | 'my-results'>('my-results');
 
@@ -451,7 +451,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
       setFavorites(doc.data() as Favorites || {});
     });
     return () => unsub();
-  }, [user]);
+  }, [user, db]);
 
   const favoritedTeamIds = useMemo(() => favorites?.teams ? Object.keys(favorites.teams).map(Number) : [], [favorites.teams]);
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);

@@ -8,9 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Star, Pencil, Shirt, Users, Trophy, BarChart2, Heart } from 'lucide-react';
-import { useAdmin, useFirebase } from '@/firebase/provider';
+import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -144,7 +143,9 @@ function useTeamData(teamId?: number) {
 // --- MAIN SCREEN COMPONENT ---
 export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerActions }: ScreenProps & { teamId: number; headerActions?: React.ReactNode }) {
   const { teamInfo, players, fixtures, standings, scorers, loading } = useTeamData(teamId);
-  const { isAdmin, user } = useAdmin();
+  const { isAdmin } = useAdmin();
+  const { user } = useAuth();
+  const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({});
   const [renameItem, setRenameItem] = useState<{ id: number; name: string; type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
@@ -163,7 +164,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         });
         return () => unsub();
     }
-  }, [teamId, teamInfo]);
+  }, [teamId, teamInfo, db]);
 
   useEffect(() => {
     if (!user) return;
@@ -171,7 +172,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         setFavorites(doc.data() as Favorites || {});
     });
     return () => unsub();
-  }, [user]);
+  }, [user, db]);
 
   const handleOpenRename = (type: RenameType, id: number, name: string) => {
     setRenameItem({ id, name, type });
@@ -394,3 +395,4 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
 }
 
     
+

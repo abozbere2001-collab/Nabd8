@@ -9,9 +9,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Send } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
-import { useFirebase } from '@/firebase/provider';
+import { useAuth, useFirestore } from '@/firebase/provider';
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
 import type { MatchComment } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -21,7 +20,8 @@ interface CommentsScreenProps extends ScreenProps {
 }
 
 export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: CommentsScreenProps) {
-  const { user } = useFirebase();
+  const { user } = useAuth();
+  const { db } = useFirestore();
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<MatchComment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     });
 
     return () => unsubscribe();
-  }, [matchId]);
+  }, [matchId, db]);
 
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
