@@ -164,20 +164,19 @@ const PlayerIcon = ({ player, isHomeTeam }: { player: LineupPlayer, isHomeTeam: 
     const [row, col] = player.player.grid.split(':').map(Number);
     
     // Default alignment
-    let top = 50;
-    let left = 50;
+    let top = '50%';
+    let left = '50%';
 
-    // Normalize grid positions. Grid seems to be ~1-11 for rows, 1-5 for cols
-    const normalizedRow = (row - 1) / 10; // 0 to 1
-    const normalizedCol = (col - 1) / 4;   // 0 to 1
-
-    top = (1 - normalizedRow) * 90 + 5; // Invert row, map to 5-95%
-    left = normalizedCol * 80 + 10;   // Map to 10-90%
-
-    // Flip for away team
+    // Normalize grid positions.
+    const xPos = (col / 5) * 100;
+    const yPos = (row / 11) * 100;
+    
+    top = `${yPos}%`;
+    left = `${xPos}%`;
+    
     if (!isHomeTeam) {
-       top = 100 - top;
-       left = 100 - left;
+       top = `${100 - yPos}%`;
+       left = `${100 - xPos}%`;
     }
 
 
@@ -185,8 +184,8 @@ const PlayerIcon = ({ player, isHomeTeam }: { player: LineupPlayer, isHomeTeam: 
         <div 
           className="absolute text-center flex flex-col items-center transition-all duration-300" 
           style={{ 
-            top: `${top}%`, 
-            left: `${left}%`,
+            top: top, 
+            left: left,
             width: '60px',
             transform: 'translate(-50%, -50%)',
           }}

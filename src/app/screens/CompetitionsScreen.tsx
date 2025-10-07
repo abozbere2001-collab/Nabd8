@@ -395,9 +395,24 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
           <Accordion type="multiple" className="w-full space-y-4" defaultValue={['World', 'Europe', 'Asia']}>
             {Object.entries(sortedCompetitions).map(([continent, content]) => (
               <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
-                <AccordionTrigger asChild>
-                    {renderContinentHeader(continent)}
-                </AccordionTrigger>
+                <div className="flex w-full items-center justify-between">
+                    <AccordionTrigger className="px-4 text-lg font-bold flex-1 hover:no-underline">
+                        {getContinentName(continent)}
+                    </AccordionTrigger>
+                    {isAdmin && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 mr-2"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openRenameDialog('continent', continent, getContinentName(continent));
+                            }}
+                        >
+                            <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                        </Button>
+                    )}
+                </div>
                 <AccordionContent className="px-1">
                   {"leagues" in content ? (
                      <ul className="flex flex-col">
@@ -407,9 +422,28 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                     <Accordion type="multiple" className="w-full space-y-2 px-2">
                          {Object.entries(content as LeaguesByCountry).map(([country, { flag, leagues }]) => (
                              <AccordionItem value={country} key={country} className="rounded-lg border bg-background">
-                                <AccordionTrigger asChild>
-                                    {renderCountryHeader(country, flag)}
-                                </AccordionTrigger>
+                                <div className="flex w-full items-center justify-between">
+                                    <AccordionTrigger className="px-4 text-base font-semibold flex-1 hover:no-underline">
+                                        <div className="flex items-center gap-3">
+                                            {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
+                                            <span>{getCountryName(country)}</span>
+                                        </div>
+                                    </AccordionTrigger>
+                                    {isAdmin && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-9 w-9 mr-2"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                openRenameDialog('country', country, getCountryName(country));
+                
+                                            }}
+                                        >
+                                            <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                        </Button>
+                                    )}
+                                </div>
                                 <AccordionContent className="px-1">
                                     <ul className="flex flex-col">
                                         {leagues.map(renderLeagueItem)}
