@@ -145,14 +145,13 @@ function AppContent({ user }: { user: User | null }) {
             <div
               key={item.key}
               className={cn(
-                "absolute inset-0 bg-background transition-transform duration-300 ease-out flex flex-col",
-                stack.length > 1 && index === stack.length -1 && !isMainTab && !isAnimating ? 'animate-slide-in-from-right' : '',
+                "absolute inset-0 bg-background transition-transform duration-300 ease-out flex-col",
+                stack.length > 1 && index === stack.length - 1 && !isMainTab && !isAnimating ? 'animate-slide-in-from-right' : '',
                 isAnimating ? 'animate-slide-out-to-right' : '',
-                !isTop ? 'pointer-events-none' : ''
               )}
               style={{ 
                 zIndex: index,
-                visibility: isTop ? 'visible' : 'hidden'
+                display: isTop ? 'flex' : 'none',
               }}
               aria-hidden={!isTop}
             >
