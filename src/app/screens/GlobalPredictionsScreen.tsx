@@ -219,6 +219,28 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             awayGoals,
             timestamp: new Date().toISOString()
         };
+
+        // Add user to leaderboard if they don't exist
+        const leaderboardRef = doc(db, 'leaderboard', user.uid);
+        const leaderboardDoc = await getDoc(leaderboardRef);
+        if (!leaderboardDoc.exists()) {
+            const newUserScore: UserScore = {
+                userId: user.uid,
+                userName: user.displayName || 'مستخدم جديد',
+                userPhoto: user.photoURL || '',
+                totalPoints: 0,
+            };
+            setDoc(leaderboardRef, newUserScore).catch(error => {
+                 const permissionError = new FirestorePermissionError({
+                    path: leaderboardRef.path,
+                    operation: 'create',
+                    requestResourceData: newUserScore
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+        }
+
+
         setDoc(predictionRef, predictionData, { merge: true }).catch(error => {
             const permissionError = new FirestorePermissionError({
               path: predictionRef.path,
@@ -315,5 +337,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
 
     
