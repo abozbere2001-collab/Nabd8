@@ -107,7 +107,7 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg border bg-card p-3 text-sm transition-colors hover:bg-accent"
+        className="rounded-lg border bg-card p-3 text-sm transition-colors hover:bg-accent cursor-pointer"
         onClick={() => onSelect(fixture.fixture.id, fixture)}
       >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
@@ -134,7 +134,7 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
              </div>
              <div className={cn(
                 "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
-                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : ""
+                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-card"
                 )}>
                  {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
@@ -144,7 +144,7 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
                   <Avatar className="h-8 w-8">
                      <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
                      <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
-                 </Avatar>
+                  </Avatar>
                  <span className="font-semibold truncate">{fixture.teams.away.name}</span>
              </div>
          </div>
@@ -236,8 +236,8 @@ const FixturesList = ({
             {sortedLeagues.map(leagueName => {
                 const { league, fixtures } = groupedFixtures[leagueName];
                 return (
-                    <div key={leagueName}>
-                        <div className="flex items-center gap-3 mb-3 px-1">
+                    <div key={leagueName} className="space-y-2">
+                        <div className="flex items-center gap-3 px-1 pt-4">
                             <Avatar className="h-6 w-6">
                                 <AvatarImage src={league.logo} alt={league.name} />
                                 <AvatarFallback>{league.name.substring(0,1)}</AvatarFallback>
@@ -283,7 +283,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     }, [selectedDateKey]);
 
     return (
-        <div ref={scrollerRef} className="flex flex-row-reverse space-x-2 space-x-reverse overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div ref={scrollerRef} className="flex flex-row-reverse space-x-2 space-x-reverse overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {dates.map(date => {
                 const dateKey = formatDateKey(date);
                 const isSelected = dateKey === selectedDateKey;
@@ -354,17 +354,17 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
       <div className="flex flex-1 flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
           
-          <div className="px-4 pt-2 border-b bg-card">
-             <div className="mb-2">
-                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="my-results">نتائجي</TabsTrigger>
-                  <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
-                </TabsList>
-             </div>
-            <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
+          <div className="border-b bg-card">
+             <TabsList className="grid w-full grid-cols-2 rounded-none h-auto p-0">
+                <TabsTrigger value="my-results" className='rounded-none data-[state=active]:rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground'>نتائجي</TabsTrigger>
+                <TabsTrigger value="all-matches" className='rounded-none data-[state=active]:rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground'>كل المباريات</TabsTrigger>
+            </TabsList>
+            <div className="py-2">
+               <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
+            </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto px-4">
             <FixturesList 
                 fixtures={fixtures}
                 loading={loading}

@@ -99,7 +99,7 @@ function AppContent({ user }: { user: User | null }) {
       canGoBack,
       headerActions: (
           <div className="flex items-center gap-1">
-             <SearchSheet>
+             <SearchSheet navigate={navigate}>
                 <Search className="h-5 w-5" />
              </SearchSheet>
              <ProfileButton navigate={navigate} />
