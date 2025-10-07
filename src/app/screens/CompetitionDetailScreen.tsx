@@ -61,6 +61,21 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     toast({ title: "تم نسخ الرابط", description: url });
   };
 
+  const fetchAllCustomNames = useCallback(async () => {
+    if (!db) return;
+    const [teamsSnapshot, playersSnapshot] = await Promise.all([
+        getDocs(collection(db, 'teamCustomizations')),
+        getDocs(collection(db, 'playerCustomizations'))
+    ]);
+    
+    const teamNames = new Map<number, string>();
+    teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+    const playerNames = new Map<number, string>();
+    playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
+    setCustomNames({ teams: teamNames, players: playerNames });
+  }, [db]);
+
+
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
@@ -91,17 +106,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       }
       setLoading(true);
       try {
-        const [teamsSnapshot, playersSnapshot] = await Promise.all([
-             getDocs(collection(db, 'teamCustomizations')),
-             getDocs(collection(db, 'playerCustomizations'))
-        ]);
-        
-        const teamNames = new Map<number, string>();
-        teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-        const playerNames = new Map<number, string>();
-        playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
-        setCustomNames({ teams: teamNames, players: playerNames });
-
+        await fetchAllCustomNames();
 
         const [fixturesRes, standingsRes, scorersRes, teamsRes] = await Promise.all([
           fetch(`/api/football/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`),
@@ -132,7 +137,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       }
     }
     fetchData();
-  }, [leagueId, initialTitle, db]);
+  }, [leagueId, initialTitle, fetchAllCustomNames]);
 
   const handleFavorite = async (type: 'league' | 'team' | 'player', item: any) => {
     if (!user) return;
@@ -180,15 +185,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         case 'player': collectionName = 'playerCustomizations'; break;
     }
     await setDoc(doc(db, collectionName, String(id)), { customName: newName });
-    // Manually update local custom names state to reflect change immediately
-    setCustomNames(prev => {
-        const newNames = new Map(prev[type === 'player' ? 'players' : 'teams']);
-        newNames.set(Number(id), newName);
-        if (type === 'team') return { ...prev, teams: newNames };
-        if (type === 'player') return { ...prev, players: newNames };
-        return prev;
-    });
-
+    await fetchAllCustomNames();
   };
   
   const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
@@ -449,5 +446,3 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
-
-    

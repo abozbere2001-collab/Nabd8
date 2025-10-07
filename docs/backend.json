@@ -199,6 +199,44 @@
         "countryFlag": { "type": "string", "format": "uri" }
       },
       "required": ["leagueId", "name", "logo", "countryName"]
+    },
+    "Prediction": {
+      "title": "Match Prediction",
+      "description": "A user's prediction for a specific match.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "fixtureId": { "type": "number" },
+        "homeGoals": { "type": "number" },
+        "awayGoals": { "type": "number" },
+        "points": { "type": "number", "description": "Points awarded for this prediction." },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "fixtureId", "homeGoals", "awayGoals", "timestamp"]
+    },
+    "UserScore": {
+      "title": "User Score",
+      "description": "Total prediction score for a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhoto": { "type": "string", "format": "uri" },
+        "totalPoints": { "type": "number" }
+      },
+      "required": ["userId", "userName", "totalPoints"]
+    },
+     "LeaderboardEntry": {
+        "title": "Leaderboard Entry",
+        "description": "Represents a single entry in the predictions leaderboard.",
+        "type": "object",
+        "properties": {
+            "userId": { "type": "string" },
+            "userName": { "type": "string" },
+            "userPhoto": { "type": "string", "format": "uri" },
+            "points": { "type": "number" }
+        },
+        "required": ["userId", "userName", "points"]
     }
   },
   "auth": {
@@ -256,8 +294,14 @@
     "/managedCompetitions/{leagueId}": {
       "schema": { "$ref": "#/entities/ManagedCompetition" },
       "description": "Stores the list of competitions managed by the admin."
+    },
+    "/predictions/{predictionId}": {
+      "schema": { "$ref": "#/entities/Prediction" },
+      "description": "Stores user predictions for matches. ID is a composite of userId and fixtureId."
+    },
+    "/leaderboard/{userId}": {
+      "schema": { "$ref": "#/entities/LeaderboardEntry" },
+      "description": "Stores user scores for the prediction leaderboard."
     }
   }
 }
-
-    

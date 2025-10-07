@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -10,12 +11,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { collection, getDocs } from 'firebase/firestore';
-import { useFirestore, useAdmin } from '@/firebase/provider';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
 import type { Fixture, Standing, TopScorer, AdminFavorite } from '@/lib/types';
 import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 
 
 const IRAQI_LEAGUE_ID = 239;
@@ -281,6 +286,109 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     );
 }
 
+function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
+    const [fixtures, setFixtures] = useState<Fixture[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { user } = useAuth();
+    const { db } = useFirestore();
+
+    useEffect(() => {
+        async function fetchData() {
+            setLoading(true);
+            try {
+                const res = await fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}&status=NS`); // Not Started
+                const data = await res.json();
+                if (data.response) setFixtures(data.response);
+            } catch (error) {
+                console.error("Failed to fetch fixtures for predictions:", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchData();
+    }, []);
+
+    const handleSavePrediction = async (fixtureId: number, homeGoals: number, awayGoals: number) => {
+        if (!user) return;
+        const predictionRef = doc(db, 'predictions', `${user.uid}_${fixtureId}`);
+        const predictionData = {
+            userId: user.uid,
+            fixtureId,
+            homeGoals,
+            awayGoals,
+            timestamp: new Date()
+        };
+        try {
+            await setDoc(predictionRef, predictionData);
+            // Optionally, give user feedback
+        } catch (error) {
+            console.error("Error saving prediction:", error);
+        }
+    };
+    
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+    
+    return (
+        <div className="space-y-4 pt-4">
+             <h3 className="text-lg font-bold">لوحة الصدارة</h3>
+              <Card>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>الترتيب</TableHead>
+                            <TableHead>المستخدم</TableHead>
+                            <TableHead className="text-center">النقاط</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {/* Placeholder data */}
+                        <TableRow>
+                            <TableCell>1</TableCell>
+                            <TableCell>المستخدم الأول</TableCell>
+                            <TableCell className="text-center">150</TableCell>
+                        </TableRow>
+                         <TableRow>
+                            <TableCell>2</TableCell>
+                            <TableCell>المستخدم الثاني</TableCell>
+                            <TableCell className="text-center">125</TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+              </Card>
+
+            <h3 className="text-lg font-bold mt-6">المباريات القادمة</h3>
+            {fixtures.length > 0 ? fixtures.map(fixture => (
+                <Card key={fixture.fixture.id} className="p-4">
+                    <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-2 flex-1">
+                            <Avatar><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                            <span className="font-semibold">{fixture.teams.home.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Input type="number" className="w-14 h-8 text-center" min="0" />
+                            <span>-</span>
+                            <Input type="number" className="w-14 h-8 text-center" min="0" />
+                        </div>
+                         <div className="flex items-center gap-2 flex-1 justify-end">
+                            <span className="font-semibold">{fixture.teams.away.name}</span>
+                            <Avatar><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                        </div>
+                    </div>
+                    <div className="text-center text-xs text-muted-foreground mt-2">
+                        {format(new Date(fixture.fixture.date), "EEE, d MMM, HH:mm", { locale: require('date-fns/locale/ar') })}
+                    </div>
+                    <Button size="sm" className="w-full mt-3">حفظ التوقع</Button>
+                </Card>
+            )) : <p className="text-center text-muted-foreground pt-4">لا توجد مباريات قادمة للتوقع.</p>}
+        </div>
+    );
+}
 
 export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   
@@ -302,13 +410,11 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
           <TabsContent value="our-ball" className="pt-0">
              <OurBallTab navigate={navigate} />
           </TabsContent>
-          <TabsContent value="predictions" className="p-4 pt-4 text-center text-muted-foreground">
-            واجهة التوقعات ستضاف لاحقاً.
+          <TabsContent value="predictions" className="pt-0">
+            <PredictionsTab navigate={navigate} />
           </TabsContent>
         </Tabs>
       </div>
     </div>
   );
 }
-
-    

@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Star, Pencil, Shirt, Users, Trophy, BarChart2, Heart, Copy } from 'lucide-react';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot, setDoc, updateDoc, deleteField, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, deleteField, getDoc, getDocs, collection } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -136,29 +136,30 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
   const [noteTeam, setNoteTeam] = useState<{id: number, name: string, logo: string} | null>(null);
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [displayTitle, setDisplayTitle] = useState(teamInfo?.team.name || "الفريق");
+  const [customPlayerNames, setCustomPlayerNames] = useState<Map<number, string>>(new Map());
 
-  const fetchCustomTeamName = React.useCallback(async () => {
-    if (teamId) {
-        const docRef = doc(db, "teamCustomizations", String(teamId));
-        try {
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                setDisplayTitle(docSnap.data().customName);
+
+  const fetchCustomNames = React.useCallback(async () => {
+    if (!db) return;
+    try {
+        if (teamId) {
+            const teamDocRef = doc(db, "teamCustomizations", String(teamId));
+            const teamDocSnap = await getDoc(teamDocRef);
+            if (teamDocSnap.exists()) {
+                setDisplayTitle(teamDocSnap.data().customName);
             } else if (teamInfo?.team.name) {
                 setDisplayTitle(teamInfo.team.name);
             }
-        } catch (error) {
-            const permissionError = new FirestorePermissionError({
-              path: docRef.path,
-              operation: 'get',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-             if (teamInfo?.team.name) {
-                setDisplayTitle(teamInfo.team.name);
-            }
         }
+        const playersSnapshot = await getDocs(collection(db, 'playerCustomizations'));
+        const playerNames = new Map<number, string>();
+        playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
+        setCustomPlayerNames(playerNames);
+    } catch (error) {
+        console.error("Error fetching custom names:", error);
     }
-  }, [db, teamId, teamInfo?.team.name]);
+}, [db, teamId, teamInfo?.team.name]);
+
 
   const handleCopy = (url: string | null) => {
     if (!url) return;
@@ -168,8 +169,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
 
 
   useEffect(() => {
-    fetchCustomTeamName();
-  }, [fetchCustomTeamName]);
+    fetchCustomNames();
+  }, [fetchCustomNames]);
 
 
   useEffect(() => {
@@ -200,9 +201,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     const data = { customName: newName };
     try {
         await setDoc(docRef, data);
-        if(type === 'team') {
-            fetchCustomTeamName();
-        }
+        await fetchCustomNames();
     } catch (error) {
         const permissionError = new FirestorePermissionError({
           path: docRef.path,
@@ -267,6 +266,10 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         });
         errorEmitter.emit('permission-error', permissionError);
     }
+  }
+  
+  const getPlayerDisplayName = (id: number, defaultName: string) => {
+    return customPlayerNames.get(id) || defaultName;
   }
 
   const isTeamFavorited = !!favorites?.teams?.[teamId];
@@ -340,7 +343,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                 {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(player.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
                             </div>
                             <div className="flex-1">
-                                <p className="font-bold">{player.name}</p>
+                                <p className="font-bold">{getPlayerDisplayName(player.id, player.name)}</p>
                                 <p className="text-sm text-muted-foreground">
                                     {player.position}
                                     {isAdmin && <span className="text-xs text-muted-foreground/70 ml-2">(ID: {player.id})</span>}
@@ -350,7 +353,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                 <Button variant="ghost" size="icon" onClick={() => handleFavorite('player', player)}>
                                     <Star className={cn("h-5 w-5", favorites?.players?.[player.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
                                 </Button>
-                                {isAdmin && <Button variant="ghost" size="icon" onClick={() => handleOpenRename('player', player.id, player.name)}>
+                                {isAdmin && <Button variant="ghost" size="icon" onClick={() => handleOpenRename('player', player.id, getPlayerDisplayName(player.id, player.name))}>
                                     <Pencil className="h-5 w-5 text-muted-foreground" />
                                 </Button>}
                             </div>
@@ -449,5 +452,3 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     </div>
   );
 }
-
-    
