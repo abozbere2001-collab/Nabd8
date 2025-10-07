@@ -239,14 +239,17 @@ const FixturesList = ({
             fixturesToFilter = fixturesToFilter.filter(f => ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(f.fixture.status.short));
         }
 
-        if (activeTab === 'all-matches' || activeTab === 'global-predictions') {
+        if (activeTab === 'all-matches') {
             return fixturesToFilter;
         }
-        return fixturesToFilter.filter(f => 
-            favoritedTeamIds.includes(f.teams.home.id) ||
-            favoritedTeamIds.includes(f.teams.away.id) ||
-            favoritedLeagueIds.includes(f.league.id)
-        );
+        if (activeTab === 'my-results'){
+             return fixturesToFilter.filter(f => 
+                favoritedTeamIds.includes(f.teams.home.id) ||
+                favoritedTeamIds.includes(f.teams.away.id) ||
+                favoritedLeagueIds.includes(f.league.id)
+            );
+        }
+        return []; // Return empty for 'global-predictions' as it has its own screen
     }, [fixtures, activeTab, favoritedTeamIds, favoritedLeagueIds, showLiveOnly]);
 
     const groupedFixtures = useMemo(() => {
@@ -287,7 +290,7 @@ const FixturesList = ({
         )
     }
 
-    if (fixtures.length > 0 && filteredFixtures.length === 0) {
+    if (fixtures.length > 0 && filteredFixtures.length === 0 && activeTab === 'my-results') {
        return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
                 <p className="font-bold text-lg">لا توجد مباريات مفضلة لهذا اليوم</p>
@@ -475,7 +478,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
   useEffect(() => {
     if (activeTab === 'global-predictions') {
-      navigate('GlobalPredictions');
       return;
     }
     async function fetchFixturesForDate(dateKey: string) {
@@ -498,7 +500,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
         }
     }
     fetchFixturesForDate(selectedDateKey);
-  }, [selectedDateKey, showOdds, activeTab, navigate]);
+  }, [selectedDateKey, showOdds, activeTab]);
   
   useEffect(() => {
     if (!user) {
@@ -518,6 +520,17 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
     return () => unsubscribe();
   }, [user, db]);
+  
+  const handleTabChange = (value: string) => {
+    const tabValue = value as 'all-matches' | 'my-results' | 'global-predictions';
+    if (tabValue === 'global-predictions') {
+      navigate('GlobalPredictions');
+      // Keep the old tab active visually until navigation happens
+    } else {
+      setActiveTab(tabValue);
+    }
+  };
+
 
   const favoritedTeamIds = useMemo(() => favorites?.teams ? Object.keys(favorites.teams).map(Number) : [], [favorites.teams]);
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
@@ -562,7 +575,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
       <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={screenHeaderActions} />
       <div className="flex flex-1 flex-col min-h-0">
         <div className="flex flex-col border-b bg-card">
-            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
               <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none">
                   <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
                   <TabsTrigger value="global-predictions">التوقعات العالمية</TabsTrigger>
@@ -591,3 +604,4 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
     </div>
   );
 }
+
