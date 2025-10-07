@@ -24,7 +24,7 @@ const Switch = React.forwardRef<
         "ltr:data-[state=checked]:translate-x-4"
       )}
     >
-        <span className="text-xs font-semibold">مباشر</span>
+        <span className="text-[8px] font-semibold">مباشر</span>
     </SwitchPrimitives.Thumb>
   </SwitchPrimitives.Root>
 ))
