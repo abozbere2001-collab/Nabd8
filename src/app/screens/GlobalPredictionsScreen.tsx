@@ -19,6 +19,7 @@ import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, where, get
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useDebounce } from '@/hooks/use-debounce';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 const AdminMatchSelector = ({ navigate }: { navigate: ScreenProps['navigate'] }) => {
@@ -275,96 +276,115 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     return (
         <div className="flex h-full flex-col bg-background">
             <ScreenHeader title="التوقعات العالمية" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="flex-1 overflow-y-auto">
+                <Tabs defaultValue="predictions" className="w-full">
+                    <div className="sticky top-0 bg-background z-10 border-b">
+                       <TabsList className="grid w-full grid-cols-3">
+                           <TabsTrigger value="prizes">الجوائز</TabsTrigger>
+                           <TabsTrigger value="leaderboard">الترتيب</TabsTrigger>
+                           <TabsTrigger value="predictions">التصويت</TabsTrigger>
+                       </TabsList>
+                    </div>
 
-                {isAdmin && <AdminMatchSelector navigate={navigate} />}
+                    <TabsContent value="predictions" className="p-4 mt-0 space-y-6">
+                        {isAdmin && <AdminMatchSelector navigate={navigate} />}
 
-                <div>
-                    <h3 className="text-xl font-bold mb-3">مباريات اليوم للتوقع</h3>
-                    {loading ? (
-                         <div className="space-y-4">
-                            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
+                        <div>
+                            <h3 className="text-xl font-bold mb-3">مباريات اليوم للتوقع</h3>
+                            {loading ? (
+                                <div className="space-y-4">
+                                    {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
+                                </div>
+                            ) : selectedMatches.length > 0 ? (
+                                <div className="space-y-4">
+                                {selectedMatches.map(fixture => (
+                                    <PredictionCard 
+                                    key={fixture.fixture.id}
+                                    fixture={fixture}
+                                    userPrediction={predictions[fixture.fixture.id]}
+                                    onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
+                                    />
+                                ))}
+                                </div>
+                            ) : (
+                                <Card>
+                                <CardContent className="p-6 text-center text-muted-foreground">
+                                        <p>لم يتم اختيار أي مباريات للتوقع لهذا اليوم بعد.</p>
+                                        <p className="text-xs">سيقوم النظام باختيار مباريات مهمة قريبًا أو يمكن للمدير اختيارها يدويًا.</p>
+                                </CardContent>
+                                </Card>
+                            )}
                         </div>
-                    ) : selectedMatches.length > 0 ? (
-                        <div className="space-y-4">
-                           {selectedMatches.map(fixture => (
-                               <PredictionCard 
-                                 key={fixture.fixture.id}
-                                 fixture={fixture}
-                                 userPrediction={predictions[fixture.fixture.id]}
-                                 onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
-                               />
-                           ))}
-                        </div>
-                    ) : (
-                        <Card>
-                           <CardContent className="p-6 text-center text-muted-foreground">
-                                <p>لم يتم اختيار أي مباريات للتوقع لهذا اليوم بعد.</p>
-                                <p className="text-xs">سيقوم النظام باختيار مباريات مهمة قريبًا أو يمكن للمدير اختيارها يدويًا.</p>
+                    </TabsContent>
+
+                    <TabsContent value="leaderboard" className="p-4 mt-0">
+                         <Card>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>الترتيب</TableHead>
+                                        <TableHead>المستخدم</TableHead>
+                                        <TableHead className="text-center">النقاط</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {loadingLeaderboard ? (
+                                        Array.from({ length: 5 }).map((_, i) => (
+                                            <TableRow key={i}>
+                                                <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                                                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                                <TableCell className="text-center"><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : leaderboard.length > 0 ? (
+                                        leaderboard.map((score, index) => (
+                                            <TableRow key={score.userId}>
+                                                <TableCell>{index + 1}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <Avatar className="h-6 w-6">
+                                                            <AvatarImage src={score.userPhoto}/>
+                                                            <AvatarFallback>{score.userName.charAt(0)}</AvatarFallback>
+                                                        </Avatar>
+                                                        {score.userName}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={3} className="text-center text-muted-foreground h-24">
+                                                لا توجد بيانات لعرضها في لوحة الصدارة بعد.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                            {hasMore && (
+                                <div className="p-2">
+                                    <Button
+                                        variant="outline"
+                                        className="w-full"
+                                        onClick={fetchMoreLeaderboard}
+                                        disabled={loadingMore}
+                                    >
+                                        {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : "تحميل المزيد"}
+                                    </Button>
+                                </div>
+                            )}
+                        </Card>
+                    </TabsContent>
+                    
+                    <TabsContent value="prizes" className="p-4 mt-0">
+                         <Card>
+                           <CardContent className="p-10 text-center text-muted-foreground">
+                                <p className="text-lg font-bold">قريبًا...</p>
+                                <p>سيتم الإعلان عن الجوائز وطريقة الفوز بها هنا.</p>
                            </CardContent>
                         </Card>
-                    )}
-                </div>
-
-                <div>
-                    <h3 className="text-xl font-bold mb-3">لوحة الصدارة العالمية</h3>
-                     <Card>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>الترتيب</TableHead>
-                                    <TableHead>المستخدم</TableHead>
-                                    <TableHead className="text-center">النقاط</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loadingLeaderboard ? (
-                                    Array.from({ length: 5 }).map((_, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                                            <TableCell className="text-center"><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : leaderboard.length > 0 ? (
-                                     leaderboard.map((score, index) => (
-                                        <TableRow key={score.userId}>
-                                            <TableCell>{index + 1}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Avatar className="h-6 w-6">
-                                                        <AvatarImage src={score.userPhoto}/>
-                                                        <AvatarFallback>{score.userName.charAt(0)}</AvatarFallback>
-                                                    </Avatar>
-                                                    {score.userName}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="text-center text-muted-foreground h-24">
-                                            لا توجد بيانات لعرضها في لوحة الصدارة بعد.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                         {hasMore && (
-                            <div className="p-2">
-                                <Button
-                                    variant="outline"
-                                    className="w-full"
-                                    onClick={fetchMoreLeaderboard}
-                                    disabled={loadingMore}
-                                >
-                                    {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : "تحميل المزيد"}
-                                </Button>
-                            </div>
-                        )}
-                    </Card>
-                </div>
+                    </TabsContent>
+                </Tabs>
             </div>
         </div>
     );
