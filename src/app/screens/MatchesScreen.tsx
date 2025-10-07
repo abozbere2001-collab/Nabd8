@@ -363,6 +363,8 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     );
 }
 
+const ODDS_STORAGE_KEY = 'goalstack-showOdds';
+
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: baseHeaderActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   const { user } = useFirebase();
@@ -377,6 +379,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   const [showOdds, setShowOdds] = useState(false);
   const [loadingOdds, setLoadingOdds] = useState(false);
   const [showLiveOnly, setShowLiveOnly] = useState(false);
+
+  useEffect(() => {
+    const savedState = localStorage.getItem(ODDS_STORAGE_KEY);
+    setShowOdds(savedState === 'true');
+  }, []);
 
   const handleSelectFixture = (fixtureId: number, fixture: Fixture) => {
     navigate('MatchDetails', { fixtureId, fixture });
@@ -443,6 +450,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   const toggleShowOdds = () => {
     const newShowOdds = !showOdds;
     setShowOdds(newShowOdds);
+    localStorage.setItem(ODDS_STORAGE_KEY, String(newShowOdds));
     if(newShowOdds && Object.keys(odds).length === 0) { // Fetch if turning on and odds are not loaded
         fetchOddsForDate(selectedDateKey);
     }
@@ -450,18 +458,17 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
   const screenHeaderActions = (
     <div className='flex items-center gap-2'>
-        <Switch
-            id="live-mode"
-            checked={showLiveOnly}
-            onCheckedChange={setShowLiveOnly}
-        />
-       <Button 
-            variant={showOdds ? 'default' : 'ghost'} 
-            className={cn(
-                "h-7 px-2 text-xs",
-                !showOdds && "border border-input"
-            )}
-            onClick={toggleShowOdds} 
+        <div className="flex items-center space-x-2">
+            <Switch
+                id="live-mode"
+                checked={showLiveOnly}
+                onCheckedChange={setShowLiveOnly}
+            />
+        </div>
+        <Button
+            variant={showOdds ? "default" : "secondary"}
+            className="h-7 px-2 text-xs"
+            onClick={toggleShowOdds}
             disabled={loadingOdds}
         >
             {loadingOdds ? <Loader2 className="h-4 w-4 animate-spin" /> : '1X2'}
