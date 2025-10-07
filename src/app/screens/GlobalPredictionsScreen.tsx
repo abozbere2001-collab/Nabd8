@@ -139,8 +139,9 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             snapshot.forEach(doc => scores.push(doc.data() as UserScore));
             setLeaderboard(scores);
         }, (error) => {
-            const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
+            // Intentionally not creating a permission error here to avoid loops if rules are strict.
+            // The main data fetch will handle permission errors.
+            console.error("Leaderboard fetch error:", error);
         });
         return () => unsubscribeLeaderboard();
     }, [db]);
@@ -322,3 +323,4 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     );
 }
 
+    
