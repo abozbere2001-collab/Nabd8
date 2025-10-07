@@ -31,6 +31,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   const commentsColRef = collection(db, 'comments', String(matchId), 'messages');
 
   useEffect(() => {
+    setLoading(true);
     const q = query(commentsColRef, orderBy('createdAt', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchComment));
