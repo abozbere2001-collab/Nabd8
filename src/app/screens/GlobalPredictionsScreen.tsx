@@ -139,8 +139,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             snapshot.forEach(doc => scores.push(doc.data() as UserScore));
             setLeaderboard(scores);
         }, (error) => {
-            // Intentionally not creating a permission error here to avoid loops if rules are strict.
-            // The main data fetch will handle permission errors.
             console.error("Leaderboard fetch error:", error);
         });
         return () => unsubscribeLeaderboard();
@@ -322,5 +320,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
 
     
