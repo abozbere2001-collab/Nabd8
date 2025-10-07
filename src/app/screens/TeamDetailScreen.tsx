@@ -258,7 +258,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         <Skeleton className="h-64 w-full" />
       </div> : teamInfo ? (
         <div className="flex-1 overflow-y-auto">
-            <Tabs defaultValue="details" className="w-full">
+            <Tabs defaultValue="players" className="w-full">
                  <div className="bg-card sticky top-0 z-10 border-b">
                     <div className="p-4 flex items-center gap-4">
                         <Avatar className="h-20 w-20 border">
@@ -271,7 +271,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                             <p className="text-sm text-muted-foreground">{teamInfo.venue.name} ({teamInfo.venue.city})</p>
                         </div>
                     </div>
-                    <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
+                    <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none flex-row-reverse">
                         <TabsTrigger value="details" className='data-[state=active]:rounded-none'>التفاصيل</TabsTrigger>
                         <TabsTrigger value="players" className='data-[state=active]:rounded-none'>اللاعبون</TabsTrigger>
                     </TabsList>
@@ -302,9 +302,9 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                    </div>
                 </TabsContent>
                 <TabsContent value="details" className="p-0">
-                     <Tabs defaultValue="matches" className="w-full">
+                     <Tabs defaultValue="scorers" className="w-full">
                          <div className="bg-card sticky top-[152px] z-10 border-b">
-                            <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none">
+                            <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none flex-row-reverse">
                                 <TabsTrigger value="matches" className='data-[state=active]:rounded-none'><Shirt className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
                                 <TabsTrigger value="standings" className='data-[state=active]:rounded-none'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
                                 <TabsTrigger value="scorers" className='data-[state=active]:rounded-none'><BarChart2 className="w-4 h-4 ml-1"/>الإحصائيات</TabsTrigger>
@@ -338,12 +338,22 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                          <TabsContent value="standings" className="p-0">
                             {standings && standings.length > 0 ? (
                                 <Table>
-                                    <TableHeader><TableRow><TableHead className="w-1/2 text-right">الفريق</TableHead><TableHead className="text-center">ل</TableHead><TableHead className="text-center">ف</TableHead><TableHead className="text-center">ت</TableHead><TableHead className="text-center">خ</TableHead><TableHead className="text-center">ن</TableHead></TableRow></TableHeader>
+                                    <TableHeader><TableRow>
+                                        <TableHead className="text-center">ن</TableHead><TableHead className="text-center">خ</TableHead><TableHead className="text-center">ت</TableHead><TableHead className="text-center">ف</TableHead><TableHead className="text-center">ل</TableHead><TableHead className="w-1/2 text-right">الفريق</TableHead>
+                                    </TableRow></TableHeader>
                                     <TableBody>
                                     {standings.map((s) => (
                                         <TableRow key={s.team.id} className={cn("cursor-pointer", s.team.id === teamId ? 'bg-primary/10' : '')} onClick={() => navigate('TeamDetails', {teamId: s.team.id})}>
-                                            <TableCell className="font-medium"><div className="flex items-center gap-2"><span>{s.rank}</span><Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar><span className="truncate">{s.team.name}</span></div></TableCell>
-                                            <TableCell className="text-center">{s.all.played}</TableCell><TableCell className="text-center">{s.all.win}</TableCell><TableCell className="text-center">{s.all.draw}</TableCell><TableCell className="text-center">{s.all.lose}</TableCell><TableCell className="text-center font-bold">{s.points}</TableCell>
+                                            <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                            <TableCell className="text-center">{s.all.lose}</TableCell>
+                                            <TableCell className="text-center">{s.all.draw}</TableCell>
+                                            <TableCell className="text-center">{s.all.win}</TableCell>
+                                            <TableCell className="text-center">{s.all.played}</TableCell>
+                                            <TableCell className="font-medium"><div className="flex items-center gap-2 justify-end">
+                                                <span className="truncate">{s.team.name}</span>
+                                                <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
+                                                <span>{s.rank}</span>
+                                            </div></TableCell>
                                         </TableRow>
                                     ))}
                                     </TableBody>
@@ -353,13 +363,17 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                          <TabsContent value="scorers" className="p-0">
                              {scorers && scorers.length > 0 ? (
                                 <Table>
-                                    <TableHeader><TableRow><TableHead className="text-right">اللاعب</TableHead><TableHead className="text-center">الأهداف</TableHead><TableHead className="text-center">صناعة</TableHead></TableRow></TableHeader>
+                                    <TableHeader><TableRow>
+                                        <TableHead className="text-center">صناعة</TableHead>
+                                        <TableHead className="text-center">الأهداف</TableHead>
+                                        <TableHead className="text-right">اللاعب</TableHead>
+                                        </TableRow></TableHeader>
                                     <TableBody>
                                     {scorers.filter(scorer => scorer.statistics[0].team.id === teamId).map(({ player, statistics }) => (
                                         <TableRow key={player.id}>
-                                            <TableCell><div className="flex items-center gap-3"><Avatar className="h-10 w-10"><AvatarImage src={player.photo} /></Avatar><p className="font-semibold">{player.name}</p></div></TableCell>
-                                            <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total || 0}</TableCell>
                                             <TableCell className="text-center font-bold text-lg">{statistics[0]?.assists || 0}</TableCell>
+                                            <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total || 0}</TableCell>
+                                            <TableCell><div className="flex items-center gap-3 justify-end"><p className="font-semibold">{player.name}</p><Avatar className="h-10 w-10"><AvatarImage src={player.photo} /></Avatar></div></TableCell>
                                         </TableRow>
                                     ))}
                                     </TableBody>

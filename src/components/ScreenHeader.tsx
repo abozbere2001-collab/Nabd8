@@ -15,7 +15,7 @@ interface ScreenHeaderProps {
 export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActions }: ScreenHeaderProps) {
   return (
     <header className="relative flex h-14 flex-shrink-0 items-center justify-center border-b bg-background px-4">
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+      <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center">
          {canGoBack && (
             <Button
             variant="ghost"
@@ -30,7 +30,7 @@ export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActio
 
       <h1 className="truncate text-lg font-bold">{title}</h1>
       
-      <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
         {secondaryActions}
         {actions}
       </div>

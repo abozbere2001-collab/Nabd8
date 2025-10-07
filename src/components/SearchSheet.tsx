@@ -235,11 +235,11 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent side="right" className="flex flex-col">
+      <SheetContent side="left" className="flex flex-col">
         <SheetHeader>
           <SheetTitle>البحث</SheetTitle>
         </SheetHeader>
-        <div className="flex w-full items-center space-x-2 space-x-reverse">
+        <div className="flex w-full items-center space-x-2">
             <Input
                 type="text"
                 placeholder="اكتب هنا للبحث عن فريق أو بطولة..."

@@ -335,7 +335,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     }, [selectedDateKey]);
 
     return (
-        <div ref={scrollerRef} className="flex flex-row-reverse space-x-2 space-x-reverse overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div ref={scrollerRef} className="flex space-x-2 overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {dates.map(date => {
                 const dateKey = formatDateKey(date);
                 const isSelected = dateKey === selectedDateKey;
@@ -370,7 +370,7 @@ const ODDS_STORAGE_KEY = 'goalstack-showOdds';
 export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: baseHeaderActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   const { user } = useFirebase();
   const [favorites, setFavorites] = useState<Favorites>({});
-  const [activeTab, setActiveTab] = useState<'my-results' | 'all-matches'>('my-results');
+  const [activeTab, setActiveTab] = useState<'all-matches' | 'my-results'>('all-matches');
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
@@ -493,7 +493,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
       <div className="flex flex-1 flex-col min-h-0">
         <div className="flex flex-col border-b bg-card">
             <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
+              <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none flex-row-reverse">
                   <TabsTrigger value="my-results">نتائجي</TabsTrigger>
                   <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
               </TabsList>

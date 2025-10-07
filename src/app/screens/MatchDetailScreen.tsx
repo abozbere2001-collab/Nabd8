@@ -142,12 +142,12 @@ function useMatchData(fixtureId?: number, leagueId?: number) {
 // --- SUB-COMPONENTS ---
 const MatchHeader = ({ fixture, onBack, headerActions, navigate }: { fixture: Fixture; onBack: () => void, headerActions?: React.ReactNode, navigate: ScreenProps['navigate'] }) => (
   <header className="relative bg-card text-foreground pt-10 pb-6 px-4 shadow-lg border-b">
-    <div className="absolute top-4 right-4">
+    <div className="absolute top-4 left-4">
       <Button variant="ghost" size="icon" onClick={onBack} className="text-foreground/80 hover:bg-accent">
         <ArrowLeft />
       </Button>
     </div>
-    <div className="absolute top-2 left-2 flex gap-1">
+    <div className="absolute top-2 right-2 flex gap-1">
        {headerActions}
     </div>
     <div className="text-center text-sm text-muted-foreground mb-4 cursor-pointer" onClick={() => navigate('CompetitionDetails', { leagueId: fixture.league.id, title: fixture.league.name, logo: fixture.league.logo })}>
@@ -423,32 +423,32 @@ const StandingsTab = ({ standings, loading, fixture, navigate }: { standings: St
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-1/2 text-right">الفريق</TableHead>
-                                <TableHead className="text-center">ل</TableHead>
-                                <TableHead className="text-center">ف</TableHead>
-                                <TableHead className="text-center">ت</TableHead>
-                                <TableHead className="text-center">خ</TableHead>
                                 <TableHead className="text-center">ن</TableHead>
+                                <TableHead className="text-center">خ</TableHead>
+                                <TableHead className="text-center">ت</TableHead>
+                                <TableHead className="text-center">ف</TableHead>
+                                <TableHead className="text-center">ل</TableHead>
+                                <TableHead className="w-1/2 text-right">الفريق</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {group.map((s) => (
                                 <TableRow key={s.team.id} className={cn('cursor-pointer', s.team.id === fixture.teams.home.id || s.team.id === fixture.teams.away.id ? 'bg-primary/10' : '')} onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
+                                    <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                    <TableCell className="text-center">{s.all.lose}</TableCell>
+                                    <TableCell className="text-center">{s.all.draw}</TableCell>
+                                    <TableCell className="text-center">{s.all.win}</TableCell>
+                                    <TableCell className="text-center">{s.all.played}</TableCell>
                                     <TableCell className="font-medium">
-                                        <div className="flex items-center gap-2">
-                                            <span>{s.rank}</span>
+                                        <div className="flex items-center gap-2 justify-end">
+                                            <span className="truncate">{s.team.name}</span>
                                             <Avatar className="h-6 w-6">
                                                 <AvatarImage src={s.team.logo} alt={s.team.name} />
                                                 <AvatarFallback>{s.team.name.substring(0, 1)}</AvatarFallback>
                                             </Avatar>
-                                            <span className="truncate">{s.team.name}</span>
+                                            <span>{s.rank}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-center">{s.all.played}</TableCell>
-                                    <TableCell className="text-center">{s.all.win}</TableCell>
-                                    <TableCell className="text-center">{s.all.draw}</TableCell>
-                                    <TableCell className="text-center">{s.all.lose}</TableCell>
-                                    <TableCell className="text-center font-bold">{s.points}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -589,9 +589,9 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
           itemType="العنصر"
         />}
       <div className="flex-1 overflow-y-auto">
-        <Tabs defaultValue="lineups" className="w-full">
+        <Tabs defaultValue="standings" className="w-full">
           <div className="sticky top-0 bg-background z-10 border-b">
-            <TabsList className="grid w-full grid-cols-4 rounded-none">
+            <TabsList className="grid w-full grid-cols-4 rounded-none flex-row-reverse">
               <TabsTrigger value="details">التفاصيل</TabsTrigger>
               <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
               <TabsTrigger value="stats">الإحصائيات</TabsTrigger>
@@ -601,7 +601,7 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
           <TabsContent value="details" className='p-0'>
             <Tabs defaultValue={eventFilter} onValueChange={(val) => setEventFilter(val as EventFilter)} className="w-full">
                  <div className="px-4 pt-2">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-2 flex-row-reverse">
                         <TabsTrigger value="highlights">الأبرز</TabsTrigger>
                         <TabsTrigger value="all">جميع التفاصيل</TabsTrigger>
                     </TabsList>

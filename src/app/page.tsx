@@ -100,9 +100,7 @@ function AppContent({ user }: { user: User | null }) {
     return stack.map((item) => {
         const ScreenComponent = screens[item.screen as Exclude<ScreenKey, 'Search'>];
         const headerActions = (
-          <>
-            <ProfileButton navigate={navigate} />
-          </>
+          <ProfileButton navigate={navigate} />
         );
 
         if (!screenInstances.current[item.key]) {
@@ -145,8 +143,8 @@ function AppContent({ user }: { user: User | null }) {
               key={item.key}
               className={cn(
                 "absolute inset-0 bg-background flex flex-col",
-                isEntering && 'animate-slide-in-from-left', 
-                isAnimating && 'animate-slide-out-to-left' 
+                isEntering && 'animate-slide-in-from-right', 
+                isAnimating && 'animate-slide-out-to-right' 
               )}
               style={{
                 zIndex: index,
