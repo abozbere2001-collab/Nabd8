@@ -107,7 +107,7 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg border bg-card p-3 text-sm transition-colors hover:bg-accent cursor-pointer"
+        className="rounded-lg border bg-muted p-3 text-sm transition-colors hover:bg-accent cursor-pointer"
         onClick={() => onSelect(fixture.fixture.id, fixture)}
       >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
@@ -134,7 +134,7 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
              </div>
              <div className={cn(
                 "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
-                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-card"
+                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-card" : "bg-card"
                 )}>
                  {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
@@ -236,8 +236,8 @@ const FixturesList = ({
             {sortedLeagues.map(leagueName => {
                 const { league, fixtures } = groupedFixtures[leagueName];
                 return (
-                    <div key={leagueName} className="space-y-2">
-                        <div className="flex items-center gap-3 px-1 pt-4">
+                    <div key={leagueName}>
+                        <div className="flex items-center gap-3 px-1 py-4">
                             <Avatar className="h-6 w-6">
                                 <AvatarImage src={league.logo} alt={league.name} />
                                 <AvatarFallback>{league.name.substring(0,1)}</AvatarFallback>
@@ -356,8 +356,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
           
           <div className="border-b bg-card">
              <TabsList className="grid w-full grid-cols-2 rounded-none h-auto p-0">
-                <TabsTrigger value="my-results" className='rounded-none data-[state=active]:rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground'>نتائجي</TabsTrigger>
-                <TabsTrigger value="all-matches" className='rounded-none data-[state=active]:rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground'>كل المباريات</TabsTrigger>
+                <TabsTrigger value="my-results" className='rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground'>نتائجي</TabsTrigger>
+                <TabsTrigger value="all-matches" className='rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground'>كل المباريات</TabsTrigger>
             </TabsList>
             <div className="py-2">
                <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
