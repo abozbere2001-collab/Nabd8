@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
+import { initializeApp, getApps, getApp, type FirebaseOptions, type FirebaseApp } from "firebase/app";
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 export const firebaseConfig: FirebaseOptions = {
@@ -14,7 +14,7 @@ export const firebaseConfig: FirebaseOptions = {
 
 
 // Initialize Firebase
-export function initializeFirebase() {
+export function initializeFirebase(): FirebaseApp {
     if (getApps().length) {
         return getApp();
     }

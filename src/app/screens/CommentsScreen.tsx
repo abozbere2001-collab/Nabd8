@@ -490,5 +490,3 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     </div>
   );
 }
-
-    
