@@ -11,8 +11,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { Fixture } from '@/lib/types';
 import { CommentsButton } from '@/components/CommentsButton';
-import { FirestorePermissionError } from '@/firebase/errors';
-import { errorEmitter } from '@/firebase/error-emitter';
+import { useToast } from '@/hooks/use-toast';
 
 
 const FixtureItem = React.memo(({ fixture, navigate }: { fixture: Fixture, navigate: (screen: 'MatchDetails', props: any) => void }) => {
@@ -70,6 +69,7 @@ FixtureItem.displayName = 'FixtureItem';
 export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, teamName, headerActions }: ScreenProps & { teamId: number; teamName: string; headerActions?: React.ReactNode }) {
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
     const [loading, setLoading] = useState(true);
+    const { toast } = useToast();
 
     useEffect(() => {
         const fetchFixtures = async () => {
@@ -84,18 +84,18 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
                 const data = await res.json();
                 setFixtures(data.response || []);
             } catch (error) {
-                console.error("Error in AdminFavoriteTeamScreen:", error);
-                const permissionError = new FirestorePermissionError({
-                  path: `/api/football/fixtures?team=${teamId}`,
-                  operation: 'get',
+                console.error("Error fetching fixtures in AdminFavoriteTeamScreen:", error);
+                toast({
+                    variant: "destructive",
+                    title: "خطأ في الشبكة",
+                    description: "فشل في جلب المباريات. يرجى التحقق من اتصالك بالإنترنت.",
                 });
-                errorEmitter.emit('permission-error', permissionError);
             } finally {
                 setLoading(false);
             }
         };
         fetchFixtures();
-    }, [teamId]);
+    }, [teamId, toast]);
 
     return (
         <div className="flex h-full flex-col bg-background">

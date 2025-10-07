@@ -34,46 +34,46 @@ export function CommentsButton({ matchId, navigate, commentsEnabled }: CommentsB
   const [isDeactivateAlertOpen, setDeactivateAlertOpen] = useState(false);
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const handleActivateComments = async (e: React.MouseEvent) => {
+  const handleActivateComments = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isAdmin) return;
+    if (!isAdmin || !db) return;
     
     setIsProcessing(true);
     const matchDocRef = doc(db, 'matches', String(matchId));
     const data = { commentsEnabled: true };
-    try {
-      await setDoc(matchDocRef, data, { merge: true });
-    } catch (error) {
-        const permissionError = new FirestorePermissionError({
-            path: matchDocRef.path,
-            operation: 'create',
-            requestResourceData: data,
+    setDoc(matchDocRef, data, { merge: true })
+        .catch((serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: matchDocRef.path,
+                operation: 'create',
+                requestResourceData: data,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        })
+        .finally(() => {
+            setIsProcessing(false);
         });
-        errorEmitter.emit('permission-error', permissionError);
-    } finally {
-      setIsProcessing(false);
-    }
   };
   
-  const handleDeactivateComments = async () => {
-    if (!isAdmin) return;
+  const handleDeactivateComments = () => {
+    if (!isAdmin || !db) return;
     
     setIsProcessing(true);
     const matchDocRef = doc(db, 'matches', String(matchId));
     const data = { commentsEnabled: false };
-     try {
-      await setDoc(matchDocRef, data, { merge: true });
-    } catch (error) {
-        const permissionError = new FirestorePermissionError({
-            path: matchDocRef.path,
-            operation: 'update',
-            requestResourceData: data,
+    setDoc(matchDocRef, data, { merge: true })
+        .catch((serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: matchDocRef.path,
+                operation: 'update',
+                requestResourceData: data,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        })
+        .finally(() => {
+            setIsProcessing(false);
+            setDeactivateAlertOpen(false);
         });
-        errorEmitter.emit('permission-error', permissionError);
-    } finally {
-      setIsProcessing(false);
-      setDeactivateAlertOpen(false);
-    }
   }
 
   const handleTouchStart = () => {

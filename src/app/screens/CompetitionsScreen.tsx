@@ -174,21 +174,15 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         const unsubscribe = onSnapshot(query(compsRef, orderBy('name', 'asc')), (snapshot) => {
             const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetition);
             setManagedCompetitions(fetchedCompetitions);
-            
-            if (snapshot.empty && isAdmin) {
-                console.log("Managed competitions is empty. Seeding from API...");
-                // Seeding logic can be added here if needed, but should be handled carefully
-            }
             setLoading(false);
         }, (error) => {
-            console.error("Error fetching managed competitions:", error);
             const permissionError = new FirestorePermissionError({ path: compsRef.path, operation: 'list' });
             errorEmitter.emit('permission-error', permissionError);
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, [db, isAdmin, fetchAllCustomNames]);
+    }, [db, fetchAllCustomNames]);
 
     const toggleLeagueFavorite = async (comp: ManagedCompetition) => {
         if (!user || !db) return;

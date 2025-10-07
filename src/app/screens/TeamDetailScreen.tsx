@@ -55,6 +55,7 @@ function useTeamData(teamId?: number) {
     leagueId: number | null;
   }>({ teamInfo: null, players: null, fixtures: null, standings: null, scorers: null, leagueId: null });
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!teamId) {
@@ -66,16 +67,19 @@ function useTeamData(teamId?: number) {
       setLoading(true);
       try {
         const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
+        if (!teamRes.ok) throw new Error('Failed to fetch team data');
         const teamData = await teamRes.json();
         const teamInfo: TeamInfo | null = teamData.response?.[0] || null;
 
         // Fetch players for the current season
         const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`);
+        if (!playersRes.ok) throw new Error('Failed to fetch players data');
         const playersData = await playersRes.json();
         const allPlayers: PlayerInfoFromApi[] = playersData.response || [];
         
         // Fetch fixtures for the current season only for performance
         const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
+        if (!fixturesRes.ok) throw new Error('Failed to fetch fixtures data');
         const fixturesData = await fixturesRes.json();
         const fixtures: Fixture[] = fixturesData.response || [];
         
@@ -93,6 +97,9 @@ function useTeamData(teamId?: number) {
                  fetch(`/api/football/standings?league=${leagueIdForStandings}&season=${seasonForStandings}`),
                  fetch(`/api/football/players/topscorers?league=${leagueIdForStandings}&season=${seasonForStandings}`)
             ]);
+            if (!standingsRes.ok) throw new Error('Failed to fetch standings');
+            if (!scorersRes.ok) throw new Error('Failed to fetch top scorers');
+
             standingsData = await standingsRes.json();
             scorersData = await scorersRes.json();
         }
@@ -108,17 +115,17 @@ function useTeamData(teamId?: number) {
 
       } catch (error) {
         console.error("Error in useTeamData:", error);
-        const permissionError = new FirestorePermissionError({
-            path: `/api/football/teams?id=${teamId}`, // Example path, adjust as needed
-            operation: 'get',
+        toast({
+            variant: "destructive",
+            title: "خطأ في الشبكة",
+            description: "فشل في جلب بيانات الفريق. يرجى التحقق من اتصالك بالإنترنت.",
         });
-        errorEmitter.emit('permission-error', permissionError);
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [teamId]);
+  }, [teamId, toast]);
 
   return { ...data, loading };
 }
@@ -142,17 +149,18 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
 
   const fetchCustomNames = React.useCallback(async () => {
     if (!db) return;
+    const teamDocRef = doc(db, "teamCustomizations", String(teamId));
+    const playersColRef = collection(db, 'playerCustomizations');
+
     try {
-        if (teamId) {
-            const teamDocRef = doc(db, "teamCustomizations", String(teamId));
-            const teamDocSnap = await getDoc(teamDocRef);
-            if (teamDocSnap.exists()) {
-                setDisplayTitle(teamDocSnap.data().customName);
-            } else if (teamInfo?.team.name) {
-                setDisplayTitle(teamInfo.team.name);
-            }
+        const teamDocSnap = await getDoc(teamDocRef);
+        if (teamDocSnap.exists()) {
+            setDisplayTitle(teamDocSnap.data().customName);
+        } else if (teamInfo?.team.name) {
+            setDisplayTitle(teamInfo.team.name);
         }
-        const playersSnapshot = await getDocs(collection(db, 'playerCustomizations'));
+
+        const playersSnapshot = await getDocs(playersColRef);
         const playerNames = new Map<number, string>();
         playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
         setCustomPlayerNames(playerNames);

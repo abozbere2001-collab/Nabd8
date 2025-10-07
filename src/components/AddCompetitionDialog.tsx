@@ -41,6 +41,7 @@ export function AddCompetitionDialog({ isOpen, onOpenChange }: AddCompetitionDia
     try {
       // Fetch league details from API to save in our DB
       const res = await fetch(`/api/football/leagues?id=${leagueId}`);
+      if (!res.ok) throw new Error('Failed to fetch from API');
       const data = await res.json();
       
       if (data.response && data.response.length > 0) {
