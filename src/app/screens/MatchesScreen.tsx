@@ -8,7 +8,7 @@ import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -62,6 +62,7 @@ interface Odds {
 }
 
 interface Favorites {
+    userId: string;
     leagues?: { [key: string]: any };
     teams?: { [key:string]: any };
 }
@@ -379,7 +380,7 @@ const ODDS_STORAGE_KEY = 'goalstack-showOdds';
 export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: baseHeaderActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   const { user } = useAuth();
   const { db } = useFirestore();
-  const [favorites, setFavorites] = useState<Favorites>({});
+  const [favorites, setFavorites] = useState<Favorites>({userId: ''});
   const [activeTab, setActiveTab] = useState<'all-matches' | 'my-results'>('my-results');
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
@@ -447,31 +448,24 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
     fetchFixturesForDate(selectedDateKey);
   }, [selectedDateKey, showOdds]);
   
-  const fetchFavorites = useCallback(async () => {
+  useEffect(() => {
     if (!user) {
-        setFavorites({});
+        setFavorites({userId: ''});
         return;
     }
     const docRef = doc(db, 'favorites', user.uid);
-    try {
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            setFavorites(docSnap.data() as Favorites || {});
-        } else {
-            setFavorites({});
-        }
-    } catch (error) {
+    const unsubscribe = onSnapshot(docRef, (doc) => {
+        setFavorites(doc.data() as Favorites || {userId: user.uid});
+    }, (error) => {
         const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: 'get',
         });
         errorEmitter.emit('permission-error', permissionError);
-    }
-  }, [user, db]);
+    });
 
-  useEffect(() => {
-    fetchFavorites();
-  }, [fetchFavorites]);
+    return () => unsubscribe();
+  }, [user, db]);
 
   const favoritedTeamIds = useMemo(() => favorites?.teams ? Object.keys(favorites.teams).map(Number) : [], [favorites.teams]);
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);

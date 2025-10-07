@@ -8,7 +8,7 @@ import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, updateDoc, deleteField, collection, getDocs, getDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteField, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -27,6 +27,7 @@ interface Competition {
 }
 
 interface Favorites {
+    userId: string;
     leagues?: { [key: number]: any };
     teams?: { [key: number]: any };
 }
@@ -96,7 +97,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
   const { isAdmin } = useAdmin();
   const { user } = useAuth();
   const { db } = useFirestore();
-  const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
+  const [favorites, setFavorites] = useState<Favorites>({ userId: '', leagues: {}, teams: {} });
   const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, type: null, id: '', currentName: '' });
   
   const [customLeagueNames, setCustomLeagueNames] = useState<Map<number, string>>(new Map());
@@ -107,31 +108,24 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
   const getCountryName = useCallback((name: string) => customCountryNames.get(name) || name, [customCountryNames]);
   const getContinentName = useCallback((name: string) => customContinentNames.get(name) || name, [customContinentNames]);
 
-  const fetchFavorites = useCallback(async () => {
+useEffect(() => {
     if (!user) {
-        setFavorites({ leagues: {}, teams: {} });
+        setFavorites({ userId: '', leagues: {}, teams: {} });
         return;
     }
     const docRef = doc(db, 'favorites', user.uid);
-    try {
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            setFavorites(docSnap.data() as Favorites || { leagues: {}, teams: {} });
-        } else {
-            setFavorites({ leagues: {}, teams: {} });
-        }
-    } catch (error) {
+    const unsubscribe = onSnapshot(docRef, (doc) => {
+        setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {}, teams: {} });
+    }, (error) => {
         const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: 'get',
         });
         errorEmitter.emit('permission-error', permissionError);
-    }
-  }, [user, db]);
+    });
+    return () => unsubscribe();
+}, [user, db]);
 
-  useEffect(() => {
-    fetchFavorites();
-  }, [fetchFavorites]);
 
   const fetchAllCustomNames = useCallback(async () => {
       try {
@@ -181,7 +175,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     } else {
         await setDoc(favRef, favoriteData, { merge: true });
     }
-    await fetchFavorites(); // Refetch to update UI
   };
 
   useEffect(() => {
