@@ -159,7 +159,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     async function fetchCompetitions() {
       try {
         setLoading(true);
-        const [leaguesResponse, { leagueNames, countryNames, continentNames }] = await Promise.all([
+        const [leaguesResponse] = await Promise.all([
             fetch('/api/football/leagues'),
             fetchAllCustomNames()
         ]);
@@ -327,7 +327,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
 
   const renderContinentHeader = (continent: string) => (
     <div className="flex w-full items-center justify-between">
-        <AccordionTrigger className="px-4 text-lg font-bold flex-1">
+        <AccordionTrigger className="px-4 text-lg font-bold flex-1 hover:no-underline">
            {getContinentName(continent)}
         </AccordionTrigger>
         {isAdmin && (
@@ -348,7 +348,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
 
   const renderCountryHeader = (country: string, flag: string | null) => (
     <div className="flex w-full items-center justify-between">
-        <AccordionTrigger className="px-4 text-base font-semibold flex-1">
+        <AccordionTrigger className="px-4 text-base font-semibold flex-1 hover:no-underline">
             <div className="flex items-center gap-3">
                 {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
                 <span>{getCountryName(country)}</span>
@@ -387,7 +387,9 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
           <Accordion type="multiple" className="w-full space-y-4" defaultValue={['World', 'Europe', 'Asia']}>
             {Object.entries(competitions).map(([continent, content]) => (
               <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
-                {renderContinentHeader(continent)}
+                <AccordionTrigger asChild>
+                    {renderContinentHeader(continent)}
+                </AccordionTrigger>
                 <AccordionContent className="px-1">
                   {"leagues" in content ? (
                      <ul className="flex flex-col">
@@ -397,7 +399,9 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                     <Accordion type="multiple" className="w-full space-y-2 px-2">
                          {Object.entries(content as LeaguesByCountry).map(([country, { flag, leagues }]) => (
                              <AccordionItem value={country} key={country} className="rounded-lg border bg-background">
-                                {renderCountryHeader(country, flag)}
+                                <AccordionTrigger asChild>
+                                    {renderCountryHeader(country, flag)}
+                                </AccordionTrigger>
                                 <AccordionContent className="px-1">
                                     <ul className="flex flex-col">
                                         {leagues.map(renderLeagueItem)}
