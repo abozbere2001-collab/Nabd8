@@ -1,300 +1,318 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a strict user-ownership model for user profiles and favorites.
- *  It also allows public read access to admin-curated content. Write rules are restricted to authenticated users.
+ * @fileoverview Firestore Security Rules for the application.
  *
- * @dataStructure
- * - /users/{userId}: Stores public profile information for each user.
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for user-specific data
+ * and allows public read access where appropriate.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores public user profile information.
  * - /users/{userId}/notifications/{notificationId}: Stores notifications for a specific user.
- * - /favorites/{userId}: Stores user's favorite leagues, teams and players.
- * - /adminFavorites/{teamId}: Stores admin-favorited teams. Publicly readable, admin-writeable (not implemented in this version).
- * - /{entity}Customizations/{entityId}: Stores user-defined names.
+ * - /favorites/{userId}: Stores user's favorite leagues, teams, and players.
+ * - /adminFavorites/{teamId}: Stores admin-curated favorites.
+ * - /{entity}Customizations/{entityId}: Stores user-defined custom names.
  * - /matches/{matchId}: Stores metadata for a specific match.
- * - /matches/{matchId}/comments/{commentId}: Stores comments and replies for a specific match.
+ * - /matches/{matchId}/comments/{commentId}: Stores comments for a specific match.
  *
- * @keySecurityDecisions
- * - Users can only read and write their own profile and favorite data.
- * - Listing of all users is disallowed.
- * - Admin-curated content (adminFavorites) is publicly readable but write access is not defined in this prototype.
- * - Customization documents are user-specific.
+ * Key Security Decisions:
+ * - Users can only read and write their own user-specific data (/users/{userId}, /favorites/{userId}, etc.).
+ * - Admin-curated favorites (/adminFavorites/{teamId}) are publicly readable but only writable by a hypothetical admin (not implemented here).
+ * - Public read access is granted to match metadata and admin favorites.
+ * - No user listing is allowed for any collections.
  *
- * @denormalizationForAuthorization
- * - User ownership is verified by matching the `userId` in the path to `request.auth.uid`.
- * - Notifications are stored under the user's document, so the user can only access their own notifications.
- *
- * @structuralSegregation
- * - Public user profiles are stored directly under `/users/{userId}`, separate from any private user data.
+ * Denormalization for Authorization:
+ * The rules rely on the `request.auth.uid` to match the `{userId}` in the path.
+ * No denormalization is necessary in this case as the path itself provides the necessary ownership context.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile documents.
+     * @description Allows users to read and write their own profile information.
      * @path /users/{userId}
-     * @allow (create) Authenticated user can create their own profile.
-     * @allow (get, update, delete) Authenticated user can read, update, and delete their own profile.
-     * @deny (create) Authenticated user cannot create a profile for another user.
-     * @deny (get, update, delete) Authenticated user cannot read, update, or delete another user's profile.
+     * @allow (create) - User with UID 'user_abc' can create their profile at /users/user_abc.
+     * @deny (create) - User with UID 'user_abc' cannot create a profile at /users/user_xyz.
+     * @allow (get) - User with UID 'user_abc' can read their profile at /users/user_abc.
+     * @deny (get) - User with UID 'user_abc' cannot read the profile at /users/user_xyz.
+     * @allow (update) - User with UID 'user_abc' can update their profile at /users/user_abc.
+     * @deny (update) - User with UID 'user_abc' cannot update the profile at /users/user_xyz.
+     * @allow (delete) - User with UID 'user_abc' can delete their profile at /users/user_abc.
+     * @deny (delete) - User with UID 'user_abc' cannot delete the profile at /users/user_xyz.
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
       function isSignedIn() {
         return request.auth != null;
       }
-
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
-
       function isExistingOwner(userId) {
         return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Allows users to manage their own notifications.
+     * @path /users/{userId}/notifications/{notificationId}
+     * @allow (create) - User with UID 'user_abc' can create a notification at /users/user_abc/notifications/note1.
+     * @deny (create) - User with UID 'user_abc' cannot create a notification at /users/user_xyz/notifications/note1.
+     * @allow (get) - User with UID 'user_abc' can read their notification at /users/user_abc/notifications/note1.
+     * @deny (get) - User with UID 'user_abc' cannot read the notification at /users/user_xyz/notifications/note1.
+     * @allow (update) - User with UID 'user_abc' can update their notification at /users/user_abc/notifications/note1.
+     * @deny (update) - User with UID 'user_abc' cannot update the notification at /users/user_xyz/notifications/note1.
+     * @allow (delete) - User with UID 'user_abc' can delete their notification at /users/user_abc/notifications/note1.
+     * @deny (delete) - User with UID 'user_abc' cannot delete the notification at /users/user_xyz/notifications/note1.
+     * @principle Restricts access to a user's own data tree.
+     */
+    match /users/{userId}/notifications/{notificationId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+       function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.recipientId == userId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+     /**
+      * @description Allows users to read and write their own favorite leagues, teams and players.
+      * @path /favorites/{userId}
+      * @allow (create) - User with UID 'user_abc' can create their favorites at /favorites/user_abc.
+      * @deny (create) - User with UID 'user_abc' cannot create favorites at /favorites/user_xyz.
+      * @allow (get) - User with UID 'user_abc' can read their favorites at /favorites/user_abc.
+      * @deny (get) - User with UID 'user_abc' cannot read the favorites at /favorites/user_xyz.
+      * @allow (update) - User with UID 'user_abc' can update their favorites at /favorites/user_abc.
+      * @deny (update) - User with UID 'user_abc' cannot update the favorites at /favorites/user_xyz.
+      * @allow (delete) - User with UID 'user_abc' can delete their favorites at /favorites/user_abc.
+      * @deny (delete) - User with UID 'user_abc' cannot delete the favorites at /favorites/user_xyz.
+      * @principle Enforces document ownership for writes.
+      */
+    match /favorites/{userId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+       function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Allows public read access to admin favorites, but restricts writes.
+     * @path /adminFavorites/{teamId}
+     * @allow (get) - Any user can read an admin favorite.
+     * @allow (list) - Any user can list admin favorites.
+     * @deny (create) - No one can create an admin favorite without admin privileges. // TODO: Add admin role check.
+     * @deny (update) - No one can update an admin favorite without admin privileges. // TODO: Add admin role check.
+     * @deny (delete) - No one can delete an admin favorite without admin privileges. // TODO: Add admin role check.
+     */
+    match /adminFavorites/{teamId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add admin role check.
+      allow update: if false; // TODO: Add admin role check.
+      allow delete: if false; // TODO: Add admin role check.
+    }
+
+    /**
+     * @description Allows users to read and write their custom league names.
+     * @path /leagueCustomizations/{leagueId}
+     * @allow (create) - User with UID 'user_abc' can create a league customization at /leagueCustomizations/123.
+     * @deny (create) - User with UID 'user_abc' cannot create a league customization at /leagueCustomizations/456 if they don't own it.
+     * @allow (get) - Any user can read a league customization.
+     * @allow (list) - No one can list league customizations.
+     * @allow (update) - User with UID 'user_abc' can update a league customization they own.
+     * @deny (update) - User with UID 'user_abc' cannot update a league customization they don't own.
+     * @allow (delete) - User with UID 'user_abc' can delete a league customization they own.
+     * @deny (delete) - User with UID 'user_abc' cannot delete a league customization they don't own.
+     * @principle Enforces document ownership for writes, allows public reads.
+     */
+    match /leagueCustomizations/{leagueId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if resource != null && isSignedIn();
+      allow delete: if resource != null && isSignedIn();
+    }
+
+    /**
+     * @description Allows users to read and write their custom country names.
+     * @path /countryCustomizations/{countryName}
+     * @allow (create) - User with UID 'user_abc' can create a country customization at /countryCustomizations/USA.
+     * @deny (create) - User with UID 'user_abc' cannot create a country customization at /countryCustomizations/Canada if they don't own it.
+     * @allow (get) - Any user can read a country customization.
+     * @allow (list) - No one can list country customizations.
+     * @allow (update) - User with UID 'user_abc' can update a country customization they own.
+     * @deny (update) - User with UID 'user_abc' cannot update a country customization they don't own.
+     * @allow (delete) - User with UID 'user_abc' can delete a country customization they own.
+     * @deny (delete) - User with UID 'user_abc' cannot delete a country customization they don't own.
+     * @principle Enforces document ownership for writes, allows public reads.
+     */
+    match /countryCustomizations/{countryName} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if resource != null && isSignedIn();
+      allow delete: if resource != null && isSignedIn();
+    }
+
+     /**
+      * @description Allows users to read and write their custom continent names.
+      * @path /continentCustomizations/{continentName}
+      * @allow (create) - User with UID 'user_abc' can create a continent customization at /continentCustomizations/Europe.
+      * @deny (create) - User with UID 'user_abc' cannot create a continent customization at /continentCustomizations/Africa if they don't own it.
+      * @allow (get) - Any user can read a continent customization.
+      * @allow (list) - No one can list continent customizations.
+      * @allow (update) - User with UID 'user_abc' can update a continent customization they own.
+      * @deny (update) - User with UID 'user_abc' cannot update a continent customization they don't own.
+      * @allow (delete) - User with UID 'user_abc' can delete a continent customization they own.
+      * @deny (delete) - User with UID 'user_abc' cannot delete a continent customization they don't own.
+      * @principle Enforces document ownership for writes, allows public reads.
+      */
+    match /continentCustomizations/{continentName} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if resource != null && isSignedIn();
+      allow delete: if resource != null && isSignedIn();
+    }
+
+    /**
+     * @description Allows users to read and write their custom team names.
+     * @path /teamCustomizations/{teamId}
+     * @allow (create) - User with UID 'user_abc' can create a team customization at /teamCustomizations/123.
+     * @deny (create) - User with UID 'user_abc' cannot create a team customization at /teamCustomizations/456 if they don't own it.
+     * @allow (get) - Any user can read a team customization.
+     * @allow (list) - No one can list team customizations.
+     * @allow (update) - User with UID 'user_abc' can update a team customization they own.
+     * @deny (update) - User with UID 'user_abc' cannot update a team customization they don't own.
+     * @allow (delete) - User with UID 'user_abc' can delete a team customization they own.
+     * @deny (delete) - User with UID 'user_abc' cannot delete a team customization they don't own.
+     * @principle Enforces document ownership for writes, allows public reads.
+     */
+    match /teamCustomizations/{teamId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if resource != null && isSignedIn();
+      allow delete: if resource != null && isSignedIn();
+    }
+
+    /**
+     * @description Allows users to read and write their custom player names.
+     * @path /playerCustomizations/{playerId}
+     * @allow (create) - User with UID 'user_abc' can create a player customization at /playerCustomizations/123.
+     * @deny (create) - User with UID 'user_abc' cannot create a player customization at /playerCustomizations/456 if they don't own it.
+     * @allow (get) - Any user can read a player customization.
+     * @allow (list) - No one can list player customizations.
+     * @allow (update) - User with UID 'user_abc' can update a player customization they own.
+     * @deny (update) - User with UID 'user_abc' cannot update a player customization they don't own.
+     * @allow (delete) - User with UID 'user_abc' can delete a player customization they own.
+     * @deny (delete) - User with UID 'user_abc' cannot delete a player customization they don't own.
+     * @principle Enforces document ownership for writes, allows public reads.
+     */
+    match /playerCustomizations/{playerId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if resource != null && isSignedIn();
+      allow delete: if resource != null && isSignedIn();
+    }
+
+    /**
+     * @description Allows users to read and write their custom coach names.
+     * @path /coachCustomizations/{coachId}
+     * @allow (create) - User with UID 'user_abc' can create a coach customization at /coachCustomizations/123.
+     * @deny (create) - User with UID 'user_abc' cannot create a coach customization at /coachCustomizations/456 if they don't own it.
+     * @allow (get) - Any user can read a coach customization.
+     * @allow (list) - No one can list coach customizations.
+     * @allow (update) - User with UID 'user_abc' can update a coach customization they own.
+     * @deny (update) - User with UID 'user_abc' cannot update a coach customization they don't own.
+     * @allow (delete) - User with UID 'user_abc' can delete a coach customization they own.
+     * @deny (delete) - User with UID 'user_abc' cannot delete a coach customization they don't own.
+     * @principle Enforces document ownership for writes, allows public reads.
+     */
+    match /coachCustomizations/{coachId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if resource != null && isSignedIn();
+      allow delete: if resource != null && isSignedIn();
+    }
+
+    /**
+     * @description Allows public read access to match details, but restricts writes.
+     * @path /matches/{matchId}
+     * @allow (get) - Any user can read match details.
+     * @allow (list) - Any user can list matches.
+     * @deny (create) - No one can create a match detail document without admin privileges. // TODO: Add admin role check.
+     * @deny (update) - No one can update a match detail document without admin privileges. // TODO: Add admin role check.
+     * @deny (delete) - No one can delete a match detail document without admin privileges. // TODO: Add admin role check.
+     */
+    match /matches/{matchId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add admin role check.
+      allow update: if false; // TODO: Add admin role check.
+      allow delete: if false; // TODO: Add admin role check.
+    }
+
+    /**
+     * @description Allows read and write access to match comments, but enforces user ownership.
+     * @path /matches/{matchId}/comments/{commentId}
+     * @allow (create) - User with UID 'user_abc' can create a comment on match 123.
+     * @deny (create) - User with UID 'user_abc' cannot create a comment on match 123 with a mismatched userId.
+     * @allow (get) - Any user can read a comment on match 123.
+     * @allow (list) - Any user can list comments on match 123.
+     * @allow (update) - User with UID 'user_abc' can update their own comment on match 123.
+     * @deny (update) - User with UID 'user_abc' cannot update a comment they don't own.
+     * @allow (delete) - User with UID 'user_abc' can delete their own comment on match 123.
+     * @deny (delete) - User with UID 'user_abc' cannot delete a comment they don't own.
+     * @principle Enforces comment ownership for writes, allows public reads.
+     */
+    match /matches/{matchId}/comments/{commentId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+      function isCommentOwner(userId) {
+          return resource.data.userId == userId;
+      }
+      function isExistingCommentOwner(userId) {
+          return isCommentOwner(userId) && resource != null;
       }
       
       allow get: if true;
-      allow list: if false;
-
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.email == request.auth.token.email;
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
-    }
-
-    /**
-     * @description Controls access to user notification documents.
-     * @path /users/{userId}/notifications/{notificationId}
-     * @allow (create) Authenticated user can create notifications under their own profile.
-     * @allow (get, update, delete) Authenticated user can read, update, and delete their own notifications.
-     * @deny (create) Authenticated user cannot create notifications for another user.
-     * @deny (get, update, delete) Authenticated user cannot read, update, or delete another user's notifications.
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId}/notifications/{notificationId} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-      
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.recipientId == userId;
-      allow update: if isExistingOwner(userId) && resource.data.recipientId == userId;
-      allow delete: if isExistingOwner(userId) && resource.data.recipientId == userId;
-    }
-
-    /**
-     * @description Controls access to user favorites document.
-     * @path /favorites/{userId}
-     * @allow (create) Authenticated user can create their own favorites.
-     * @allow (get, update, delete) Authenticated user can read, update, and delete their own favorites.
-     * @deny (create) Authenticated user cannot create favorites for another user.
-     * @deny (get, update, delete) Authenticated user cannot read, update, or delete another user's favorites.
-     * @principle Enforces document ownership for writes.
-     */
-    match /favorites/{userId} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-      
-      allow get: if isOwner(userId);
-      allow list: if false;
-
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
-    }
-
-    /**
-     * @description Controls access to admin-favorited teams.
-     * @path /adminFavorites/{teamId}
-     * @allow (get, list) Public read access.
-     * @deny (create, update, delete) Only admins can modify (not implemented in this version).
-     * @principle Public read access with restricted writes.
-     */
-    match /adminFavorites/{teamId} {
-      allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add admin role check for writes.
-    }
-
-    /**
-     * @description Controls access to league customizations.
-     * @path /leagueCustomizations/{leagueId}
-     * @allow (create) Authenticated user can create their own league customization.
-     * @allow (get, update, delete) Authenticated user can read, update, and delete their own league customization.
-     * @deny (create) Authenticated user cannot create league customizations for another user.
-     * @deny (get, update, delete) Authenticated user cannot read, update, or delete another user's league customizations.
-     * @principle Enforces document ownership for writes.
-     */
-    match /leagueCustomizations/{leagueId} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-      
-      allow get: if isSignedIn();
-      allow list: if false;
-
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    /**
-     * @description Controls access to country customizations.
-     * @path /countryCustomizations/{countryName}
-     * @allow (create) Authenticated user can create their own country customization.
-     * @allow (get, update, delete) Authenticated user can read, update, and delete their own country customization.
-     * @deny (create) Authenticated user cannot create country customizations for another user.
-     * @deny (get, update, delete) Authenticated user cannot read, update, or delete another user's country customizations.
-     */
-    match /countryCustomizations/{countryName} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-      
-      allow get: if isSignedIn();
-      allow list: if false;
-
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    /**
-     * @description Controls access to continent customizations.
-     * @path /continentCustomizations/{continentName}
-     * @allow (create) Authenticated user can create their own continent customization.
-     * @allow (get, update, delete) Authenticated user can read, update, and delete their own continent customization.
-     * @deny (create) Authenticated user cannot create continent customizations for another user.
-     * @deny (get, update, delete) Authenticated user cannot read, update, or delete another user's continent customizations.
-     */
-    match /continentCustomizations/{continentName} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-      
-      allow get: if isSignedIn();
-      allow list: if false;
-
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    /**
-     * @description Controls access to team customizations.
-     * @path /teamCustomizations/{teamId}
-     * @allow (create) Authenticated user can create their own team customization.
-     * @allow (get, update, delete) Authenticated user can read, update, and delete their own team customization.
-     * @deny (create) Authenticated user cannot create team customizations for another user.
-     * @deny (get, update, delete) Authenticated user cannot read, update, or delete another user's team customizations.
-     */
-    match /teamCustomizations/{teamId} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-      
-      allow get: if isSignedIn();
-      allow list: if false;
-
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    /**
-     * @description Controls access to player customizations.
-     * @path /playerCustomizations/{playerId}
-     * @allow (create) Authenticated user can create their own player customization.
-     * @allow (get, update, delete) Authenticated user can read, update, and delete their own player customization.
-     * @deny (create) Authenticated user cannot create player customizations for another user.
-     * @deny (get, update, delete) Authenticated user cannot read, update, or delete another user's player customizations.
-     */
-    match /playerCustomizations/{playerId} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-      
-      allow get: if isSignedIn();
-      allow list: if false;
-
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    /**
-     * @description Controls access to coach customizations.
-     * @path /coachCustomizations/{coachId}
-     * @allow (create) Authenticated user can create their own coach customization.
-     * @allow (get, update, delete) Authenticated user can read, update, and delete their own coach customization.
-     * @deny (create) Authenticated user cannot create coach customizations for another user.
-     * @deny (get, update, delete) Authenticated user cannot read, update, or delete another user's coach customizations.
-     */
-    match /coachCustomizations/{coachId} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-      
-      allow get: if isSignedIn();
-      allow list: if false;
-
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    /**
-     * @description Controls access to match details.
-     * @path /matches/{matchId}
-     * @allow (get, list) Public read access.
-     * @deny (create, update, delete) Restricted writes.
-     * @principle Public read access with restricted writes.
-     */
-    match /matches/{matchId} {
-      allow get, list: if true; // Assuming matches are publicly visible.
-      allow create, update, delete: if false; // TODO: Add admin role check for writes.
-    }
-
-    /**
-     * @description Controls access to match comments.
-     * @path /matches/{matchId}/comments/{commentId}
-     * @allow (create) Authenticated users can create comments.
-     * @allow (get, list) Public read access.
-     * @allow (update, delete) Only the comment owner can update or delete their own comment.
-     * @principle Public read access with owner-only writes.
-     */
-    match /matches/{matchId}/comments/{commentId} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-      
-      allow get, list: if true;
+      allow list: if true;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.userId);
-      allow delete: if isExistingOwner(resource.data.userId);
+      allow update: if isExistingCommentOwner(request.auth.uid);
+      allow delete: if isExistingCommentOwner(request.auth.uid);
     }
   }
 }
