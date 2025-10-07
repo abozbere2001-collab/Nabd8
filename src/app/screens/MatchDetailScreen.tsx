@@ -591,7 +591,7 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
       <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="lineups" className="w-full">
           <div className="sticky top-0 bg-background z-10 border-b">
-            <TabsList className="grid w-full grid-cols-4 rounded-none flex-row-reverse">
+            <TabsList className="grid w-full grid-cols-4 rounded-none">
               <TabsTrigger value="details">التفاصيل</TabsTrigger>
               <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
               <TabsTrigger value="stats">الإحصائيات</TabsTrigger>

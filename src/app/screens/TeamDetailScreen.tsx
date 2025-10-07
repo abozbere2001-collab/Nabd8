@@ -258,7 +258,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         <Skeleton className="h-64 w-full" />
       </div> : teamInfo ? (
         <div className="flex-1 overflow-y-auto">
-            <Tabs defaultValue="players" className="w-full">
+            <Tabs defaultValue="details" className="w-full">
                  <div className="bg-card sticky top-0 z-10 border-b">
                     <div className="p-4 flex items-center gap-4">
                         <Avatar className="h-20 w-20 border">
@@ -271,7 +271,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                             <p className="text-sm text-muted-foreground">{teamInfo.venue.name} ({teamInfo.venue.city})</p>
                         </div>
                     </div>
-                    <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none flex-row-reverse">
+                    <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none">
                         <TabsTrigger value="details" className='data-[state=active]:rounded-none'>التفاصيل</TabsTrigger>
                         <TabsTrigger value="players" className='data-[state=active]:rounded-none'>اللاعبون</TabsTrigger>
                     </TabsList>
@@ -304,7 +304,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                 <TabsContent value="details" className="p-0">
                      <Tabs defaultValue="matches" className="w-full">
                          <div className="bg-card sticky top-[152px] z-10 border-b">
-                            <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none flex-row-reverse">
+                            <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none">
                                 <TabsTrigger value="matches" className='data-[state=active]:rounded-none'><Shirt className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
                                 <TabsTrigger value="standings" className='data-[state=active]:rounded-none'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
                                 <TabsTrigger value="scorers" className='data-[state=active]:rounded-none'><BarChart2 className="w-4 h-4 ml-1"/>الإحصائيات</TabsTrigger>

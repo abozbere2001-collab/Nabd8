@@ -145,8 +145,8 @@ function AppContent({ user }: { user: User | null }) {
               key={item.key}
               className={cn(
                 "absolute inset-0 bg-background flex flex-col",
-                isEntering && 'animate-slide-in-from-left', // Changed from right
-                isAnimating && 'animate-slide-out-to-left' // Changed from right
+                isEntering && 'animate-slide-in-from-left', 
+                isAnimating && 'animate-slide-out-to-left' 
               )}
               style={{
                 zIndex: index,

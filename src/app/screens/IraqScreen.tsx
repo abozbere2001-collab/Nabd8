@@ -103,9 +103,9 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     };
 
     return (
-        <Tabs defaultValue="scorers" className="w-full">
+        <Tabs defaultValue="standings" className="w-full">
             <div className="sticky top-0 bg-background z-10 border-b -mx-4 px-4">
-                <TabsList className="grid w-full grid-cols-3 rounded-none h-auto p-0 border-t flex-row-reverse">
+                <TabsList className="grid w-full grid-cols-3 rounded-none h-auto p-0 border-t">
                     <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'>الترتيب</TabsTrigger>
                     <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>المباريات</TabsTrigger>
                     <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'>الهدافين</TabsTrigger>
@@ -260,9 +260,9 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="العراق" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
       <div className="flex-1 overflow-y-auto px-4">
-        <Tabs defaultValue="our-card" className="w-full">
+        <Tabs defaultValue="our-league" className="w-full">
           <div className="sticky top-0 bg-background z-10">
-            <TabsList className="grid w-full grid-cols-3 flex-row-reverse">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="our-league">دورينا</TabsTrigger>
               <TabsTrigger value="our-card">كرتنا</TabsTrigger>
               <TabsTrigger value="predictions">التوقعات</TabsTrigger>
