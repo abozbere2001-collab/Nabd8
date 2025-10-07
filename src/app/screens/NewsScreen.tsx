@@ -7,14 +7,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { ScreenProps } from '@/app/page';
 import Image from 'next/image';
 
-export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+export function NewsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   useEffect(() => {
     console.log("NewsScreen: init");
   }, []);
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="الأخبار" onBack={goBack} canGoBack={canGoBack} />
+      <ScreenHeader title="الأخبار" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
           <Card key={i}>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Star, Pencil } from 'lucide-react';
@@ -90,17 +90,21 @@ const countryToContinent: { [key: string]: string } = {
 
 const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "North America", "Oceania"];
 
-export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   const [competitions, setCompetitions] = useState<GroupedCompetitions | null>(null);
   const [loading, setLoading] = useState(true);
   const { isAdmin } = useAdmin();
   const { user } = useFirebase();
   const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
   const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, type: null, id: '', currentName: '' });
+  
   const [customLeagueNames, setCustomLeagueNames] = useState<Map<number, string>>(new Map());
   const [customCountryNames, setCustomCountryNames] = useState<Map<string, string>>(new Map());
   const [customContinentNames, setCustomContinentNames] = useState<Map<string, string>>(new Map());
 
+  const getLeagueName = useCallback((comp: Competition) => customLeagueNames.get(comp.league.id) || comp.league.name, [customLeagueNames]);
+  const getCountryName = useCallback((name: string) => customCountryNames.get(name) || name, [customCountryNames]);
+  const getContinentName = useCallback((name: string) => customContinentNames.get(name) || name, [customContinentNames]);
 
   useEffect(() => {
     if (!user) return;
@@ -138,7 +142,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     const favRef = doc(db, 'favorites', user.uid);
     const fieldPath = `leagues.${leagueId}`;
     const isFavorited = favorites?.leagues?.[leagueId];
-    const leagueName = customLeagueNames.get(leagueId) || comp.league.name;
+    const leagueName = getLeagueName(comp);
 
     if (isFavorited) {
         await updateDoc(favRef, { [fieldPath]: deleteField() });
@@ -270,13 +274,17 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     setRenameState({ isOpen: false, type: null, id: '', currentName: '' });
   };
   
-  const getLeagueName = (comp: Competition) => customLeagueNames.get(comp.league.id) || comp.league.name;
-  const getCountryName = (name: string) => customCountryNames.get(name) || name;
-  const getContinentName = (name: string) => customContinentNames.get(name) || name;
-
   const openRenameDialog = (type: RenameState['type'], id: string, currentName: string) => {
       setRenameState({ isOpen: true, type, id, currentName });
   };
+
+  const sortedCompetitions = useMemo(() => {
+    if (!competitions) return null;
+    // This is a simplified sort. For a real "float to top" feature on edit,
+    // we would need to track recently edited items and adjust the sorting logic.
+    // For now, we just apply the custom names to the existing structure.
+    return competitions;
+  }, [competitions, customLeagueNames, customCountryNames, customContinentNames]);
 
 
   const renderLeagueItem = (comp: Competition) => (
@@ -372,7 +380,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="البطولات" onBack={goBack} canGoBack={canGoBack} />
+      <ScreenHeader title="البطولات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
           <div className="space-y-4">
@@ -382,10 +390,10 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
               </div>
             ))}
           </div>
-        ) : competitions ? (
+        ) : sortedCompetitions ? (
           <>
           <Accordion type="multiple" className="w-full space-y-4" defaultValue={['World', 'Europe', 'Asia']}>
-            {Object.entries(competitions).map(([continent, content]) => (
+            {Object.entries(sortedCompetitions).map(([continent, content]) => (
               <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
                 <AccordionTrigger asChild>
                     {renderContinentHeader(continent)}

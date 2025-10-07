@@ -7,24 +7,31 @@ interface ScreenHeaderProps {
   canGoBack: boolean;
   onBack: () => void;
   actions?: React.ReactNode;
+  secondaryActions?: React.ReactNode;
 }
 
-export function ScreenHeader({ title, canGoBack, onBack, actions }: ScreenHeaderProps) {
+export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActions }: ScreenHeaderProps) {
   return (
     <header className="relative flex h-14 flex-shrink-0 items-center justify-center border-b bg-background px-4">
-      {canGoBack && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onBack}
-          className="absolute right-2 top-1/2 -translate-y-1/2"
-          aria-label="Go back"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-      )}
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+         {canGoBack && (
+            <Button
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            aria-label="Go back"
+            >
+            <ArrowLeft className="h-5 w-5" />
+            </Button>
+        )}
+      </div>
+
       <h1 className="truncate text-lg font-bold">{title}</h1>
-      {actions && <div className="absolute left-2 top-1/2 -translate-y-1/2">{actions}</div>}
+      
+      <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+        {secondaryActions}
+        {actions}
+      </div>
     </header>
   );
 }

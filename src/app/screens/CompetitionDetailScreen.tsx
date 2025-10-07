@@ -88,14 +88,16 @@ interface Favorites {
 
 const CURRENT_SEASON = 2024;
 
-export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo }: ScreenProps & { title?: string, leagueId?: number, logo?: string }) {
+export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo, headerActions }: ScreenProps & { title?: string, leagueId?: number, logo?: string, headerActions?: React.ReactNode }) {
   const { isAdmin } = useAdmin();
   const { user } = useFirebase();
 
   const [favorites, setFavorites] = useState<Favorites>({ leagues: {}, teams: {} });
 
   const [loading, setLoading] = useState(true);
-  const [title, setTitle] = useState(initialTitle);
+  const [originalTitle, setOriginalTitle] = useState(initialTitle);
+  const [displayTitle, setDisplayTitle] = useState(initialTitle);
+
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
@@ -112,17 +114,21 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     return () => unsub();
   }, [user]);
 
-  useEffect(() => {
+ useEffect(() => {
     async function fetchCustomName() {
         if (leagueId) {
-            const customNameDoc = await getDoc(doc(db, 'leagueCustomizations', String(leagueId)));
-            if (customNameDoc.exists()) {
-                setTitle(customNameDoc.data().customName);
-            }
+            const unsub = onSnapshot(doc(db, "leagueCustomizations", String(leagueId)), (doc) => {
+                if (doc.exists()) {
+                    setDisplayTitle(doc.data().customName);
+                } else {
+                    setDisplayTitle(initialTitle);
+                }
+            });
+            return () => unsub();
         }
     }
     fetchCustomName();
-  }, [leagueId]);
+  }, [leagueId, initialTitle]);
 
 
   useEffect(() => {
@@ -144,8 +150,14 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         const standingsData = await standingsRes.json();
         const scorersData = await scorersRes.json();
         const teamsData = await teamsRes.json();
-
-        if (fixturesData.response) setFixtures(fixturesData.response);
+        
+        if(fixturesData.response) {
+            setFixtures(fixturesData.response);
+            if(!initialTitle && fixturesData.response.length > 0) {
+                 setOriginalTitle(fixturesData.response[0].league.name);
+                 setDisplayTitle(fixturesData.response[0].league.name);
+            }
+        }
         if (standingsData.response[0]?.league?.standings[0]) setStandings(standingsData.response[0].league.standings[0]);
         if (scorersData.response) setTopScorers(scorersData.response);
         if (teamsData.response) setTeams(teamsData.response);
@@ -157,7 +169,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       }
     }
     fetchData();
-  }, [leagueId]);
+  }, [leagueId, initialTitle]);
 
   const handleFavoriteLeague = async () => {
     if (!user || !leagueId) return;
@@ -171,7 +183,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             leagues: { 
                 [leagueId]: { 
                     leagueId: leagueId, 
-                    name: title, 
+                    name: displayTitle, 
                     logo: logo || teams[0]?.team?.logo
                 } 
             } 
@@ -204,10 +216,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     if (!leagueId) return;
     const customNameRef = doc(db, 'leagueCustomizations', String(leagueId));
     await setDoc(customNameRef, { customName: newName });
-    setTitle(newName);
+    setDisplayTitle(newName);
   };
   
-  const headerActions = (
+  const localHeaderActions = (
     <div className="flex items-center gap-1">
       {isAdmin && (
          <>
@@ -221,7 +233,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         <RenameDialog 
           isOpen={isRenameOpen}
           onOpenChange={setRenameOpen}
-          currentName={title || ''}
+          currentName={displayTitle || ''}
           onSave={handleSaveRename}
           itemType="البطولة"
         />
@@ -239,7 +251,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title={title || "البطولة"} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+      <ScreenHeader title={displayTitle || "البطولة"} onBack={goBack} canGoBack={canGoBack} actions={headerActions} secondaryActions={localHeaderActions} />
        <div className="flex-1 overflow-y-auto">
         <p className="text-center text-xs text-muted-foreground py-2">جميع البيانات تخص موسم {CURRENT_SEASON}</p>
         <Tabs defaultValue="matches" className="w-full">

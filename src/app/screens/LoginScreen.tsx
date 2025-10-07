@@ -31,7 +31,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="تسجيل الدخول" onBack={goBack} canGoBack={canGoBack} />
+      <ScreenHeader title="تسجيل الدخول" onBack={goBack} canGoBack={false} />
       <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
         {error && (
           <Alert variant="destructive" className="mb-6">

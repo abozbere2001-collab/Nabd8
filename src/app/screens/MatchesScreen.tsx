@@ -267,7 +267,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
 }
 
 // Main Screen Component
-export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   const { user } = useFirebase();
   const [favorites, setFavorites] = useState<Favorites>({});
   const [activeTab, setActiveTab] = useState<'my-results' | 'all-matches'>('all-matches');
@@ -312,7 +312,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="المباريات" onBack={goBack} canGoBack={canGoBack} />
+      <ScreenHeader title="المباريات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
       <div className="flex flex-1 flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full flex-1 flex flex-col min-h-0">
           

@@ -120,16 +120,15 @@ function useMatchData(fixtureId?: number, leagueId?: number) {
 }
 
 // --- SUB-COMPONENTS ---
-const MatchHeader = ({ fixture, onBack }: { fixture: Fixture; onBack: () => void }) => (
+const MatchHeader = ({ fixture, onBack, headerActions }: { fixture: Fixture; onBack: () => void, headerActions?: React.ReactNode }) => (
   <header className="relative bg-card text-foreground pt-10 pb-6 px-4 shadow-lg border-b">
     <div className="absolute top-4 right-4">
       <Button variant="ghost" size="icon" onClick={onBack} className="text-foreground/80 hover:bg-accent">
         <ArrowLeft />
       </Button>
     </div>
-    <div className="absolute top-4 left-4 flex gap-2">
-      <Button variant="ghost" size="icon" className="text-foreground/80 hover:bg-accent"><Star /></Button>
-      <Button variant="ghost" size="icon" className="text-foreground/80 hover:bg-accent"><Share2 /></Button>
+    <div className="absolute top-2 left-2 flex gap-1">
+       {headerActions}
     </div>
     <div className="text-center text-sm text-muted-foreground mb-4">
         {fixture.league.name} - {fixture.league.round}
@@ -164,33 +163,30 @@ const PlayerIcon = ({ player, isHomeTeam }: { player: LineupPlayer, isHomeTeam: 
 
     const [row, col] = player.player.grid.split(':').map(Number);
     
-    // Normalize grid positions to a 0-1 range, then convert to percentage.
-    // The grid is roughly 11 rows and 5 columns.
-    const maxRows = 11;
-    const maxCols = 5;
+    // Default alignment
+    let top = 50;
+    let left = 50;
 
-    // Calculate base percentages
-    let topPercent = (row / (maxRows + 1)) * 100;
-    let leftPercent = ((col - 1) / (maxCols - 1)) * 100;
+    // Normalize grid positions. Grid seems to be ~1-11 for rows, 1-5 for cols
+    const normalizedRow = (row - 1) / 10; // 0 to 1
+    const normalizedCol = (col - 1) / 4;   // 0 to 1
 
-    // Flip coordinates for away team to appear on the opposite side
+    top = (1 - normalizedRow) * 90 + 5; // Invert row, map to 5-95%
+    left = normalizedCol * 80 + 10;   // Map to 10-90%
+
+    // Flip for away team
     if (!isHomeTeam) {
-       topPercent = 100 - topPercent;
-       leftPercent = 100 - leftPercent;
+       top = 100 - top;
+       left = 100 - left;
     }
-
-    // Add some padding/offset to prevent players from being on the absolute edge
-    // Clamp values to stay within a visible area (e.g., 5% to 95%)
-    leftPercent = Math.max(5, Math.min(95, leftPercent));
-    topPercent = Math.max(5, Math.min(95, topPercent));
 
 
     return (
         <div 
           className="absolute text-center flex flex-col items-center transition-all duration-300" 
           style={{ 
-            top: `${topPercent}%`, 
-            left: `${leftPercent}%`,
+            top: `${top}%`, 
+            left: `${left}%`,
             width: '60px',
             transform: 'translate(-50%, -50%)',
           }}
@@ -201,7 +197,8 @@ const PlayerIcon = ({ player, isHomeTeam }: { player: LineupPlayer, isHomeTeam: 
                    <AvatarFallback>{player.player.pos ? player.player.pos.charAt(0) : 'P'}</AvatarFallback>
                 </Avatar>
                 <span className={cn(
-                  "absolute -top-1 -right-1 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background bg-primary"
+                  "absolute -top-1 -right-1 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background",
+                   isHomeTeam ? "bg-primary" : "bg-destructive"
                   )}>
                     {player.player.number}
                 </span>
@@ -489,13 +486,13 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
 
 
 // --- MAIN SCREEN COMPONENT ---
-export function MatchDetailScreen({ goBack, fixtureId, fixture }: ScreenProps & { fixtureId: number; fixture: Fixture }) {
+export function MatchDetailScreen({ goBack, fixtureId, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: Fixture, headerActions?: React.ReactNode }) {
   const { lineups, events, stats, standings, loading } = useMatchData(fixtureId, fixture.league.id);
   const [eventFilter, setEventFilter] = useState<EventFilter>("highlights");
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <MatchHeader fixture={fixture} onBack={goBack} />
+      <MatchHeader fixture={fixture} onBack={goBack} headerActions={headerActions} />
       <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="lineups" className="w-full">
           <div className="p-4 pb-0 sticky top-0 bg-background z-10 border-b">

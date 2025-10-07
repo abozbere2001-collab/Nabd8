@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 
-export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+export function SettingsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   
@@ -55,7 +55,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="الإعدادات" onBack={goBack} canGoBack={canGoBack} />
+      <ScreenHeader title="الإعدادات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-2">
             <button onClick={toggleTheme} className="flex w-full items-center justify-between rounded-lg bg-card p-4 text-right transition-colors hover:bg-accent/50">
