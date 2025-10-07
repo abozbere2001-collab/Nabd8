@@ -36,12 +36,12 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
               </div>
          </div>
          <div className="flex items-center justify-between gap-2">
-             <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                 <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+             <div className="flex items-center gap-2 flex-1">
                  <Avatar className="h-8 w-8">
                      <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
                      <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
                  </Avatar>
+                 <span className="font-semibold truncate">{fixture.teams.home.name}</span>
              </div>
              <div className={cn(
                 "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
@@ -51,12 +51,12 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
                    : format(new Date(fixture.fixture.date), "HH:mm")}
              </div>
-             <div className="flex items-center gap-2 flex-1 truncate">
+             <div className="flex items-center gap-2 flex-1 justify-end">
+                  <span className="font-semibold truncate">{fixture.teams.away.name}</span>
                   <Avatar className="h-8 w-8">
                      <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
                      <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
                   </Avatar>
-                 <span className="font-semibold truncate">{fixture.teams.away.name}</span>
              </div>
          </div>
       </div>
@@ -103,9 +103,9 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     };
 
     return (
-        <Tabs defaultValue="scorers" className="w-full">
+        <Tabs defaultValue="standings" className="w-full">
             <div className="sticky top-0 bg-background z-10 border-b -mx-4 px-4">
-                <TabsList className="grid w-full grid-cols-3 rounded-none h-auto p-0 border-t">
+                <TabsList className="grid w-full grid-cols-3 rounded-none h-auto p-0 border-t flex-row-reverse">
                     <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'>الترتيب</TabsTrigger>
                     <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>المباريات</TabsTrigger>
                     <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'>الهدافين</TabsTrigger>
@@ -282,5 +282,3 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
     </div>
   );
 }
-
-    
