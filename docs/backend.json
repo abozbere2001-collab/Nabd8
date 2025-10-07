@@ -230,9 +230,9 @@
       "schema": { "$ref": "#/entities/MatchDetails" },
       "description": "Stores metadata for a specific match, identified by its unique ID."
     },
-    "/comments/{matchId}/messages/{messageId}": {
+    "/matches/{matchId}/comments/{commentId}": {
       "schema": { "$ref": "#/entities/MatchComment" },
-      "description": "Stores all comments for a specific match. Each comment is a document in the 'messages' subcollection."
+      "description": "Stores all comments for a specific match. Each comment is a document in the 'comments' subcollection."
     }
   }
 }

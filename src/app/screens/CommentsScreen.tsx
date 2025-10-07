@@ -28,7 +28,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   const [sending, setSending] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
-  const commentsColRef = collection(db, 'comments', String(matchId), 'messages');
+  const commentsColRef = collection(db, 'matches', String(matchId), 'comments');
 
   useEffect(() => {
     setLoading(true);
