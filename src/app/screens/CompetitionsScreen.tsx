@@ -422,14 +422,16 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                                                 <AccordionItem value={country} key={country} className="rounded-lg border bg-background">
                                                     <div className="flex w-full items-center justify-between">
                                                         <AccordionTrigger asChild className="px-4 text-base font-semibold flex-1 hover:no-underline">
-                                                            <div className="flex items-center gap-3">
-                                                                {flag && (
-                                                                     <div className="relative">
-                                                                        <img src={flag} alt={country} className="h-5 w-7 object-contain" />
-                                                                         {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(flag); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
-                                                                    </div>
-                                                                )}
-                                                                <span>{getCountryName(country)}</span>
+                                                            <div>
+                                                                <div className="flex items-center gap-3">
+                                                                    {flag && (
+                                                                        <div className="relative">
+                                                                            <img src={flag} alt={country} className="h-5 w-7 object-contain" />
+                                                                            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(flag); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                                                                        </div>
+                                                                    )}
+                                                                    <span>{getCountryName(country)}</span>
+                                                                </div>
                                                             </div>
                                                         </AccordionTrigger>
                                                         {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getCountryName(country)); }}>
