@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -57,7 +58,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   const [isNoteOpen, setIsNoteOpen] = useState(false);
 
   const fetchFavorites = useCallback(async () => {
-    if (!user) return;
+    if (!user || !db) return;
     const docRef = doc(db, 'favorites', user.uid);
     try {
         const docSnap = await getDoc(docRef);
@@ -67,11 +68,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
             setFavorites({ userId: user.uid });
         }
     } catch (error) {
-        console.error("Error in fetchFavorites:", error);
-        const permissionError = new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'get',
-        });
+        const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
         errorEmitter.emit('permission-error', permissionError);
     }
   }, [user, db]);
@@ -89,10 +86,10 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   
   const fetchAllCustomNames = useCallback(async () => {
     if (!db) return;
+    const leaguesCollection = collection(db, 'leagueCustomizations');
+    const teamsCollection = collection(db, 'teamCustomizations');
+    
     try {
-        const leaguesCollection = collection(db, 'leagueCustomizations');
-        const teamsCollection = collection(db, 'teamCustomizations');
-        
         const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
             getDocs(leaguesCollection),
             getDocs(teamsCollection)
@@ -104,14 +101,10 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
         const teamNames = new Map<number, string>();
         teamsSnapshot?.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
         
-        setCustomNames({ leagues: leagueNames, teams: teamNames });
+        setCustomNames({ leagues: leagueNames, teams: teamNames as any });
     } catch(error) {
-         console.error("Error in fetchAllCustomNames:", error);
-         const permissionError = new FirestorePermissionError({
-            path: 'leagueCustomizations or teamCustomizations',
-            operation: 'list',
-        });
-        errorEmitter.emit('permission-error', permissionError);
+         const permissionError = new FirestorePermissionError({ path: 'leagueCustomizations or teamCustomizations', operation: 'list' });
+         errorEmitter.emit('permission-error', permissionError);
     }
   }, [db]);
 
@@ -189,7 +182,6 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
       
       setResults(Array.from(resultsMap.values()));
     } catch (error) {
-      console.error("Error in handleSearch:", error);
       const permissionError = new FirestorePermissionError({
         path: 'teamCustomizations/leagueCustomizations',
         operation: 'list'
@@ -218,18 +210,16 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     let collectionName = type === 'league' ? 'leagueCustomizations' : 'teamCustomizations';
     const docRef = doc(db, collectionName, String(id));
     const data = { customName: newName };
-    try {
-        await setDoc(docRef, data);
-        await fetchAllCustomNames();
-    } catch(error) {
-        console.error("Error in handleSaveRename:", error);
-        const permissionError = new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'create',
-          requestResourceData: data,
+    setDoc(docRef, data)
+        .then(() => fetchAllCustomNames())
+        .catch(serverError => {
+            const permissionError = new FirestorePermissionError({
+                path: docRef.path,
+                operation: 'create',
+                requestResourceData: data,
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
-        errorEmitter.emit('permission-error', permissionError);
-    }
   };
   
   const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
@@ -246,17 +236,15 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
       logo: noteTeam.logo,
       note: note
     };
-    try {
-        await setDoc(docRef, data);
-    } catch(error) {
-        console.error("Error in handleSaveNote:", error);
-        const permissionError = new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'create',
-          requestResourceData: data,
+    setDoc(docRef, data)
+        .catch(serverError => {
+            const permissionError = new FirestorePermissionError({
+                path: docRef.path,
+                operation: 'create',
+                requestResourceData: data,
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
-        errorEmitter.emit('permission-error', permissionError);
-    }
   }
 
   const handleFavorite = async (type: 'team' | 'league', item: any) => {
@@ -273,22 +261,20 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
        favoriteData.leagues = { [item.id]: { leagueId: item.id, name: item.name, logo: item.logo }};
     }
 
-    try {
-        if (isFavorited) {
-            await updateDoc(favRef, { [fieldPath]: deleteField() });
-        } else {
-            await setDoc(favRef, favoriteData, { merge: true });
-        }
-        await fetchFavorites();
-    } catch(error) {
-        console.error("Error in handleFavorite:", error);
-        const permissionError = new FirestorePermissionError({
-          path: favRef.path,
-          operation: 'update',
-          requestResourceData: favoriteData,
+    const operation = isFavorited
+        ? updateDoc(favRef, { [fieldPath]: deleteField() })
+        : setDoc(favRef, favoriteData, { merge: true });
+
+    operation
+        .then(() => fetchFavorites())
+        .catch(serverError => {
+            const permissionError = new FirestorePermissionError({
+                path: favRef.path,
+                operation: 'update',
+                requestResourceData: favoriteData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
-        errorEmitter.emit('permission-error', permissionError);
-    }
   };
 
   const handleResultClick = (result: SearchResult) => {
@@ -336,7 +322,10 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
                                 <AvatarImage src={item.logo} alt={displayName} />
                                 <AvatarFallback>{displayName.substring(0, 2)}</AvatarFallback>
                             </Avatar>
-                            <span className="font-semibold">{displayName}</span>
+                            <div className="font-semibold">
+                                {displayName}
+                                {isAdmin && <span className="block text-xs text-muted-foreground font-normal">(ID: {item.id})</span>}
+                            </div>
                             <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">{result.type === 'team' ? 'فريق' : 'بطولة'}</span>
                         </div>
                         <div className='flex items-center'>

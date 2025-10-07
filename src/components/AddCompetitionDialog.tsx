@@ -54,19 +54,23 @@ export function AddCompetitionDialog({ isOpen, onOpenChange }: AddCompetitionDia
         };
         
         const docRef = doc(db, 'managedCompetitions', String(league.id));
-        await setDoc(docRef, newCompetition);
-        
-        toast({ title: 'نجاح', description: `تمت إضافة بطولة "${league.name}" بنجاح.` });
-        onOpenChange(false);
-        setLeagueId('');
+        setDoc(docRef, newCompetition)
+            .then(() => {
+                toast({ title: 'نجاح', description: `تمت إضافة بطولة "${league.name}" بنجاح.` });
+                onOpenChange(false);
+                setLeagueId('');
+            })
+            .catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: newCompetition });
+                errorEmitter.emit('permission-error', permissionError);
+                toast({ variant: 'destructive', title: 'حدث خطأ', description: 'فشل في إضافة البطولة. يرجى المحاولة مرة أخرى.' });
+            });
       } else {
         toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على بطولة بهذا المعرف.' });
       }
     } catch (error) {
       console.error("Error adding competition:", error);
-      const permissionError = new FirestorePermissionError({ path: `managedCompetitions/${leagueId}`, operation: 'create' });
-      errorEmitter.emit('permission-error', permissionError);
-      toast({ variant: 'destructive', title: 'حدث خطأ', description: 'فشل في إضافة البطولة. يرجى المحاولة مرة أخرى.' });
+      toast({ variant: 'destructive', title: 'حدث خطأ', description: 'فشل في جلب بيانات البطولة من المصدر.' });
     } finally {
       setLoading(false);
     }

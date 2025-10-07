@@ -119,9 +119,9 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
     useEffect(() => {
         const fetchAndFilter = async () => {
             setLoading(true);
+            const adminFavsRef = collection(db, 'adminFavorites');
             try {
                 // 1. Fetch Admin Favorite Teams
-                const adminFavsRef = collection(db, 'adminFavorites');
                 const adminFavsSnapshot = await getDocs(adminFavsRef);
                 const adminFavoriteTeamIds = new Set<number>();
                 adminFavsSnapshot.forEach(doc => {
@@ -146,8 +146,13 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
                 }
 
             } catch (error) {
-                console.error("Failed to fetch fixtures or admin favorites:", error);
-                toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب المباريات." });
+                console.error("Failed to fetch admin favorites:", error);
+                 if (error instanceof Error && error.message.includes('permission-denied')) {
+                    const permissionError = new FirestorePermissionError({ path: adminFavsRef.path, operation: 'list' });
+                    errorEmitter.emit('permission-error', permissionError);
+                } else {
+                    toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب المباريات أو الفرق المفضلة." });
+                }
             } finally {
                 setLoading(false);
             }
@@ -217,20 +222,21 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
             selectedMatches: selectedMatchesData,
         };
 
-        try {
-            await setDoc(dailyDocRef, dataToSave);
-            toast({
-                title: "تم الحفظ بنجاح",
-                description: `تم حفظ ${selectedFixtureIds.size} مباريات للتوقعات العالمية.`,
+        setDoc(dailyDocRef, dataToSave)
+            .then(() => {
+                toast({
+                    title: "تم الحفظ بنجاح",
+                    description: `تم حفظ ${selectedFixtureIds.size} مباريات للتوقعات العالمية.`,
+                });
+            })
+            .catch((serverError) => {
+                const permissionError = new FirestorePermissionError({ path: dailyDocRef.path, operation: 'create', requestResourceData: dataToSave });
+                errorEmitter.emit('permission-error', permissionError);
+                toast({ variant: "destructive", title: "خطأ", description: "فشل حفظ الاختيارات." });
+            })
+            .finally(() => {
+                setSaving(false);
             });
-        } catch (error) {
-            console.error("Error saving selections:", error);
-            const permissionError = new FirestorePermissionError({ path: dailyDocRef.path, operation: 'create', requestResourceData: dataToSave });
-            errorEmitter.emit('permission-error', permissionError);
-            toast({ variant: "destructive", title: "خطأ", description: "فشل حفظ الاختيارات." });
-        } finally {
-            setSaving(false);
-        }
     };
 
 
@@ -273,4 +279,3 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
     );
 }
 
-    

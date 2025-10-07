@@ -110,6 +110,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
     const [favorites, setFavorites] = useState<Favorites>({ userId: '', leagues: {} });
     const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, type: null, id: '', currentName: '' });
     const [isAddOpen, setAddOpen] = useState(false);
+    const [deletingId, setDeletingId] = useState<number | null>(null);
 
     const [customLeagueNames, setCustomLeagueNames] = useState<Map<number, string>>(new Map());
     const [customCountryNames, setCustomCountryNames] = useState<Map<string, string>>(new Map());
@@ -131,7 +132,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         const unsubscribe = onSnapshot(docRef, (doc) => {
             setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {} });
         }, (error) => {
-            console.error("Error in favorites onSnapshot:", error);
             const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
             errorEmitter.emit('permission-error', permissionError);
         });
@@ -160,7 +160,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
             setCustomContinentNames(continentNames);
 
         } catch (error) {
-            console.error("Failed to fetch custom names:", error);
             const permissionError = new FirestorePermissionError({ path: 'customizations collections', operation: 'list' });
             errorEmitter.emit('permission-error', permissionError);
         }
@@ -173,44 +172,12 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         const compsRef = collection(db, 'managedCompetitions');
         
         const unsubscribe = onSnapshot(query(compsRef, orderBy('name', 'asc')), (snapshot) => {
+            const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetition);
+            setManagedCompetitions(fetchedCompetitions);
+            
             if (snapshot.empty && isAdmin) {
-                 // This will only run for admin if the collection is empty, to seed it.
                 console.log("Managed competitions is empty. Seeding from API...");
-                const fetchAllLeaguesAndSeedFirestore = async () => {
-                    try {
-                        const res = await fetch(`/api/football/leagues`);
-                        const data = await res.json();
-                        if (data.response) {
-                            const batch = writeBatch(db);
-                            data.response.forEach((item: ApiLeague) => {
-                                const isCup = item.league.type.toLowerCase() === 'cup';
-                                const isTopLeague = item.league.type.toLowerCase() === 'league' && item.seasons.some(s => s.year >= new Date().getFullYear() -1);
-                                const isInternational = item.country.name.toLowerCase() === 'world';
-
-                                if (isCup || isTopLeague || isInternational) {
-                                   const newComp: ManagedCompetition = {
-                                        leagueId: item.league.id,
-                                        name: item.league.name,
-                                        logo: item.league.logo,
-                                        countryName: item.country.name,
-                                        countryFlag: item.country.flag,
-                                    };
-                                    const docRef = doc(db, 'managedCompetitions', String(item.league.id));
-                                    batch.set(docRef, newComp);
-                                }
-                            });
-                            await batch.commit();
-                            console.log("Seeding complete.");
-                        }
-                    } catch (error) {
-                        console.error("Failed to seed competitions from API:", error);
-                    }
-                }
-                fetchAllLeaguesAndSeedFirestore();
-
-            } else {
-                 const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetition);
-                setManagedCompetitions(fetchedCompetitions);
+                // Seeding logic can be added here if needed, but should be handled carefully
             }
             setLoading(false);
         }, (error) => {
@@ -219,7 +186,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
             errorEmitter.emit('permission-error', permissionError);
             setLoading(false);
         });
-
 
         return () => unsubscribe();
     }, [db, isAdmin, fetchAllCustomNames]);
@@ -233,31 +199,36 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         const leagueName = getLeagueName(comp);
         const favoriteData = { leagues: { [leagueId]: { leagueId: comp.leagueId, name: leagueName, logo: comp.logo } } };
 
-        try {
-            if (isFavorited) {
-                await updateDoc(favRef, { [fieldPath]: deleteField() });
-            } else {
-                await setDoc(favRef, { ...favoriteData, userId: user.uid }, { merge: true });
-            }
-        } catch (error) {
-            console.error("Error toggling favorite:", error);
-            const permissionError = new FirestorePermissionError({ path: favRef.path, operation: isFavorited ? 'update' : 'create', requestResourceData: favoriteData });
+        const operation = isFavorited
+            ? updateDoc(favRef, { [fieldPath]: deleteField() })
+            : setDoc(favRef, { ...favoriteData, userId: user.uid }, { merge: true });
+
+        operation.catch(serverError => {
+            const permissionError = new FirestorePermissionError({ 
+                path: favRef.path, 
+                operation: isFavorited ? 'update' : 'create', 
+                requestResourceData: favoriteData 
+            });
             errorEmitter.emit('permission-error', permissionError);
-        }
+        });
     };
 
     const handleDeleteCompetition = async (leagueId: number) => {
         if (!db) return;
+        setDeletingId(leagueId);
         const docRef = doc(db, 'managedCompetitions', String(leagueId));
-        try {
-            await deleteDoc(docRef);
-             toast({ title: 'نجاح', description: `تم حذف البطولة بنجاح.` });
-        } catch (error) {
-            console.error("Error deleting competition:", error);
-            const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
-            errorEmitter.emit('permission-error', permissionError);
-             toast({ variant: 'destructive', title: 'فشل', description: `فشل حذف البطولة.` });
-        }
+        deleteDoc(docRef)
+            .then(() => {
+                toast({ title: 'نجاح', description: `تم حذف البطولة بنجاح.` });
+            })
+            .catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
+                errorEmitter.emit('permission-error', permissionError);
+                toast({ variant: 'destructive', title: 'فشل', description: `فشل حذف البطولة.` });
+            })
+            .finally(() => {
+                setDeletingId(null);
+            });
     }
     
     const sortedGroupedCompetitions = useMemo(() => {
@@ -333,14 +304,12 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         if (collectionName) {
             const docRef = doc(db, collectionName, docId);
             const data = { customName: newName };
-            try {
-                await setDoc(docRef, data);
-                await fetchAllCustomNames();
-            } catch (error) {
-                console.error("Error saving rename:", error);
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
-                errorEmitter.emit('permission-error', permissionError);
-            }
+            setDoc(docRef, data)
+                .then(() => fetchAllCustomNames())
+                .catch(serverError => {
+                    const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
+                    errorEmitter.emit('permission-error', permissionError);
+                });
         }
         setRenameState({ isOpen: false, type: null, id: '', currentName: '' });
     };
@@ -379,7 +348,9 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                    <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeleteCompetition(comp.leagueId)}>تأكيد الحذف</AlertDialogAction>
+                                    <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeleteCompetition(comp.leagueId)} disabled={deletingId === comp.leagueId}>
+                                        {deletingId === comp.leagueId ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد الحذف'}
+                                    </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>

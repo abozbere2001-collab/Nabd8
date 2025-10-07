@@ -379,7 +379,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 });
                 setPredictions(userPredictions);
             }, (error) => {
-                const permissionError = new FirestorePermissionError({ path: 'predictions', operation: 'list' });
+                const permissionError = new FirestorePermissionError({ path: `predictions where userId == ${user.uid}`, operation: 'list' });
                 errorEmitter.emit('permission-error', permissionError);
             });
         }
@@ -405,16 +405,14 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             awayGoals,
             timestamp: new Date().toISOString()
         };
-        try {
-            await setDoc(predictionRef, predictionData, { merge: true });
-        } catch (error) {
+        setDoc(predictionRef, predictionData, { merge: true }).catch(serverError => {
             const permissionError = new FirestorePermissionError({
               path: predictionRef.path,
               operation: 'create',
               requestResourceData: predictionData
             });
             errorEmitter.emit('permission-error', permissionError);
-        }
+        });
     }, [user, db]);
     
     if (loading) {

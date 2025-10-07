@@ -157,7 +157,6 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
         setCustomPlayerNames(playerNames);
     } catch (error) {
-        console.error("Error in fetchCustomNames:", error);
         const permissionError = new FirestorePermissionError({
           path: `teamCustomizations/${teamId} or playerCustomizations`,
           operation: 'get',
@@ -185,11 +184,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     const unsub = onSnapshot(docRef, (doc) => {
         setFavorites(doc.data() as Favorites || { userId: user.uid });
     }, (error) => {
-        console.error("Error in favorites onSnapshot:", error);
-        const permissionError = new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'get',
-        });
+        const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
         errorEmitter.emit('permission-error', permissionError);
     });
     return () => unsub();
@@ -206,18 +201,16 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     const collectionName = type === 'player' ? 'playerCustomizations' : 'teamCustomizations';
     const docRef = doc(db, collectionName, String(id));
     const data = { customName: newName };
-    try {
-        await setDoc(docRef, data);
-        await fetchCustomNames();
-    } catch (error) {
-        console.error("Error in handleSaveRename:", error);
-        const permissionError = new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'create',
-          requestResourceData: data,
+    setDoc(docRef, data)
+        .then(() => fetchCustomNames())
+        .catch(serverError => {
+            const permissionError = new FirestorePermissionError({
+                path: docRef.path,
+                operation: 'create',
+                requestResourceData: data,
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
-        errorEmitter.emit('permission-error', permissionError);
-    }
   };
 
   const handleFavorite = async (type: 'team' | 'player', item: any) => {
@@ -234,21 +227,18 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
        favoriteData.players = { [item.id]: { playerId: item.id, name: item.name, photo: item.photo }};
     }
 
-    try {
-        if (isFavorited) {
-            await updateDoc(favRef, { [fieldPath]: deleteField() });
-        } else {
-            await setDoc(favRef, favoriteData, { merge: true });
-        }
-    } catch (error) {
-        console.error("Error in handleFavorite:", error);
+    const operation = isFavorited
+        ? updateDoc(favRef, { [fieldPath]: deleteField() })
+        : setDoc(favRef, favoriteData, { merge: true });
+
+    operation.catch(serverError => {
         const permissionError = new FirestorePermissionError({
-          path: favRef.path,
-          operation: 'update',
-          requestResourceData: favoriteData,
+            path: favRef.path,
+            operation: 'update',
+            requestResourceData: favoriteData,
         });
         errorEmitter.emit('permission-error', permissionError);
-    }
+    });
   };
   
   const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
@@ -265,17 +255,14 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
       logo: noteTeam.logo,
       note: note
     };
-    try {
-        await setDoc(docRef, data);
-    } catch (error) {
-        console.error("Error in handleSaveNote:", error);
+    setDoc(docRef, data).catch(serverError => {
         const permissionError = new FirestorePermissionError({
           path: docRef.path,
           operation: 'create',
           requestResourceData: data,
         });
         errorEmitter.emit('permission-error', permissionError);
-    }
+    });
   }
   
   const getPlayerDisplayName = (id: number, defaultName: string) => {
