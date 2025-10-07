@@ -448,10 +448,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
   const screenHeaderActions = (
     <div className='flex items-center gap-2'>
-        <Button variant={showLiveOnly ? 'default' : 'outline'} size="sm" onClick={() => setShowLiveOnly(!showLiveOnly)}>
+        <Button variant={showLiveOnly ? 'default' : 'outline'} size="sm" className="h-8 px-2" onClick={() => setShowLiveOnly(!showLiveOnly)}>
             مباشر
         </Button>
-       <Button variant={showOdds ? 'default' : 'outline'} size="sm" onClick={toggleShowOdds} disabled={loadingOdds}>
+       <Button variant={showOdds ? 'default' : 'outline'} size="sm" className="h-8 px-2" onClick={toggleShowOdds} disabled={loadingOdds}>
             {loadingOdds ? <Loader2 className="h-4 w-4 animate-spin" /> : '1X2'}
         </Button>
         {baseHeaderActions}
