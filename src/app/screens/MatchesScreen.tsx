@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -8,7 +8,7 @@ import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -447,21 +447,31 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
     fetchFixturesForDate(selectedDateKey);
   }, [selectedDateKey, showOdds]);
   
-  useEffect(() => {
-    if (!user) return;
+  const fetchFavorites = useCallback(async () => {
+    if (!user) {
+        setFavorites({});
+        return;
+    }
     const docRef = doc(db, 'favorites', user.uid);
-    const unsubscribe = onSnapshot(docRef, (doc) => {
-        setFavorites(doc.data() as Favorites || {});
-    }, (error) => {
+    try {
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            setFavorites(docSnap.data() as Favorites || {});
+        } else {
+            setFavorites({});
+        }
+    } catch (error) {
         const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: 'get',
         });
         errorEmitter.emit('permission-error', permissionError);
-    });
-
-    return () => unsubscribe();
+    }
   }, [user, db]);
+
+  useEffect(() => {
+    fetchFavorites();
+  }, [fetchFavorites]);
 
   const favoritedTeamIds = useMemo(() => favorites?.teams ? Object.keys(favorites.teams).map(Number) : [], [favorites.teams]);
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
