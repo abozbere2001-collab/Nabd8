@@ -271,7 +271,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
 
              // Fetch likes for each reply
             const repliesWithLikes = await Promise.all(replies.map(async (reply) => {
-                const replyLikesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies', reply.id, 'likes');
+                const replyLikesRef = collection(db, 'matches', String(matchId), 'comments', reply.parentId!, 'replies', reply.id, 'likes');
                 const replyLikesSnapshot = await getDocs(replyLikesRef);
                 const replyLikes = replyLikesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
                 return { ...reply, likes: replyLikes };
@@ -497,9 +497,12 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
 
       if (!commentToLike) return;
 
-      const likeRef = parentCommentId
-        ? doc(db, 'matches', String(matchId), 'comments', parentCommentId, 'replies', commentId, 'likes', user.uid)
-        : doc(db, 'matches', String(matchId), 'comments', commentId, 'likes', user.uid);
+      const basePath = ['matches', String(matchId), 'comments'];
+      const likePath = parentCommentId 
+        ? [...basePath, parentCommentId, 'replies', commentId, 'likes', user.uid]
+        : [...basePath, commentId, 'likes', user.uid];
+
+      const likeRef = doc(db, ...likePath);
 
       const hasLiked = commentToLike.likes?.some(like => like.id === user.uid);
 
