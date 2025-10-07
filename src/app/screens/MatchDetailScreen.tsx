@@ -164,43 +164,44 @@ const PlayerIcon = ({ player, isHomeTeam }: { player: LineupPlayer, isHomeTeam: 
 
     const [row, col] = player.player.grid.split(':').map(Number);
     
-    // Normalize to a 0-1 range, then convert to percentage.
-    // X-axis (col): 1-5 -> 0-1
-    // Y-axis (row): 1-11 -> 0-1
-    let x = (col - 1) / 4;
-    let y = (row - 1) / 10;
-    
-    // Flip coordinates for away team
+    // Normalize grid positions to a 0-1 range, then convert to percentage.
+    // The grid is roughly 11 rows and 5 columns.
+    const maxRows = 11;
+    const maxCols = 5;
+
+    // Calculate base percentages
+    let topPercent = (row / (maxRows + 1)) * 100;
+    let leftPercent = ((col - 1) / (maxCols - 1)) * 100;
+
+    // Flip coordinates for away team to appear on the opposite side
     if (!isHomeTeam) {
-       x = 1 - x;
-       y = 1 - y;
+       topPercent = 100 - topPercent;
+       leftPercent = 100 - leftPercent;
     }
 
-    const topPercentage = y * 100;
-    const leftPercentage = x * 100;
-    
+    // Add some padding/offset to prevent players from being on the absolute edge
+    // Clamp values to stay within a visible area (e.g., 5% to 95%)
+    leftPercent = Math.max(5, Math.min(95, leftPercent));
+    topPercent = Math.max(5, Math.min(95, topPercent));
+
+
     return (
         <div 
           className="absolute text-center flex flex-col items-center transition-all duration-300" 
           style={{ 
-            top: `calc(${topPercentage}% - 25px)`, 
-            left: `calc(${leftPercentage}% - 30px)`,
+            top: `${topPercent}%`, 
+            left: `${leftPercent}%`,
             width: '60px',
             transform: 'translate(-50%, -50%)',
           }}
         >
             <div className="relative">
-                <div className="relative w-10 h-10">
-                    <Avatar className="w-10 h-10 border-2 bg-slate-800 border-white/50 shadow-md text-white font-bold flex items-center justify-center">
-                        <AvatarFallback>{player.player.pos ? player.player.pos.charAt(0) : 'P'}</AvatarFallback>
-                    </Avatar>
-                    <Avatar className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8">
-                        <AvatarImage src={player.player.photo} alt={player.player.name} />
-                        <AvatarFallback>{player.player.pos ? player.player.pos.charAt(0) : 'P'}</AvatarFallback>
-                    </Avatar>
-                </div>
+                <Avatar className="w-10 h-10 border-2 bg-slate-800 border-white/50 shadow-md text-white font-bold flex items-center justify-center">
+                   <AvatarImage src={player.player.photo} alt={player.player.name} />
+                   <AvatarFallback>{player.player.pos ? player.player.pos.charAt(0) : 'P'}</AvatarFallback>
+                </Avatar>
                 <span className={cn(
-                  "absolute -top-1 -right-1 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background bg-red-600"
+                  "absolute -top-1 -right-1 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background bg-primary"
                   )}>
                     {player.player.number}
                 </span>
@@ -227,14 +228,12 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
   const homeLineup = lineups.find(l => l.team.id === fixture.teams.home.id);
   const awayLineup = lineups.find(l => l.team.id === fixture.teams.away.id);
 
-  const selectedLineup = selectedTeamId === fixture.teams.home.id ? homeLineup : awayLineup;
+  const lineupToShow = selectedTeamId === fixture.teams.home.id ? homeLineup : awayLineup;
 
-  if (!selectedLineup) {
+  if (!lineupToShow) {
       return <p className="text-center text-muted-foreground p-8">تشكيلة الفريق المحدد غير متاحة.</p>;
   }
   
-  const lineupToShow = selectedTeamId === fixture.teams.home.id ? homeLineup : awayLineup;
-
 
   return (
     <div className="p-4 space-y-6">
@@ -263,7 +262,7 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
 
       <div className="space-y-4">
         <div 
-            className="relative w-full max-w-md mx-auto aspect-[3/4] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-500/30 shadow-2xl p-4" 
+            className="relative w-full max-w-md mx-auto aspect-[3/4] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-500/30 shadow-2xl" 
             style={{
                 backgroundImage: "url(/football-pitch-3d.svg)",
                 backgroundSize: '100% 100%',
@@ -283,11 +282,11 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
         <div className="space-y-2">
             <div className="flex items-center gap-3 p-2 rounded-md">
                 <Avatar className="w-10 h-10">
-                <AvatarImage src={selectedLineup.coach.photo} alt={selectedLineup.coach.name} />
-                <AvatarFallback>{selectedLineup.coach.name.substring(0,1)}</AvatarFallback>
+                <AvatarImage src={lineupToShow.coach.photo} alt={lineupToShow.coach.name} />
+                <AvatarFallback>{lineupToShow.coach.name.substring(0,1)}</AvatarFallback>
                 </Avatar>
                 <div>
-                    <p className="font-medium">{selectedLineup.coach.name}</p>
+                    <p className="font-medium">{lineupToShow.coach.name}</p>
                     <p className="text-xs text-muted-foreground">المدرب</p>
                 </div>
             </div>
@@ -297,7 +296,7 @@ const LineupsTab = ({ lineups, loading, fixture }: { lineups: Lineup[] | null, l
       <div className="p-2 rounded-lg bg-card border">
          <h4 className="font-bold mb-2 text-base px-2">البدلاء</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            {selectedLineup.substitutes.map(s => (
+            {lineupToShow.substitutes.map(s => (
             <div key={s.player.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted">
                 <span className="text-muted-foreground w-6 text-center font-mono">{s.player.number}</span>
                 <Avatar className="w-6 h-6">
@@ -426,7 +425,7 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
             }
             return true;
         })
-        .sort((a, b) => a.time.elapsed - b.time.elapsed), [events, filter]);
+        .sort((a, b) => b.time.elapsed - a.time.elapsed), [events, filter]);
 
     if (filteredEvents.length === 0) {
         return <p className="text-center p-8">لا توجد أحداث بارزة.</p>;
@@ -459,7 +458,7 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
             const isHomeTeam = event.team.id === fixture.teams.home.id;
             
             const content = (
-              <div className={cn("flex items-center gap-2 text-xs", isHomeTeam ? "flex-row" : "flex-row-reverse")}>
+              <div className={cn("flex items-center gap-2 text-xs", isHomeTeam ? "flex-row-reverse" : "flex-row")}>
                  <span className="font-bold w-6 text-center">{event.time.elapsed}'</span>
                  {getEventIcon(event)}
                  <div className={cn("text-left", isHomeTeam ? "text-right" : "text-left")}>
@@ -477,7 +476,7 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
 
             return (
               <div key={index} className="relative flex my-3 w-full">
-                 <div className={cn("w-[calc(50%-1.5rem)]", isHomeTeam ? 'mr-auto' : 'ml-auto' )}>
+                 <div className={cn("w-[calc(50%-1.5rem)]", isHomeTeam ? 'ml-auto' : 'mr-auto' )}>
                     {content}
                  </div>
               </div>
