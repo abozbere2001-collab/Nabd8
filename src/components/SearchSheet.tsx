@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenKey, ScreenProps } from '@/app/page';
 import { useAdmin, useFirebase } from '@/firebase/provider';
-import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase-client';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
@@ -43,6 +43,8 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>}>({leagues: new Map(), teams: new Map()});
+
 
   const { isAdmin, user } = useAdmin();
   const [favorites, setFavorites] = useState<Favorites>({});
@@ -57,28 +59,96 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     return () => unsub();
   }, [user]);
 
-  const handleSearch = useCallback(async (query: string) => {
-    if (!query.trim() || query.length < 3) {
+  const getDisplayName = (type: 'team' | 'league', id: number, defaultName: string) => {
+      if (type === 'team') {
+          return customNames.teams.get(id) || defaultName;
+      }
+      return customNames.leagues.get(id) || defaultName;
+  }
+
+  useEffect(() => {
+    const fetchAllCustomNames = async () => {
+        const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+            getDocs(collection(db, 'leagueCustomizations')),
+            getDocs(collection(db, 'teamCustomizations'))
+        ]);
+        
+        const leagueNames = new Map<number, string>();
+        leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+        
+        const teamNames = new Map<number, string>();
+        teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+        
+        setCustomNames({ leagues: leagueNames, teams: teamNames });
+    };
+    if (isOpen) {
+        fetchAllCustomNames();
+    }
+  }, [isOpen]);
+
+  const handleSearch = useCallback(async (queryTerm: string) => {
+    if (!queryTerm.trim() || queryTerm.length < 3) {
       setResults([]);
       return;
     }
     setLoading(true);
-    try {
-      const [teamsRes, leaguesRes] = await Promise.all([
-        fetch(`/api/football/teams?search=${query}`),
-        fetch(`/api/football/leagues?search=${query}`)
-      ]);
-      const teamsData = await teamsRes.json();
-      const leaguesData = await leaguesRes.json();
 
-      const combinedResults: SearchResult[] = [];
-      if (teamsData.response) {
-        combinedResults.push(...teamsData.response.map((r: TeamResult) => ({ ...r, type: 'team' } as const)));
-      }
-      if (leaguesData.response) {
-        combinedResults.push(...leaguesData.response.map((r: LeagueResult) => ({ ...r, type: 'league' } as const)));
-      }
-      setResults(combinedResults);
+    const resultsMap = new Map<string, SearchResult>();
+
+    try {
+        // 1. Search external API
+        const [teamsRes, leaguesRes] = await Promise.all([
+            fetch(`/api/football/teams?search=${queryTerm}`),
+            fetch(`/api/football/leagues?search=${queryTerm}`)
+        ]);
+        const teamsData = await teamsRes.json();
+        const leaguesData = await leaguesRes.json();
+
+        if (teamsData.response) {
+            teamsData.response.forEach((r: TeamResult) => resultsMap.set(`team-${r.team.id}`, { ...r, type: 'team' }));
+        }
+        if (leaguesData.response) {
+            leaguesData.response.forEach((r: LeagueResult) => resultsMap.set(`league-${r.league.id}`, { ...r, type: 'league' }));
+        }
+
+        // 2. Search Firestore for custom names (case-insensitive for Arabic)
+        const teamCustomQuery = query(collection(db, "teamCustomizations"), where("customName", ">=", queryTerm), where("customName", "<=", queryTerm + '\uf8ff'), limit(10));
+        const leagueCustomQuery = query(collection(db, "leagueCustomizations"), where("customName", ">=", queryTerm), where("customName", "<=", queryTerm + '\uf8ff'), limit(10));
+
+        const [teamCustomSnap, leagueCustomSnap] = await Promise.all([
+            getDocs(teamCustomQuery),
+            getDocs(leagueCustomQuery),
+        ]);
+
+        const firestoreTeamIds = teamCustomSnap.docs.map(d => d.id);
+        const firestoreLeagueIds = leagueCustomSnap.docs.map(d => d.id);
+
+        if (firestoreTeamIds.length > 0) {
+            const teamDetailsRes = await fetch(`/api/football/teams?id=${firestoreTeamIds.join('-')}`);
+            const teamDetailsData = await teamDetailsRes.json();
+            if (teamDetailsData.response) {
+                 teamDetailsData.response.forEach((r: TeamResult) => {
+                    if (!resultsMap.has(`team-${r.team.id}`)) {
+                        resultsMap.set(`team-${r.team.id}`, { ...r, type: 'team' });
+                    }
+                });
+            }
+        }
+        
+        if (firestoreLeagueIds.length > 0) {
+            // API doesn't support multiple league IDs, fetch one by one
+             for (const leagueId of firestoreLeagueIds) {
+                if (!resultsMap.has(`league-${leagueId}`)) {
+                    const leagueDetailsRes = await fetch(`/api/football/leagues?id=${leagueId}`);
+                    const leagueDetailsData = await leagueDetailsRes.json();
+                    if (leagueDetailsData.response?.[0]) {
+                        resultsMap.set(`league-${leagueId}`, { ...leagueDetailsData.response[0], type: 'league' });
+                    }
+                }
+            }
+        }
+      
+      setResults(Array.from(resultsMap.values()));
     } catch (error) {
       console.error("Search failed:", error);
       setResults([]);
@@ -103,6 +173,12 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     const { id, type } = renameItem;
     let collectionName = type === 'league' ? 'leagueCustomizations' : 'teamCustomizations';
     await setDoc(doc(db, collectionName, String(id)), { customName: newName });
+    // Optimistically update custom names
+    if (type === 'league') {
+        setCustomNames(prev => ({...prev, leagues: new Map(prev.leagues).set(Number(id), newName)}));
+    } else {
+        setCustomNames(prev => ({...prev, teams: new Map(prev.teams).set(Number(id), newName)}));
+    }
   };
 
   const handleFavorite = async (type: 'team' | 'league', item: any) => {
@@ -130,7 +206,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     if (result.type === 'team') {
       navigate('TeamDetails', { teamId: result.team.id });
     } else {
-      navigate('CompetitionDetails', { leagueId: result.league.id, title: result.league.name, logo: result.league.logo });
+      navigate('CompetitionDetails', { leagueId: result.league.id, title: getDisplayName('league', result.league.id, result.league.name), logo: result.league.logo });
     }
     setIsOpen(false);
   }
@@ -162,15 +238,16 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
                 <ul className="space-y-2">
                 {results.map(result => {
                     const item = result.type === 'team' ? result.team : result.league;
+                    const displayName = getDisplayName(result.type, item.id, item.name);
                     const isFavorited = result.type === 'team' ? !!favorites?.teams?.[item.id] : !!favorites?.leagues?.[item.id];
                     return (
                         <li key={`${result.type}-${item.id}`} className="flex items-center gap-3 p-2 border rounded-md bg-card hover:bg-accent">
                         <div className='flex-1 flex items-center gap-3 cursor-pointer' onClick={() => handleResultClick(result)}>
                             <Avatar>
-                                <AvatarImage src={item.logo} alt={item.name} />
-                                <AvatarFallback>{item.name.substring(0, 2)}</AvatarFallback>
+                                <AvatarImage src={item.logo} alt={displayName} />
+                                <AvatarFallback>{displayName.substring(0, 2)}</AvatarFallback>
                             </Avatar>
-                            <span className="font-semibold">{item.name}</span>
+                            <span className="font-semibold">{displayName}</span>
                             <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">{result.type === 'team' ? 'فريق' : 'بطولة'}</span>
                         </div>
                         <div className='flex items-center'>
@@ -178,7 +255,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
                                 <Star className={cn("h-5 w-5", isFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
                             </Button>
                             {isAdmin && (
-                                <Button variant="ghost" size="icon" onClick={() => handleOpenRename(result.type, item.id, item.name)}>
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenRename(result.type, item.id, displayName)}>
                                     <Pencil className="h-4 w-4 text-muted-foreground" />
                                 </Button>
                             )}
