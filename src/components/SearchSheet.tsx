@@ -183,16 +183,16 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
       
       setResults(Array.from(resultsMap.values()));
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "خطأ في البحث",
-        description: "فشل في جلب نتائج البحث. قد تكون هناك مشكلة في الشبكة."
-      })
+      const permissionError = new FirestorePermissionError({
+        path: 'teamCustomizations/leagueCustomizations',
+        operation: 'list'
+      });
+      errorEmitter.emit('permission-error', permissionError);
       setResults([]);
     } finally {
       setLoading(false);
     }
-  }, [db, toast]);
+  }, [db]);
 
   useEffect(() => {
     if (isOpen) {

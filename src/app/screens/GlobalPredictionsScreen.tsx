@@ -15,7 +15,7 @@ import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
 import type { Fixture, UserScore, Prediction, DailyGlobalPredictions } from '@/lib/types';
-import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -131,6 +131,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
 
     useEffect(() => {
+        if (!db) return;
         setLoading(true);
 
         const leaderboardRef = query(collection(db, 'leaderboard'), orderBy('totalPoints', 'desc'));
@@ -147,7 +148,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             const today = format(new Date(), 'yyyy-MM-dd');
             const dailyDocRef = doc(db, 'dailyGlobalPredictions', today);
             
-            let fetchedFixtures: Fixture[] = [];
             let dailyMatchIds: number[] = [];
 
             try {
@@ -160,8 +160,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                         const res = await fetch(`/api/football/fixtures?ids=${fixtureIds}`);
                         const data = await res.json();
                         if (data.response) {
-                             fetchedFixtures = data.response;
-                             setSelectedMatches(fetchedFixtures);
+                             setSelectedMatches(data.response);
                         }
                     } else {
                         setSelectedMatches([]);
@@ -181,22 +180,21 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 const userPredictions: { [key: number]: Prediction } = {};
                 const predictionPromises = dailyMatchIds.map(fixtureId => {
                     const predDocRef = doc(db, 'predictions', `${user.uid}_${fixtureId}`);
-                    return getDoc(predDocRef);
+                    return getDoc(predDocRef).catch(error => {
+                        const permissionError = new FirestorePermissionError({ path: predDocRef.path, operation: 'get' });
+                        errorEmitter.emit('permission-error', permissionError);
+                        return null; // return null on error to not break Promise.all
+                    });
                 });
 
-                try {
-                    const predictionDocs = await Promise.all(predictionPromises);
-                    predictionDocs.forEach(docSnap => {
-                        if (docSnap.exists()) {
-                            const pred = docSnap.data() as Prediction;
-                            userPredictions[pred.fixtureId] = pred;
-                        }
-                    });
-                    setPredictions(userPredictions);
-                } catch (error) {
-                    // This error is less critical, maybe just log it.
-                    console.error("Error fetching user predictions directly:", error);
-                }
+                const predictionDocs = await Promise.all(predictionPromises);
+                predictionDocs.forEach(docSnap => {
+                    if (docSnap && docSnap.exists()) {
+                        const pred = docSnap.data() as Prediction;
+                        userPredictions[pred.fixtureId] = pred;
+                    }
+                });
+                setPredictions(userPredictions);
             }
         };
 
@@ -208,7 +206,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     }, [db, user]);
 
     const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
-        if (!user || homeGoalsStr === '' || awayGoalsStr === '') return;
+        if (!user || homeGoalsStr === '' || awayGoalsStr === '' || !db) return;
         const homeGoals = parseInt(homeGoalsStr, 10);
         const awayGoals = parseInt(awayGoalsStr, 10);
         if (isNaN(homeGoals) || isNaN(awayGoals)) return;
@@ -221,16 +219,14 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             awayGoals,
             timestamp: new Date().toISOString()
         };
-        try {
-            await setDoc(predictionRef, predictionData, { merge: true });
-        } catch (error) {
+        setDoc(predictionRef, predictionData, { merge: true }).catch(error => {
             const permissionError = new FirestorePermissionError({
               path: predictionRef.path,
               operation: 'create',
               requestResourceData: predictionData
             });
             errorEmitter.emit('permission-error', permissionError);
-        }
+        });
     }, [user, db]);
 
 
@@ -320,4 +316,3 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     );
 }
 
-    

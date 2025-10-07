@@ -218,7 +218,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
             .catch(serverError => {
                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
                 errorEmitter.emit('permission-error', permissionError);
-                toast({ variant: 'destructive', title: 'فشل', description: `فشل حذف البطولة.` });
             })
             .finally(() => {
                 setDeletingId(null);

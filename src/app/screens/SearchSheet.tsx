@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -24,6 +23,7 @@ import { cn } from '@/lib/utils';
 import type { Favorites } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { useToast } from '@/hooks/use-toast';
 
 interface TeamResult {
   team: { id: number; name: string; logo: string; };
@@ -50,6 +50,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   const { isAdmin } = useAdmin();
   const { user } = useAuth();
   const { db } = useFirestore();
+  const { toast } = useToast();
   const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || ''});
   const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
@@ -60,17 +61,16 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   const fetchFavorites = useCallback(async () => {
     if (!user || !db) return;
     const docRef = doc(db, 'favorites', user.uid);
-    try {
-        const docSnap = await getDoc(docRef);
+    getDoc(docRef).then(docSnap => {
         if (docSnap.exists()) {
             setFavorites(docSnap.data() as Favorites);
         } else {
             setFavorites({ userId: user.uid });
         }
-    } catch (error) {
+    }).catch(error => {
         const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
         errorEmitter.emit('permission-error', permissionError);
-    }
+    });
   }, [user, db]);
 
   useEffect(() => {
@@ -270,7 +270,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
         .catch(serverError => {
             const permissionError = new FirestorePermissionError({
                 path: favRef.path,
-                operation: 'update',
+                operation: isFavorited ? 'update' : 'create',
                 requestResourceData: favoriteData,
             });
             errorEmitter.emit('permission-error', permissionError);

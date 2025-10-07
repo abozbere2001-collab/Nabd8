@@ -167,7 +167,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     } catch (error) {
         const permissionError = new FirestorePermissionError({
           path: `teamCustomizations/${teamId} or playerCustomizations`,
-          operation: 'get',
+          operation: 'list',
         });
         errorEmitter.emit('permission-error', permissionError);
     }

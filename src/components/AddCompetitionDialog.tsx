@@ -33,7 +33,7 @@ export function AddCompetitionDialog({ isOpen, onOpenChange }: AddCompetitionDia
   const { toast } = useToast();
 
   const handleAdd = async () => {
-    if (!leagueId.trim()) {
+    if (!leagueId.trim() || !db) {
       toast({ variant: 'destructive', title: 'خطأ', description: 'يرجى إدخال معرف البطولة.' });
       return;
     }
@@ -64,7 +64,6 @@ export function AddCompetitionDialog({ isOpen, onOpenChange }: AddCompetitionDia
             .catch(serverError => {
                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: newCompetition });
                 errorEmitter.emit('permission-error', permissionError);
-                toast({ variant: 'destructive', title: 'حدث خطأ', description: 'فشل في إضافة البطولة. يرجى المحاولة مرة أخرى.' });
             });
       } else {
         toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على بطولة بهذا المعرف.' });

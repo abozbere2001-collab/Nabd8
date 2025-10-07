@@ -222,9 +222,9 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const [teams, setTeams] = useState<AdminFavorite[]>([]);
     const [loading, setLoading] = useState(true);
     const { db } = useFirestore();
-    const { isAdmin } = useAdmin();
 
     useEffect(() => {
+        if (!db) return;
         const fetchAdminFavorites = async () => {
             setLoading(true);
             const favsRef = collection(db, 'adminFavorites');
@@ -236,10 +236,7 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 });
                 setTeams(fetchedTeams);
             } catch (error) {
-                const permissionError = new FirestorePermissionError({
-                  path: favsRef.path,
-                  operation: 'list',
-                });
+                const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'list' });
                 errorEmitter.emit('permission-error', permissionError);
             } finally {
                 setLoading(false);
@@ -343,6 +340,8 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
 
     useEffect(() => {
+        if (!db) return;
+        
         async function fetchData() {
             setLoading(true);
             try {
@@ -363,7 +362,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
            snapshot.forEach(doc => scores.push(doc.data() as UserScore));
            setLeaderboard(scores);
         }, (error) => {
-           const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
+           const permissionError = new FirestorePermissionError({ path: leaderboardRef.path, operation: 'list' });
            errorEmitter.emit('permission-error', permissionError);
         });
 
@@ -375,7 +374,11 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 const userPredictions: { [key: number]: Prediction } = {};
                 snapshot.forEach(doc => {
                     const pred = doc.data() as Prediction;
-                    userPredictions[pred.fixtureId] = pred;
+                    // Filter for only Iraqi league predictions
+                    const isIraqiFixture = fixtures.some(f => f.fixture.id === pred.fixtureId && f.league.id === IRAQI_LEAGUE_ID);
+                    if (isIraqiFixture) {
+                       userPredictions[pred.fixtureId] = pred;
+                    }
                 });
                 setPredictions(userPredictions);
             }, (error) => {
@@ -389,10 +392,10 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             unsubscribePreds();
         };
 
-    }, [user, db]);
+    }, [user, db, fixtures]);
 
     const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
-        if (!user || homeGoalsStr === '' || awayGoalsStr === '') return;
+        if (!user || homeGoalsStr === '' || awayGoalsStr === '' || !db) return;
         const homeGoals = parseInt(homeGoalsStr, 10);
         const awayGoals = parseInt(awayGoalsStr, 10);
         if (isNaN(homeGoals) || isNaN(awayGoals)) return;

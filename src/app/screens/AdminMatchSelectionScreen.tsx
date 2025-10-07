@@ -118,8 +118,10 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
     // Fetch admin's favorite teams and then filter fixtures
     useEffect(() => {
         const fetchAndFilter = async () => {
+            if (!db) return;
             setLoading(true);
             const adminFavsRef = collection(db, 'adminFavorites');
+            
             try {
                 // 1. Fetch Admin Favorite Teams
                 const adminFavsSnapshot = await getDocs(adminFavsRef);
@@ -146,22 +148,18 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
                 }
 
             } catch (error) {
-                console.error("Failed to fetch admin favorites:", error);
-                 if (error instanceof Error && error.message.includes('permission-denied')) {
-                    const permissionError = new FirestorePermissionError({ path: adminFavsRef.path, operation: 'list' });
-                    errorEmitter.emit('permission-error', permissionError);
-                } else {
-                    toast({ variant: "destructive", title: "خطأ", description: "فشل في جلب المباريات أو الفرق المفضلة." });
-                }
+                const permissionError = new FirestorePermissionError({ path: adminFavsRef.path, operation: 'list' });
+                errorEmitter.emit('permission-error', permissionError);
             } finally {
                 setLoading(false);
             }
         };
         fetchAndFilter();
-    }, [selectedDateKey, toast, db]);
+    }, [selectedDateKey, db]);
 
     // Fetch existing selections for the selected date from Firestore
     useEffect(() => {
+        if (!db) return;
         const fetchSelections = async () => {
             const dailyDocRef = doc(db, 'dailyGlobalPredictions', selectedDateKey);
             try {
@@ -206,6 +204,7 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
     };
     
     const handleSaveSelections = async () => {
+        if (!db) return;
         setSaving(true);
         const dailyDocRef = doc(db, 'dailyGlobalPredictions', selectedDateKey);
 
@@ -232,7 +231,6 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
             .catch((serverError) => {
                 const permissionError = new FirestorePermissionError({ path: dailyDocRef.path, operation: 'create', requestResourceData: dataToSave });
                 errorEmitter.emit('permission-error', permissionError);
-                toast({ variant: "destructive", title: "خطأ", description: "فشل حفظ الاختيارات." });
             })
             .finally(() => {
                 setSaving(false);
