@@ -167,48 +167,47 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         fetchAllCustomNames();
         const compsRef = collection(db, 'managedCompetitions');
         
-        const fetchAllLeaguesAndSeedFirestore = async () => {
-            try {
-                const res = await fetch(`/api/football/leagues`);
-                const data = await res.json();
-                if (data.response) {
-                    const batch = writeBatch(db);
-                    data.response.forEach((item: ApiLeague) => {
-                        const isCup = item.league.type.toLowerCase() === 'cup';
-                        const isTopLeague = item.league.type.toLowerCase() === 'league' && item.seasons.some(s => s.year >= new Date().getFullYear() -1);
-                        const isInternational = item.country.name.toLowerCase() === 'world';
-
-                        if (isCup || isTopLeague || isInternational) {
-                           const newComp: ManagedCompetition = {
-                                leagueId: item.league.id,
-                                name: item.league.name,
-                                logo: item.league.logo,
-                                countryName: item.country.name,
-                                countryFlag: item.country.flag,
-                            };
-                            const docRef = doc(db, 'managedCompetitions', String(item.league.id));
-                            batch.set(docRef, newComp);
-                        }
-                    });
-                    await batch.commit();
-                    console.log("Seeding complete.");
-                }
-            } catch (error) {
-                console.error("Failed to seed competitions from API:", error);
-            } finally {
-                setLoading(false);
-            }
-        }
-        
         const unsubscribe = onSnapshot(query(compsRef, orderBy('name', 'asc')), (snapshot) => {
             if (snapshot.empty && isAdmin) {
+                 // This will only run for admin if the collection is empty, to seed it.
                 console.log("Managed competitions is empty. Seeding from API...");
+                const fetchAllLeaguesAndSeedFirestore = async () => {
+                    try {
+                        const res = await fetch(`/api/football/leagues`);
+                        const data = await res.json();
+                        if (data.response) {
+                            const batch = writeBatch(db);
+                            data.response.forEach((item: ApiLeague) => {
+                                const isCup = item.league.type.toLowerCase() === 'cup';
+                                const isTopLeague = item.league.type.toLowerCase() === 'league' && item.seasons.some(s => s.year >= new Date().getFullYear() -1);
+                                const isInternational = item.country.name.toLowerCase() === 'world';
+
+                                if (isCup || isTopLeague || isInternational) {
+                                   const newComp: ManagedCompetition = {
+                                        leagueId: item.league.id,
+                                        name: item.league.name,
+                                        logo: item.league.logo,
+                                        countryName: item.country.name,
+                                        countryFlag: item.country.flag,
+                                    };
+                                    const docRef = doc(db, 'managedCompetitions', String(item.league.id));
+                                    batch.set(docRef, newComp);
+                                }
+                            });
+                            await batch.commit();
+                            console.log("Seeding complete.");
+                        }
+                    } catch (error) {
+                        console.error("Failed to seed competitions from API:", error);
+                    }
+                }
                 fetchAllLeaguesAndSeedFirestore();
+
             } else {
-                const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetition);
+                 const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetition);
                 setManagedCompetitions(fetchedCompetitions);
-                setLoading(false);
             }
+            setLoading(false);
         }, (error) => {
             console.error("Error fetching managed competitions:", error);
             const permissionError = new FirestorePermissionError({ path: compsRef.path, operation: 'list' });
@@ -460,3 +459,5 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         </div>
     );
 }
+
+    
