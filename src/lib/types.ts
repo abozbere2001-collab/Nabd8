@@ -47,4 +47,8 @@ export interface MatchComment {
     userPhoto: string;
     text: string;
     timestamp: any; // Firestore ServerTimestamp
+    parentId: string | null;
+    replies?: MatchComment[];
 }
+
+    

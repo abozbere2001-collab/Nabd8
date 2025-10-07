@@ -157,30 +157,21 @@
     },
     "MatchComment": {
       "title": "Match Comment",
-      "description": "A single comment on a match.",
+      "description": "A single comment on a match, which can be a top-level comment or a reply.",
       "type": "object",
       "properties": {
-        "userId": {
-          "type": "string",
-          "description": "The ID of the user who posted the comment."
-        },
-        "userName": {
-          "type": "string",
-          "description": "The display name of the user."
-        },
-        "userPhoto": {
-          "type": "string",
-          "format": "uri",
-          "description": "The profile picture URL of the user."
-        },
-        "text": {
-          "type": "string",
-          "description": "The content of the comment."
-        },
-        "timestamp": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The timestamp when the comment was created."
+        "userId": { "type": "string", "description": "The ID of the user who posted the comment." },
+        "userName": { "type": "string", "description": "The display name of the user." },
+        "userPhoto": { "type": "string", "format": "uri", "description": "The profile picture URL of the user." },
+        "text": { "type": "string", "description": "The content of the comment." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "The timestamp when the comment was created." },
+        "parentId": { "type": ["string", "null"], "description": "The ID of the parent comment if this is a reply." },
+        "replies": { 
+            "type": "array", 
+            "description": "A list of replies to this comment.",
+            "items": {
+                "$ref": "#/entities/MatchComment"
+            }
         }
       },
       "required": ["userId", "userName", "text", "timestamp"]
@@ -232,7 +223,8 @@
     },
     "/matches/{matchId}/comments/{commentId}": {
       "schema": { "$ref": "#/entities/MatchComment" },
-      "description": "Stores all comments for a specific match. Each comment is a document in the 'comments' subcollection."
+      "description": "Stores all comments and their replies for a specific match. Replies are nested within parent comment documents."
     }
   }
 }
+    
