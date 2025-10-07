@@ -174,9 +174,8 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                 if (data.response) {
                     const batch = writeBatch(db);
                     data.response.forEach((item: ApiLeague) => {
-                        // Filter for top-tier leagues and cups
                         const isCup = item.league.type.toLowerCase() === 'cup';
-                        const isTopLeague = item.league.type.toLowerCase() === 'league' && item.seasons.some(s => s.year === new Date().getFullYear());
+                        const isTopLeague = item.league.type.toLowerCase() === 'league' && item.seasons.some(s => s.year >= new Date().getFullYear() -1);
                         const isInternational = item.country.name.toLowerCase() === 'world';
 
                         if (isCup || isTopLeague || isInternational) {
@@ -344,11 +343,11 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
 
     const renderLeagueItem = (comp: ManagedCompetition) => (
         <li key={comp.leagueId}>
-            <div className="flex w-full items-center justify-between p-3 hover:bg-accent transition-colors rounded-md cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: getLeagueName(comp), leagueId: comp.leagueId, logo: comp.logo })}>
-                <div className="flex items-center gap-3">
+            <div className="flex w-full items-center justify-between p-3 hover:bg-accent transition-colors rounded-md group">
+                <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: getLeagueName(comp), leagueId: comp.leagueId, logo: comp.logo })}>
                      <div className="relative">
                         <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
-                        {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(comp.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                         {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); handleCopy(comp.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
                     </div>
                     <div className="text-sm">
                         {getLeagueName(comp)}
@@ -422,18 +421,14 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
                                                     <div className="flex w-full items-center justify-between">
                                                         <AccordionTrigger className="px-4 text-base font-semibold flex-1 hover:no-underline">
                                                           <div className="flex items-center gap-3">
-                                                              {flag && (
-                                                                  <div className="relative">
-                                                                      <img src={flag} alt={country} className="h-5 w-7 object-contain" />
-                                                                      {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(flag); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
-                                                                  </div>
-                                                              )}
+                                                              {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
                                                               <span>{getCountryName(country)}</span>
                                                           </div>
                                                         </AccordionTrigger>
-                                                        {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getCountryName(country)); }}>
-                                                                <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                                                        </Button>)}
+                                                         <div className="flex items-center pr-2">
+                                                            {isAdmin && flag && <Button variant="ghost" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); handleCopy(flag); }}><Copy className="h-4 w-4 text-muted-foreground/80" /></Button>}
+                                                            {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getCountryName(country)); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
+                                                        </div>
                                                     </div>
                                                     <AccordionContent className="px-1">
                                                         <ul className="flex flex-col">{leagues.map(renderLeagueItem)}</ul>
@@ -465,5 +460,3 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         </div>
     );
 }
-
-    
