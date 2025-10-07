@@ -18,7 +18,8 @@ import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
 import type { Fixture, Standing, TopScorer, Team, Favorites } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 type RenameType = 'league' | 'team' | 'player';
 
@@ -47,6 +48,30 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const [customNames, setCustomNames] = useState<{ teams: Map<number, string>, players: Map<number, string> }>({ teams: new Map(), players: new Map() });
 
   
+  const fetchAllCustomNames = useCallback(async () => {
+    if (!db) return;
+    try {
+        const [teamsSnapshot, playersSnapshot] = await Promise.all([
+            getDocs(collection(db, 'teamCustomizations')),
+            getDocs(collection(db, 'playerCustomizations'))
+        ]);
+        
+        const teamNames = new Map<number, string>();
+        teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+        
+        const playerNames = new Map<number, string>();
+        playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
+        
+        setCustomNames({ teams: teamNames, players: playerNames });
+    } catch (error) {
+        const permissionError = new FirestorePermissionError({
+          path: 'teamCustomizations or playerCustomizations',
+          operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    }
+  }, [db]);
+
   const getDisplayName = useCallback((type: 'team' | 'player', id: number, defaultName: string) => {
     const key = `${type}s` as 'teams' | 'players';
     return customNames[key]?.get(id) || defaultName;
@@ -60,21 +85,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     navigator.clipboard.writeText(url);
     toast({ title: "تم نسخ الرابط", description: url });
   };
-
-  const fetchAllCustomNames = useCallback(async () => {
-    if (!db) return;
-    const [teamsSnapshot, playersSnapshot] = await Promise.all([
-        getDocs(collection(db, 'teamCustomizations')),
-        getDocs(collection(db, 'playerCustomizations'))
-    ]);
-    
-    const teamNames = new Map<number, string>();
-    teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-    const playerNames = new Map<number, string>();
-    playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
-    setCustomNames({ teams: teamNames, players: playerNames });
-  }, [db]);
-
 
   useEffect(() => {
     if (!user) return;
@@ -163,10 +173,19 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         favoriteData.players = { [item.id]: { playerId: item.id, name: displayName, photo: item.photo }};
     }
 
-    if (isFavoritedCurrent) {
-        await updateDoc(favRef, { [fieldPath]: deleteField() });
-    } else {
-        await setDoc(favRef, favoriteData, { merge: true });
+    try {
+      if (isFavoritedCurrent) {
+          await updateDoc(favRef, { [fieldPath]: deleteField() });
+      } else {
+          await setDoc(favRef, favoriteData, { merge: true });
+      }
+    } catch (error) {
+      const permissionError = new FirestorePermissionError({
+          path: favRef.path,
+          operation: 'update',
+          requestResourceData: favoriteData,
+      });
+      errorEmitter.emit('permission-error', permissionError);
     }
   };
   
@@ -184,8 +203,17 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         case 'team': collectionName = 'teamCustomizations'; break;
         case 'player': collectionName = 'playerCustomizations'; break;
     }
-    await setDoc(doc(db, collectionName, String(id)), { customName: newName });
-    await fetchAllCustomNames();
+    try {
+      await setDoc(doc(db, collectionName, String(id)), { customName: newName });
+      await fetchAllCustomNames(); // Refetch names after saving
+    } catch(error) {
+      const permissionError = new FirestorePermissionError({
+          path: `${collectionName}/${id}`,
+          operation: 'create',
+          requestResourceData: { customName: newName },
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    }
   };
   
   const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
@@ -195,12 +223,23 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   const handleSaveNote = async (note: string) => {
     if (!noteTeam) return;
-    await setDoc(doc(db, "adminFavorites", String(noteTeam.id)), {
+    const docRef = doc(db, "adminFavorites", String(noteTeam.id));
+    const data = {
       teamId: noteTeam.id,
       name: noteTeam.name,
       logo: noteTeam.logo,
       note: note
-    });
+    };
+    try {
+      await setDoc(docRef, data);
+    } catch(error) {
+       const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'create',
+          requestResourceData: data
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    }
   }
 
   const secondaryActions = (

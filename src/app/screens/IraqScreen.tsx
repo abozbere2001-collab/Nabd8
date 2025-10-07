@@ -320,6 +320,9 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                     userPredictions[pred.fixtureId] = pred;
                 });
                 setPredictions(userPredictions);
+            }, (error) => {
+                const permissionError = new FirestorePermissionError({ path: 'predictions', operation: 'list' });
+                errorEmitter.emit('permission-error', permissionError);
             });
 
              const leaderboardRef = query(collection(db, 'leaderboard'), orderBy('totalPoints', 'desc'));
@@ -327,6 +330,9 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 const scores: UserScore[] = [];
                 snapshot.forEach(doc => scores.push(doc.data() as UserScore));
                 setLeaderboard(scores);
+            }, (error) => {
+                const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
+                errorEmitter.emit('permission-error', permissionError);
             });
 
             return () => {
@@ -353,7 +359,12 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
         try {
             await setDoc(predictionRef, predictionData, { merge: true });
         } catch (error) {
-            console.error("Error saving prediction:", error);
+            const permissionError = new FirestorePermissionError({
+              path: predictionRef.path,
+              operation: 'create',
+              requestResourceData: predictionData
+            });
+            errorEmitter.emit('permission-error', permissionError);
         }
     };
     

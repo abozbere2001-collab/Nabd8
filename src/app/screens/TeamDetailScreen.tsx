@@ -156,7 +156,11 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
         playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
         setCustomPlayerNames(playerNames);
     } catch (error) {
-        console.error("Error fetching custom names:", error);
+        const permissionError = new FirestorePermissionError({
+          path: `teamCustomizations/${teamId} or playerCustomizations`,
+          operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
     }
 }, [db, teamId, teamInfo?.team.name]);
 

@@ -74,3 +74,19 @@ export interface Notification {
     read: boolean;
     timestamp: any; // Firestore ServerTimestamp
 }
+
+export interface Prediction {
+  userId: string;
+  fixtureId: number;
+  homeGoals: number;
+  awayGoals: number;
+  points?: number;
+  timestamp: string;
+}
+
+export interface UserScore {
+    userId: string;
+    userName: string;
+    userPhoto: string;
+    totalPoints: number;
+}
