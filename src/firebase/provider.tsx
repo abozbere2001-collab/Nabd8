@@ -4,7 +4,7 @@ import React, { createContext, useContext, useMemo, useEffect, useState } from '
 import type { User, Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { firebaseConfig } from '@/lib/firebase';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
@@ -14,16 +14,13 @@ interface FirebaseContextType {
   db: Firestore;
   user: User | null;
   isAdmin: boolean;
-  loading: boolean;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
 
 const ADMIN_EMAIL = "sagralnarey@gmail.com";
 
-export const FirebaseProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+export const FirebaseProvider = ({ children, user }: { children: React.ReactNode, user: User | null }) => {
 
   const { auth, db } = useMemo(() => {
     const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -31,14 +28,6 @@ export const FirebaseProvider = ({ children }: { children: React.ReactNode }) =>
     const db = getFirestore(app);
     return { app, auth, db };
   }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [auth]);
   
   const isAdmin = useMemo(() => {
     return user?.email === ADMIN_EMAIL;
@@ -49,8 +38,7 @@ export const FirebaseProvider = ({ children }: { children: React.ReactNode }) =>
     db,
     user,
     isAdmin,
-    loading,
-  }), [auth, db, user, isAdmin, loading]);
+  }), [auth, db, user, isAdmin]);
 
   return (
     <FirebaseContext.Provider value={value}>
@@ -73,7 +61,7 @@ export const useAuth = () => {
     if (context === undefined) {
         throw new Error('useAuth must be used within a FirebaseProvider');
     }
-    return { auth: context.auth, user: context.user, loading: context.loading };
+    return { auth: context.auth, user: context.user };
 }
 
 export const useFirestore = () => {

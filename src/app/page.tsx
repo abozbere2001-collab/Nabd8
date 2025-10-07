@@ -16,7 +16,7 @@ import { CommentsScreen } from './screens/CommentsScreen';
 import { NotificationsScreen } from './screens/NotificationsScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
-import { FirebaseProvider, useAuth } from '@/firebase/provider';
+import { FirebaseProvider } from '@/firebase/provider';
 import { ProfileButton } from '@/components/ProfileButton';
 import { SearchSheet } from '@/components/SearchSheet';
 import { onAuthStateChange } from '@/lib/firebase-client';
@@ -53,7 +53,7 @@ type StackItem = {
   props?: Record<string, any>;
 };
 
-function AppContent({ user }: { user: User | null }) {
+function AppContent() {
   const [stack, setStack] = useState<StackItem[]>([{ key: 'Matches-0', screen: 'Matches' }]);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const [isEntering, setIsEntering] = useState(false);
@@ -121,7 +121,7 @@ function AppContent({ user }: { user: User | null }) {
 
 
   const activeScreenKey = activeStackItem.screen;
-  const showBottomNav = user && mainTabs.includes(activeScreenKey);
+  const showBottomNav = mainTabs.includes(activeScreenKey);
 
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
@@ -188,10 +188,8 @@ export default function Home() {
   }
 
   return (
-    <FirebaseProvider>
-      {user ? <AppContent user={user} /> : <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />}
+    <FirebaseProvider user={user}>
+      {user ? <AppContent /> : <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />}
     </FirebaseProvider>
   );
 }
-
-    
