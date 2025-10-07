@@ -22,6 +22,7 @@ export async function GET(
         'x-rapidapi-host': API_FOOTBALL_HOST,
         'x-rapidapi-key': API_FOOTBALL_KEY,
       },
+      next: { revalidate: 3600 } // Revalidate every hour
     });
 
     if (!apiResponse.ok) {
