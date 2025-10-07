@@ -172,27 +172,31 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 }
 
                 // 2. Fetch ALL of the user's predictions with a simple query
-                const predsRef = collection(db, 'predictions');
-                const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
-                const querySnapshot = await getDocs(userPredsQuery);
+                if (fixtureIds.length > 0) {
+                    const predsRef = collection(db, 'predictions');
+                    const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
+                    const querySnapshot = await getDocs(userPredsQuery);
 
-                const userPredictions: { [key: number]: Prediction } = {};
-                querySnapshot.forEach(doc => {
-                    const pred = doc.data() as Prediction;
-                    userPredictions[pred.fixtureId] = pred;
-                });
-                
-                // 3. Filter predictions locally to match today's fixtures
-                const todaysPredictions: { [key: number]: Prediction } = {};
-                const todaysFixtureIds = new Set(fixtureIds);
-                for (const fixtureId in userPredictions) {
-                    if (todaysFixtureIds.has(Number(fixtureId))) {
-                        todaysPredictions[fixtureId] = userPredictions[fixtureId];
+                    const userPredictions: { [key: number]: Prediction } = {};
+                    querySnapshot.forEach(doc => {
+                        const pred = doc.data() as Prediction;
+                        userPredictions[pred.fixtureId] = pred;
+                    });
+                    
+                    const todaysFixtureIds = new Set(fixtureIds);
+                    const todaysPredictions: { [key: number]: Prediction } = {};
+                    for (const fixtureId in userPredictions) {
+                        if (todaysFixtureIds.has(Number(fixtureId))) {
+                            todaysPredictions[fixtureId] = userPredictions[fixtureId];
+                        }
                     }
+                    setPredictions(todaysPredictions);
+                } else {
+                    setPredictions({});
                 }
-                setPredictions(todaysPredictions);
 
             } catch (error) {
+                 // This will catch getDoc and getDocs permission errors
                  const permissionError = new FirestorePermissionError({ path: `dailyGlobalPredictions or predictions where userId == ${user.uid}`, operation: 'list' });
                  errorEmitter.emit('permission-error', permissionError);
             } finally {
@@ -315,3 +319,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    
