@@ -13,7 +13,6 @@ import { db } from '@/lib/firebase-client';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
 // Interfaces
@@ -127,7 +126,7 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg bg-muted border p-3 text-sm transition-colors hover:bg-accent/50 cursor-pointer"
+        className="rounded-lg bg-card border p-3 text-sm transition-colors hover:bg-accent/50 cursor-pointer"
         onClick={() => onSelect(fixture.fixture.id, fixture)}
       >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
@@ -154,7 +153,7 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
              </div>
              <div className={cn(
                 "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
-                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-card"
+                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-background"
                 )}>
                  {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
@@ -170,17 +169,17 @@ const FixtureItem = React.memo(({ fixture, onSelect, odds }: { fixture: Fixture,
          </div>
          {odds && (
             <div className="flex justify-between items-center text-center mt-3 pt-3 border-t border-dashed">
-                <div className="flex-1 space-y-1">
+                <div className="flex-1 space-y-1 px-1">
                     <span className="text-xs text-muted-foreground">1</span>
-                    <p className="font-bold text-sm bg-card rounded-md p-1">{homeOdd}</p>
+                    <p className="font-bold text-sm bg-muted rounded-md p-1">{homeOdd}</p>
                 </div>
-                 <div className="flex-1 space-y-1">
+                 <div className="flex-1 space-y-1 px-1">
                     <span className="text-xs text-muted-foreground">X</span>
-                    <p className="font-bold text-sm bg-card rounded-md p-1">{drawOdd}</p>
+                    <p className="font-bold text-sm bg-muted rounded-md p-1">{drawOdd}</p>
                 </div>
-                <div className="flex-1 space-y-1">
+                <div className="flex-1 space-y-1 px-1">
                     <span className="text-xs text-muted-foreground">2</span>
-                    <p className="font-bold text-sm bg-card rounded-md p-1">{awayOdd}</p>
+                    <p className="font-bold text-sm bg-muted rounded-md p-1">{awayOdd}</p>
                 </div>
             </div>
          )}
@@ -448,10 +447,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   }
 
   const screenHeaderActions = (
-    <div className='flex items-center gap-4'>
-        <div className="flex items-center space-x-2 space-x-reverse">
-            <Switch id="live-filter" checked={showLiveOnly} onCheckedChange={setShowLiveOnly} />
-        </div>
+    <div className='flex items-center gap-2'>
+        <Button variant={showLiveOnly ? 'default' : 'outline'} size="sm" onClick={() => setShowLiveOnly(!showLiveOnly)}>
+            مباشر
+        </Button>
        <Button variant={showOdds ? 'default' : 'outline'} size="sm" onClick={toggleShowOdds} disabled={loadingOdds}>
             {loadingOdds ? <Loader2 className="h-4 w-4 animate-spin" /> : '1X2'}
         </Button>
