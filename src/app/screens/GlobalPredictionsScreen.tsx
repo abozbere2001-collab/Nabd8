@@ -15,7 +15,7 @@ import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
 import type { Fixture, UserScore, Prediction, DailyGlobalPredictions } from '@/lib/types';
-import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, where, getDocs, limit, startAfter, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -127,23 +127,64 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     const { db } = useFirestore();
     const [loading, setLoading] = useState(true);
     const [selectedMatches, setSelectedMatches] = useState<Fixture[]>([]);
+    
+    // Leaderboard state
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
+    const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
+    const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+
     const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
     
-    // Fetch Leaderboard
+    const LEADERBOARD_PAGE_SIZE = 20;
+
+    // Fetch initial leaderboard
     useEffect(() => {
         if (!db) return;
-        const leaderboardRef = query(collection(db, 'leaderboard'), orderBy('totalPoints', 'desc'));
-        const unsubscribeLeaderboard = onSnapshot(leaderboardRef, (snapshot) => {
-            const scores: UserScore[] = [];
-            snapshot.forEach(doc => scores.push(doc.data() as UserScore));
+        setLoadingLeaderboard(true);
+        const leaderboardRef = collection(db, 'leaderboard');
+        const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), limit(LEADERBOARD_PAGE_SIZE));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const scores = snapshot.docs.map(doc => doc.data() as UserScore);
+            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
             setLeaderboard(scores);
+            setLastVisible(lastDoc);
+            setHasMore(snapshot.docs.length === LEADERBOARD_PAGE_SIZE);
+            setLoadingLeaderboard(false);
         }, (error) => {
             const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
             errorEmitter.emit('permission-error', permissionError);
+            setLoadingLeaderboard(false);
         });
-        return () => unsubscribeLeaderboard();
+
+        return () => unsubscribe();
     }, [db]);
+    
+    const fetchMoreLeaderboard = async () => {
+        if (!db || !lastVisible || !hasMore || loadingMore) return;
+        setLoadingMore(true);
+        
+        const leaderboardRef = collection(db, 'leaderboard');
+        const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), startAfter(lastVisible), limit(LEADERBOARD_PAGE_SIZE));
+
+        try {
+            const snapshot = await getDocs(q);
+            const newScores = snapshot.docs.map(doc => doc.data() as UserScore);
+            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+            setLeaderboard(prev => [...prev, ...newScores]);
+            setLastVisible(lastDoc);
+            setHasMore(snapshot.docs.length === LEADERBOARD_PAGE_SIZE);
+        } catch (error) {
+             const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
+             errorEmitter.emit('permission-error', permissionError);
+        } finally {
+            setLoadingMore(false);
+        }
+    }
+
 
     // Fetch Daily Matches and then user predictions for those matches
     useEffect(() => {
@@ -298,7 +339,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {leaderboard.length === 0 && loading ? (
+                                {loadingLeaderboard ? (
                                     Array.from({ length: 5 }).map((_, i) => (
                                         <TableRow key={i}>
                                             <TableCell><Skeleton className="h-4 w-4" /></TableCell>
@@ -331,12 +372,21 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                 )}
                             </TableBody>
                         </Table>
+                         {hasMore && (
+                            <div className="p-2">
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={fetchMoreLeaderboard}
+                                    disabled={loadingMore}
+                                >
+                                    {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : "تحميل المزيد"}
+                                </Button>
+                            </div>
+                        )}
                     </Card>
                 </div>
             </div>
         </div>
     );
 }
-
-
-    
