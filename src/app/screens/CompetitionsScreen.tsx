@@ -10,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, setDoc, onSnapshot, updateDoc, deleteField, collection, getDocs } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 
 interface Competition {
@@ -107,8 +109,15 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
 
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
+    const docRef = doc(db, 'favorites', user.uid);
+    const unsub = onSnapshot(docRef, (doc) => {
         setFavorites(doc.data() as Favorites || { leagues: {}, teams: {} });
+    }, (error) => {
+        const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
     });
     return () => unsub();
   }, [user, db]);

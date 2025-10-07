@@ -8,7 +8,7 @@ import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { SearchSheet } from '@/components/SearchSheet';
 import { CommentsButton } from '@/components/CommentsButton';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 
 // Interfaces
@@ -447,16 +449,18 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   
   useEffect(() => {
     if (!user) return;
-    const fetchFavorites = async () => {
-        const docRef = doc(db, 'favorites', user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            setFavorites(docSnap.data() as Favorites);
-        } else {
-            setFavorites({});
-        }
-    };
-    fetchFavorites();
+    const docRef = doc(db, 'favorites', user.uid);
+    const unsubscribe = onSnapshot(docRef, (doc) => {
+        setFavorites(doc.data() as Favorites || {});
+    }, (error) => {
+        const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+
+    return () => unsubscribe();
   }, [user, db]);
 
   const favoritedTeamIds = useMemo(() => favorites?.teams ? Object.keys(favorites.teams).map(Number) : [], [favorites.teams]);
