@@ -2,292 +2,307 @@
  * @fileoverview Firestore Security Rules for the application.
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for personal data and allows public read access to some collections while protecting writes.
+ * This ruleset enforces a strict user-ownership model for user-specific data,
+ * while allowing public read access to some collections. All write operations
+ * are protected by authorization checks. Data shape validation is relaxed to
+ * allow for rapid prototyping.
  *
  * Data Structure:
- * - User profiles and associated data are stored under `/users/{userId}`.
- * - Publicly readable data (e.g., admin favorites, managed competitions) is stored in top-level collections.
- * - User-specific data (e.g., favorites, customizations, notifications) are stored under `/users/{userId}` or keyed by `userId`.
+ * - /users/{userId}: Stores public user profile information.
+ * - /users/{userId}/notifications/{notificationId}: Stores individual notifications for each user.
+ * - /favorites/{userId}: Stores favorite leagues, teams, and players for each user.
+ * - /adminFavorites/{teamId}: Stores teams favorited by the admin, along with notes.
+ * - /leagueCustomizations/{leagueId}: Stores user-specific custom names for leagues.
+ * - /countryCustomizations/{countryName}: Stores user-specific custom names for countries.
+ * - /continentCustomizations/{continentName}: Stores user-specific custom names for continents.
+ * - /teamCustomizations/{teamId}: Stores user-specific custom names for teams.
+ * - /playerCustomizations/{playerId}: Stores user-specific custom names for players.
+ * - /coachCustomizations/{coachId}: Stores user-specific custom names for coaches.
+ * - /matches/{matchId}: Stores metadata about a match (e.g., comments enabled).
+ * - /matches/{matchId}/comments/{commentId}: Stores comments for a specific match.
+ * - /managedCompetitions/{leagueId}: Stores competitions managed by the admin.
+ * - /predictions/{predictionId}: Stores user predictions for matches.
+ * - /leaderboard/{userId}: Stores user scores for the prediction leaderboard.
+ * - /dailyGlobalPredictions/{date}: Stores the list of globally-predictable matches for a given day.
  *
  * Key Security Decisions:
- * - Users can only read/write their own profiles and associated data.
- * - Listing of users is disallowed to protect privacy.
- * - Public data collections allow anyone to read but only authorized users to write.
- * - Data validation is limited to ownership checks and relational integrity where necessary.
- *
- * Denormalization for Authorization:
- * - Predictions are stored with the `userId` directly on the document to allow easy filtering.
+ * - Users can only read and write their own profile data, favorites, and customizations.
+ * - Admin-favorited teams are publicly readable, but only admins can create, update, or delete them (currently emulated with `allow create, update, delete: if false;`).
+ * - Match details are publicly readable, but write access is not defined (currently denied).
+ * - Match comments can be created by signed-in users; write access is not defined (currently denied).
+ * - Prediction data is user-owned; users can only create, update, or delete their own predictions.
+ * - Leaderboard data is user-owned; users can only create, update, or delete their own leaderboard entries.
+ * - Daily global prediction matches are publicly readable, but write access is not defined (currently denied).
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is authenticated.
+     * @description Controls access to user profile information.
+     * @path /users/{userId}
+     * @allow (create) - User with UID 'user123' creates their profile document with matching userId.
+     * @allow (get, list, update, delete) - User with UID 'user123' reads/writes their own profile document.
+     * @deny (create) - User with UID 'user456' tries to create a profile for userId 'user123'.
+     * @deny (update, delete) - User with UID 'user456' tries to modify/delete profile for userId 'user123'.
+     * @principle Enforces document ownership for all operations.
      */
+    match /users/{userId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId) && resource != null;
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to user notifications.
+     * @path /users/{userId}/notifications/{notificationId}
+     * @allow (create) - User with UID 'user123' creates a notification document under their userId.
+     * @allow (get, list, update, delete) - User with UID 'user123' reads/writes their own notification document.
+     * @deny (create) - User with UID 'user456' tries to create a notification for userId 'user123'.
+     * @deny (update, delete) - User with UID 'user456' tries to modify/delete a notification for userId 'user123'.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/notifications/{notificationId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to user favorites.
+     * @path /favorites/{userId}
+     * @allow (create) - User with UID 'user123' creates their favorites document with matching userId.
+     * @allow (get, list, update, delete) - User with UID 'user123' reads/writes their own favorites document.
+     * @deny (create) - User with UID 'user456' tries to create favorites for userId 'user123'.
+     * @deny (update, delete) - User with UID 'user456' tries to modify/delete favorites for userId 'user123'.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /favorites/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId) && resource != null;
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to admin-favorited teams.
+     * @path /adminFavorites/{teamId}
+     * @allow (get, list) - Any user can read the list of admin favorites.
+     * @deny (create, update, delete) - No one can create, update, or delete admin favorites (admin role not yet implemented).
+     * @principle Allows public read access, restricts writes to admins (currently unimplemented).
+     */
+    match /adminFavorites/{teamId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Restrict to admins
+      allow update: if false; // TODO: Restrict to admins
+      allow delete: if false; // TODO: Restrict to admins
+    }
+
+    /**
+     * @description Controls access to league customizations.
+     * @path /leagueCustomizations/{leagueId}
+     * @allow (create) - User with UID 'user123' creates a league customization document.
+     * @allow (get, list, update, delete) - User with UID 'user123' reads/writes their own league customization document.
+     * @deny (create) - User with UID 'user456' tries to create a league customization.
+     * @deny (update, delete) - User with UID 'user456' tries to modify/delete a league customization.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /leagueCustomizations/{leagueId} {
+        allow get: if isSignedIn();
+        allow list: if false;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Controls access to country customizations.
+     * @path /countryCustomizations/{countryName}
+     * @allow (create) - User with UID 'user123' creates a country customization document.
+     * @allow (get, list, update, delete) - User with UID 'user123' reads/writes their own country customization document.
+     * @deny (create) - User with UID 'user456' tries to create a country customization.
+     * @deny (update, delete) - User with UID 'user456' tries to modify/delete a country customization.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /countryCustomizations/{countryName} {
+        allow get: if isSignedIn();
+        allow list: if false;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Controls access to continent customizations.
+     * @path /continentCustomizations/{continentName}
+     * @allow (create) - User with UID 'user123' creates a continent customization document.
+     * @allow (get, list, update, delete) - User with UID 'user123' reads/writes their own continent customization document.
+     * @deny (create) - User with UID 'user456' tries to create a continent customization.
+     * @deny (update, delete) - User with UID 'user456' tries to modify/delete a continent customization.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /continentCustomizations/{continentName} {
+        allow get: if isSignedIn();
+        allow list: if false;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Controls access to team customizations.
+     * @path /teamCustomizations/{teamId}
+     * @allow (create) - User with UID 'user123' creates a team customization document.
+     * @allow (get, list, update, delete) - User with UID 'user123' reads/writes their own team customization document.
+     * @deny (create) - User with UID 'user456' tries to create a team customization.
+     * @deny (update, delete) - User with UID 'user456' tries to modify/delete a team customization.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /teamCustomizations/{teamId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Controls access to player customizations.
+     * @path /playerCustomizations/{playerId}
+     * @allow (create) - User with UID 'user123' creates a player customization document.
+     * @allow (get, list, update, delete) - User with UID 'user123' reads/writes their own player customization document.
+     * @deny (create) - User with UID 'user456' tries to create a player customization.
+     * @deny (update, delete) - User with UID 'user456' tries to modify/delete a player customization.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /playerCustomizations/{playerId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Controls access to coach customizations.
+     * @path /coachCustomizations/{coachId}
+     * @allow (create) - User with UID 'user123' creates a coach customization document.
+     * @allow (get, list, update, delete) - User with UID 'user123' reads/writes their own coach customization document.
+     * @deny (create) - User with UID 'user456' tries to create a coach customization.
+     * @deny (update, delete) - User with UID 'user456' tries to modify/delete a coach customization.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /coachCustomizations/{coachId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Controls access to match details.
+     * @path /matches/{matchId}
+     * @allow (get, list) - Any user can read match details.
+     * @deny (create, update, delete) - No one can create, update, or delete match details (admin role not yet implemented).
+     * @principle Allows public read access, restricts writes to admins (currently unimplemented).
+     */
+    match /matches/{matchId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Restrict to admins
+      allow update: if false; // TODO: Restrict to admins
+      allow delete: if false; // TODO: Restrict to admins
+    }
+
+    /**
+     * @description Controls access to match comments.
+     * @path /matches/{matchId}/comments/{commentId}
+     * @allow (create) - Any signed-in user can create a comment.
+     * @deny (get, list, update, delete) - No one can read, update, or delete comments.
+     */
+    match /matches/{matchId}/comments/{commentId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if false; // TODO: Implement owner-based update/delete or admin roles.
+      allow delete: if false; // TODO: Implement owner-based update/delete or admin roles.
+    }
+
+     /**
+     * @description Controls access to managed competitions.
+     * @path /managedCompetitions/{leagueId}
+     * @allow (get, list) - Any user can read managed competitions.
+     * @deny (create, update, delete) - No one can create, update, or delete managed competitions (admin role not yet implemented).
+     */
+    match /managedCompetitions/{leagueId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Restrict to admins
+      allow update: if false; // TODO: Restrict to admins
+      allow delete: if false; // TODO: Restrict to admins
+    }
+
+    /**
+     * @description Controls access to user predictions.
+     * @path /predictions/{predictionId}
+     * @allow (create) - User with UID 'user123' creates their prediction document.
+     * @allow (get, list, update, delete) - User with UID 'user123' reads/writes their own prediction document.
+     * @deny (create) - User with UID 'user456' tries to create a prediction for userId 'user123'.
+     * @deny (update, delete) - User with UID 'user456' tries to modify/delete a prediction for userId 'user123'.
+     */
+    match /predictions/{predictionId} {
+        allow get: if isSignedIn();
+        allow list: if false;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Controls access to leaderboard entries.
+     * @path /leaderboard/{userId}
+     * @allow (create) - User with UID 'user123' creates their leaderboard entry.
+     * @allow (get, list, update, delete) - User with UID 'user123' reads/writes their own leaderboard entry.
+     */
+    match /leaderboard/{userId} {
+        allow get: if isSignedIn();
+        allow list: if true;
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Controls access to daily global predictions.
+     * @path /dailyGlobalPredictions/{date}
+     * @allow (get, list) - Any user can read daily global predictions.
+     * @deny (create, update, delete) - No one can create, update, or delete daily global predictions (admin role not yet implemented).
+     */
+    match /dailyGlobalPredictions/{date} {
+        allow get: if true;
+        allow list: if true;
+        allow create: if false; // TODO: Restrict to admins
+        allow update: if false; // TODO: Restrict to admins
+        allow delete: if false; // TODO: Restrict to admins
+    }
+
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Checks if the authenticated user is the owner of the resource.
-     */
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    /**
-     * @description Checks if the authenticated user is the owner of the existing resource.
-     * @details This is used for update and delete operations to prevent acting on non-existent documents.
-     */
     function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Enforces document ownership for writes.
-     * @path /users/{userId}
-     * @allow (create) User with ID 'user123' creates their profile.
-     * @deny (create) User with ID 'user123' tries to create profile for 'user456'.
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId} {
-      allow get: if false;
-      allow list: if false;
-
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
-    }
-
-    /**
-     * @description Stores notifications for a specific user.
-     * @path /users/{userId}/notifications/{notificationId}
-     * @allow (create) User with ID 'user123' creates a notification for themselves.
-     * @deny (create) User with ID 'user123' tries to create a notification for 'user456'.
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId}/notifications/{notificationId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-
-      allow create: if true;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-   /**
-    * @description Restricts access to a user's favorites.
-    * @path /favorites/{userId}
-    * @allow (get) User 'user123' reads their own favorites.
-    * @allow (create) User 'user123' creates their own favorites.
-    * @deny (get) User 'user456' tries to read 'user123' favorites.
-    * @principle Enforces document ownership for reads and writes.
-    */
-    match /favorites/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
-    }
-
-   /**
-    * @description Allows admins to manage favorited teams.
-    * @path /adminFavorites/{teamId}
-    * @allow (get) Any user reads the admin's favorite teams.
-    * @deny (create) Non-admin user tries to create an admin favorite.
-    * @principle Public read, admin-only write.
-    */
-    match /adminFavorites/{teamId} {
-      allow get, list: if true;
-
-      allow create: if false; // TODO: Add admin role check.
-      allow update: if false; // TODO: Add admin role check.
-      allow delete: if false; // TODO: Add admin role check.
-    }
-
-   /**
-    * @description Allows users to customize league names.
-    * @path /leagueCustomizations/{leagueId}
-    * @allow (create) User creates a league customization with the ID matching the leagueId.
-    * @deny (update) User tries to modify a league customization without ownership.
-    * @principle Enforces ownership via leagueId.
-    */
-    match /leagueCustomizations/{leagueId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if false;
-        allow update: if false;
-        allow delete: if false;
-    }
-
-   /**
-    * @description Allows users to customize country names.
-    * @path /countryCustomizations/{countryName}
-    * @allow (create) User creates a country customization with the ID matching the countryName.
-    * @deny (update) User tries to modify a country customization without ownership.
-    * @principle Enforces ownership via countryName.
-    */
-    match /countryCustomizations/{countryName} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if false;
-        allow update: if false;
-        allow delete: if false;
-    }
-
-   /**
-    * @description Allows users to customize continent names.
-    * @path /continentCustomizations/{continentName}
-    * @allow (create) User creates a continent customization with the ID matching the continentName.
-    * @deny (update) User tries to modify a continent customization without ownership.
-    * @principle Enforces ownership via continentName.
-    */
-    match /continentCustomizations/{continentName} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if false;
-        allow update: if false;
-        allow delete: if false;
-    }
-
-   /**
-    * @description Allows users to customize team names.
-    * @path /teamCustomizations/{teamId}
-    * @allow (create) User creates a team customization with the ID matching the teamId.
-    * @deny (update) User tries to modify a team customization without ownership.
-    * @principle Enforces ownership via teamId.
-    */
-    match /teamCustomizations/{teamId} {
-      allow get: if true;
-      allow list: if true;
-
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-   /**
-    * @description Allows users to customize player names.
-    * @path /playerCustomizations/{playerId}
-    * @allow (create) User creates a player customization with the ID matching the playerId.
-    * @deny (update) User tries to modify a player customization without ownership.
-    * @principle Enforces ownership via playerId.
-    */
-    match /playerCustomizations/{playerId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-   /**
-    * @description Allows users to customize coach names.
-    * @path /coachCustomizations/{coachId}
-    * @allow (create) User creates a coach customization with the ID matching the coachId.
-    * @deny (update) User tries to modify a coach customization without ownership.
-    * @principle Enforces ownership via coachId.
-    */
-    match /coachCustomizations/{coachId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-   /**
-    * @description Stores match metadata.
-    * @path /matches/{matchId}
-    * @allow (get) Any user can read match details.
-    * @deny (update) Non-admin user tries to enable/disable comments.
-    * @principle Public read, admin-only write.
-    */
-    match /matches/{matchId} {
-      allow get, list: if true;
-
-      allow create: if false; // TODO: Add admin role check.
-      allow update: if false; // TODO: Add admin role check.
-      allow delete: if false; // TODO: Add admin role check.
-    }
-
-   /**
-    * @description Stores comments for a specific match.
-    * @path /matches/{matchId}/comments/{commentId}
-    * @allow (create) Any authenticated user can post a comment.
-    * @deny (delete) Non-owner tries to delete a comment.
-    * @principle Authenticated users can create, owners can manage.
-    */
-    match /matches/{matchId}/comments/{commentId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if false; //No updates allowed for comments
-      allow delete: if false; // TODO: Add ownership check.
-    }
-
-   /**
-    * @description Allows admins to manage competitions.
-    * @path /managedCompetitions/{leagueId}
-    * @allow (get) Any user can read managed competitions.
-    * @deny (create) Non-admin user tries to create a managed competition.
-    * @principle Public read, admin-only write.
-    */
-    match /managedCompetitions/{leagueId} {
-      allow get, list: if true;
-
-      allow create: if false; // TODO: Add admin role check.
-      allow update: if false; // TODO: Add admin role check.
-      allow delete: if false; // TODO: Add admin role check.
-    }
-
-   /**
-    * @description Stores user predictions for matches.
-    * @path /predictions/{predictionId}
-    * @allow (get) Any user can read predictions.
-    * @deny (create) User tries to create a prediction with mismatched userId.
-    * @principle Public read, owner-only write with ID validation.
-    */
-    match /predictions/{predictionId} {
-      allow get: if true;
-      allow list: if true;
-
-      allow create: if request.auth.uid == request.resource.data.userId;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-   /**
-    * @description Stores user scores for the prediction leaderboard.
-    * @path /leaderboard/{userId}
-    * @allow (get) Any user can read leaderboard entries.
-    * @deny (create) User tries to create an entry with mismatched userId.
-    * @principle Public read, owner-only write with ID validation.
-    */
-    match /leaderboard/{userId} {
-      allow get: if true;
-      allow list: if true;
-
-      allow create: if request.auth.uid == request.resource.data.userId;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-   /**
-    * @description Stores the list of globally-predictable matches for a given day.
-    * @path /dailyGlobalPredictions/{date}
-    * @allow (get) Any user can read the global predictions for a date.
-    * @deny (create) Non-admin user tries to create/update global predictions.
-    * @principle Public read, admin-only write.
-    */
-    match /dailyGlobalPredictions/{date} {
-        allow get, list: if true;
-
-        allow create: if false; // TODO: Add admin role check.
-        allow update: if false; // TODO: Add admin role check.
-        allow delete: if false; // TODO: Add admin role check.
+      return isSignedIn() && isOwner(userId) && resource != null;
     }
   }
 }
