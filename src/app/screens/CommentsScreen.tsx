@@ -107,11 +107,11 @@ const CommentItem = ({
     onEdit,
     onDelete,
     onReply,
+    onLike,
     isDeleting,
     isEditing,
     onUpdate,
     onCancelEdit,
-    onLike,
     sending,
     editingText,
     setEditingText,
@@ -271,7 +271,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
 
              // Fetch likes for each reply
             const repliesWithLikes = await Promise.all(replies.map(async (reply) => {
-                const replyLikesRef = collection(db, 'matches', String(matchId), 'comments', reply.parentId!, 'replies', reply.id, 'likes');
+                const replyLikesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies', reply.id!, 'likes');
                 const replyLikesSnapshot = await getDocs(replyLikesRef);
                 const replyLikes = replyLikesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
                 return { ...reply, likes: replyLikes };
@@ -288,7 +288,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         setComments(resolvedComments);
         setLoading(false);
 
-    }, async (error) => {
+    }, (error) => {
         const permissionError = new FirestorePermissionError({
           path: commentsColRef.path,
           operation: 'list',
@@ -335,7 +335,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         : commentsColRef;
 
     addDoc(collectionRef, newCommentData)
-    .then(async (newDocRef) => {
+    .then((newDocRef) => {
         if (parentId) {
             const parentComment = comments.find(c => c.id === parentId);
             if (parentComment && parentComment.userId !== user.uid) {
@@ -353,7 +353,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
                     timestamp: serverTimestamp(),
                 };
                 addDoc(notificationsCollectionRef, notificationData)
-                .catch(async (serverError) => {
+                .catch((serverError) => {
                      const permissionError = new FirestorePermissionError({
                         path: notificationsCollectionRef.path,
                         operation: 'create',
@@ -367,7 +367,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
             setReplyingTo(null);
         }
     })
-    .catch(async (serverError) => {
+    .catch((serverError) => {
         const permissionError = new FirestorePermissionError({
             path: collectionRef.path,
             operation: 'create',
@@ -396,7 +396,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     setEditingCommentId(null);
   }
 
-  const handleUpdateComment = async () => {
+  const handleUpdateComment = () => {
     if (!editingCommentId || !editingText.trim() || sending) return;
     setSending(true);
     
@@ -418,7 +418,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     .then(() => {
       handleCancelEdit();
     })
-    .catch(async (serverError) => {
+    .catch((serverError) => {
         const permissionError = new FirestorePermissionError({
             path: commentDocRef.path,
             operation: 'update',
@@ -431,7 +431,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     });
   };
   
-  const handleDeleteComment = async (commentId: string) => {
+  const handleDeleteComment = (commentId: string) => {
     setIsDeleting(commentId);
     const batch = writeBatch(db);
 
@@ -463,7 +463,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         batch.delete(commentRef);
         return batch.commit();
     })
-    .catch(async (serverError) => {
+    .catch((serverError) => {
         const permissionError = new FirestorePermissionError({
             path: commentRef.path,
             operation: 'delete',
@@ -475,64 +475,86 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     });
   }
 
-  const handleLikeComment = async (commentId: string) => {
-      if (!user) return;
-      
-      let commentToLike: MatchComment | undefined;
-      let parentCommentId: string | undefined;
+  const handleLikeComment = (commentId: string) => {
+    if (!user) return;
 
-      // Find the comment (could be top-level or a reply)
-      for (const parent of comments) {
-          if (parent.id === commentId) {
-              commentToLike = parent;
-              break;
-          }
-          const reply = parent.replies.find(r => r.id === commentId);
-          if (reply) {
-              commentToLike = reply;
-              parentCommentId = parent.id;
-              break;
-          }
-      }
+    let commentPath: string[] | null = null;
+    let originalComment: MatchComment | null = null;
 
-      if (!commentToLike) return;
+    // Find the comment and its path
+    for (const parent of comments) {
+        if (parent.id === commentId) {
+            commentPath = ['matches', String(matchId), 'comments', commentId];
+            originalComment = parent;
+            break;
+        }
+        const reply = parent.replies.find(r => r.id === commentId);
+        if (reply) {
+            commentPath = ['matches', String(matchId), 'comments', parent.id, 'replies', commentId];
+            originalComment = reply;
+            break;
+        }
+    }
 
-      const basePath = ['matches', String(matchId), 'comments'];
-      const likePath = parentCommentId 
-        ? [...basePath, parentCommentId, 'replies', commentId, 'likes', user.uid]
-        : [...basePath, commentId, 'likes', user.uid];
+    if (!commentPath || !originalComment) return;
 
-      const likeRef = doc(db, ...likePath);
+    const hasLiked = originalComment.likes?.some(like => like.id === user.uid);
+    const likeRef = doc(db, ...commentPath, 'likes', user.uid);
 
-      const hasLiked = commentToLike.likes?.some(like => like.id === user.uid);
+    // Optimistic UI Update
+    setComments(prevComments => {
+        return prevComments.map(c => {
+            if (c.id === originalComment?.parentId || c.id === originalComment?.id) {
+                const updateLikes = (comment: MatchComment): MatchComment => {
+                    if (comment.id !== commentId) {
+                        return {
+                            ...comment,
+                            replies: comment.replies.map(updateLikes)
+                        };
+                    }
 
-      if (hasLiked) {
-        deleteDoc(likeRef).catch(async (serverError) => {
+                    const currentLikes = comment.likes || [];
+                    const newLikes = hasLiked
+                        ? currentLikes.filter(l => l.id !== user.uid)
+                        : [...currentLikes, { id: user.uid, userId: user.uid }];
+
+                    return { ...comment, likes: newLikes };
+                };
+                return updateLikes(c);
+            }
+            return c;
+        });
+    });
+
+    if (hasLiked) {
+        deleteDoc(likeRef).catch((serverError) => {
             const permissionError = new FirestorePermissionError({
                 path: likeRef.path,
                 operation: 'delete',
             });
             errorEmitter.emit('permission-error', permissionError);
+            // Revert optimistic update on error
+            fetchComments(); 
         });
-      } else {
+    } else {
         const likeData = { userId: user.uid };
         setDoc(likeRef, likeData)
         .then(() => {
-            if (commentToLike && commentToLike.userId !== user.uid) {
-                const notificationsCollectionRef = collection(db, 'users', commentToLike.userId, 'notifications');
+            if (originalComment && originalComment.userId !== user.uid) {
+                const notificationsCollectionRef = collection(db, 'users', originalComment.userId, 'notifications');
                 const notificationData = {
-                    recipientId: commentToLike.userId,
+                    recipientId: originalComment.userId,
                     senderId: user.uid,
                     senderName: user.displayName,
                     senderPhoto: user.photoURL,
                     type: 'like' as 'like' | 'reply',
                     matchId: matchId,
                     commentId: commentId,
-                    commentText: commentToLike.text,
+                    commentText: originalComment.text,
                     read: false,
                     timestamp: serverTimestamp(),
                 };
-                addDoc(notificationsCollectionRef, notificationData).catch(async (serverError) => {
+                addDoc(notificationsCollectionRef, notificationData).catch((serverError) => {
                      const permissionError = new FirestorePermissionError({
                         path: notificationsCollectionRef.path,
                         operation: 'create',
@@ -541,15 +563,17 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
                     errorEmitter.emit('permission-error', permissionError);
                 });
             }
-        }).catch(async (serverError) => {
+        }).catch((serverError) => {
             const permissionError = new FirestorePermissionError({
                 path: likeRef.path,
                 operation: 'create',
                 requestResourceData: likeData
             });
             errorEmitter.emit('permission-error', permissionError);
+             // Revert optimistic update on error
+            fetchComments();
         });
-      }
+    }
   };
 
   const renderCommentTree = (comment: MatchComment, isReply: boolean = false) => (
@@ -621,5 +645,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     </div>
   );
 }
+
+    
 
     
