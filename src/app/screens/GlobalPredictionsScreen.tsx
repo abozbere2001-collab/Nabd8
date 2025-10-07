@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,18 +18,23 @@ import type { Fixture, UserScore, Prediction, DailyGlobalPredictions } from '@/l
 import { collection, query, orderBy, onSnapshot, doc, getDoc, where, setDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { useDebounce } from '@/hooks/use-debounce';
 
 
 const AdminMatchSelector = () => {
     // This is a placeholder for the admin-specific UI to select matches.
-    // In a full implementation, this would fetch matches from the API and allow the admin to pick them.
     return (
         <Card>
             <CardContent className="p-4">
-                <h3 className="font-bold text-lg mb-2">لوحة تحكم المدير: اختيار المباريات</h3>
-                <p className="text-sm text-muted-foreground">
-                    هنا يمكن للمدير اختيار ما يصل إلى 15 مباراة لليوم. إذا لم يتم اختيار أي شيء، سيقوم النظام تلقائيًا باختيار ما يصل إلى 10 مباريات مهمة. هذه الميزة سيتم تفعيلها في مرحلة لاحقة.
-                </p>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h3 className="font-bold text-lg mb-2">لوحة تحكم المدير: اختيار المباريات</h3>
+                        <p className="text-sm text-muted-foreground">
+                            هنا يمكن للمدير اختيار ما يصل إلى 15 مباراة لليوم. إذا لم يتم اختيار أي شيء، سيقوم النظام تلقائيًا باختيار ما يصل إلى 10 مباريات مهمة.
+                        </p>
+                    </div>
+                    <Button>إدارة المباريات</Button>
+                </div>
             </CardContent>
         </Card>
     )
@@ -39,15 +44,22 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
     const isPredictionDisabled = isPast(new Date(fixture.fixture.date));
     const [homeValue, setHomeValue] = useState(userPrediction?.homeGoals?.toString() ?? '');
     const [awayValue, setAwayValue] = useState(userPrediction?.awayGoals?.toString() ?? '');
+    
+    const debouncedHome = useDebounce(homeValue, 500);
+    const debouncedAway = useDebounce(awayValue, 500);
+
+    useEffect(() => {
+        if (debouncedHome !== '' && debouncedAway !== '') {
+            onSave(debouncedHome, debouncedAway);
+        }
+    }, [debouncedHome, debouncedAway, onSave]);
 
     const handleHomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setHomeValue(e.target.value);
-        onSave(e.target.value, awayValue);
     }
 
     const handleAwayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setAwayValue(e.target.value);
-        onSave(homeValue, e.target.value);
     }
 
     return (
@@ -172,7 +184,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         };
     }, [db, user]);
 
-    const handleSavePrediction = async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
+    const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
         if (!user || homeGoalsStr === '' || awayGoalsStr === '') return;
         const homeGoals = parseInt(homeGoalsStr, 10);
         const awayGoals = parseInt(awayGoalsStr, 10);
@@ -196,7 +208,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             });
             errorEmitter.emit('permission-error', permissionError);
         }
-    };
+    }, [user, db]);
 
 
     return (
