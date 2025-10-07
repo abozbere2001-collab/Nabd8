@@ -3,7 +3,7 @@
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithRedirect,
+  signInWithPopup,
   signOut as firebaseSignOut, 
   onAuthStateChanged as firebaseOnAuthStateChanged,
   getRedirectResult,
@@ -20,7 +20,7 @@ const auth = getAuth(app);
 
 export const signInWithGoogle = async (): Promise<void> => {
   const provider = new GoogleAuthProvider();
-  await signInWithRedirect(auth, provider);
+  await signInWithPopup(auth, provider);
 };
 
 export const signOut = (): Promise<void> => {

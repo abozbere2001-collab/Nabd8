@@ -19,12 +19,16 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setError(null);
     try {
       await signInWithGoogle();
-      // With signInWithRedirect, the page will navigate away. 
-      // If it fails before navigating, the catch block will handle it.
-      // We might not even need to set loading to false here as the page will refresh.
+      // With signInWithPopup, successful login will trigger the onAuthStateChanged listener.
+      // We don't need to do anything else here. The loading state will be reset if there's an error.
     } catch (e: any) {
       console.error("Login Error:", e);
-      setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+      // Handle specific error for popup closed by user
+      if (e.code === 'auth/popup-closed-by-user') {
+        setError('تم إلغاء عملية تسجيل الدخول.');
+      } else {
+        setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+      }
       setLoading(false);
     }
   };
@@ -52,7 +56,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           size="lg"
         >
           {loading ? (
-            'جاري توجيهك...'
+            'جاري التحقق...'
           ) : (
             <>
               <GoogleIcon className="h-5 w-5 mr-2" />

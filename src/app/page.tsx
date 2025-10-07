@@ -18,7 +18,7 @@ import { LoginScreen } from './screens/LoginScreen';
 import { FirebaseProvider, useAuth } from '@/firebase/provider';
 import { ProfileButton } from '@/components/ProfileButton';
 import { SearchSheet } from '@/components/SearchSheet';
-import { onAuthStateChange, checkRedirectResult } from '@/lib/firebase-client';
+import { onAuthStateChange } from '@/lib/firebase-client';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'MatchDetails' | 'TeamDetails' | 'AdminFavoriteTeamDetails' | 'Comments';
 export type ScreenProps = {
@@ -42,7 +42,7 @@ const screens: Record<Exclude<ScreenKey, 'Search'>, React.ComponentType<any>> = 
   Comments: CommentsScreen,
 };
 
-const mainTabs: ScreenKey[] = ['Settings', 'News', 'Iraq', 'Competitions', 'Matches'];
+const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
 
 type StackItem = {
   key: string;
@@ -159,10 +159,6 @@ export default function Home() {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
-    checkRedirectResult().catch(err => {
-        console.error("Redirect check failed:", err);
-    });
-
     const unsubscribe = onAuthStateChange((currentUser) => {
       setUser(currentUser);
       setLoadingAuth(false);
