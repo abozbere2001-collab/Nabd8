@@ -36,12 +36,12 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
               </div>
          </div>
          <div className="flex items-center justify-between gap-2">
-             <div className="flex items-center gap-2 flex-1">
+             <div className="flex items-center gap-2 flex-1 justify-end truncate">
+                 <span className="font-semibold truncate">{fixture.teams.home.name}</span>
                  <Avatar className="h-8 w-8">
                      <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
                      <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
                  </Avatar>
-                 <span className="font-semibold truncate">{fixture.teams.home.name}</span>
              </div>
              <div className={cn(
                 "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
@@ -51,12 +51,12 @@ const FixtureItem = React.memo(({ fixture, onSelect }: { fixture: Fixture, onSel
                    ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
                    : format(new Date(fixture.fixture.date), "HH:mm")}
              </div>
-             <div className="flex items-center gap-2 flex-1 justify-end">
-                  <span className="font-semibold truncate">{fixture.teams.away.name}</span>
+             <div className="flex items-center gap-2 flex-1 truncate">
                   <Avatar className="h-8 w-8">
                      <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
                      <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
                   </Avatar>
+                 <span className="font-semibold truncate">{fixture.teams.away.name}</span>
              </div>
          </div>
       </div>
@@ -103,12 +103,12 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     };
 
     return (
-        <Tabs defaultValue="standings" className="w-full">
+        <Tabs defaultValue="matches" className="w-full">
             <div className="sticky top-0 bg-background z-10 border-b -mx-4 px-4">
-                <TabsList className="grid w-full grid-cols-3 rounded-none h-auto p-0 border-t flex-row-reverse">
+                <TabsList className="grid w-full grid-cols-3 rounded-none h-auto p-0 border-t">
+                    <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'>الهدافين</TabsTrigger>
                     <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'>الترتيب</TabsTrigger>
                     <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>المباريات</TabsTrigger>
-                    <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'>الهدافين</TabsTrigger>
                 </TabsList>
             </div>
             <TabsContent value="matches" className="p-4 mt-0 -mx-4">
@@ -133,32 +133,32 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-1/2 text-left">الفريق</TableHead>
-                            <TableHead className="text-center">لعب</TableHead>
-                            <TableHead className="text-center">ف</TableHead>
-                            <TableHead className="text-center">ت</TableHead>
-                            <TableHead className="text-center">خ</TableHead>
                             <TableHead className="text-center">نقاط</TableHead>
+                            <TableHead className="text-center">خ</TableHead>
+                            <TableHead className="text-center">ت</TableHead>
+                            <TableHead className="text-center">ف</TableHead>
+                            <TableHead className="text-center">لعب</TableHead>
+                            <TableHead className="w-1/2 text-right">الفريق</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {standings.map((s) => (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
+                                <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                <TableCell className="text-center">{s.all.lose}</TableCell>
+                                <TableCell className="text-center">{s.all.draw}</TableCell>
+                                <TableCell className="text-center">{s.all.win}</TableCell>
+                                <TableCell className="text-center">{s.all.played}</TableCell>
                                 <TableCell className="font-medium">
-                                    <div className="flex items-center gap-2">
-                                        <span>{s.rank}</span>
+                                    <div className="flex items-center gap-2 justify-end">
+                                        <span className="truncate">{s.team.name}</span>
                                         <Avatar className="h-6 w-6">
                                             <AvatarImage src={s.team.logo} alt={s.team.name} />
                                             <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
                                         </Avatar>
-                                        <span className="truncate">{s.team.name}</span>
+                                        <span>{s.rank}</span>
                                     </div>
                                 </TableCell>
-                                <TableCell className="text-center">{s.all.played}</TableCell>
-                                <TableCell className="text-center">{s.all.win}</TableCell>
-                                <TableCell className="text-center">{s.all.draw}</TableCell>
-                                <TableCell className="text-center">{s.all.lose}</TableCell>
-                                <TableCell className="text-center font-bold">{s.points}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -174,27 +174,27 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                             <TableHead className="text-left">اللاعب</TableHead>
-                             <TableHead className="text-left">الفريق</TableHead>
                             <TableHead className="text-center">الأهداف</TableHead>
+                             <TableHead className="text-right">الفريق</TableHead>
+                             <TableHead className="text-right">اللاعب</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {topScorers.map(({ player, statistics }) => (
                             <TableRow key={player.id}>
+                                <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
+                                <TableCell className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: statistics[0]?.team.id })}>
+                                     <p className="text-xs text-muted-foreground text-right">{statistics[0]?.team.name}</p>
+                                </TableCell>
                                 <TableCell>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 justify-end">
+                                        <p className="font-semibold">{player.name}</p>
                                         <Avatar className="h-10 w-10">
                                             <AvatarImage src={player.photo} alt={player.name} />
                                             <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
                                         </Avatar>
-                                        <p className="font-semibold">{player.name}</p>
                                     </div>
                                 </TableCell>
-                                <TableCell className="cursor-pointer text-left" onClick={() => navigate('TeamDetails', { teamId: statistics[0]?.team.id })}>
-                                     <p className="text-xs text-muted-foreground">{statistics[0]?.team.name}</p>
-                                </TableCell>
-                                <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -263,9 +263,9 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
         <Tabs defaultValue="our-league" className="w-full">
           <div className="sticky top-0 bg-background z-10">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="our-league">دورينا</TabsTrigger>
-              <TabsTrigger value="predictions">التوقعات</TabsTrigger>
               <TabsTrigger value="our-card">كرتنا</TabsTrigger>
+              <TabsTrigger value="predictions">التوقعات</TabsTrigger>
+              <TabsTrigger value="our-league">دورينا</TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="our-league" className="pt-0">
