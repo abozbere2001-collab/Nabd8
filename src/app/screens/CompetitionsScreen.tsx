@@ -4,53 +4,47 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Star, Pencil } from 'lucide-react';
+import { Star, Pencil, Plus, Trash2, Loader2 } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, updateDoc, deleteField, collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, collection, onSnapshot, writeBatch, getDocs, query, orderBy } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
+import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
-
-interface Competition {
-  league: {
-    id: number;
+interface ManagedCompetition {
+    leagueId: number;
     name: string;
     logo: string;
-  };
-  country: {
-    name: string;
-    flag: string | null;
-  };
+    countryName: string;
+    countryFlag: string | null;
 }
 
 interface Favorites {
     userId: string;
     leagues?: { [key: number]: any };
-    teams?: { [key: number]: any };
 }
 
-interface LeaguesByCountry {
+interface CompetitionsByCountry {
     [country: string]: {
         flag: string | null;
-        leagues: Competition[];
+        leagues: ManagedCompetition[];
     };
 }
 
 interface GroupedCompetitions {
-  [continent: string]: LeaguesByCountry | { leagues: Competition[] };
+  [continent: string]: CompetitionsByCountry | { leagues: ManagedCompetition[] };
 }
 
 interface RenameState {
     isOpen: boolean;
     type: 'league' | 'country' | 'continent' | null;
-    id: string; // Can be leagueId, country name, or continent name
+    id: string;
     currentName: string;
 }
-
 
 const countryToContinent: { [key: string]: string } = {
     "World": "World",
@@ -93,120 +87,112 @@ const countryToContinent: { [key: string]: string } = {
 const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "North America", "Oceania"];
 
 export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
-  const [competitions, setCompetitions] = useState<Competition[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const { isAdmin } = useAdmin();
-  const { user } = useAuth();
-  const { db } = useFirestore();
-  const [favorites, setFavorites] = useState<Favorites>({ userId: '', leagues: {}, teams: {} });
-  const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, type: null, id: '', currentName: '' });
-  
-  const [customLeagueNames, setCustomLeagueNames] = useState<Map<number, string>>(new Map());
-  const [customCountryNames, setCustomCountryNames] = useState<Map<string, string>>(new Map());
-  const [customContinentNames, setCustomContinentNames] = useState<Map<string, string>>(new Map());
+    const [competitions, setCompetitions] = useState<ManagedCompetition[] | null>(null);
+    const [loading, setLoading] = useState(true);
+    const { isAdmin } = useAdmin();
+    const { user } = useAuth();
+    const { db } = useFirestore();
+    const [favorites, setFavorites] = useState<Favorites>({ userId: '', leagues: {} });
+    const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, type: null, id: '', currentName: '' });
+    const [isAddOpen, setAddOpen] = useState(false);
 
-  const getLeagueName = useCallback((comp: Competition) => customLeagueNames.get(comp.league.id) || comp.league.name, [customLeagueNames]);
-  const getCountryName = useCallback((name: string) => customCountryNames.get(name) || name, [customCountryNames]);
-  const getContinentName = useCallback((name: string) => customContinentNames.get(name) || name, [customContinentNames]);
+    const [customLeagueNames, setCustomLeagueNames] = useState<Map<number, string>>(new Map());
+    const [customCountryNames, setCustomCountryNames] = useState<Map<string, string>>(new Map());
+    const [customContinentNames, setCustomContinentNames] = useState<Map<string, string>>(new Map());
 
-useEffect(() => {
-    if (!user) {
-        setFavorites({ userId: '', leagues: {}, teams: {} });
-        return;
-    }
-    const docRef = doc(db, 'favorites', user.uid);
-    const unsubscribe = onSnapshot(docRef, (doc) => {
-        setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {}, teams: {} });
-    }, (error) => {
-        const permissionError = new FirestorePermissionError({
-            path: docRef.path,
-            operation: 'get',
+    const getLeagueName = useCallback((comp: ManagedCompetition) => customLeagueNames.get(comp.leagueId) || comp.name, [customLeagueNames]);
+    const getCountryName = useCallback((name: string) => customCountryNames.get(name) || name, [customCountryNames]);
+    const getContinentName = useCallback((name: string) => customContinentNames.get(name) || name, [customContinentNames]);
+
+    useEffect(() => {
+        if (!user) return;
+        const docRef = doc(db, 'favorites', user.uid);
+        const unsubscribe = onSnapshot(docRef, (doc) => {
+            setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {} });
+        }, (error) => {
+            const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
+            errorEmitter.emit('permission-error', permissionError);
         });
-        errorEmitter.emit('permission-error', permissionError);
-    });
-    return () => unsubscribe();
-}, [user, db]);
+        return () => unsubscribe();
+    }, [user, db]);
 
+    const fetchAllCustomNames = useCallback(async () => {
+        try {
+            const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
+                getDocs(collection(db, 'leagueCustomizations')),
+                getDocs(collection(db, 'countryCustomizations')),
+                getDocs(collection(db, 'continentCustomizations'))
+            ]);
+            
+            const leagueNames = new Map<number, string>();
+            leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+            setCustomLeagueNames(leagueNames);
 
-  const fetchAllCustomNames = useCallback(async () => {
-      try {
-        const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
-            getDocs(collection(db, 'leagueCustomizations')),
-            getDocs(collection(db, 'countryCustomizations')),
-            getDocs(collection(db, 'continentCustomizations'))
-        ]);
-        
-        const leagueNames = new Map<number, string>();
-        leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
-        setCustomLeagueNames(leagueNames);
+            const countryNames = new Map<string, string>();
+            countriesSnapshot.forEach(doc => countryNames.set(doc.id, doc.data().customName));
+            setCustomCountryNames(countryNames);
 
-        const countryNames = new Map<string, string>();
-        countriesSnapshot.forEach(doc => countryNames.set(doc.id, doc.data().customName));
-        setCustomCountryNames(countryNames);
+            const continentNames = new Map<string, string>();
+            continentsSnapshot.forEach(doc => continentNames.set(doc.id, doc.data().customName));
+            setCustomContinentNames(continentNames);
+        } catch (error) {
+            console.error("Failed to fetch custom names:", error);
+            const permissionError = new FirestorePermissionError({ path: 'customizations collections', operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    }, [db]);
 
-        const continentNames = new Map<string, string>();
-        continentsSnapshot.forEach(doc => continentNames.set(doc.id, doc.data().customName));
-        setCustomContinentNames(continentNames);
-      } catch (error) {
-          console.error("Failed to fetch custom names:", error);
-      }
-  }, [db]);
+    useEffect(() => {
+        setLoading(true);
+        fetchAllCustomNames();
+        const compsRef = collection(db, 'managedCompetitions');
+        const q = query(compsRef, orderBy('name', 'asc'));
 
-  const toggleLeagueFavorite = async (comp: Competition) => {
-    if (!user) return;
-    const leagueId = comp.league.id;
-    const favRef = doc(db, 'favorites', user.uid);
-    const fieldPath = `leagues.${leagueId}`;
-    const isFavorited = favorites?.leagues?.[leagueId];
-    const leagueName = getLeagueName(comp);
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetition);
+            setCompetitions(fetchedCompetitions);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching managed competitions:", error);
+            const permissionError = new FirestorePermissionError({ path: compsRef.path, operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
+            setLoading(false);
+        });
 
-    const favoriteData = {
-        userId: user.uid,
-        leagues: { 
-            [leagueId]: {
-                leagueId: comp.league.id,
-                name: leagueName,
-                logo: comp.league.logo,
+        return () => unsubscribe();
+    }, [db, fetchAllCustomNames]);
+
+    const toggleLeagueFavorite = async (comp: ManagedCompetition) => {
+        if (!user) return;
+        const leagueId = comp.leagueId;
+        const favRef = doc(db, 'favorites', user.uid);
+        const fieldPath = `leagues.${leagueId}`;
+        const isFavorited = favorites?.leagues?.[leagueId];
+        const leagueName = getLeagueName(comp);
+
+        const favoriteData = { leagues: { [leagueId]: { leagueId: comp.leagueId, name: leagueName, logo: comp.logo } } };
+
+        try {
+            if (isFavorited) {
+                await updateDoc(favRef, { [fieldPath]: deleteField() });
+            } else {
+                await setDoc(favRef, { ...favoriteData, userId: user.uid }, { merge: true });
             }
-        } 
+        } catch (error) {
+            const permissionError = new FirestorePermissionError({ path: favRef.path, operation: isFavorited ? 'update' : 'create', requestResourceData: favoriteData });
+            errorEmitter.emit('permission-error', permissionError);
+        }
     };
 
-    if (isFavorited) {
-        await updateDoc(favRef, { [fieldPath]: deleteField() });
-    } else {
-        await setDoc(favRef, favoriteData, { merge: true });
-    }
-  };
-
-  useEffect(() => {
-    async function fetchCompetitions() {
-      try {
-        setLoading(true);
-        await fetchAllCustomNames();
-        const leaguesResponse = await fetch('/api/football/leagues');
-        
-        if (!leaguesResponse.ok) {
-            const errorBody = await leaguesResponse.text();
-            console.error('Failed to fetch competitions:', errorBody);
-            throw new Error(`Failed to fetch competitions. Status: ${leaguesResponse.status}`);
+    const handleDeleteCompetition = async (leagueId: number) => {
+        const docRef = doc(db, 'managedCompetitions', String(leagueId));
+        try {
+            await deleteDoc(docRef);
+        } catch (error) {
+            const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
+            errorEmitter.emit('permission-error', permissionError);
         }
-        const data = await leaguesResponse.json();
-        
-        if (data.errors && Object.keys(data.errors).length > 0) {
-            console.error("API Errors:", data.errors);
-            throw new Error("API returned errors. Check your API key or request parameters.");
-        }
-        
-        setCompetitions(data.response as Competition[]);
-
-      } catch (error) {
-        console.error("Error fetching competitions:", error);
-      } finally {
-        setLoading(false);
-      }
     }
-    fetchCompetitions();
-  }, [fetchAllCustomNames]);
 
     const sortedGroupedCompetitions = useMemo(() => {
         if (!competitions) return null;
@@ -214,23 +200,22 @@ useEffect(() => {
         const grouped: GroupedCompetitions = {};
 
         competitions.forEach(comp => {
-            const countryName = comp.country.name;
+            const countryName = comp.countryName;
             const continent = countryToContinent[countryName] || "Other";
 
             if (continent === "World") {
                 if (!grouped.World) grouped.World = { leagues: [] };
-                (grouped.World as { leagues: Competition[] }).leagues.push(comp);
+                (grouped.World as { leagues: ManagedCompetition[] }).leagues.push(comp);
             } else {
                 if (!grouped[continent]) grouped[continent] = {};
-                const continentGroup = grouped[continent] as LeaguesByCountry;
+                const continentGroup = grouped[continent] as CompetitionsByCountry;
                 if (!continentGroup[countryName]) {
-                    continentGroup[countryName] = { flag: comp.country.flag, leagues: [] };
+                    continentGroup[countryName] = { flag: comp.countryFlag, leagues: [] };
                 }
                 continentGroup[countryName].leagues.push(comp);
             }
         });
 
-        // Smart sorting logic
         const sortWithCustomPriority = (arr: string[], customNamesMap: Map<string, string>) => {
             return arr.sort((a, b) => {
                 const aHasCustom = customNamesMap.has(a);
@@ -242,31 +227,30 @@ useEffect(() => {
         };
 
         const sortedGrouped: GroupedCompetitions = {};
-        
         const sortedContinents = continentOrder.filter(c => grouped[c]);
         sortWithCustomPriority(sortedContinents, customContinentNames);
 
         for (const continent of sortedContinents) {
              if (continent === "World") {
-                const worldLeagues = (grouped.World as { leagues: Competition[] }).leagues;
+                const worldLeagues = (grouped.World as { leagues: ManagedCompetition[] }).leagues;
                 worldLeagues.sort((a,b) => {
-                    const aHasCustom = customLeagueNames.has(a.league.id);
-                    const bHasCustom = customLeagueNames.has(b.league.id);
+                    const aHasCustom = customLeagueNames.has(a.leagueId);
+                    const bHasCustom = customLeagueNames.has(b.leagueId);
                     if (aHasCustom && !bHasCustom) return -1;
                     if (!aHasCustom && bHasCustom) return 1;
                     return getLeagueName(a).localeCompare(getLeagueName(b));
                 });
                 sortedGrouped.World = { leagues: worldLeagues };
             } else {
-                const countries = grouped[continent] as LeaguesByCountry;
+                const countries = grouped[continent] as CompetitionsByCountry;
                 const sortedCountries = Object.keys(countries);
                 sortWithCustomPriority(sortedCountries, customCountryNames);
                 
-                const sortedCountriesObj: LeaguesByCountry = {};
+                const sortedCountriesObj: CompetitionsByCountry = {};
                 for (const country of sortedCountries) {
                     countries[country].leagues.sort((a, b) => {
-                       const aHasCustom = customLeagueNames.has(a.league.id);
-                       const bHasCustom = customLeagueNames.has(b.league.id);
+                       const aHasCustom = customLeagueNames.has(a.leagueId);
+                       const bHasCustom = customLeagueNames.has(b.leagueId);
                        if (aHasCustom && !bHasCustom) return -1;
                        if (!aHasCustom && bHasCustom) return 1;
                        return getLeagueName(a).localeCompare(getLeagueName(b));
@@ -283,181 +267,129 @@ useEffect(() => {
 
     }, [competitions, customLeagueNames, customCountryNames, customContinentNames, getLeagueName, getContinentName]);
 
-  const handleSaveRename = async (newName: string) => {
-    if (!renameState.type || !renameState.id) return;
-    
-    let collectionName = '';
-    let docId = renameState.id;
+    const handleSaveRename = async (newName: string) => {
+        if (!renameState.type || !renameState.id) return;
+        
+        let collectionName = '';
+        let docId = renameState.id;
 
-    switch (renameState.type) {
-        case 'league':
-            collectionName = 'leagueCustomizations';
-            break;
-        case 'country':
-            collectionName = 'countryCustomizations';
-            break;
-        case 'continent':
-            collectionName = 'continentCustomizations';
-            break;
-    }
-    
-    if (collectionName) {
-        await setDoc(doc(db, collectionName, docId), { customName: newName });
-        // Re-fetch names to update UI and sorting
-        await fetchAllCustomNames();
-    }
-
-    setRenameState({ isOpen: false, type: null, id: '', currentName: '' });
-  };
+        switch (renameState.type) {
+            case 'league': collectionName = 'leagueCustomizations'; break;
+            case 'country': collectionName = 'countryCustomizations'; break;
+            case 'continent': collectionName = 'continentCustomizations'; break;
+        }
+        
+        if (collectionName) {
+            const docRef = doc(db, collectionName, docId);
+            const data = { customName: newName };
+            try {
+                await setDoc(docRef, data);
+                await fetchAllCustomNames();
+            } catch (error) {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
+                errorEmitter.emit('permission-error', permissionError);
+            }
+        }
+        setRenameState({ isOpen: false, type: null, id: '', currentName: '' });
+    };
   
-  const openRenameDialog = (type: RenameState['type'], id: string, currentName: string) => {
+    const openRenameDialog = (type: RenameState['type'], id: string, currentName: string) => {
       setRenameState({ isOpen: true, type, id, currentName });
-  };
+    };
 
-
-  const renderLeagueItem = (comp: Competition) => (
-    <li key={comp.league.id}>
-      <div
-        className="flex w-full items-center justify-between p-3 hover:bg-accent transition-colors rounded-md cursor-pointer"
-        onClick={() => navigate('CompetitionDetails', { title: getLeagueName(comp), leagueId: comp.league.id, logo: comp.league.logo })}
-      >
-        <div className="flex items-center gap-3">
-          <img src={comp.league.logo} alt={comp.league.name} className="h-6 w-6 object-contain" />
-          <div className="text-sm">
-            {getLeagueName(comp)}
-            {isAdmin && <span className="text-xs text-muted-foreground ml-2"> (ID: {comp.league.id})</span>}
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-            {isAdmin && (
-                <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    openRenameDialog('league', String(comp.league.id), getLeagueName(comp));
-                }}
-                >
-                <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                </Button>
-            )}
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleLeagueFavorite(comp);
-                }}
-            >
-              <Star className={favorites?.leagues?.[comp.league.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-            </Button>
-        </div>
-      </div>
-    </li>
-  );
-
-  const itemTypeMap = {
-    league: 'البطولة',
-    country: 'الدولة',
-    continent: 'القارة'
-  };
-
-
-  return (
-    <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
-      <div className="flex-1 overflow-y-auto p-4">
-        {loading ? (
-          <div className="space-y-4">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="rounded-lg border bg-card p-4">
-                <Skeleton className="h-6 w-1/3" />
-              </div>
-            ))}
-          </div>
-        ) : sortedGroupedCompetitions ? (
-          <>
-          <Accordion type="multiple" className="w-full space-y-4">
-            {Object.entries(sortedGroupedCompetitions).map(([continent, content]) => (
-              <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
-                <div className="flex w-full items-center justify-between">
-                    <AccordionTrigger className="px-4 text-lg font-bold flex-1 hover:no-underline">
-                        {getContinentName(continent)}
-                    </AccordionTrigger>
-                    {isAdmin && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 mr-2"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                openRenameDialog('continent', continent, getContinentName(continent));
-                            }}
-                        >
+    const renderLeagueItem = (comp: ManagedCompetition) => (
+        <li key={comp.leagueId}>
+            <div className="flex w-full items-center justify-between p-3 hover:bg-accent transition-colors rounded-md cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: getLeagueName(comp), leagueId: comp.leagueId, logo: comp.logo })}>
+                <div className="flex items-center gap-3">
+                    <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+                    <div className="text-sm">{getLeagueName(comp)}</div>
+                </div>
+                <div className="flex items-center gap-1">
+                    {isAdmin && (<>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleDeleteCompetition(comp.leagueId); }}>
+                            <Trash2 className="h-4 w-4 text-destructive/80" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openRenameDialog('league', String(comp.leagueId), getLeagueName(comp)); }}>
                             <Pencil className="h-4 w-4 text-muted-foreground/80" />
                         </Button>
-                    )}
+                    </>)}
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); toggleLeagueFavorite(comp); }}>
+                        <Star className={favorites?.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                    </Button>
                 </div>
-                <AccordionContent className="px-1">
-                  {"leagues" in content ? (
-                     <ul className="flex flex-col">
-                        {(content.leagues as Competition[]).map(renderLeagueItem)}
-                      </ul>
-                  ) : (
-                    <Accordion type="multiple" className="w-full space-y-2 px-2">
-                         {Object.entries(content as LeaguesByCountry).map(([country, { flag, leagues }]) => (
-                             <AccordionItem value={country} key={country} className="rounded-lg border bg-background">
+            </div>
+        </li>
+    );
+
+    const itemTypeMap = { league: 'البطولة', country: 'الدولة', continent: 'القارة' };
+
+    return (
+        <div className="flex h-full flex-col bg-background">
+            <ScreenHeader title="البطولات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+            <div className="flex-1 overflow-y-auto p-4">
+                {loading ? (
+                    <div className="space-y-4">
+                        {Array.from({ length: 10 }).map((_, i) => (
+                            <div key={i} className="rounded-lg border bg-card p-4">
+                                <Skeleton className="h-6 w-1/3" />
+                            </div>
+                        ))}
+                    </div>
+                ) : competitions && competitions.length > 0 ? (
+                    <Accordion type="multiple" className="w-full space-y-4">
+                        {Object.entries(sortedGroupedCompetitions || {}).map(([continent, content]) => (
+                            <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
                                 <div className="flex w-full items-center justify-between">
-                                    <AccordionTrigger className="px-4 text-base font-semibold flex-1 hover:no-underline">
-                                        <div className="flex items-center gap-3">
-                                            {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
-                                            <span>{getCountryName(country)}</span>
-                                        </div>
-                                    </AccordionTrigger>
-                                    {isAdmin && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-9 w-9 mr-2"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                openRenameDialog('country', country, getCountryName(country));
-                
-                                            }}
-                                        >
+                                    <AccordionTrigger className="px-4 text-lg font-bold flex-1 hover:no-underline">{getContinentName(continent)}</AccordionTrigger>
+                                    {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('continent', continent, getContinentName(continent)); }}>
                                             <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                                        </Button>
-                                    )}
+                                    </Button>)}
                                 </div>
                                 <AccordionContent className="px-1">
-                                    <ul className="flex flex-col">
-                                        {leagues.map(renderLeagueItem)}
-                                    </ul>
+                                    {"leagues" in content ? (
+                                        <ul className="flex flex-col">{(content.leagues as ManagedCompetition[]).map(renderLeagueItem)}</ul>
+                                    ) : (
+                                        <Accordion type="multiple" className="w-full space-y-2 px-2">
+                                            {Object.entries(content as CompetitionsByCountry).map(([country, { flag, leagues }]) => (
+                                                <AccordionItem value={country} key={country} className="rounded-lg border bg-background">
+                                                    <div className="flex w-full items-center justify-between">
+                                                        <AccordionTrigger className="px-4 text-base font-semibold flex-1 hover:no-underline">
+                                                            <div className="flex items-center gap-3">
+                                                                {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
+                                                                <span>{getCountryName(country)}</span>
+                                                            </div>
+                                                        </AccordionTrigger>
+                                                        {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getCountryName(country)); }}>
+                                                                <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                                        </Button>)}
+                                                    </div>
+                                                    <AccordionContent className="px-1">
+                                                        <ul className="flex flex-col">{leagues.map(renderLeagueItem)}</ul>
+                                                    </AccordionContent>
+                                                </AccordionItem>
+                                            ))}
+                                        </Accordion>
+                                    )}
                                 </AccordionContent>
-                             </AccordionItem>
-                         ))}
+                            </AccordionItem>
+                        ))}
                     </Accordion>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-          <RenameDialog
-              isOpen={renameState.isOpen}
-              onOpenChange={(isOpen) => setRenameState({ ...renameState, isOpen })}
-              currentName={renameState.currentName}
-              onSave={handleSaveRename}
-              itemType={renameState.type ? itemTypeMap[renameState.type] : "العنصر"}
-          />
-          </>
-        ) : (
-          <div className="text-center text-muted-foreground py-10">فشل في تحميل البطولات. يرجى التحقق من مفتاح API أو المحاولة مرة أخرى لاحقًا.</div>
-        )}
-      </div>
-    </div>
-  );
-}
+                ) : (
+                    <div className="text-center text-muted-foreground py-10">
+                        <p className="text-lg font-semibold">لم تتم إضافة بطولات بعد.</p>
+                        {isAdmin && <p>انقر على زر الإضافة لبدء إدارة البطولات.</p>}
+                    </div>
+                )}
+            </div>
 
-    
+            {isAdmin && (
+                <Button className="absolute bottom-24 right-4 h-14 w-14 rounded-full shadow-lg" size="icon" onClick={() => setAddOpen(true)}>
+                    <Plus className="h-6 w-6" />
+                </Button>
+            )}
+
+            <RenameDialog isOpen={renameState.isOpen} onOpenChange={(isOpen) => setRenameState({ ...renameState, isOpen })} currentName={renameState.currentName} onSave={handleSaveRename} itemType={renameState.type ? itemTypeMap[renameState.type] : "العنصر"} />
+            <AddCompetitionDialog isOpen={isAddOpen} onOpenChange={setAddOpen} />
+        </div>
+    );
+}

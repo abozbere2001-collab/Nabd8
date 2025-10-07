@@ -186,6 +186,19 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["recipientId", "senderId", "senderName", "type", "matchId", "read", "timestamp"]
+    },
+    "ManagedCompetition": {
+      "title": "Managed Competition",
+      "description": "Represents a competition that is managed by an admin.",
+      "type": "object",
+      "properties": {
+        "leagueId": { "type": "number" },
+        "name": { "type": "string" },
+        "logo": { "type": "string", "format": "uri" },
+        "countryName": { "type": "string" },
+        "countryFlag": { "type": "string", "format": "uri" }
+      },
+      "required": ["leagueId", "name", "logo", "countryName"]
     }
   },
   "auth": {
@@ -239,6 +252,10 @@
     "/matches/{matchId}/comments/{commentId}": {
       "schema": { "$ref": "#/entities/MatchComment" },
       "description": "Stores all comments and their replies for a specific match. Replies are nested within parent comment documents."
+    },
+    "/managedCompetitions/{leagueId}": {
+      "schema": { "$ref": "#/entities/ManagedCompetition" },
+      "description": "Stores the list of competitions managed by the admin."
     }
   }
 }
