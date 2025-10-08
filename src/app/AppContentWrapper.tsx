@@ -171,12 +171,6 @@ export function AppContentWrapper() {
       canGoBack: stack.length > 1,
   };
 
-  const headerActions = (
-    <>
-      <ProfileButton navigate={navigate} />
-    </>
-  );
-
   const activeScreenKey = activeStackItem.screen;
   const showBottomNav = mainTabs.includes(activeScreenKey);
 
@@ -197,7 +191,7 @@ export function AppContentWrapper() {
                         className="absolute inset-0 bg-background flex flex-col"
                         style={{ zIndex: stack.length - 2 }}
                      >
-                        <PreviousScreenComponent {...navigationProps} {...previousStackItem.props} headerActions={headerActions} />
+                        <PreviousScreenComponent {...navigationProps} {...previousStackItem.props} headerActions={<ProfileButton navigate={navigate} />} />
                      </div>
                 )
              })()
@@ -213,7 +207,7 @@ export function AppContentWrapper() {
             )}
             style={{ zIndex: stack.length -1 }}
         >
-           {ActiveScreenComponent ? <ActiveScreenComponent {...navigationProps} {...activeStackItem.props} headerActions={headerActions} /> : <p>Screen not found</p>}
+           {ActiveScreenComponent ? <ActiveScreenComponent {...navigationProps} {...activeStackItem.props} headerActions={<ProfileButton navigate={navigate} />} /> : <p>Screen not found</p>}
         </div>
 
       </div>

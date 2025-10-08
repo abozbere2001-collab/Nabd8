@@ -10,7 +10,7 @@ import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, RadioTower } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -358,7 +358,7 @@ type TabName = 'all-matches' | 'my-results';
 type Cache<T> = { [date: string]: T };
 
 // Main Screen Component
-export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: baseHeaderActions }: ScreenProps & { headerActions?: React.ReactNode }) {
+export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   const { user } = useAuth();
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
@@ -479,15 +479,19 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
                 <Search className="h-5 w-5" />
             </Button>
         </SearchSheet>
-        <div className="flex items-center space-x-2">
-            <Switch
-                id="live-mode"
-                checked={showLiveOnly}
-                onCheckedChange={setShowLiveOnly}
-            />
-            <Label htmlFor="live-mode" className="text-xs">مباشر</Label>
-        </div>
-        {baseHeaderActions}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowLiveOnly(!showLiveOnly)}
+          className={cn(
+            "h-8 gap-1.5 px-2.5 bg-card border-border",
+            showLiveOnly && "bg-green-600/20 text-green-500 border-green-600/30"
+          )}
+        >
+          <RadioTower className={cn("h-4 w-4", showLiveOnly && "animate-pulse")} />
+          <span className="text-xs">مباشر</span>
+        </Button>
+        {headerActions}
     </div>
   )
 
