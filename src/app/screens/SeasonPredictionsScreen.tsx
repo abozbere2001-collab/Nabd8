@@ -43,6 +43,7 @@ interface LeagueData {
 const useLeagueData = (leagueId: number) => {
     const [data, setData] = useState<LeagueData>({ teams: [], scorers: [] });
     const [loading, setLoading] = useState(true);
+    const PREVIOUS_SEASON = CURRENT_SEASON - 1;
 
     useEffect(() => {
         const fetchData = async () => {
@@ -52,10 +53,10 @@ const useLeagueData = (leagueId: number) => {
             }
             setLoading(true);
             try {
-                // Fetch teams for the upcoming season, but scorers from the previous one
+                // Fetch teams and scorers from the PREVIOUS season to ensure data is available.
                 const [teamsRes, scorersRes] = await Promise.all([
-                    fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`),
-                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON - 1}`)
+                    fetch(`/api/football/teams?league=${leagueId}&season=${PREVIOUS_SEASON}`),
+                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${PREVIOUS_SEASON}`)
                 ]);
                 const teamsData = await teamsRes.json();
                 const scorersData = await scorersRes.json();
@@ -70,7 +71,7 @@ const useLeagueData = (leagueId: number) => {
             }
         };
         fetchData();
-    }, [leagueId]);
+    }, [leagueId, PREVIOUS_SEASON]);
 
     return { ...data, loading };
 };

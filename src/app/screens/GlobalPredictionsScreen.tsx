@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2 } from 'lucide-react';
-import { format, isPast, subDays } from 'date-fns';
+import { format, isPast, subDays, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
 import type { Fixture, UserScore, Prediction, DailyGlobalPredictions, UserProfile } from '@/lib/types';
@@ -23,6 +23,46 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
+const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
+
+const getDayLabel = (date: Date) => {
+    if (isToday(date)) return "اليوم";
+    if (isYesterday(date)) return "الأمس";
+    if (isTomorrow(date)) return "غداً";
+    return format(date, "EEE", { locale: ar });
+};
+
+const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: string, onDateSelect: (dateKey: string) => void}) => {
+    const dates = React.useMemo(() => {
+        const today = new Date();
+        const days = [];
+        for (let i = -7; i <= 7; i++) {
+            days.push(addDays(today, i));
+        }
+        return days;
+    }, []);
+    
+    return (
+        <div className="flex space-x-2 overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none' }}>
+            {dates.map(date => {
+                const dateKey = formatDateKey(date);
+                return (
+                     <button
+                        key={dateKey}
+                        className={cn(
+                            "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors",
+                            dateKey === selectedDateKey ? "text-primary bg-primary/10" : "text-foreground/80 hover:text-primary"
+                        )}
+                        onClick={() => onDateSelect(dateKey)}
+                    >
+                        <span className="text-xs font-normal">{getDayLabel(date)}</span>
+                        <span className="font-bold text-sm">{format(date, 'd')}</span>
+                    </button>
+                )
+            })}
+        </div>
+    );
+}
 
 const AdminMatchSelector = ({ navigate }: { navigate: ScreenProps['navigate'] }) => {
     return (
@@ -205,7 +245,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     const [loading, setLoading] = useState(true);
     const [selectedMatches, setSelectedMatches] = useState<Fixture[]>([]);
     
-    // Leaderboard state
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
     const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
     const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
@@ -217,6 +256,8 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     const [calculatingPoints, setCalculatingPoints] = useState(false);
     
     const LEADERBOARD_PAGE_SIZE = 20;
+
+    const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
 
     const handleCalculatePoints = async () => {
         if (!db) return;
@@ -242,7 +283,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 return;
             }
             
-            // Chunking fixtureIds to avoid Firestore 'in' query limit of 30
             const chunkSize = 30;
             const chunks = [];
             for (let i = 0; i < fixtureIds.length; i += chunkSize) {
@@ -272,7 +312,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             const batch = writeBatch(db);
             predictionsToUpdate.forEach(p => batch.update(p.ref, { points: p.points }));
             
-            // Recalculate total scores for all users
             const allUsersSnapshot = await getDocs(collection(db, 'users'));
             const allUsers = allUsersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as UserProfile }));
             
@@ -313,7 +352,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         } catch (error: any) {
             console.error("Error calculating points:", error);
             const permissionError = new FirestorePermissionError({ 
-                path: `predictions/ or leaderboard/ with error: ${error.message}`,
+                path: `predictions/ or leaderboard/`,
                 operation: 'update',
             });
             errorEmitter.emit('permission-error', permissionError);
@@ -324,7 +363,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     };
 
 
-    // Fetch initial leaderboard
     useEffect(() => {
         if (!db) return;
         setLoadingLeaderboard(true);
@@ -371,64 +409,57 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     }
 
 
-    // Fetch Daily Matches and then user predictions for those matches
-    useEffect(() => {
+    const fetchDailyMatchesAndPredictions = useCallback(async (dateKey: string) => {
         if (!db || !user) {
             setLoading(false);
             return;
         }
+        setLoading(true);
+        try {
+            const predsRef = collection(db, 'predictions');
+            const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
+            const userPredsSnapshot = await getDocs(userPredsQuery);
 
-        const fetchDailyMatchesAndPredictions = async () => {
-            setLoading(true);
-            try {
-                // 1. Fetch ALL of the user's predictions with a simple query first.
-                const predsRef = collection(db, 'predictions');
-                const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
-                const userPredsSnapshot = await getDocs(userPredsQuery);
+            const allUserPredictions: { [key: number]: Prediction } = {};
+            userPredsSnapshot.forEach(doc => {
+                const pred = doc.data() as Prediction;
+                allUserPredictions[pred.fixtureId] = pred;
+            });
+            setPredictions(allUserPredictions);
 
-                const allUserPredictions: { [key: number]: Prediction } = {};
-                userPredsSnapshot.forEach(doc => {
-                    const pred = doc.data() as Prediction;
-                    allUserPredictions[pred.fixtureId] = pred;
-                });
-                setPredictions(allUserPredictions);
-
-                // 2. Fetch today's global matches from Firestore
-                const today = format(new Date(), 'yyyy-MM-dd');
-                const dailyDocRef = doc(db, 'dailyGlobalPredictions', today);
-                const docSnap = await getDoc(dailyDocRef);
-                
-                let fixtureIds: number[] = [];
-                if (docSnap.exists()) {
-                    const dailyData = docSnap.data() as DailyGlobalPredictions;
-                    if (dailyData.selectedMatches && dailyData.selectedMatches.length > 0) {
-                        fixtureIds = dailyData.selectedMatches.map(m => m.fixtureId);
-                    }
+            const dailyDocRef = doc(db, 'dailyGlobalPredictions', dateKey);
+            const docSnap = await getDoc(dailyDocRef);
+            
+            let fixtureIds: number[] = [];
+            if (docSnap.exists()) {
+                const dailyData = docSnap.data() as DailyGlobalPredictions;
+                if (dailyData.selectedMatches && dailyData.selectedMatches.length > 0) {
+                    fixtureIds = dailyData.selectedMatches.map(m => m.fixtureId);
                 }
-                
-                if (fixtureIds.length === 0) {
-                    setSelectedMatches([]);
-                    setLoading(false);
-                    return; // No matches for today, exit early.
-                }
-
-                // 3. Fetch details for those fixtures from the API
-                const res = await fetch(`/api/football/fixtures?ids=${fixtureIds.join('-')}`);
-                const data = await res.json();
-                const fetchedFixtures = data.response || [];
-                setSelectedMatches(fetchedFixtures);
-                
-            } catch (error) {
-                 const permissionError = new FirestorePermissionError({ path: `dailyGlobalPredictions or predictions where userId == ${user.uid}`, operation: 'list' });
-                 errorEmitter.emit('permission-error', permissionError);
-            } finally {
-                setLoading(false);
             }
-        };
+            
+            if (fixtureIds.length === 0) {
+                setSelectedMatches([]);
+                setLoading(false);
+                return;
+            }
 
-        fetchDailyMatchesAndPredictions();
-
+            const res = await fetch(`/api/football/fixtures?ids=${fixtureIds.join('-')}`);
+            const data = await res.json();
+            const fetchedFixtures = data.response || [];
+            setSelectedMatches(fetchedFixtures);
+            
+        } catch (error) {
+             const permissionError = new FirestorePermissionError({ path: `dailyGlobalPredictions or predictions where userId == ${user.uid}`, operation: 'list' });
+             errorEmitter.emit('permission-error', permissionError);
+        } finally {
+            setLoading(false);
+        }
     }, [db, user]);
+
+    useEffect(() => {
+        fetchDailyMatchesAndPredictions(selectedDateKey);
+    }, [selectedDateKey, fetchDailyMatchesAndPredictions]);
 
 
     const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
@@ -443,7 +474,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             fixtureId,
             homeGoals,
             awayGoals,
-            points: 0, // Default points, will be updated by a backend process
+            points: 0,
             timestamp: new Date().toISOString()
         };
 
@@ -472,34 +503,37 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                        </TabsList>
                     </div>
 
-                    <TabsContent value="predictions" className="p-4 mt-0 space-y-6">
-                        {isAdmin && <AdminMatchSelector navigate={navigate} />}
-
-                        <div>
-                            <h3 className="text-xl font-bold mb-3">مباريات اليوم للتوقع</h3>
-                            {loading ? (
-                                <div className="space-y-4">
-                                    {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
-                                </div>
-                            ) : selectedMatches.length > 0 ? (
-                                <div className="space-y-4">
-                                {selectedMatches.map(fixture => (
-                                    <PredictionCard 
-                                    key={fixture.fixture.id}
-                                    fixture={fixture}
-                                    userPrediction={predictions[fixture.fixture.id]}
-                                    onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
-                                    />
-                                ))}
-                                </div>
-                            ) : (
-                                <Card>
-                                <CardContent className="p-6 text-center text-muted-foreground">
-                                        <p>لم يتم اختيار أي مباريات للتوقع لهذا اليوم بعد.</p>
-                                        <p className="text-xs">سيقوم النظام باختيار مباريات مهمة قريبًا أو يمكن للمدير اختيارها يدويًا.</p>
-                                </CardContent>
-                                </Card>
-                            )}
+                    <TabsContent value="predictions" className="mt-0 space-y-6">
+                         <div className="border-b bg-card py-2">
+                            <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
+                        </div>
+                        <div className="p-4 space-y-4">
+                            {isAdmin && isToday(new Date(selectedDateKey)) && <AdminMatchSelector navigate={navigate} />}
+                            <div>
+                                <h3 className="text-xl font-bold mb-3">مباريات اليوم للتوقع</h3>
+                                {loading ? (
+                                    <div className="space-y-4">
+                                        {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
+                                    </div>
+                                ) : selectedMatches.length > 0 ? (
+                                    <div className="space-y-4">
+                                    {selectedMatches.map(fixture => (
+                                        <PredictionCard 
+                                        key={fixture.fixture.id}
+                                        fixture={fixture}
+                                        userPrediction={predictions[fixture.fixture.id]}
+                                        onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
+                                        />
+                                    ))}
+                                    </div>
+                                ) : (
+                                    <Card>
+                                    <CardContent className="p-6 text-center text-muted-foreground">
+                                            <p>لم يتم اختيار أي مباريات للتوقع لهذا اليوم بعد.</p>
+                                    </CardContent>
+                                    </Card>
+                                )}
+                            </div>
                         </div>
                     </TabsContent>
                     
