@@ -354,7 +354,6 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                     setUserProfile(userDoc.data() as UserProfile);
                 }
 
-                // Process custom names
                 const teamNames = new Map<number, string>();
                 teamsCustomSnap.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
                 
@@ -363,7 +362,6 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                 
                 setCustomNames({ teams: teamNames, players: playerNames });
     
-                // Process user predictions
                 const predictions = predsSnapshot.docs.map(doc => doc.data() as SeasonPrediction);
                 setUserPredictions(predictions);
     
@@ -379,15 +377,21 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                 });
     
                  const teamPromises = Array.from(teamIds).map(async (teamId) => {
-                    const res = await fetch(`/api/football/teams?id=${teamId}`);
-                    const data = await res.json();
-                    return data.response?.[0]?.team ? { id: teamId, data: data.response[0].team } : null;
+                    try {
+                        const res = await fetch(`/api/football/teams?id=${teamId}`);
+                        if (!res.ok) return null;
+                        const data = await res.json();
+                        return data.response?.[0]?.team ? { id: teamId, data: data.response[0].team } : null;
+                    } catch { return null; }
                 });
 
                 const playerPromises = Array.from(playerIds).map(async (playerId) => {
-                    const res = await fetch(`/api/football/players?id=${playerId}&season=${CURRENT_SEASON}`);
-                    const data = await res.json();
-                    return data.response?.[0]?.player ? { id: playerId, data: data.response[0].player } : null;
+                    try {
+                        const res = await fetch(`/api/football/players?id=${playerId}&season=${CURRENT_SEASON}`);
+                        if (!res.ok) return null;
+                        const data = await res.json();
+                        return data.response?.[0]?.player ? { id: playerId, data: data.response[0].player } : null;
+                    } catch { return null; }
                 });
     
                 const [teamResults, playerResults] = await Promise.all([
@@ -421,6 +425,21 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
         fetchInitialData();
     }, [db, userId]);
 
+    const uniquePredictions = useMemo(() => {
+        return Array.from(
+            userPredictions
+                .sort((a, b) => (b.timestamp?.toMillis?.() ?? 0) - (a.timestamp?.toMillis?.() ?? 0))
+                .reduce((map, pred) => {
+                    if (!map.has(pred.leagueId)) {
+                        map.set(pred.leagueId, pred);
+                    }
+                    return map;
+                }, new Map<number, SeasonPrediction>())
+                .values()
+        ).sort((a,b) => leagueOrder.indexOf(a.leagueId) - leagueOrder.indexOf(b.leagueId));
+    }, [userPredictions, leagueOrder]);
+
+
     if (loading) {
         return (
              <Card className="mb-4">
@@ -434,68 +453,60 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
     if (!userScore) {
         return null;
     }
-    
-    // Sort predictions by leagueOrder and then filter for uniqueness, taking the latest one
-    const uniquePredictions = Array.from(
-        userPredictions
-            .sort((a, b) => (b.timestamp?.toMillis?.() ?? 0) - (a.timestamp?.toMillis?.() ?? 0))
-            .reduce((map, pred) => {
-                if (!map.has(pred.leagueId)) {
-                    map.set(pred.leagueId, pred);
-                }
-                return map;
-            }, new Map<number, SeasonPrediction>())
-            .values()
-    ).sort((a,b) => leagueOrder.indexOf(a.leagueId) - leagueOrder.indexOf(b.leagueId));
 
     return (
-        <Card className="mb-4">
-            <CardHeader className="flex-row items-center gap-4 space-y-0">
-                <Avatar className="h-16 w-16 border">
-                    <AvatarImage src={userProfile?.photoURL} />
-                    <AvatarFallback>{userProfile?.displayName.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div>
-                    <CardTitle className="text-xl">{userProfile?.displayName}</CardTitle>
-                    <CardDescription>
-                        الترتيب: {userScore.rank ? `#${userScore.rank}`: 'N/A'} - النقاط: {userScore.totalPoints}
-                    </CardDescription>
-                </div>
-            </CardHeader>
-            <CardContent>
-                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-center">
-                    {uniquePredictions.map(pred => {
-                        const champion = pred.predictedChampionId ? teams.get(pred.predictedChampionId) : null;
-                        const topScorer = pred.predictedTopScorerId ? players.get(pred.predictedTopScorerId) : null;
-                        return (
-                            <div key={`${pred.leagueId}-${userId}`} className="p-2 border rounded-lg bg-card-foreground/5 flex flex-col items-center">
-                                <p className="font-bold text-xs mb-2 h-8">{pred.leagueName}</p>
-                                <div className="space-y-2">
-                                     <div className="flex flex-col items-center">
-                                        <Trophy className="h-5 w-5 text-yellow-500" />
-                                        {champion ? (
-                                            <>
-                                            <Avatar className="h-6 w-6 mt-1"><AvatarImage src={champion.logo} /></Avatar>
-                                            <p className="text-[10px] mt-1 truncate w-full">{getDisplayName('team', champion.id, champion.name)}</p>
-                                            </>
-                                        ) : <div className="h-6 w-6 bg-muted rounded-full mt-1"/>}
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                        <FootballIcon className="h-5 w-5" />
-                                        {topScorer ? (
-                                             <>
-                                             <Avatar className="h-6 w-6 mt-1"><AvatarImage src={topScorer.photo} /></Avatar>
-                                             <p className="text-[10px] mt-1 truncate w-full">{getDisplayName('player', topScorer.id, topScorer.name)}</p>
-                                             </>
-                                        ) : <div className="h-6 w-6 bg-muted rounded-full mt-1"/>}
-                                    </div>
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-            </CardContent>
-        </Card>
+      <Card className="mb-4 overflow-hidden">
+        <CardContent className="p-4">
+          <div className="flex flex-row-reverse gap-4">
+             {/* User Info Section */}
+            <div className="flex flex-col items-center justify-center space-y-2 pr-4 border-r-2 border-dashed border-border">
+              <Avatar className="h-16 w-16 border-2 border-primary">
+                <AvatarImage src={userProfile?.photoURL} />
+                <AvatarFallback>{userScore.userName.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="text-center">
+                <p className="font-bold text-lg">{userScore.userName}</p>
+                <p className="text-sm text-muted-foreground">الترتيب: {userScore.rank ? `#${userScore.rank}` : 'N/A'}</p>
+                <p className="text-sm text-primary font-bold">النقاط: {userScore.totalPoints}</p>
+              </div>
+            </div>
+
+            {/* Predictions Grid */}
+            <div className="flex-1 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 text-center">
+              {uniquePredictions.map(pred => {
+                const champion = pred.predictedChampionId ? teams.get(pred.predictedChampionId) : null;
+                const topScorer = pred.predictedTopScorerId ? players.get(pred.predictedTopScorerId) : null;
+                const championName = champion ? getDisplayName('team', champion.id, champion.name) : 'لم يختر';
+                const topScorerName = topScorer ? getDisplayName('player', topScorer.id, topScorer.name) : 'لم يختر';
+
+                return (
+                  <div key={pred.leagueId} className="p-2 border rounded-lg bg-card-foreground/5 flex flex-col items-center justify-start h-full">
+                    <p className="font-bold text-[10px] mb-1 h-8 leading-tight">{pred.leagueName}</p>
+                    <div className="flex flex-col items-center justify-center flex-1 space-y-2">
+                      {/* Champion */}
+                      <div className="flex flex-col items-center">
+                        <Trophy className="h-4 w-4 text-yellow-500 mb-1" />
+                        <Avatar className="h-8 w-8 border">
+                          {champion ? <AvatarImage src={champion.logo} /> : <AvatarFallback>?</AvatarFallback>}
+                        </Avatar>
+                        <p className="text-[10px] mt-1 truncate w-20">{championName}</p>
+                      </div>
+                      {/* Top Scorer */}
+                      <div className="flex flex-col items-center">
+                        <FootballIcon className="h-4 w-4 mb-1" />
+                         <Avatar className="h-8 w-8 border">
+                          {topScorer ? <AvatarImage src={topScorer.photo} /> : <AvatarFallback>?</AvatarFallback>}
+                        </Avatar>
+                        <p className="text-[10px] mt-1 truncate w-20">{topScorerName}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     );
 };
 
