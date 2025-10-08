@@ -319,6 +319,7 @@ const PredictionsInfoDialog = () => (
 
 const UserPredictionSummary = ({ userId }: { userId: string }) => {
     const { db } = useFirestore();
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [userPredictions, setUserPredictions] = useState<SeasonPrediction[]>([]);
     const [teams, setTeams] = useState<Map<number, Team>>(new Map());
     const [players, setPlayers] = useState<Map<number, Player>>(new Map());
@@ -341,13 +342,18 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
             setLoading(true);
             try {
                 // Fetch all necessary data in parallel
-                const [predsSnapshot, scoreDoc, teamsCustomSnap, playersCustomSnap] = await Promise.all([
+                const [predsSnapshot, scoreDoc, userDoc, teamsCustomSnap, playersCustomSnap] = await Promise.all([
                     getDocs(query(collection(db, "seasonPredictions"), where("userId", "==", userId), where("season", "==", CURRENT_SEASON))),
                     getDoc(doc(db, 'leaderboard', userId)),
+                    getDoc(doc(db, 'users', userId)),
                     getDocs(collection(db, 'teamCustomizations')),
                     getDocs(collection(db, 'playerCustomizations'))
                 ]);
                 
+                if (userDoc.exists()) {
+                    setUserProfile(userDoc.data() as UserProfile);
+                }
+
                 // Process custom names
                 const teamNames = new Map<number, string>();
                 teamsCustomSnap.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
@@ -365,7 +371,6 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                     setUserScore(scoreDoc.data() as UserScore);
                 }
     
-                // Gather all unique IDs to fetch from API
                 const teamIds = new Set<number>();
                 const playerIds = new Set<number>();
                 predictions.forEach(p => {
@@ -401,6 +406,13 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
     
             } catch (error) {
                 console.error("Error fetching user prediction summary:", error);
+                 if (error instanceof Error && error.message.includes('permission-denied')) {
+                    const permissionError = new FirestorePermissionError({
+                        path: `users/${userId} or related collections`,
+                        operation: 'get',
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
+                }
             } finally {
                 setLoading(false);
             }
@@ -426,7 +438,7 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
     // Sort predictions by leagueOrder and then filter for uniqueness, taking the latest one
     const uniquePredictions = Array.from(
         userPredictions
-            .sort((a, b) => (b.timestamp?.toMillis() ?? 0) - (a.timestamp?.toMillis() ?? 0)) // Sort descending by timestamp first
+            .sort((a, b) => (b.timestamp?.toMillis?.() ?? 0) - (a.timestamp?.toMillis?.() ?? 0))
             .reduce((map, pred) => {
                 if (!map.has(pred.leagueId)) {
                     map.set(pred.leagueId, pred);
@@ -440,11 +452,11 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
         <Card className="mb-4">
             <CardHeader className="flex-row items-center gap-4 space-y-0">
                 <Avatar className="h-16 w-16 border">
-                    <AvatarImage src={userScore.userPhoto} />
-                    <AvatarFallback>{userScore.userName.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={userProfile?.photoURL} />
+                    <AvatarFallback>{userProfile?.displayName.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div>
-                    <CardTitle className="text-xl">{userScore.userName}</CardTitle>
+                    <CardTitle className="text-xl">{userProfile?.displayName}</CardTitle>
                     <CardDescription>
                         الترتيب: {userScore.rank ? `#${userScore.rank}`: 'N/A'} - النقاط: {userScore.totalPoints}
                     </CardDescription>
@@ -456,7 +468,7 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                         const champion = pred.predictedChampionId ? teams.get(pred.predictedChampionId) : null;
                         const topScorer = pred.predictedTopScorerId ? players.get(pred.predictedTopScorerId) : null;
                         return (
-                            <div key={pred.leagueId} className="p-2 border rounded-lg bg-card-foreground/5 flex flex-col items-center">
+                            <div key={`${pred.leagueId}-${userId}`} className="p-2 border rounded-lg bg-card-foreground/5 flex flex-col items-center">
                                 <p className="font-bold text-xs mb-2 h-8">{pred.leagueName}</p>
                                 <div className="space-y-2">
                                      <div className="flex flex-col items-center">
