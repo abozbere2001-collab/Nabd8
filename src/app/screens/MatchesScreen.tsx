@@ -479,7 +479,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible, headerAc
                        <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
                    </TabsList>
                  </Tabs>
-                 <div className="flex items-center gap-2 rounded-lg bg-card p-1">
+                <div className="flex items-center gap-2 rounded-lg bg-card p-1">
                     <RadioTower className={cn("h-4 w-4 text-muted-foreground", showLiveOnly && "text-green-500")} />
                     <Switch
                         id="live-only-switch"
@@ -511,3 +511,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible, headerAc
     </div>
   );
 }
+
+    
