@@ -22,7 +22,7 @@ interface SeasonPlayerSelectionScreenProps extends ScreenProps {
     leagueId: number;
     leagueName: string;
     teamId: number;
-    teamName: string;
+    teamName:string;
 }
 
 interface PlayerResponse {
@@ -31,7 +31,7 @@ interface PlayerResponse {
 }
 
 
-const PlayerListItem = React.memo(({ player, isPredictedTopScorer, onScorerSelect }: { player: Player, isPredictedTopScorer: boolean, onScorerSelect: () => void }) => {
+const PlayerListItem = React.memo(({ player, isPredictedTopScorer, onScorerSelect }: { player: Player, isPredictedTopScorer: boolean, onScorerSelect: (playerId: number) => void }) => {
     return (
         <div className="flex items-center p-2 border rounded-lg bg-card">
              <div className="flex-1 flex items-center gap-3">
@@ -41,7 +41,7 @@ const PlayerListItem = React.memo(({ player, isPredictedTopScorer, onScorerSelec
                    <p className="text-xs text-muted-foreground">{player.position}</p>
                 </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={onScorerSelect}>
+            <Button variant="ghost" size="icon" onClick={() => onScorerSelect(player.id)}>
                 <FootballIcon className={cn("h-6 w-6 text-muted-foreground transition-colors", isPredictedTopScorer && "text-yellow-400")} />
             </Button>
         </div>
@@ -121,7 +121,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
 
     const handleScorerSelect = useCallback((playerId: number) => {
         const newScorerId = predictedTopScorerId === playerId ? undefined : playerId;
-        setPredictedTopScorerId(prevId => prevId === playerId ? undefined : playerId);
+        setPredictedTopScorerId(newScorerId);
         
         if (predictionDocRef && user) {
             const predictionData: Partial<SeasonPrediction> = {
@@ -139,6 +139,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                 });
         }
     }, [predictionDocRef, user, leagueId, leagueName, predictedTopScorerId]);
+
 
     if (loading) {
         return (
@@ -161,7 +162,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                         key={player.id}
                         player={player}
                         isPredictedTopScorer={predictedTopScorerId === player.id}
-                        onScorerSelect={() => handleScorerSelect(player.id)}
+                        onScorerSelect={handleScorerSelect}
                     />
                 )) : (
                     <p className="text-center pt-8 text-muted-foreground">لا يوجد لاعبون متاحون لهذا الفريق.</p>
