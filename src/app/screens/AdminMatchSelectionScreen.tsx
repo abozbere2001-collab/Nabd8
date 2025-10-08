@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
@@ -42,16 +42,35 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
         return days;
     }, []);
     
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const selectedButtonRef = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        const scroller = scrollerRef.current;
+        const selectedButton = selectedButtonRef.current;
+
+        if (scroller && selectedButton) {
+            const scrollerRect = scroller.getBoundingClientRect();
+            const selectedRect = selectedButton.getBoundingClientRect();
+            
+            const scrollOffset = selectedRect.left - scrollerRect.left - (scrollerRect.width / 2) + (selectedRect.width / 2);
+            
+            scroller.scrollTo({ left: scroller.scrollLeft + scrollOffset, behavior: 'smooth' });
+        }
+    }, [selectedDateKey]);
+
     return (
-        <div className="flex flex-row-reverse overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none' }}>
+        <div ref={scrollerRef} className="flex flex-row-reverse overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none' }}>
             {dates.map(date => {
                 const dateKey = formatDateKey(date);
+                const isSelected = dateKey === selectedDateKey;
                 return (
                      <button
                         key={dateKey}
+                        ref={isSelected ? selectedButtonRef : null}
                         className={cn(
                             "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors ml-2",
-                            dateKey === selectedDateKey ? "text-primary bg-primary/10" : "text-foreground/80 hover:text-primary"
+                            isSelected ? "text-primary bg-primary/10" : "text-foreground/80 hover:text-primary"
                         )}
                         onClick={() => onDateSelect(dateKey)}
                     >

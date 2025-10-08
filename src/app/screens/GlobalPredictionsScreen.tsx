@@ -1,10 +1,10 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { Loader2 } from 'lucide-react';
 import { format, isPast, subDays, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
-import type { Fixture, UserScore, Prediction, DailyGlobalPredictions, UserProfile } from '@/lib/types';
+import type { Fixture, UserScore, Prediction, DailyGlobalPredictions, UserProfile, Team, TopScorer, SeasonPrediction } from '@/lib/types';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, where, getDocs, limit, startAfter, type DocumentData, type QueryDocumentSnapshot, writeBatch } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -22,6 +22,14 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
 
@@ -42,13 +50,32 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
         return days;
     }, []);
     
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const selectedButtonRef = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        const scroller = scrollerRef.current;
+        const selectedButton = selectedButtonRef.current;
+
+        if (scroller && selectedButton) {
+            const scrollerRect = scroller.getBoundingClientRect();
+            const selectedRect = selectedButton.getBoundingClientRect();
+            
+            const scrollOffset = selectedRect.left - scrollerRect.left - (scrollerRect.width / 2) + (selectedRect.width / 2);
+            
+            scroller.scrollTo({ left: scroller.scrollLeft + scrollOffset, behavior: 'smooth' });
+        }
+    }, [selectedDateKey]);
+
     return (
-        <div className="flex flex-row-reverse overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none' }}>
+        <div ref={scrollerRef} className="flex flex-row-reverse overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none' }}>
             {dates.map(date => {
                 const dateKey = formatDateKey(date);
+                const isSelected = dateKey === selectedDateKey;
                 return (
                      <button
                         key={dateKey}
+                        ref={isSelected ? selectedButtonRef : null}
                         className={cn(
                             "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors ml-2",
                             dateKey === selectedDateKey ? "text-primary bg-primary/10" : "text-foreground/80 hover:text-primary"
@@ -236,7 +263,162 @@ const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
     return 0;
 };
 
+// Season Predictions Components
+const PREMIER_LEAGUE_ID = 39;
+const LALIGA_ID = 140;
+const SERIE_A_ID = 135;
+const BUNDESLIGA_ID = 78;
+const CURRENT_SEASON = 2025;
 
+const seasonLeagues = [
+    { id: PREMIER_LEAGUE_ID, name: "الدوري الإنجليزي الممتاز" },
+    { id: LALIGA_ID, name: "الدوري الإسباني" },
+    { id: SERIE_A_ID, name: "الدوري الإيطالي" },
+    { id: BUNDESLIGA_ID, name: "الدوري الألماني" },
+];
+
+interface LeagueData {
+    teams: { team: Team }[];
+    scorers: TopScorer[];
+}
+
+const useLeagueData = (leagueId: number) => {
+    const [data, setData] = useState<LeagueData>({ teams: [], scorers: [] });
+    const [loading, setLoading] = useState(true);
+    
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!leagueId) {
+                 setLoading(false);
+                 return;
+            }
+            setLoading(true);
+            try {
+                // Fetch teams and scorers from the CURRENT season to allow predictions
+                const [teamsRes, scorersRes] = await Promise.all([
+                    fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`),
+                    // Scorers list might be empty for a new season, so we get it from the previous one for selection purposes.
+                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON - 1}`)
+                ]);
+                const teamsData = await teamsRes.json();
+                const scorersData = await scorersRes.json();
+                setData({
+                    teams: teamsData.response || [],
+                    scorers: scorersData.response || []
+                });
+            } catch (error) {
+                console.error(`Failed to fetch data for league ${leagueId}`, error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [leagueId]);
+
+    return { ...data, loading };
+};
+
+const LeaguePredictionCard = ({ league, userId }: { league: { id: number, name: string }, userId: string }) => {
+    const { teams, scorers, loading } = useLeagueData(league.id);
+    const { db } = useFirestore();
+    const { toast } = useToast();
+    
+    const [championId, setChampionId] = useState<string | undefined>();
+    const [scorerId, setScorerId] = useState<string | undefined>();
+    const [saving, setSaving] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(true);
+
+
+    const predictionDocRef = useMemo(() => {
+        if (!db) return null;
+        return doc(db, 'seasonPredictions', `${userId}_${league.id}_${CURRENT_SEASON}`);
+    }, [db, userId, league.id]);
+
+    useEffect(() => {
+        if (!predictionDocRef) return;
+        
+        setInitialLoading(true);
+        getDoc(predictionDocRef).then(docSnap => {
+            if (docSnap.exists()) {
+                const data = docSnap.data() as SeasonPrediction;
+                setChampionId(String(data.predictedChampionId));
+                setScorerId(String(data.predictedTopScorerId));
+            }
+        }).catch(error => {
+            const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'get' });
+            errorEmitter.emit('permission-error', permissionError);
+        }).finally(() => {
+            setInitialLoading(false);
+        });
+    }, [predictionDocRef]);
+
+    const handleSave = async () => {
+        if (!championId || !scorerId || !predictionDocRef) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'يرجى اختيار البطل والهداف.' });
+            return;
+        }
+        setSaving(true);
+        const predictionData: SeasonPrediction = {
+            userId,
+            leagueId: league.id,
+            season: CURRENT_SEASON,
+            predictedChampionId: Number(championId),
+            predictedTopScorerId: Number(scorerId),
+            championPoints: 0,
+            topScorerPoints: 0
+        };
+        
+        setDoc(predictionDocRef, predictionData)
+            .then(() => {
+                toast({ title: 'تم الحفظ', description: `تم حفظ توقعاتك لـ ${league.name}.` });
+            })
+            .catch(serverError => {
+                 const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'create', requestResourceData: predictionData });
+                 errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => {
+                setSaving(false);
+            });
+    };
+    
+    const isLoading = loading || initialLoading;
+
+    return (
+        <div className="p-4 border rounded-lg bg-card">
+            <h3 className="font-bold mb-4">{league.name}</h3>
+            {isLoading ? <Loader2 className="mx-auto h-6 w-6 animate-spin" /> : (
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-sm font-medium mb-1 block">توقع البطل</label>
+                         <Select value={championId} onValueChange={setChampionId} dir="rtl">
+                            <SelectTrigger><SelectValue placeholder="اختر الفريق البطل..." /></SelectTrigger>
+                            <SelectContent>
+                                {teams.map(({ team }) => (
+                                    <SelectItem key={team.id} value={String(team.id)}>{team.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium mb-1 block">توقع الهداف</label>
+                         <Select value={scorerId} onValueChange={setScorerId} dir="rtl">
+                            <SelectTrigger><SelectValue placeholder="اختر الهداف..." /></SelectTrigger>
+                            <SelectContent>
+                                {scorers.map(({ player }) => (
+                                    <SelectItem key={player.id} value={String(player.id)}>{player.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <Button onClick={handleSave} disabled={saving} className="w-full">
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ'}
+                    </Button>
+                </div>
+            )}
+        </div>
+    );
+};
+// --- Main Screen ---
 export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
     const { isAdmin } = useAdmin();
     const { user } = useAuth();
@@ -352,7 +534,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         } catch (error: any) {
             console.error("Error calculating points:", error);
             const permissionError = new FirestorePermissionError({ 
-                path: `predictions/ or leaderboard/`,
+                path: `predictions or leaderboard`,
                 operation: 'update',
             });
             errorEmitter.emit('permission-error', permissionError);
@@ -538,11 +720,18 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     </TabsContent>
                     
                     <TabsContent value="season_predictions" className="p-4 mt-0">
-                         <Card className="cursor-pointer hover:bg-card/90" onClick={() => navigate('SeasonPredictions')}>
-                           <CardContent className="p-6 text-center">
-                                <p className="text-lg font-bold">توقع بطل الموسم والهداف</p>
-                                <p className="text-sm text-muted-foreground">اربح نقاطًا إضافية في نهاية الموسم. اضغط هنا للمشاركة.</p>
-                           </CardContent>
+                         <Card>
+                            <CardHeader>
+                                <CardTitle>توقع بطل الموسم وهداف الدوري</CardTitle>
+                                <CardDescription>
+                                    سيتم منح 50 نقطة لتوقع البطل الصحيح و 25 نقطة لتوقع الهداف الصحيح في نهاية الموسم لكل دوري.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                            {user ? seasonLeagues.map(league => (
+                                    <LeaguePredictionCard key={league.id} league={league} userId={user.uid} />
+                                )) : <p>الرجاء تسجيل الدخول للمشاركة.</p>}
+                            </CardContent>
                         </Card>
                     </TabsContent>
 
@@ -629,8 +818,3 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
-
-
-    
-
-    
