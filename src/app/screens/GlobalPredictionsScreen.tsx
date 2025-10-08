@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, Trophy, Award, Info } from 'lucide-react';
+import { Loader2, Trophy, Award, Info, Shield, User } from 'lucide-react';
 import { format, isPast, subDays, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
@@ -315,6 +315,116 @@ const PredictionsInfoDialog = () => (
 );
 
 
+const UserPredictionSummary = ({ userId }: { userId: string }) => {
+    const { db } = useFirestore();
+    const [userPredictions, setUserPredictions] = useState<SeasonPrediction[]>([]);
+    const [teams, setTeams] = useState<Map<number, Team>>(new Map());
+    const [players, setPlayers] = useState<Map<number, Player>>(new Map());
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!db || !userId) return;
+
+        const fetchInitialData = async () => {
+            setLoading(true);
+            try {
+                // Fetch all of the user's season predictions
+                const q = query(collection(db, "seasonPredictions"), where("userId", "==", userId));
+                const querySnapshot = await getDocs(q);
+                const predictions = querySnapshot.docs.map(doc => doc.data() as SeasonPrediction);
+                setUserPredictions(predictions);
+
+                // Gather all unique team and player IDs from the predictions
+                const teamIds = new Set<number>();
+                const playerIds = new Set<number>();
+                predictions.forEach(p => {
+                    if (p.predictedChampionId) teamIds.add(p.predictedChampionId);
+                    if (p.predictedTopScorerId) playerIds.add(p.predictedTopScorerId);
+                });
+
+                // Fetch details for those teams and players
+                const teamData = new Map<number, Team>();
+                const playerData = new Map<number, Player>();
+
+                if (teamIds.size > 0) {
+                     const teamRes = await fetch(`/api/football/teams?id=${Array.from(teamIds).join('-')}`);
+                     const teamResData = await teamRes.json();
+                     if (teamResData.response) {
+                         teamResData.response.forEach((t: { team: Team }) => teamData.set(t.team.id, t.team));
+                     }
+                     setTeams(teamData);
+                }
+
+                if (playerIds.size > 0) {
+                    const playerRes = await fetch(`/api/football/players?id=${Array.from(playerIds).join('-')}&season=2024`);
+                    const playerResData = await playerRes.json();
+                    if (playerResData.response) {
+                        playerResData.response.forEach((p: { player: Player }) => playerData.set(p.player.id, p.player));
+                    }
+                    setPlayers(playerData);
+                }
+
+            } catch (error) {
+                console.error("Error fetching user prediction summary:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchInitialData();
+    }, [db, userId]);
+
+    if (loading) {
+        return <Skeleton className="h-24 w-full" />;
+    }
+
+    if (userPredictions.length === 0) {
+        return null; // Or some placeholder
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-lg">توقعاتك للموسم</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {userPredictions.map(pred => {
+                    const champion = pred.predictedChampionId ? teams.get(pred.predictedChampionId) : null;
+                    const topScorer = pred.predictedTopScorerId ? players.get(pred.predictedTopScorerId) : null;
+                    return (
+                        <div key={pred.leagueId} className="p-3 border rounded-lg bg-card-foreground/5">
+                            <p className="font-bold text-sm mb-2">{pred.leagueName}</p>
+                            <div className="space-y-2 text-xs">
+                                <div className="flex items-center gap-2">
+                                    <Trophy className="h-4 w-4 text-yellow-500" />
+                                    <span>البطل:</span>
+                                    {champion ? (
+                                        <div className="flex items-center gap-1 font-semibold">
+                                            <Avatar className="h-4 w-4"><AvatarImage src={champion.logo} /></Avatar>
+                                            <span>{champion.name}</span>
+                                        </div>
+                                    ) : <span className="text-muted-foreground">لم يختر</span>}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <FootballIcon className="h-4 w-4 text-gray-500" />
+                                    <span>الهداف:</span>
+                                    {topScorer ? (
+                                        <div className="flex items-center gap-1 font-semibold">
+                                            <Avatar className="h-4 w-4"><AvatarImage src={topScorer.photo} /></Avatar>
+                                            <span>{topScorer.name}</span>
+                                        </div>
+                                    ) : <span className="text-muted-foreground">لم يختر</span>}
+                                </div>
+                            </div>
+                        </div>
+                    )
+                })}
+            </CardContent>
+        </Card>
+    );
+};
+
+
 // --- Main Screen ---
 export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
     const { isAdmin } = useAdmin();
@@ -473,6 +583,9 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 } else {
                     setUserRank(null);
                 }
+            }, (error) => {
+                const permissionError = new FirestorePermissionError({ path: userRankRef.path, operation: 'get' });
+                errorEmitter.emit('permission-error', permissionError);
             });
         }
 
@@ -671,6 +784,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                 </CardContent>
                             </Card>
                          )}
+                         {user && <UserPredictionSummary userId={user.uid} />}
                          <Card>
                             <Table>
                                 <TableHeader>
