@@ -10,16 +10,13 @@ import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
-import { Loader2, Search, RadioTower } from 'lucide-react';
+import { Loader2, RadioTower } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { SearchSheet } from '@/components/SearchSheet';
 import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from '@/components/ui/switch';
 
 
 // Interfaces
@@ -471,7 +468,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible, headerAc
     <div className="flex-1 flex flex-col min-h-0">
         <div className="flex flex-col border-b bg-card">
             <div className='flex items-center justify-between px-4 pt-2'>
-                 <div/>
+                 <div className="flex items-center gap-2 rounded-lg bg-card p-1 border">
+                    <Switch
+                        id="live-only-switch"
+                        checked={showLiveOnly}
+                        onCheckedChange={setShowLiveOnly}
+                    />
+                 </div>
                  <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full max-w-sm mx-auto">
                    <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
                        <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>كل المباريات</TabsTrigger>
@@ -479,14 +482,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible, headerAc
                        <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
                    </TabsList>
                  </Tabs>
-                <div className="flex items-center gap-2 rounded-lg bg-card p-1">
-                    <RadioTower className={cn("h-4 w-4 text-muted-foreground", showLiveOnly && "text-green-500")} />
-                    <Switch
-                        id="live-only-switch"
-                        checked={showLiveOnly}
-                        onCheckedChange={setShowLiveOnly}
-                    />
-                </div>
+                <div className="w-12"></div>
             </div>
 
             <div className="py-2">

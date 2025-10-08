@@ -38,7 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LogOut, User as UserIcon } from 'lucide-react';
+import { LogOut, User as UserIcon, Search } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
 import { ScreenHeader } from '@/components/ScreenHeader';
 
@@ -201,27 +201,35 @@ export function AppContentWrapper() {
       );
     };
 
+    const headerActions = (
+        <div className="flex items-center gap-1">
+            <SearchSheet navigate={navigate}>
+                <Button variant="ghost" size="icon">
+                    <Search className="h-5 w-5" />
+                </Button>
+            </SearchSheet>
+            <ProfileButton />
+        </div>
+    );
+
 
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
       <div className="relative flex-1 flex flex-col overflow-hidden">
-        <ScreenHeader
-            title={itemTitle}
-            canGoBack={navigationProps.canGoBack}
-            onBack={navigationProps.goBack}
-            actions={
-                <div className="flex items-center gap-1">
-                  <SearchSheet navigate={navigate} />
-                  <ProfileButton />
-                </div>
-            }
-        />
         
         <div className="relative flex-1 overflow-hidden">
             {stack.map((item, index) => {
                 const ScreenComponent = screenConfig[item.screen].component;
                 const isActive = index === stack.length - 1;
                 const isPrevious = index === stack.length - 2;
+
+                // Pass headerActions only to the active screen
+                const screenProps = {
+                    ...navigationProps,
+                    ...item.props,
+                    isVisible: isActive,
+                    headerActions: isActive ? headerActions : undefined
+                };
 
                 return (
                     <div
@@ -234,7 +242,13 @@ export function AppContentWrapper() {
                             isActive && isAnimatingOut && 'animate-slide-out-to-right'
                         )}
                     >
-                         <ScreenComponent {...navigationProps} {...item.props} isVisible={isActive} />
+                         <ScreenHeader
+                            title={getScreenTitle(item)}
+                            canGoBack={navigationProps.canGoBack && index > 0}
+                            onBack={navigationProps.goBack}
+                            actions={screenProps.headerActions}
+                        />
+                         <ScreenComponent {...screenProps} />
                     </div>
                 );
             })}
