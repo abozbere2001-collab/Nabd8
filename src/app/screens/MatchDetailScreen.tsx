@@ -671,3 +671,5 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
     
 
     
+
+    

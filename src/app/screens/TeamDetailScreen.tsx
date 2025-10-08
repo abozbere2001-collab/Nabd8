@@ -71,7 +71,7 @@ function useTeamData(teamId?: number) {
         const teamData = await teamRes.json();
         const teamInfo: TeamInfo | null = teamData.response?.[0] || null;
 
-        const seasonForData = teamInfo?.team.type === 'National' ? CURRENT_SEASON - 1 : CURRENT_SEASON;
+        const seasonForData = teamInfo?.team.type === 'National' ? new Date().getFullYear() : CURRENT_SEASON;
         
         // Fetch players for the correct season
         const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${seasonForData}`);
@@ -462,5 +462,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     </div>
   );
 }
+
+    
 
     
