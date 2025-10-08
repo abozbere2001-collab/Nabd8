@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAuth, useFirestore } from '@/firebase/provider';
@@ -31,7 +31,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
     const { toast } = useToast();
     const [players, setPlayers] = useState<{ player: Player }[]>([]);
     const [loading, setLoading] = useState(true);
-    const [prediction, setPrediction] = useState<Partial<SeasonPrediction>>({});
+    const [predictedTopScorerId, setPredictedTopScorerId] = useState<number | undefined>();
 
     const predictionDocRef = useMemo(() => {
         if (!user || !db) return null;
@@ -62,7 +62,8 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
         getDoc(predictionDocRef)
             .then(docSnap => {
                 if (docSnap.exists()) {
-                    setPrediction(docSnap.data() as SeasonPrediction);
+                    const data = docSnap.data() as SeasonPrediction;
+                    setPredictedTopScorerId(data.predictedTopScorerId);
                 }
             })
             .catch(error => {
@@ -71,29 +72,24 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
             });
     }, [predictionDocRef]);
 
-    const handleScorerSelect = (playerId: number) => {
-        setPrediction(prev => {
-            const newScorerId = prev.predictedTopScorerId === playerId ? undefined : playerId;
-            const updatedPrediction = { ...prev, predictedTopScorerId: newScorerId };
-            
-            // Save immediately
-            if (predictionDocRef && user) {
-                 const predictionData: Partial<SeasonPrediction> = {
-                    userId: user.uid,
-                    leagueId: leagueId,
-                    season: CURRENT_SEASON,
-                    predictedTopScorerId: newScorerId,
-                };
-                setDoc(predictionDocRef, predictionData, { merge: true })
-                    .catch(serverError => {
-                        const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'create', requestResourceData: predictionData });
-                        errorEmitter.emit('permission-error', permissionError);
-                    });
-            }
-            
-            return updatedPrediction;
-        });
-    };
+    const handleScorerSelect = useCallback((playerId: number) => {
+        const newScorerId = predictedTopScorerId === playerId ? undefined : playerId;
+        setPredictedTopScorerId(newScorerId);
+        
+        if (predictionDocRef && user) {
+            const predictionData: Partial<SeasonPrediction> = {
+                userId: user.uid,
+                leagueId: leagueId,
+                season: CURRENT_SEASON,
+                predictedTopScorerId: newScorerId,
+            };
+            setDoc(predictionDocRef, predictionData, { merge: true })
+                .catch(serverError => {
+                    const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'create', requestResourceData: predictionData });
+                    errorEmitter.emit('permission-error', permissionError);
+                });
+        }
+    }, [predictionDocRef, user, leagueId, predictedTopScorerId]);
 
     if (loading) {
         return (
@@ -121,7 +117,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                             </div>
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => handleScorerSelect(player.id)}>
-                            <FootballIcon className={cn("h-6 w-6 text-muted-foreground transition-colors", prediction.predictedTopScorerId === player.id && "text-yellow-400")} />
+                            <FootballIcon className={cn("h-6 w-6 text-muted-foreground transition-colors", predictedTopScorerId === player.id && "text-yellow-400")} />
                         </Button>
                     </div>
                 )) : (

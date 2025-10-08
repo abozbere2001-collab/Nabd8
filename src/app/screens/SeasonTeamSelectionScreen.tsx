@@ -4,9 +4,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
-import type { Team, SeasonPrediction, Player } from '@/lib/types';
+import { useAuth, useFirestore } from '@/firebase/provider';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import type { Team, SeasonPrediction } from '@/lib/types';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { Loader2, Trophy } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -27,7 +27,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
     const { toast } = useToast();
     const [teams, setTeams] = useState<{ team: Team }[]>([]);
     const [loading, setLoading] = useState(true);
-    const [prediction, setPrediction] = useState<Partial<SeasonPrediction>>({});
+    const [predictedChampionId, setPredictedChampionId] = useState<number | undefined>();
 
     const predictionDocRef = useMemo(() => {
         if (!user || !db) return null;
@@ -58,7 +58,8 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
         getDoc(predictionDocRef)
             .then(docSnap => {
                 if (docSnap.exists()) {
-                    setPrediction(docSnap.data() as SeasonPrediction);
+                    const data = docSnap.data() as SeasonPrediction;
+                    setPredictedChampionId(data.predictedChampionId);
                 }
             })
             .catch(error => {
@@ -67,29 +68,25 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
             });
     }, [predictionDocRef]);
 
-    const handleChampionSelect = (teamId: number) => {
-        setPrediction(prev => {
-            const newChampionId = prev.predictedChampionId === teamId ? undefined : teamId;
-            const updatedPrediction = { ...prev, predictedChampionId: newChampionId };
-            
-            // Save immediately
-            if (predictionDocRef && user) {
-                const predictionData: Partial<SeasonPrediction> = {
-                    userId: user.uid,
-                    leagueId: leagueId,
-                    season: CURRENT_SEASON,
-                    predictedChampionId: newChampionId,
-                };
-                 setDoc(predictionDocRef, predictionData, { merge: true })
-                    .catch(serverError => {
-                        const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'create', requestResourceData: predictionData });
-                        errorEmitter.emit('permission-error', permissionError);
-                    });
-            }
+    const handleChampionSelect = useCallback((teamId: number) => {
+        const newChampionId = predictedChampionId === teamId ? undefined : teamId;
+        setPredictedChampionId(newChampionId);
+        
+        if (predictionDocRef && user) {
+            const predictionData: Partial<SeasonPrediction> = {
+                userId: user.uid,
+                leagueId: leagueId,
+                season: CURRENT_SEASON,
+                predictedChampionId: newChampionId,
+            };
+            setDoc(predictionDocRef, predictionData, { merge: true })
+                .catch(serverError => {
+                    const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'create', requestResourceData: predictionData });
+                    errorEmitter.emit('permission-error', permissionError);
+                });
+        }
+    }, [predictionDocRef, user, leagueId, predictedChampionId]);
 
-            return updatedPrediction;
-        });
-    };
 
     const handleTeamClick = (teamId: number, teamName: string) => {
         navigate('SeasonPlayerSelection', { leagueId, leagueName, teamId, teamName });
@@ -122,7 +119,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
                             <span className="font-semibold">{team.name}</span>
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => handleChampionSelect(team.id)}>
-                            <Trophy className={cn("h-6 w-6 text-muted-foreground transition-colors", prediction.predictedChampionId === team.id && "text-yellow-400 fill-current")} />
+                            <Trophy className={cn("h-6 w-6 text-muted-foreground transition-colors", predictedChampionId === team.id && "text-yellow-400 fill-current")} />
                         </Button>
                     </div>
                 ))}
