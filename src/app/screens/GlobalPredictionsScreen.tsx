@@ -11,16 +11,17 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2 } from 'lucide-react';
-import { format, isPast } from 'date-fns';
+import { format, isPast, subDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
 import type { Fixture, UserScore, Prediction, DailyGlobalPredictions } from '@/lib/types';
-import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, where, getDocs, limit, startAfter, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, where, getDocs, limit, startAfter, type DocumentData, type QueryDocumentSnapshot, writeBatch } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useDebounce } from '@/hooks/use-debounce';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 
 const AdminMatchSelector = ({ navigate }: { navigate: ScreenProps['navigate'] }) => {
@@ -171,11 +172,36 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
     );
 };
 
+const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
+    if (fixture.goals.home === null || fixture.goals.away === null) return 0;
+
+    const actualHome = fixture.goals.home;
+    const actualAway = fixture.goals.away;
+    const predHome = prediction.homeGoals;
+    const predAway = prediction.awayGoals;
+
+    // Exact score
+    if (actualHome === predHome && actualAway === predAway) {
+        return 5;
+    }
+
+    // Correct outcome (winner or draw)
+    const actualWinner = actualHome > actualAway ? 'home' : actualHome < actualAway ? 'away' : 'draw';
+    const predWinner = predHome > predAway ? 'home' : predHome < predAway ? 'away' : 'draw';
+    
+    if (actualWinner === predWinner) {
+        return 3;
+    }
+
+    return 0;
+};
+
 
 export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
     const { isAdmin } = useAdmin();
     const { user } = useAuth();
     const { db } = useFirestore();
+    const { toast } = useToast();
     const [loading, setLoading] = useState(true);
     const [selectedMatches, setSelectedMatches] = useState<Fixture[]>([]);
     
@@ -187,8 +213,104 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     const [loadingMore, setLoadingMore] = useState(false);
 
     const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
+
+    const [calculatingPoints, setCalculatingPoints] = useState(false);
     
     const LEADERBOARD_PAGE_SIZE = 20;
+
+    const handleCalculatePoints = async () => {
+        if (!db) return;
+        setCalculatingPoints(true);
+        toast({ title: 'بدء احتساب النقاط', description: 'يتم الآن احتساب نقاط مباريات الأمس...' });
+
+        try {
+            const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+            
+            // 1. Get yesterday's finished fixtures
+            const fixturesRes = await fetch(`/api/football/fixtures?date=${yesterday}&status=FT-AET-PEN`);
+            const fixturesData = await fixturesRes.json();
+            const finishedFixtures: Fixture[] = fixturesData.response || [];
+
+            if (finishedFixtures.length === 0) {
+                toast({ title: 'لا توجد مباريات', description: 'لا توجد مباريات منتهية لاحتساب نقاطها.' });
+                setCalculatingPoints(false);
+                return;
+            }
+
+            const fixtureIds = finishedFixtures.map(f => f.fixture.id);
+
+            // 2. Get all predictions for these fixtures
+            const predictionsRef = collection(db, 'predictions');
+            const q = query(predictionsRef, where('fixtureId', 'in', fixtureIds));
+            const predictionsSnapshot = await getDocs(q);
+
+            const batch = writeBatch(db);
+            const userPoints: { [userId: string]: number } = {};
+
+            predictionsSnapshot.forEach(doc => {
+                const prediction = { ...doc.data() } as Prediction;
+                const fixture = finishedFixtures.find(f => f.fixture.id === prediction.fixtureId);
+
+                if (fixture) {
+                    const points = calculatePoints(prediction, fixture);
+                    if (prediction.points !== points) {
+                        batch.update(doc.ref, { points: points });
+                    }
+                    userPoints[prediction.userId] = (userPoints[prediction.userId] || 0) + points;
+                }
+            });
+            
+            // 3. Update total scores for all users
+            const leaderboardSnapshot = await getDocs(collection(db, 'leaderboard'));
+            const userScores: { [userId: string]: { docId: string, data: UserScore } } = {};
+            leaderboardSnapshot.forEach(doc => {
+                userScores[doc.id] = { docId: doc.id, data: doc.data() as UserScore };
+            });
+
+            for (const userId in userPoints) {
+                const userScore = userScores[userId];
+                if (userScore) {
+                     const leaderboardRef = doc(db, 'leaderboard', userId);
+                     // This is a simplified update. A real-world scenario would use a transaction or a Cloud Function to increment.
+                     // For now, we recalculate the total for simplicity, which is not ideal.
+                     // A better client-side approach (if forced) is fetching all user's predictions, recalculating total.
+                     // But for this manual trigger, we just update with yesterday's points.
+                     // A proper implementation needs a backend.
+                }
+            }
+            
+            // A more robust but slower client-side approach
+            const allPredictionsSnapshot = await getDocs(collection(db, 'predictions'));
+            const totalUserScores: { [userId: string]: number } = {};
+            allPredictionsSnapshot.forEach(predDoc => {
+                const pred = predDoc.data() as Prediction;
+                totalUserScores[pred.userId] = (totalUserScores[pred.userId] || 0) + (pred.points || 0);
+            });
+
+            for (const userId in totalUserScores) {
+                 if(userScores[userId]) {
+                    const leaderboardRef = doc(db, 'leaderboard', userId);
+                    batch.update(leaderboardRef, { totalPoints: totalUserScores[userId] });
+                 }
+            }
+
+
+            await batch.commit();
+
+            toast({ title: 'اكتمل الاحتساب', description: 'تم تحديث جميع النقاط ولوحة الصدارة بنجاح.' });
+
+        } catch (error) {
+            console.error("Error calculating points:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل احتساب النقاط.' });
+            if (error instanceof Error) {
+                 const permissionError = new FirestorePermissionError({ path: 'predictions/leaderboard', operation: 'update' });
+                 errorEmitter.emit('permission-error', permissionError);
+            }
+        } finally {
+            setCalculatingPoints(false);
+        }
+    };
+
 
     // Fetch initial leaderboard
     useEffect(() => {
@@ -379,7 +501,17 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     </TabsContent>
 
 
-                    <TabsContent value="leaderboard" className="p-4 mt-0">
+                    <TabsContent value="leaderboard" className="p-4 mt-0 space-y-4">
+                         {isAdmin && (
+                            <Card>
+                                <CardContent className="p-4">
+                                    <Button onClick={handleCalculatePoints} disabled={calculatingPoints} className="w-full">
+                                        {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin" /> : "احتساب نقاط الأمس"}
+                                    </Button>
+                                    <p className='text-xs text-muted-foreground text-center mt-2'>هذا الإجراء يقوم بحساب نقاط مباريات الأمس المنتهية فقط.</p>
+                                </CardContent>
+                            </Card>
+                         )}
                          <Card>
                             <Table>
                                 <TableHeader>
@@ -451,3 +583,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    

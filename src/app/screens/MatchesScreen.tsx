@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
@@ -311,7 +311,7 @@ const FixturesList = ({
 
     return (
         <div className="space-y-4">
-            {sortedLeagues.map(leagueName => {
+            {activeTab === 'all-matches' && sortedLeagues.map(leagueName => {
                 const { league, fixtures } = groupedFixtures[leagueName];
                 return (
                     <div key={leagueName} className="space-y-2">
@@ -322,6 +322,29 @@ const FixturesList = ({
                     </div>
                 )
             })}
+             {activeTab === 'my-results' && (
+                 <Accordion type="multiple" defaultValue={sortedLeagues} className="w-full space-y-4">
+                     {sortedLeagues.map(leagueName => {
+                         const { league, fixtures } = groupedFixtures[leagueName];
+                         return (
+                            <AccordionItem value={leagueName} key={leagueName} className="rounded-lg border bg-card/50">
+                                <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                                    <div className="flex items-center gap-3">
+                                        <Avatar className="h-6 w-6">
+                                            <AvatarImage src={league.logo} alt={league.name} />
+                                            <AvatarFallback>{league.name.substring(0,1)}</AvatarFallback>
+                                        </Avatar>
+                                        <span className="font-bold text-foreground">{leagueName}</span>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="p-2 space-y-2">
+                                     {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} odds={odds[f.fixture.id]} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} />)}
+                                </AccordionContent>
+                            </AccordionItem>
+                         )
+                     })}
+                 </Accordion>
+             )}
         </div>
     );
 };
@@ -613,3 +636,4 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   );
 }
 
+    
