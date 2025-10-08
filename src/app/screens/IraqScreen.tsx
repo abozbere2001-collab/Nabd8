@@ -409,53 +409,47 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
     
+    const fetchFixtures = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`);
+            const data = await res.json();
+            if (data.response) {
+                setFixtures(data.response);
+            }
+        } catch (error) {
+             console.error("Failed to fetch fixtures for predictions:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchFixtures();
+    }, [fetchFixtures]);
+
     useEffect(() => {
         if (!db) return;
-        
-        const fetchFixtures = async () => {
-            setLoading(true);
-            try {
-                const res = await fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`);
-                const data = await res.json();
-                if (data.response) {
-                    setFixtures(data.response);
-                }
-            } catch (error) {
-                 console.error("Failed to fetch fixtures for predictions:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchFixtures();
-        
+
+        let unsubPreds = () => {};
         if (user) {
             const predsRef = collection(db, 'predictions');
             const q = query(predsRef, where('userId', '==', user.uid));
-
-            const unsubscribePreds = onSnapshot(q, (snapshot) => {
+            unsubPreds = onSnapshot(q, (snapshot) => {
                 const userPredictions: { [key: number]: Prediction } = {};
                 snapshot.forEach(doc => {
                     const pred = doc.data() as Prediction;
-                    // Only store predictions for the Iraqi league
-                    const fixtureForPred = fixtures.find(f => f.fixture.id === pred.fixtureId);
-                    if(fixtureForPred && fixtureForPred.league.id === IRAQI_LEAGUE_ID) {
-                        userPredictions[pred.fixtureId] = pred;
-                    }
+                    userPredictions[pred.fixtureId] = pred;
                 });
                 setPredictions(userPredictions);
             }, (error) => {
                 const permissionError = new FirestorePermissionError({ path: `predictions where userId == ${user.uid}`, operation: 'list' });
                 errorEmitter.emit('permission-error', permissionError);
             });
-            return () => unsubscribePreds();
         }
-
-    }, [user, db, fixtures]); // Removed fixtures from deps to fix infinite loop
-
-    useEffect(() => {
-        if (!db) return;
+        
         const leaderboardRef = query(collection(db, 'leaderboard'), orderBy('totalPoints', 'desc'));
-        const unsubscribeLeaderboard = onSnapshot(leaderboardRef, (snapshot) => {
+        const unsubLeaderboard = onSnapshot(leaderboardRef, (snapshot) => {
            const scores: UserScore[] = [];
            snapshot.forEach(doc => scores.push(doc.data() as UserScore));
            setLeaderboard(scores);
@@ -465,10 +459,10 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
         });
 
         return () => {
-            unsubscribeLeaderboard();
+            unsubPreds();
+            unsubLeaderboard();
         };
-
-    }, [db]);
+    }, [user, db]);
 
     const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
         if (!user || homeGoalsStr === '' || awayGoalsStr === '' || !db) return;
@@ -552,7 +546,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     );
 }
 
-export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+export function IraqScreen({ navigate, goBack, canGoBack, ...props }: ScreenProps) {
   
   return (
     <div className="flex h-full flex-col bg-background">
