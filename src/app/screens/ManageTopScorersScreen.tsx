@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useFirestore } from '@/firebase/provider';
 import { doc, setDoc, collection, query, orderBy, onSnapshot, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload } from 'lucide-react';
 import type { ManualTopScorer } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const NUM_SCORERS = 10;
 
@@ -23,13 +24,15 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
       rank: i + 1,
       playerName: '',
       teamName: '',
-      goals: 0
+      goals: 0,
+      playerPhoto: ''
     }))
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { db } = useFirestore();
   const { toast } = useToast();
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     if (!db) return;
@@ -46,7 +49,7 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
       
       const newScorers = Array.from({ length: NUM_SCORERS }, (_, i) => {
         const existing = fetchedScorers.find(s => s.rank === i + 1);
-        return existing || { rank: i + 1, playerName: '', teamName: '', goals: 0 };
+        return existing || { rank: i + 1, playerName: '', teamName: '', goals: 0, playerPhoto: '' };
       });
 
       setScorers(newScorers);
@@ -68,16 +71,33 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
     );
   };
   
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, rank: number) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        handleInputChange(rank, 'playerPhoto', reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSave = async () => {
     if (!db) return;
     setSaving(true);
     try {
       const batch = writeBatch(db);
       scorers.forEach(scorer => {
-        // Only attempt to write the document if there's meaningful data to save
-        if(scorer.playerName.trim() || scorer.teamName.trim() || scorer.goals > 0) {
+        if(scorer.playerName.trim() || scorer.teamName.trim() || scorer.goals > 0 || scorer.playerPhoto) {
             const docRef = doc(db, 'iraqiLeagueTopScorers', String(scorer.rank));
-            batch.set(docRef, scorer);
+            const dataToSave: ManualTopScorer = {
+                rank: scorer.rank,
+                playerName: scorer.playerName.trim(),
+                teamName: scorer.teamName.trim(),
+                goals: scorer.goals,
+                playerPhoto: scorer.playerPhoto || undefined
+            };
+            batch.set(docRef, dataToSave);
         }
       });
       await batch.commit();
@@ -106,10 +126,23 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="إدارة الهدافين" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {scorers.map((scorer) => (
+        {scorers.map((scorer, index) => (
           <Card key={scorer.rank}>
             <CardContent className="flex items-center gap-2 p-3">
               <span className="font-bold text-lg w-8 text-center">{scorer.rank}</span>
+               <button onClick={() => fileInputRefs.current[index]?.click()} className="flex-shrink-0">
+                  <Avatar className="h-12 w-12 cursor-pointer">
+                    <AvatarImage src={scorer.playerPhoto} />
+                    <AvatarFallback><Upload className="h-5 w-5" /></AvatarFallback>
+                  </Avatar>
+                </button>
+                <input
+                    type="file"
+                    ref={el => fileInputRefs.current[index] = el}
+                    onChange={(e) => handleFileChange(e, scorer.rank)}
+                    className="hidden"
+                    accept="image/*"
+                />
               <div className="flex-1 space-y-2">
                 <Input
                   placeholder="اسم اللاعب"

@@ -145,4 +145,5 @@ export interface ManualTopScorer {
     playerName: string;
     teamName: string;
     goals: number;
+    playerPhoto?: string;
 }

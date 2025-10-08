@@ -217,6 +217,10 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                             <TableRow key={scorer.rank}>
                                 <TableCell>
                                     <div className="flex items-center gap-3">
+                                        <Avatar className="h-8 w-8">
+                                            <AvatarImage src={scorer.playerPhoto} />
+                                            <AvatarFallback>{scorer.playerName.charAt(0)}</AvatarFallback>
+                                        </Avatar>
                                         <p className="font-semibold">{scorer.playerName}</p>
                                     </div>
                                 </TableCell>
@@ -578,3 +582,4 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
     
 
     
+
