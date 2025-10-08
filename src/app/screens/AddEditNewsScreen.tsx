@@ -75,16 +75,13 @@ export function AddEditNewsScreen({ goBack, canGoBack, article, isEditing }: Add
         finalImageUrl = imagePreview || undefined;
     }
 
-    const newsData: Partial<NewsArticle> = {
+    const newsData: Omit<NewsArticle, 'id'> = {
       title: title.trim(),
       content: content.trim(),
       timestamp: serverTimestamp(),
-      imageHint: imageHint.trim() || undefined,
+      ...(finalImageUrl && { imageUrl: finalImageUrl }),
+      ...(imageHint.trim() && { imageHint: imageHint.trim() }),
     };
-    
-    if (finalImageUrl) {
-        newsData.imageUrl = finalImageUrl;
-    }
 
 
     try {
@@ -138,7 +135,7 @@ export function AddEditNewsScreen({ goBack, canGoBack, article, isEditing }: Add
             
             <div className="relative flex items-center">
               <div className="flex-grow border-t border-muted"></div>
-              <span className="flex-shrink mx-4 text-muted-foreground text-xs">أو</span>
+              <span className="flex-shrink mx-4 text-xs text-muted-foreground">أو</span>
               <div className="flex-grow border-t border-muted"></div>
             </div>
 

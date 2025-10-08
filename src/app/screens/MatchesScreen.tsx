@@ -471,7 +471,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible, headerAc
     <div className="flex-1 flex flex-col min-h-0">
         <div className="flex flex-col border-b bg-card">
             <div className='flex items-center justify-between px-4 pt-2'>
-                 <div />
+                 <div/>
                  <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full max-w-sm mx-auto">
                    <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
                        <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>كل المباريات</TabsTrigger>
@@ -479,7 +479,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible, headerAc
                        <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
                    </TabsList>
                  </Tabs>
-                 <div className="flex items-center space-x-2 bg-card border rounded-lg px-2">
+                 <div className="flex items-center gap-2 rounded-lg bg-card p-1">
                     <RadioTower className={cn("h-4 w-4 text-muted-foreground", showLiveOnly && "text-green-500")} />
                     <Switch
                         id="live-only-switch"
