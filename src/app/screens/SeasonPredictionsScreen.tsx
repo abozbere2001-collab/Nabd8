@@ -5,13 +5,14 @@ import React from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { PREMIER_LEAGUE_ID, LALIGA_ID, SERIE_A_ID, BUNDESLIGA_ID } from '@/lib/constants';
+import { PREMIER_LEAGUE_ID, LALIGA_ID, SERIE_A_ID, BUNDESLIGA_ID, CHAMPIONS_LEAGUE_ID } from '@/lib/constants';
 
 const leagues = [
-    { id: PREMIER_LEAGUE_ID, name: "الدوري الإنجليزي الممتاز", logo: "https://media.api-sports.io/football/leagues/39.png" },
+    { id: PREMIER_LEAGUE_ID, name: "الدوري الإنجليزي", logo: "https://media.api-sports.io/football/leagues/39.png" },
     { id: LALIGA_ID, name: "الدوري الإسباني", logo: "https://media.api-sports.io/football/leagues/140.png" },
     { id: SERIE_A_ID, name: "الدوري الإيطالي", logo: "https://media.api-sports.io/football/leagues/135.png" },
     { id: BUNDESLIGA_ID, name: "الدوري الألماني", logo: "https://media.api-sports.io/football/leagues/78.png" },
+    { id: CHAMPIONS_LEAGUE_ID, name: "دوري أبطال أوروبا", logo: "https://media.api-sports.io/football/leagues/2.png"},
 ];
 
 

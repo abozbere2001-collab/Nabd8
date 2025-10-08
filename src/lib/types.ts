@@ -99,6 +99,7 @@ export interface UserScore {
     userName: string;
     userPhoto: string;
     totalPoints: number;
+    rank?: number;
 }
 
 export interface UserProfile {
@@ -121,11 +122,10 @@ export interface DailyGlobalPredictions {
 export interface SeasonPrediction {
     userId: string;
     leagueId: number;
+    leagueName: string;
     season: number;
-    predictedChampionId: number;
-    predictedTopScorerId: number;
+    predictedChampionId?: number;
+    predictedTopScorerId?: number;
     championPoints?: number;
     topScorerPoints?: number;
 }
-
-    

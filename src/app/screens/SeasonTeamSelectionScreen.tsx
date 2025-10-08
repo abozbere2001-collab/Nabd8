@@ -21,17 +21,17 @@ interface SeasonTeamSelectionScreenProps extends ScreenProps {
     leagueName: string;
 }
 
-const TeamListItem = React.memo(({ team, isPredictedChampion, onChampionSelect, onTeamClick }: { team: Team, isPredictedChampion: boolean, onChampionSelect: (teamId: number) => void, onTeamClick: (teamId: number, teamName: string) => void }) => {
+const TeamListItem = React.memo(({ team, isPredictedChampion, onChampionSelect, onTeamClick }: { team: Team, isPredictedChampion: boolean, onChampionSelect: () => void, onTeamClick: () => void }) => {
     return (
         <div className="flex items-center p-2 border rounded-lg bg-card">
             <div 
                 className="flex-1 flex items-center gap-3 cursor-pointer"
-                onClick={() => onTeamClick(team.id, team.name)}
+                onClick={onTeamClick}
             >
                 <Avatar className="h-8 w-8"><AvatarImage src={team.logo} /></Avatar>
                 <span className="font-semibold">{team.name}</span>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => onChampionSelect(team.id)}>
+            <Button variant="ghost" size="icon" onClick={onChampionSelect}>
                 <Trophy className={cn("h-6 w-6 text-muted-foreground transition-colors", isPredictedChampion && "text-yellow-400 fill-current")} />
             </Button>
         </div>
@@ -88,26 +88,24 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
     }, [predictionDocRef]);
 
     const handleChampionSelect = useCallback((teamId: number) => {
-        setPredictedChampionId(prevId => {
-            const newChampionId = prevId === teamId ? undefined : teamId;
-            
-            if (predictionDocRef && user) {
-                const predictionData: Partial<SeasonPrediction> = {
-                    userId: user.uid,
-                    leagueId: leagueId,
-                    leagueName: leagueName,
-                    season: CURRENT_SEASON,
-                    predictedChampionId: newChampionId,
-                };
-                setDoc(predictionDocRef, predictionData, { merge: true })
-                    .catch(serverError => {
-                        const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'create', requestResourceData: predictionData });
-                        errorEmitter.emit('permission-error', permissionError);
-                    });
-            }
-            return newChampionId;
-        });
-    }, [predictionDocRef, user, leagueId, leagueName]);
+        const newChampionId = predictedChampionId === teamId ? undefined : teamId;
+        setPredictedChampionId(newChampionId);
+        
+        if (predictionDocRef && user) {
+            const predictionData: Partial<SeasonPrediction> = {
+                userId: user.uid,
+                leagueId: leagueId,
+                leagueName: leagueName,
+                season: CURRENT_SEASON,
+                predictedChampionId: newChampionId,
+            };
+            setDoc(predictionDocRef, predictionData, { merge: true })
+                .catch(serverError => {
+                    const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'create', requestResourceData: predictionData });
+                    errorEmitter.emit('permission-error', permissionError);
+                });
+        }
+    }, [predictionDocRef, user, leagueId, leagueName, predictedChampionId]);
 
 
     const handleTeamClick = (teamId: number, teamName: string) => {
@@ -136,8 +134,8 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
                         key={team.id}
                         team={team}
                         isPredictedChampion={predictedChampionId === team.id}
-                        onChampionSelect={handleChampionSelect}
-                        onTeamClick={handleTeamClick}
+                        onChampionSelect={() => handleChampionSelect(team.id)}
+                        onTeamClick={() => handleTeamClick(team.id, team.name)}
                     />
                 ))}
             </div>

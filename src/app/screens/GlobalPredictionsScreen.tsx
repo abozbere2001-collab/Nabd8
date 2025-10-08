@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, Trophy, Award, Info, Shield, User } from 'lucide-react';
+import { Loader2, Trophy, Award, Info, Shield, User, X } from 'lucide-react';
 import { format, isPast, subDays, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
@@ -33,7 +33,9 @@ import {
   AlertDialogTrigger,
   AlertDialogFooter,
   AlertDialogCancel,
+  AlertDialogClose,
 } from "@/components/ui/alert-dialog";
+import { PREMIER_LEAGUE_ID, LALIGA_ID, SERIE_A_ID, BUNDESLIGA_ID, CHAMPIONS_LEAGUE_ID } from '@/lib/constants';
 
 
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -320,7 +322,10 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
     const [userPredictions, setUserPredictions] = useState<SeasonPrediction[]>([]);
     const [teams, setTeams] = useState<Map<number, Team>>(new Map());
     const [players, setPlayers] = useState<Map<number, Player>>(new Map());
+    const [userScore, setUserScore] = useState<UserScore | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const leagueOrder = [PREMIER_LEAGUE_ID, LALIGA_ID, SERIE_A_ID, BUNDESLIGA_ID, CHAMPIONS_LEAGUE_ID];
 
     useEffect(() => {
         if (!db || !userId) return;
@@ -328,11 +333,17 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
         const fetchInitialData = async () => {
             setLoading(true);
             try {
-                // Fetch all of the user's season predictions
-                const q = query(collection(db, "seasonPredictions"), where("userId", "==", userId));
-                const querySnapshot = await getDocs(q);
-                const predictions = querySnapshot.docs.map(doc => doc.data() as SeasonPrediction);
+                // Fetch all of the user's season predictions and their leaderboard entry
+                const [predsSnapshot, scoreDoc] = await Promise.all([
+                    getDocs(query(collection(db, "seasonPredictions"), where("userId", "==", userId))),
+                    getDoc(doc(db, 'leaderboard', userId))
+                ]);
+
+                const predictions = predsSnapshot.docs.map(doc => doc.data() as SeasonPrediction);
                 setUserPredictions(predictions);
+                if (scoreDoc.exists()) {
+                    setUserScore(scoreDoc.data() as UserScore);
+                }
 
                 // Gather all unique team and player IDs from the predictions
                 const teamIds = new Set<number>();
@@ -345,7 +356,7 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                 // Fetch details for those teams and players
                 const teamData = new Map<number, Team>();
                 const playerData = new Map<number, Player>();
-
+                
                 if (teamIds.size > 0) {
                      const teamRes = await fetch(`/api/football/teams?id=${Array.from(teamIds).join('-')}`);
                      const teamResData = await teamRes.json();
@@ -375,50 +386,57 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
     }, [db, userId]);
 
     if (loading) {
-        return <Skeleton className="h-24 w-full" />;
+        return (
+             <Card className="mb-4">
+                <CardContent className="p-4">
+                     <Skeleton className="h-40 w-full" />
+                </CardContent>
+             </Card>
+        );
     }
 
-    if (userPredictions.length === 0) {
-        return null; // Or some placeholder
+    if (!userScore) {
+        return null;
     }
+    
+    const sortedPredictions = userPredictions.sort((a, b) => leagueOrder.indexOf(a.leagueId) - leagueOrder.indexOf(b.leagueId));
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-lg">توقعاتك للموسم</CardTitle>
+        <Card className="mb-4">
+            <CardHeader className="flex-row items-center gap-4 space-y-0">
+                <Avatar className="h-16 w-16 border">
+                    <AvatarImage src={userScore.userPhoto} />
+                    <AvatarFallback>{userScore.userName.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div>
+                    <CardTitle className="text-xl">{userScore.userName}</CardTitle>
+                    <CardDescription>
+                        الترتيب: {userScore.rank ? `#${userScore.rank}`: 'N/A'} - النقاط: {userScore.totalPoints}
+                    </CardDescription>
+                </div>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {userPredictions.map(pred => {
-                    const champion = pred.predictedChampionId ? teams.get(pred.predictedChampionId) : null;
-                    const topScorer = pred.predictedTopScorerId ? players.get(pred.predictedTopScorerId) : null;
-                    return (
-                        <div key={pred.leagueId} className="p-3 border rounded-lg bg-card-foreground/5">
-                            <p className="font-bold text-sm mb-2">{pred.leagueName}</p>
-                            <div className="space-y-2 text-xs">
-                                <div className="flex items-center gap-2">
-                                    <Trophy className="h-4 w-4 text-yellow-500" />
-                                    <span>البطل:</span>
-                                    {champion ? (
-                                        <div className="flex items-center gap-1 font-semibold">
-                                            <Avatar className="h-4 w-4"><AvatarImage src={champion.logo} /></Avatar>
-                                            <span>{champion.name}</span>
-                                        </div>
-                                    ) : <span className="text-muted-foreground">لم يختر</span>}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <FootballIcon className="h-4 w-4 text-gray-500" />
-                                    <span>الهداف:</span>
-                                    {topScorer ? (
-                                        <div className="flex items-center gap-1 font-semibold">
-                                            <Avatar className="h-4 w-4"><AvatarImage src={topScorer.photo} /></Avatar>
-                                            <span>{topScorer.name}</span>
-                                        </div>
-                                    ) : <span className="text-muted-foreground">لم يختر</span>}
+            <CardContent>
+                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-center">
+                    {sortedPredictions.map(pred => {
+                        const champion = pred.predictedChampionId ? teams.get(pred.predictedChampionId) : null;
+                        const topScorer = pred.predictedTopScorerId ? players.get(pred.predictedTopScorerId) : null;
+                        return (
+                            <div key={pred.leagueId} className="p-2 border rounded-lg bg-card-foreground/5 flex flex-col items-center">
+                                <p className="font-bold text-xs mb-2 h-8">{pred.leagueName}</p>
+                                <div className="space-y-2">
+                                     <div className="flex flex-col items-center">
+                                        <Trophy className="h-5 w-5 text-yellow-500" />
+                                        {champion ? <Avatar className="h-6 w-6 mt-1"><AvatarImage src={champion.logo} /></Avatar> : <div className="h-6 w-6 bg-muted rounded-full mt-1"/>}
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <FootballIcon className="h-5 w-5" />
+                                        {topScorer ? <Avatar className="h-6 w-6 mt-1"><AvatarImage src={topScorer.photo} /></Avatar> : <div className="h-6 w-6 bg-muted rounded-full mt-1"/>}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )
-                })}
+                        )
+                    })}
+                </div>
             </CardContent>
         </Card>
     );
@@ -439,7 +457,8 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [userRank, setUserRank] = useState<UserScore | null>(null);
+    
+    const [selectedUser, setSelectedUser] = useState<UserScore | null>(null);
 
     const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
 
@@ -561,7 +580,11 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), limit(LEADERBOARD_PAGE_SIZE));
 
         const unsubscribeLeaderboard = onSnapshot(q, (snapshot) => {
-            const scores = snapshot.docs.map(doc => ({...doc.data(), rank: 0 }) as UserScore & {rank: number});
+            const scores: UserScore[] = [];
+            let rank = 1;
+            snapshot.forEach(doc => {
+                scores.push({...(doc.data() as UserScore), rank: rank++ });
+            });
             
             const lastDoc = snapshot.docs[snapshot.docs.length - 1];
             setLeaderboard(scores);
@@ -573,28 +596,11 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             errorEmitter.emit('permission-error', permissionError);
             setLoadingLeaderboard(false);
         });
-        
-        let unsubscribeUserRank = () => {};
-        if (user) {
-            const userRankRef = doc(db, 'leaderboard', user.uid);
-            unsubscribeUserRank = onSnapshot(userRankRef, (doc) => {
-                if (doc.exists()) {
-                    setUserRank(doc.data() as UserScore);
-                } else {
-                    setUserRank(null);
-                }
-            }, (error) => {
-                const permissionError = new FirestorePermissionError({ path: userRankRef.path, operation: 'get' });
-                errorEmitter.emit('permission-error', permissionError);
-            });
-        }
-
 
         return () => {
             unsubscribeLeaderboard();
-            unsubscribeUserRank();
         }
-    }, [db, user]);
+    }, [db]);
     
     const fetchMoreLeaderboard = async () => {
         if (!db || !lastVisible || !hasMore || loadingMore) return;
@@ -605,7 +611,8 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
         try {
             const snapshot = await getDocs(q);
-            const newScores = snapshot.docs.map(doc => doc.data() as UserScore);
+            let currentRank = (leaderboard[leaderboard.length - 1]?.rank || 0) + 1;
+            const newScores = snapshot.docs.map(doc => ({...doc.data() as UserScore, rank: currentRank++}));
             const lastDoc = snapshot.docs[snapshot.docs.length - 1];
 
             setLeaderboard(prev => [...prev, ...newScores]);
@@ -706,11 +713,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             errorEmitter.emit('permission-error', permissionError);
         });
     }, [user, db]);
-
-    const userIsOnLeaderboard = useMemo(() => {
-        if (!user || !leaderboard) return false;
-        return leaderboard.some(entry => entry.userId === user.uid);
-    }, [user, leaderboard]);
+    
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -726,6 +729,16 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 }
             />
             <div className="flex-1 overflow-y-auto">
+                 <AlertDialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
+                    <AlertDialogContent className="max-w-lg w-full">
+                        {selectedUser && <UserPredictionSummary userId={selectedUser.userId} />}
+                         <AlertDialogFooter>
+                           <AlertDialogCancel asChild>
+                              <Button variant="outline" onClick={() => setSelectedUser(null)}>إغلاق</Button>
+                           </AlertDialogCancel>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
                 <Tabs defaultValue="predictions" className="w-full">
                     <div className="sticky top-0 bg-background z-10 border-b">
                        <TabsList className="grid w-full grid-cols-3">
@@ -806,8 +819,8 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                     ) : leaderboard.length > 0 ? (
                                         <>
                                             {leaderboard.map((score, index) => (
-                                                <TableRow key={`${score.userId}-${index}`} className={cn(user && score.userId === user.uid && 'bg-primary/10')}>
-                                                    <TableCell>{index + 1}</TableCell>
+                                                <TableRow key={`${score.userId}-${index}`} className={cn("cursor-pointer", user && score.userId === user.uid && 'bg-primary/10')} onClick={() => setSelectedUser(score)}>
+                                                    <TableCell>{score.rank}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">
                                                             <Avatar className="h-6 w-6">
@@ -820,26 +833,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                                     <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
                                                 </TableRow>
                                             ))}
-                                            {user && userRank && !userIsOnLeaderboard && (
-                                                <>
-                                                 <TableRow>
-                                                    <TableCell colSpan={3} className="text-center h-4">...</TableCell>
-                                                 </TableRow>
-                                                 <TableRow className="bg-accent/20">
-                                                    <TableCell className="font-bold">ترتيبك</TableCell>
-                                                     <TableCell>
-                                                        <div className="flex items-center gap-2">
-                                                            <Avatar className="h-6 w-6">
-                                                                <AvatarImage src={userRank.userPhoto}/>
-                                                                <AvatarFallback>{userRank.userName.charAt(0)}</AvatarFallback>
-                                                            </Avatar>
-                                                            {userRank.userName}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="text-center font-bold">{userRank.totalPoints}</TableCell>
-                                                 </TableRow>
-                                                </>
-                                            )}
                                         </>
                                     ) : (
                                         <TableRow>
