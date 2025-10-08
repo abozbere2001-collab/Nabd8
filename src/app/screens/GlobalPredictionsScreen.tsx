@@ -313,9 +313,8 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         } catch (error: any) {
             console.error("Error calculating points:", error);
             const permissionError = new FirestorePermissionError({ 
-                path: 'predictions/ or leaderboard/', 
+                path: `predictions/ or leaderboard/ with error: ${error.message}`,
                 operation: 'update',
-                requestResourceData: { details: error.message }
             });
             errorEmitter.emit('permission-error', permissionError);
             toast({ variant: 'destructive', title: 'خطأ', description: error.message || 'فشل احتساب النقاط.' });
@@ -545,7 +544,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                         ))
                                     ) : leaderboard.length > 0 ? (
                                         leaderboard.map((score, index) => (
-                                            <TableRow key={score.userId}>
+                                            <TableRow key={`${score.userId}-${index}`}>
                                                 <TableCell>{index + 1}</TableCell>
                                                 <TableCell>
                                                     <div className="flex items-center gap-2">
@@ -597,5 +596,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     );
 }
 
+
+    
 
     
