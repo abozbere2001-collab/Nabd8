@@ -129,3 +129,19 @@ export interface SeasonPrediction {
     championPoints?: number;
     topScorerPoints?: number;
 }
+
+export interface NewsArticle {
+    id?: string;
+    title: string;
+    content: string;
+    imageUrl: string;
+    imageHint?: string;
+    timestamp: any; // Firestore ServerTimestamp
+}
+
+export interface ManualTopScorer {
+    rank: number;
+    playerName: string;
+    teamName: string;
+    goals: number;
+}

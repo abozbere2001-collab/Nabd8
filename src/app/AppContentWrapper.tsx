@@ -20,6 +20,8 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { SeasonPredictionsScreen } from './screens/SeasonPredictionsScreen';
 import { SeasonTeamSelectionScreen } from './screens/SeasonTeamSelectionScreen';
 import { SeasonPlayerSelectionScreen } from './screens/SeasonPlayerSelectionScreen';
+import { AddEditNewsScreen } from './screens/AddEditNewsScreen';
+import { ManageTopScorersScreen } from './screens/ManageTopScorersScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import { SearchSheet } from '@/components/SearchSheet';
@@ -58,6 +60,8 @@ const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>; tit
   SeasonPredictions: { component: SeasonPredictionsScreen, title: 'توقعات الموسم' },
   SeasonTeamSelection: { component: SeasonTeamSelectionScreen, title: 'اختيار الفريق' },
   SeasonPlayerSelection: { component: SeasonPlayerSelectionScreen, title: 'اختيار اللاعب' },
+  AddEditNews: { component: AddEditNewsScreen, title: 'إضافة/تعديل خبر' },
+  ManageTopScorers: { component: ManageTopScorersScreen, title: 'إدارة الهدافين' },
   Login: { component: LoginScreen, title: 'تسجيل الدخول'},
   SignUp: { component: LoginScreen, title: 'تسجيل'},
 };
@@ -71,50 +75,12 @@ type StackItem = {
   props?: Record<string, any>;
 };
 
-const ProfileButton = ({ onProfileClick, onSignOut }: { onProfileClick: () => void, onSignOut: () => void }) => {
-  const { user } = useAuth();
-
-  if (!user) return null;
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
-            <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.displayName}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
-            </p>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onProfileClick}>
-          <UserIcon className="mr-2 h-4 w-4" />
-          <span>الملف الشخصي</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onSignOut}>
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>تسجيل الخروج</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-};
-
 
 export function AppContentWrapper() {
   const [stack, setStack] = useState<StackItem[]>([{ key: 'Matches-0', screen: 'Matches' }]);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const [isEntering, setIsEntering] = useState(false);
+  const { user } = useAuth();
   
   const goBack = useCallback(() => {
     if (stack.length > 1) {
@@ -170,9 +136,6 @@ export function AppContentWrapper() {
   }
 
   const activeStackItem = stack[stack.length - 1];
-  const previousStackItem = stack.length > 1 ? stack[stack.length - 2] : null;
-
-  const ActiveScreenComponent = screenConfig[activeStackItem.screen].component;
   
   const navigationProps = useMemo(() => ({ 
       navigate, 
@@ -190,24 +153,68 @@ export function AppContentWrapper() {
     if (item.screen === 'TeamDetails' && item.props?.teamName) {
         return item.props.teamName;
     }
+    if (item.screen === 'AddEditNews' && item.props?.isEditing) {
+        return 'تعديل الخبر';
+    }
+    if (item.screen === 'AddEditNews' && !item.props?.isEditing) {
+        return 'إضافة خبر جديد';
+    }
     return screenConfig[item.screen].title;
   };
 
   const itemTitle = getScreenTitle(activeStackItem);
-  const currentProps = { ...navigationProps, ...activeStackItem.props, isVisible: true };
+  
+  const ProfileButton = () => {
+      if (!user) return null;
+
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
+                <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56" align="end" forceMount>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                <p className="text-xs leading-none text-muted-foreground">
+                  {user.email}
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleProfileClick}>
+              <UserIcon className="mr-2 h-4 w-4" />
+              <span>الملف الشخصي</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSignOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>تسجيل الخروج</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    };
+
 
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
-       <SearchSheet navigate={navigate}>
-          <div className='hidden'></div>
-       </SearchSheet>
-      
       <div className="relative flex-1 flex flex-col overflow-hidden">
         <ScreenHeader
             title={itemTitle}
             canGoBack={navigationProps.canGoBack}
             onBack={navigationProps.goBack}
-            actions={<ProfileButton onProfileClick={handleProfileClick} onSignOut={handleSignOut} />}
+            actions={
+                <div className="flex items-center gap-1">
+                  <SearchSheet navigate={navigate} />
+                  <ProfileButton />
+                </div>
+            }
         />
         
         <div className="relative flex-1 overflow-hidden">

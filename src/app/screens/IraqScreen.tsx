@@ -14,14 +14,14 @@ import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { collection, getDocs, doc, setDoc, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
-import type { Fixture, Standing, TopScorer, AdminFavorite, Prediction, UserScore } from '@/lib/types';
+import type { Fixture, Standing, TopScorer as ApiTopScorer, AdminFavorite, Prediction, UserScore, ManualTopScorer } from '@/lib/types';
 import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Users } from 'lucide-react';
 import { useDebounce } from '@/hooks/use-debounce';
 
 
@@ -86,25 +86,24 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const [loading, setLoading] = useState(true);
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
     const [standings, setStandings] = useState<Standing[]>([]);
-    const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
+    const [topScorers, setTopScorers] = useState<ManualTopScorer[]>([]);
+    const { isAdmin } = useAdmin();
+    const { db } = useFirestore();
 
     useEffect(() => {
         async function fetchData() {
             setLoading(true);
             try {
-                const [fixturesRes, standingsRes, scorersRes] = await Promise.all([
+                const [fixturesRes, standingsRes] = await Promise.all([
                     fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`),
                     fetch(`/api/football/standings?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`),
-                    fetch(`/api/football/players/topscorers?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`)
                 ]);
 
                 const fixturesData = await fixturesRes.json();
                 const standingsData = await standingsRes.json();
-                const scorersData = await scorersRes.json();
                 
                 if (fixturesData.response) setFixtures(fixturesData.response);
                 if (standingsData.response[0]?.league?.standings[0]) setStandings(standingsData.response[0].league.standings[0]);
-                if (scorersData.response) setTopScorers(scorersData.response);
 
             } catch (error) {
                 console.error("Failed to fetch Iraqi league details:", error);
@@ -113,7 +112,20 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             }
         }
         fetchData();
-    }, []);
+
+        if (db) {
+            const scorersRef = collection(db, 'iraqiLeagueTopScorers');
+            const q = query(scorersRef, orderBy('rank', 'asc'));
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const fetchedScorers = snapshot.docs.map(doc => doc.data() as ManualTopScorer);
+                setTopScorers(fetchedScorers);
+            }, (error) => {
+                const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+             return () => unsubscribe();
+        }
+    }, [db]);
 
     return (
         <Tabs defaultValue="matches" className="w-full">
@@ -179,6 +191,14 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             ): <p className="pt-4 text-center text-muted-foreground">جدول الترتيب غير متاح حاليًا.</p>}
           </TabsContent>
            <TabsContent value="scorers" className="p-0 mt-0 -mx-4">
+            {isAdmin && (
+                <div className="p-4">
+                    <Button className="w-full" onClick={() => navigate('ManageTopScorers')}>
+                        <Users className="ml-2 h-4 w-4" />
+                        إدارة الهدافين
+                    </Button>
+                </div>
+            )}
             {loading ? (
                 <div className="space-y-px p-4">
                     {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
@@ -193,21 +213,17 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {topScorers.map(({ player, statistics }) => (
-                            <TableRow key={player.id}>
+                        {topScorers.map((scorer) => (
+                            <TableRow key={scorer.rank}>
                                 <TableCell>
                                     <div className="flex items-center gap-3">
-                                        <Avatar className="h-10 w-10">
-                                            <AvatarImage src={player.photo} alt={player.name} />
-                                            <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
-                                        </Avatar>
-                                        <p className="font-semibold">{player.name}</p>
+                                        <p className="font-semibold">{scorer.playerName}</p>
                                     </div>
                                 </TableCell>
-                                <TableCell className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: statistics[0]?.team.id })}>
-                                     <p className="text-xs text-muted-foreground text-right">{statistics[0]?.team.name}</p>
+                                <TableCell>
+                                     <p className="text-xs text-muted-foreground text-right">{scorer.teamName}</p>
                                 </TableCell>
-                                <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
+                                <TableCell className="text-center font-bold text-lg">{scorer.goals}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
