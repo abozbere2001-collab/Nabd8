@@ -329,7 +329,7 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
 
     useEffect(() => {
         if (!db || !userId) return;
-
+    
         const fetchInitialData = async () => {
             setLoading(true);
             try {
@@ -338,50 +338,53 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                     getDocs(query(collection(db, "seasonPredictions"), where("userId", "==", userId))),
                     getDoc(doc(db, 'leaderboard', userId))
                 ]);
-
+    
                 const predictions = predsSnapshot.docs.map(doc => doc.data() as SeasonPrediction);
                 setUserPredictions(predictions);
+    
                 if (scoreDoc.exists()) {
                     setUserScore(scoreDoc.data() as UserScore);
                 }
-
-                // Gather all unique team and player IDs from the predictions
+    
+                // Using maps to prevent duplicate fetches
                 const teamIds = new Set<number>();
                 const playerIds = new Set<number>();
                 predictions.forEach(p => {
                     if (p.predictedChampionId) teamIds.add(p.predictedChampionId);
                     if (p.predictedTopScorerId) playerIds.add(p.predictedTopScorerId);
                 });
-
-                // Fetch details for those teams and players
-                const teamData = new Map<number, Team>();
-                const playerData = new Map<number, Player>();
-                
-                if (teamIds.size > 0) {
-                     const teamRes = await fetch(`/api/football/teams?id=${Array.from(teamIds).join('-')}`);
-                     const teamResData = await teamRes.json();
-                     if (teamResData.response) {
-                         teamResData.response.forEach((t: { team: Team }) => teamData.set(t.team.id, t.team));
-                     }
-                     setTeams(teamData);
-                }
-
-                if (playerIds.size > 0) {
-                    const playerRes = await fetch(`/api/football/players?id=${Array.from(playerIds).join('-')}&season=2024`);
-                    const playerResData = await playerRes.json();
-                    if (playerResData.response) {
-                        playerResData.response.forEach((p: { player: Player }) => playerData.set(p.player.id, p.player));
+    
+                const newTeams = new Map<number, Team>();
+                const newPlayers = new Map<number, Player>();
+    
+                const teamPromises = Array.from(teamIds).map(async (teamId) => {
+                    const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
+                    const teamResData = await teamRes.json();
+                    if (teamResData.response?.[0]) {
+                        newTeams.set(teamId, teamResData.response[0].team);
                     }
-                    setPlayers(playerData);
-                }
-
+                });
+    
+                const playerPromises = Array.from(playerIds).map(async (playerId) => {
+                    const playerRes = await fetch(`/api/football/players?id=${playerId}&season=2024`);
+                    const playerResData = await playerRes.json();
+                    if (playerResData.response?.[0]) {
+                        newPlayers.set(playerId, playerResData.response[0].player);
+                    }
+                });
+    
+                await Promise.all([...teamPromises, ...playerPromises]);
+    
+                setTeams(newTeams);
+                setPlayers(newPlayers);
+    
             } catch (error) {
                 console.error("Error fetching user prediction summary:", error);
             } finally {
                 setLoading(false);
             }
         };
-
+    
         fetchInitialData();
     }, [db, userId]);
 
