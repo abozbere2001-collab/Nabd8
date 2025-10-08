@@ -14,7 +14,7 @@ import { Loader2 } from 'lucide-react';
 import { format, isPast, subDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
-import type { Fixture, UserScore, Prediction, DailyGlobalPredictions } from '@/lib/types';
+import type { Fixture, UserScore, Prediction, DailyGlobalPredictions, UserProfile } from '@/lib/types';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, where, getDocs, limit, startAfter, type DocumentData, type QueryDocumentSnapshot, writeBatch } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -226,10 +226,9 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         try {
             const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
             
-            // 1. Get yesterday's finished fixtures
-            const fixturesRes = await fetch(`/api/football/fixtures?date=${yesterday}&status=FT-AET-PEN`);
+            const fixturesRes = await fetch(`/api/football/fixtures?date=${yesterday}`);
             const fixturesData = await fixturesRes.json();
-            const finishedFixtures: Fixture[] = fixturesData.response || [];
+            const finishedFixtures: Fixture[] = (fixturesData.response || []).filter((f: Fixture) => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short));
 
             if (finishedFixtures.length === 0) {
                 toast({ title: 'لا توجد مباريات', description: 'لا توجد مباريات منتهية لاحتساب نقاطها.' });
@@ -238,14 +237,17 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             }
 
             const fixtureIds = finishedFixtures.map(f => f.fixture.id);
+            if (fixtureIds.length === 0) {
+                setCalculatingPoints(false);
+                return;
+            }
 
-            // 2. Get all predictions for these fixtures
             const predictionsRef = collection(db, 'predictions');
             const q = query(predictionsRef, where('fixtureId', 'in', fixtureIds));
             const predictionsSnapshot = await getDocs(q);
 
             const batch = writeBatch(db);
-            const userPoints: { [userId: string]: number } = {};
+            const usersWithNewPoints: { [userId: string]: { points: number, docRef: QueryDocumentSnapshot<DocumentData> } } = {};
 
             predictionsSnapshot.forEach(doc => {
                 const prediction = { ...doc.data() } as Prediction;
@@ -256,56 +258,59 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     if (prediction.points !== points) {
                         batch.update(doc.ref, { points: points });
                     }
-                    userPoints[prediction.userId] = (userPoints[prediction.userId] || 0) + points;
+                    if (!usersWithNewPoints[prediction.userId]) {
+                        usersWithNewPoints[prediction.userId] = { points: 0, docRef: doc };
+                    }
                 }
-            });
-            
-            // 3. Update total scores for all users
-            const leaderboardSnapshot = await getDocs(collection(db, 'leaderboard'));
-            const userScores: { [userId: string]: { docId: string, data: UserScore } } = {};
-            leaderboardSnapshot.forEach(doc => {
-                userScores[doc.id] = { docId: doc.id, data: doc.data() as UserScore };
             });
 
-            for (const userId in userPoints) {
-                const userScore = userScores[userId];
-                if (userScore) {
-                     const leaderboardRef = doc(db, 'leaderboard', userId);
-                     // This is a simplified update. A real-world scenario would use a transaction or a Cloud Function to increment.
-                     // For now, we recalculate the total for simplicity, which is not ideal.
-                     // A better client-side approach (if forced) is fetching all user's predictions, recalculating total.
-                     // But for this manual trigger, we just update with yesterday's points.
-                     // A proper implementation needs a backend.
-                }
-            }
+            // Recalculate total scores for all users
+            const allUsersSnapshot = await getDocs(collection(db, 'users'));
+            const allUsers = allUsersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as UserProfile }));
             
-            // A more robust but slower client-side approach
             const allPredictionsSnapshot = await getDocs(collection(db, 'predictions'));
             const totalUserScores: { [userId: string]: number } = {};
+
             allPredictionsSnapshot.forEach(predDoc => {
                 const pred = predDoc.data() as Prediction;
-                totalUserScores[pred.userId] = (totalUserScores[pred.userId] || 0) + (pred.points || 0);
+                if(pred.points && pred.points > 0) {
+                    totalUserScores[pred.userId] = (totalUserScores[pred.userId] || 0) + pred.points;
+                }
             });
+            
+            for (const u of allUsers) {
+                const leaderboardRef = doc(db, 'leaderboard', u.id);
+                const totalPoints = totalUserScores[u.id] || 0;
+                
+                const existingLeaderboardEntry = await getDoc(leaderboardRef);
 
-            for (const userId in totalUserScores) {
-                 if(userScores[userId]) {
-                    const leaderboardRef = doc(db, 'leaderboard', userId);
-                    batch.update(leaderboardRef, { totalPoints: totalUserScores[userId] });
-                 }
+                if (existingLeaderboardEntry.exists()) {
+                     if (existingLeaderboardEntry.data().totalPoints !== totalPoints) {
+                        batch.update(leaderboardRef, { totalPoints: totalPoints });
+                     }
+                } else {
+                     batch.set(leaderboardRef, {
+                        userId: u.id,
+                        userName: u.displayName,
+                        userPhoto: u.photoURL,
+                        totalPoints: totalPoints
+                    });
+                }
             }
-
-
+            
             await batch.commit();
 
             toast({ title: 'اكتمل الاحتساب', description: 'تم تحديث جميع النقاط ولوحة الصدارة بنجاح.' });
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error calculating points:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل احتساب النقاط.' });
-            if (error instanceof Error) {
-                 const permissionError = new FirestorePermissionError({ path: 'predictions/leaderboard', operation: 'update' });
-                 errorEmitter.emit('permission-error', permissionError);
-            }
+            const permissionError = new FirestorePermissionError({ 
+                path: 'predictions/ or leaderboard/', 
+                operation: 'update',
+                requestResourceData: { details: error.message }
+            });
+            errorEmitter.emit('permission-error', permissionError);
         } finally {
             setCalculatingPoints(false);
         }
@@ -583,5 +588,3 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
-
-    
