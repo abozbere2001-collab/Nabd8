@@ -13,13 +13,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2 } from 'lucide-react';
 import { addDays, format, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { useFirestore, useAdmin } from '@/firebase/provider';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
-import type { Fixture, DailyGlobalPredictions, GlobalPredictionMatch, AdminFavorite } from '@/lib/types';
+import { useFirestore } from '@/firebase/provider';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import type { Fixture, DailyGlobalPredictions, GlobalPredictionMatch } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 // --- Helper Functions & Components ---
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -65,42 +66,42 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
 
 const FixtureSelectionItem = ({ fixture, isSelected, onSelectionChange }: { fixture: Fixture, isSelected: boolean, onSelectionChange: (checked: boolean) => void }) => {
     return (
-      <Card>
-        <CardContent className="p-3">
-          <div className="flex items-center gap-3">
-            <Checkbox
-              id={`fixture-${fixture.fixture.id}`}
-              checked={isSelected}
-              onCheckedChange={onSelectionChange}
-              className="h-5 w-5"
-            />
-            <Label htmlFor={`fixture-${fixture.fixture.id}`} className="flex-1 cursor-pointer">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                  <span className="font-semibold truncate">{fixture.teams.home.name}</span>
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={fixture.teams.home.logo} />
-                  </Avatar>
-                </div>
-                <div className="font-bold text-sm px-2 bg-muted rounded-md min-w-[70px] text-center">
-                  {format(new Date(fixture.fixture.date), "HH:mm")}
-                </div>
-                <div className="flex items-center gap-2 flex-1 truncate">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={fixture.teams.away.logo} />
-                  </Avatar>
-                  <span className="font-semibold truncate">{fixture.teams.away.name}</span>
-                </div>
-              </div>
-              <div className="text-center text-xs text-muted-foreground mt-1">
-                {fixture.league.name}
-              </div>
-            </Label>
+      <div className="flex items-center gap-3 p-3 bg-card rounded-lg border">
+        <Checkbox
+          id={`fixture-${fixture.fixture.id}`}
+          checked={isSelected}
+          onCheckedChange={onSelectionChange}
+          className="h-5 w-5"
+        />
+        <Label htmlFor={`fixture-${fixture.fixture.id}`} className="flex-1 cursor-pointer">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-1 justify-end truncate">
+              <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={fixture.teams.home.logo} />
+              </Avatar>
+            </div>
+            <div className="font-bold text-sm px-2 bg-muted rounded-md min-w-[70px] text-center">
+              {format(new Date(fixture.fixture.date), "HH:mm")}
+            </div>
+            <div className="flex items-center gap-2 flex-1 truncate">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={fixture.teams.away.logo} />
+              </Avatar>
+              <span className="font-semibold truncate">{fixture.teams.away.name}</span>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </Label>
+      </div>
     );
 };
+
+interface GroupedFixtures {
+    [leagueName: string]: {
+        league: Fixture['league'];
+        fixtures: Fixture[];
+    }
+}
 
 // --- Main Screen Component ---
 export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
@@ -221,6 +222,18 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
             });
     };
 
+    const groupedFixtures = useMemo(() => {
+        return allFixtures.reduce((acc, fixture) => {
+            const leagueName = fixture.league.name;
+            if (!acc[leagueName]) {
+                acc[leagueName] = { league: fixture.league, fixtures: [] };
+            }
+            acc[leagueName].fixtures.push(fixture);
+            return acc;
+        }, {} as GroupedFixtures);
+    }, [allFixtures]);
+
+    const sortedLeagues = useMemo(() => Object.keys(groupedFixtures).sort((a,b) => a.localeCompare(b)), [groupedFixtures]);
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -230,16 +243,36 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {loading ? (
-                    Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
-                ) : allFixtures.length > 0 ? (
-                    allFixtures.map(fixture => (
-                        <FixtureSelectionItem
-                            key={fixture.fixture.id}
-                            fixture={fixture}
-                            isSelected={selectedFixtureIds.has(fixture.fixture.id)}
-                            onSelectionChange={(checked) => handleSelectionChange(fixture.fixture.id, !!checked)}
-                        />
-                    ))
+                    Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)
+                ) : sortedLeagues.length > 0 ? (
+                    <Accordion type="multiple" defaultValue={sortedLeagues} className="w-full space-y-4">
+                        {sortedLeagues.map(leagueName => {
+                            const { league, fixtures } = groupedFixtures[leagueName];
+                            return (
+                               <AccordionItem value={leagueName} key={leagueName} className="rounded-lg border bg-card/50">
+                                   <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                                       <div className="flex items-center gap-3">
+                                           <Avatar className="h-6 w-6">
+                                               <AvatarImage src={league.logo} alt={league.name} />
+                                               <AvatarFallback>{league.name.substring(0,1)}</AvatarFallback>
+                                           </Avatar>
+                                           <span className="font-bold text-foreground">{leagueName}</span>
+                                       </div>
+                                   </AccordionTrigger>
+                                   <AccordionContent className="p-2 space-y-2">
+                                        {fixtures.map(fixture => (
+                                             <FixtureSelectionItem
+                                                key={fixture.fixture.id}
+                                                fixture={fixture}
+                                                isSelected={selectedFixtureIds.has(fixture.fixture.id)}
+                                                onSelectionChange={(checked) => handleSelectionChange(fixture.fixture.id, !!checked)}
+                                            />
+                                        ))}
+                                   </AccordionContent>
+                               </AccordionItem>
+                            )
+                        })}
+                    </Accordion>
                 ) : (
                     <Card>
                         <CardContent className="p-6 text-center text-muted-foreground">
@@ -260,3 +293,4 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
         </div>
     );
 }
+

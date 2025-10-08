@@ -19,6 +19,7 @@ import { SearchSheet } from '@/components/SearchSheet';
 import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 // Interfaces
@@ -290,10 +291,10 @@ const FixturesList = ({
         )
     }
 
-    if (fixtures.length > 0 && filteredFixtures.length === 0 && activeTab === 'my-results') {
+    if (fixtures.length > 0 && filteredFixtures.length === 0) {
        return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
-                <p className="font-bold text-lg">لا توجد مباريات مفضلة لهذا اليوم</p>
+                <p className="font-bold text-lg">لا توجد مباريات لهذا اليوم</p>
             </div>
         );
     }
@@ -311,7 +312,7 @@ const FixturesList = ({
 
     return (
         <div className="space-y-4">
-            {activeTab === 'all-matches' && sortedLeagues.map(leagueName => {
+            {sortedLeagues.map(leagueName => {
                 const { league, fixtures } = groupedFixtures[leagueName];
                 return (
                     <div key={leagueName} className="space-y-2">
@@ -322,29 +323,6 @@ const FixturesList = ({
                     </div>
                 )
             })}
-             {activeTab === 'my-results' && (
-                 <Accordion type="multiple" defaultValue={sortedLeagues} className="w-full space-y-4">
-                     {sortedLeagues.map(leagueName => {
-                         const { league, fixtures } = groupedFixtures[leagueName];
-                         return (
-                            <AccordionItem value={leagueName} key={leagueName} className="rounded-lg border bg-card/50">
-                                <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                                    <div className="flex items-center gap-3">
-                                        <Avatar className="h-6 w-6">
-                                            <AvatarImage src={league.logo} alt={league.name} />
-                                            <AvatarFallback>{league.name.substring(0,1)}</AvatarFallback>
-                                        </Avatar>
-                                        <span className="font-bold text-foreground">{leagueName}</span>
-                                    </div>
-                                </AccordionTrigger>
-                                <AccordionContent className="p-2 space-y-2">
-                                     {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} odds={odds[f.fixture.id]} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} />)}
-                                </AccordionContent>
-                            </AccordionItem>
-                         )
-                     })}
-                 </Accordion>
-             )}
         </div>
     );
 };
@@ -429,39 +407,42 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
 
   useEffect(() => {
-      const fetchMatchDetails = async () => {
-          if (!db) return;
+      if (!db) return;
+      const fetchAndListenToMatchDetails = () => {
           const matchesColRef = collection(db, 'matches');
-          try {
-              const snapshot = await getDocs(matchesColRef);
+          
+          // Initial fetch
+          getDocs(matchesColRef).then(snapshot => {
               const details: { [matchId: string]: MatchDetails } = {};
               snapshot.forEach(doc => {
                   details[doc.id] = doc.data() as MatchDetails;
               });
               setMatchDetails(details);
-          } catch (error) {
-                const permissionError = new FirestorePermissionError({
-                    path: matchesColRef.path,
-                    operation: 'list',
-                });
-                errorEmitter.emit('permission-error', permissionError);
-          }
+          }).catch(error => {
+              const permissionError = new FirestorePermissionError({
+                  path: matchesColRef.path,
+                  operation: 'list',
+              });
+              errorEmitter.emit('permission-error', permissionError);
+          });
+          
+          // Real-time listener
+          const unsubscribe = onSnapshot(matchesColRef, (snapshot) => {
+              const details: { [matchId: string]: MatchDetails } = {};
+              snapshot.forEach(doc => {
+                  details[doc.id] = doc.data() as MatchDetails;
+              });
+              setMatchDetails(prevDetails => ({ ...prevDetails, ...details }));
+          }, (error) => {
+              const permissionError = new FirestorePermissionError({ path: 'matches', operation: 'list' });
+              errorEmitter.emit('permission-error', permissionError);
+          });
+
+          return unsubscribe;
       };
-      fetchMatchDetails();
-
-      // Also set up a listener for real-time updates
-      const unsubscribe = onSnapshot(collection(db, 'matches'), (snapshot) => {
-        const details: { [matchId: string]: MatchDetails } = {};
-        snapshot.forEach(doc => {
-            details[doc.id] = doc.data() as MatchDetails;
-        });
-        setMatchDetails(prevDetails => ({...prevDetails, ...details}));
-      }, (error) => {
-          const permissionError = new FirestorePermissionError({ path: 'matches', operation: 'list' });
-          errorEmitter.emit('permission-error', permissionError);
-      });
-
-      return () => unsubscribe();
+      
+      const unsubscribe = fetchAndListenToMatchDetails();
+      return () => unsubscribe && unsubscribe();
   }, [db]);
 
 
@@ -492,11 +473,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
           setOdds(oddsByFixture);
       } catch (error) {
           console.error("Error fetching odds:", error);
-          const permissionError = new FirestorePermissionError({
-            path: url,
-            operation: 'get',
-          });
-          errorEmitter.emit('permission-error', permissionError);
           setOdds({});
       } finally {
           setLoadingOdds(false);
@@ -523,8 +499,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
             setFixtures(data.response || []);
         } catch (error) {
             console.error(`Failed to fetch fixtures for ${dateKey}:`, error);
-            const permissionError = new FirestorePermissionError({ path: url, operation: 'get' });
-            errorEmitter.emit('permission-error', permissionError);
             setFixtures([]);
         } finally {
             setLoading(false);
@@ -534,7 +508,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   }, [selectedDateKey, showOdds, activeTab]);
   
   useEffect(() => {
-    if (!user) {
+    if (!user || !db) {
         setFavorites({userId: ''});
         return;
     }
@@ -636,4 +610,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   );
 }
 
-    
