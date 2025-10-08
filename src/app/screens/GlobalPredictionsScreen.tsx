@@ -378,16 +378,16 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                     if (p.predictedTopScorerId) playerIds.add(p.predictedTopScorerId);
                 });
     
-                const teamPromises = Array.from(teamIds).map(async (teamId) => {
-                    const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
-                    const teamResData = await teamRes.json();
-                    return teamResData.response?.[0]?.team ? { id: teamId, data: teamResData.response[0].team } : null;
+                 const teamPromises = Array.from(teamIds).map(async (teamId) => {
+                    const res = await fetch(`/api/football/teams?id=${teamId}`);
+                    const data = await res.json();
+                    return data.response?.[0]?.team ? { id: teamId, data: data.response[0].team } : null;
                 });
-    
+
                 const playerPromises = Array.from(playerIds).map(async (playerId) => {
-                    const playerRes = await fetch(`/api/football/players?id=${playerId}&season=${CURRENT_SEASON}`);
-                    const playerResData = await playerRes.json();
-                    return playerResData.response?.[0]?.player ? { id: playerId, data: playerResData.response[0].player } : null;
+                    const res = await fetch(`/api/football/players?id=${playerId}&season=${CURRENT_SEASON}`);
+                    const data = await res.json();
+                    return data.response?.[0]?.player ? { id: playerId, data: data.response[0].player } : null;
                 });
     
                 const [teamResults, playerResults] = await Promise.all([
@@ -787,6 +787,9 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             <div className="flex-1 overflow-y-auto">
                  <AlertDialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
                     <AlertDialogContent className="max-w-lg w-full">
+                       <AlertDialogHeader>
+                            <AlertDialogTitle>بطاقة توقعات {selectedUser?.userName}</AlertDialogTitle>
+                       </AlertDialogHeader>
                         {selectedUser && <UserPredictionSummary userId={selectedUser.userId} />}
                          <AlertDialogFooter>
                            <AlertDialogCancel asChild>
@@ -927,3 +930,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    
