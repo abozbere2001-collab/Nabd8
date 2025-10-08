@@ -36,21 +36,21 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     const dates = useMemo(() => {
         const today = new Date();
         const days = [];
-        for (let i = -7; i <= 7; i++) {
+        for (let i = -365; i <= 365; i++) {
             days.push(addDays(today, i));
         }
         return days;
     }, []);
     
     return (
-        <div className="flex space-x-2 overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex flex-row-reverse overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none' }}>
             {dates.map(date => {
                 const dateKey = formatDateKey(date);
                 return (
                      <button
                         key={dateKey}
                         className={cn(
-                            "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors",
+                            "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors ml-2",
                             dateKey === selectedDateKey ? "text-primary bg-primary/10" : "text-foreground/80 hover:text-primary"
                         )}
                         onClick={() => onDateSelect(dateKey)}
