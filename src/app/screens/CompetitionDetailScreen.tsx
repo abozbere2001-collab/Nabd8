@@ -123,10 +123,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         const leagueData = await leagueRes.json();
         const leagueInfo = leagueData.response?.[0];
         
-        const isNational = leagueInfo?.league.type.toLowerCase() === 'cup' && leagueInfo?.country.name.toLowerCase() === 'world';
-
         let seasonToFetch = CURRENT_SEASON;
-        if (isNational && leagueInfo?.seasons?.length > 0) {
+        // For national team competitions (like World Cup, Euros), find the latest available season from the API response.
+        if (leagueInfo?.league.type.toLowerCase() === 'cup' && leagueInfo.seasons.length > 0) {
             const latestSeason = leagueInfo.seasons.sort((a: any, b: any) => b.year - a.year)[0];
             if (latestSeason) {
                 seasonToFetch = latestSeason.year;
@@ -313,7 +312,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             ) : fixtures.length > 0 ? (
                 <div className="space-y-3">
                     {fixtures.map(({ fixture, teams, goals }) => (
-                        <div key={fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.id, fixture })}>
+                        <div key={fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.id, fixture: { fixture, teams, goals, league: {id: leagueId, name: displayTitle, logo, round: ''}} })}>
                            <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
                                 <span>{new Date(fixture.date).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                 <span>{fixture.status.short}</span>
