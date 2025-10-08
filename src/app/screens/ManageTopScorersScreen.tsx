@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, collection, query, orderBy, onSnapshot, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import type { ManualTopScorer } from '@/lib/types';
@@ -72,8 +72,9 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
     if (!db) return;
     setSaving(true);
     try {
-      const batch = db.batch();
+      const batch = writeBatch(db);
       scorers.forEach(scorer => {
+        // Only attempt to write the document if there's meaningful data to save
         if(scorer.playerName.trim() || scorer.teamName.trim() || scorer.goals > 0) {
             const docRef = doc(db, 'iraqiLeagueTopScorers', String(scorer.rank));
             batch.set(docRef, scorer);

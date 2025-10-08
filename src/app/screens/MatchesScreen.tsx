@@ -358,7 +358,7 @@ type TabName = 'all-matches' | 'my-results';
 type Cache<T> = { [date: string]: T };
 
 // Main Screen Component
-export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: ScreenProps & { isVisible: boolean }) {
+export function MatchesScreen({ navigate, goBack, canGoBack, isVisible, headerActions }: ScreenProps & { isVisible: boolean, headerActions: React.ReactNode }) {
   const { user } = useAuth();
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
@@ -374,19 +374,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   const [matchDetails, setMatchDetails] = useState<{ [matchId: string]: MatchDetails }>({});
   
-  useEffect(() => {
-    const screenHeader = document.querySelector('[data-id="screen-header-"]');
-    if (screenHeader) {
-      const actionsContainer = screenHeader.querySelector('[data-id="screen-header-actions"]');
-      const searchButtonContainer = document.getElementById('search-button-container');
-      const liveSwitchContainer = document.getElementById('live-switch-container');
-      if (actionsContainer && searchButtonContainer && liveSwitchContainer) {
-          actionsContainer.appendChild(searchButtonContainer);
-          actionsContainer.appendChild(liveSwitchContainer);
-      }
-    }
-  }, [isVisible]);
-
   useEffect(() => {
     if (!user || !db) {
         setFavorites({userId: ''});
@@ -482,24 +469,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-        <div id="portal-container" className="fixed top-2 right-2 flex items-center gap-2 z-50">
-             <div id="search-button-container">
-                <SearchSheet navigate={navigate}>
-                    <Button variant="ghost" size="icon">
-                        <Search className="h-5 w-5" />
-                    </Button>
-                </SearchSheet>
-             </div>
-             <div id="live-switch-container" className="flex items-center gap-2 bg-card border rounded-lg p-1.5 shadow">
-                <RadioTower className={cn("h-4 w-4 transition-colors", showLiveOnly ? "text-green-500" : "text-muted-foreground")} />
-                <Switch
-                    id="live-mode"
-                    checked={showLiveOnly}
-                    onCheckedChange={setShowLiveOnly}
-                />
-            </div>
-        </div>
-      
         <div className="flex flex-col border-b bg-card">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
               <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none">

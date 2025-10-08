@@ -68,24 +68,24 @@ export function AddEditNewsScreen({ goBack, canGoBack, article, isEditing }: Add
     }
 
     setSaving(true);
-    let finalImageUrl = imageUrl.trim();
+    let finalImageUrl: string | undefined = imageUrl.trim() || undefined;
 
     if (selectedFile) {
         // If a file is selected, its preview (Data URI) becomes the image URL
-        finalImageUrl = imagePreview || '';
-    } else if (!finalImageUrl) {
-        // If no URL and no file, use a placeholder
-        const seed = Math.floor(Math.random() * 1000);
-        finalImageUrl = `https://picsum.photos/seed/${seed}/600/400`;
+        finalImageUrl = imagePreview || undefined;
     }
 
-    const newsData = {
+    const newsData: Partial<NewsArticle> = {
       title: title.trim(),
       content: content.trim(),
-      imageUrl: finalImageUrl,
-      imageHint: imageHint.trim(),
       timestamp: serverTimestamp(),
+      imageHint: imageHint.trim() || undefined,
     };
+    
+    if (finalImageUrl) {
+        newsData.imageUrl = finalImageUrl;
+    }
+
 
     try {
       const collectionRef = collection(db, 'news');
