@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { BottomNav } from '@/components/BottomNav';
 import { MatchesScreen } from './screens/MatchesScreen';
 import { CompetitionsScreen } from './screens/CompetitionsScreen';
@@ -38,25 +38,30 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User as UserIcon } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
-const screens: Record<Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp' | 'Profile'>, React.ComponentType<any>> = {
-  Matches: MatchesScreen,
-  Competitions: CompetitionsScreen,
-  Iraq: IraqScreen,
-  News: NewsScreen,
-  Settings: SettingsScreen,
-  CompetitionDetails: CompetitionDetailScreen,
-  MatchDetails: MatchDetailScreen,
-  TeamDetails: TeamDetailScreen,
-  AdminFavoriteTeamDetails: AdminFavoriteTeamScreen,
-  Comments: CommentsScreen,
-  Notifications: NotificationsScreen,
-  GlobalPredictions: GlobalPredictionsScreen,
-  AdminMatchSelection: AdminMatchSelectionScreen,
-  SeasonPredictions: SeasonPredictionsScreen,
-  SeasonTeamSelection: SeasonTeamSelectionScreen,
-  SeasonPlayerSelection: SeasonPlayerSelectionScreen,
+const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>; title: string; }> = {
+  Matches: { component: MatchesScreen, title: '' },
+  Competitions: { component: CompetitionsScreen, title: 'البطولات' },
+  Iraq: { component: IraqScreen, title: 'العراق' },
+  News: { component: NewsScreen, title: 'الأخبار' },
+  Settings: { component: SettingsScreen, title: 'الإعدادات' },
+  CompetitionDetails: { component: CompetitionDetailScreen, title: 'تفاصيل البطولة' },
+  MatchDetails: { component: MatchDetailScreen, title: 'تفاصيل المباراة' },
+  TeamDetails: { component: TeamDetailScreen, title: 'تفاصيل الفريق' },
+  AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen, title: 'الفريق المفضل للمدير' },
+  Comments: { component: CommentsScreen, title: 'التعليقات' },
+  Notifications: { component: NotificationsScreen, title: 'الإشعارات' },
+  GlobalPredictions: { component: GlobalPredictionsScreen, title: 'التوقعات' },
+  AdminMatchSelection: { component: AdminMatchSelectionScreen, title: 'اختيار المباريات' },
+  Profile: { component: ProfileScreen, title: 'الملف الشخصي' },
+  SeasonPredictions: { component: SeasonPredictionsScreen, title: 'توقعات الموسم' },
+  SeasonTeamSelection: { component: SeasonTeamSelectionScreen, title: 'اختيار الفريق' },
+  SeasonPlayerSelection: { component: SeasonPlayerSelectionScreen, title: 'اختيار اللاعب' },
+  Login: { component: LoginScreen, title: 'تسجيل الدخول'},
+  SignUp: { component: LoginScreen, title: 'تسجيل'},
 };
+
 
 const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
 
@@ -167,16 +172,48 @@ export function AppContentWrapper() {
   const activeStackItem = stack[stack.length - 1];
   const previousStackItem = stack.length > 1 ? stack[stack.length - 2] : null;
 
-  const ActiveScreenComponent = activeStackItem.screen === 'Profile' ? ProfileScreen : screens[activeStackItem.screen as Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp' | 'Profile'>];
+  const ActiveScreenComponent = screenConfig[activeStackItem.screen].component;
   
-  const navigationProps = { 
+  const navigationProps = useMemo(() => ({ 
       navigate, 
       goBack, 
       canGoBack: stack.length > 1,
-  };
+  }), [navigate, goBack, stack.length]);
 
   const activeScreenKey = activeStackItem.screen;
   const showBottomNav = mainTabs.includes(activeScreenKey);
+
+  const getScreenTitle = (item: StackItem) => {
+    // For specific screens, use dynamic titles from props if available
+    if (item.screen === 'CompetitionDetails' && item.props?.title) {
+        return item.props.title;
+    }
+    if (item.screen === 'TeamDetails' && item.props?.teamName) {
+        return item.props.teamName;
+    }
+    // Default to static title from config
+    return screenConfig[item.screen].title;
+  };
+
+
+  const renderScreen = (item: StackItem, isActive: boolean) => {
+    const ScreenComponent = screenConfig[item.screen].component;
+    const itemTitle = getScreenTitle(item);
+    
+    if (!ScreenComponent) return <p>Screen not found</p>;
+    
+    return (
+        <div className="flex h-full flex-col bg-background">
+            <ScreenHeader
+                title={itemTitle}
+                canGoBack={navigationProps.canGoBack}
+                onBack={navigationProps.goBack}
+                actions={<ProfileButton onProfileClick={handleProfileClick} onSignOut={handleSignOut} />}
+            />
+            <ScreenComponent {...navigationProps} {...item.props} isVisible={isActive} />
+        </div>
+    );
+  }
 
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
@@ -186,32 +223,26 @@ export function AppContentWrapper() {
       <div className="relative flex-1 overflow-hidden">
         {/* Previous screen for animation */}
         {previousStackItem && isAnimatingOut && (
-             (() => {
-                const PreviousScreenComponent = previousStackItem.screen === 'Profile' ? ProfileScreen : screens[previousStackItem.screen as Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp' | 'Profile'>];
-                if (!PreviousScreenComponent) return null;
-                return (
-                     <div
-                        key={previousStackItem.key}
-                        className="absolute inset-0 bg-background flex flex-col"
-                        style={{ zIndex: stack.length - 2 }}
-                     >
-                        <PreviousScreenComponent {...navigationProps} {...previousStackItem.props} headerActions={<ProfileButton onProfileClick={handleProfileClick} onSignOut={handleSignOut} />} />
-                     </div>
-                )
-             })()
+             <div
+                key={previousStackItem.key}
+                className="absolute inset-0 bg-background"
+                style={{ zIndex: stack.length - 2 }}
+             >
+                {renderScreen(previousStackItem, false)}
+             </div>
         )}
         
         {/* Active screen */}
         <div
             key={activeStackItem.key}
             className={cn(
-            "absolute inset-0 bg-background flex flex-col",
+            "absolute inset-0 bg-background",
             isEntering && !mainTabs.includes(activeStackItem.screen) && 'animate-slide-in-from-right',
             isAnimatingOut && 'animate-slide-out-to-right'
             )}
             style={{ zIndex: stack.length -1 }}
         >
-           {ActiveScreenComponent ? <ActiveScreenComponent {...navigationProps} {...activeStackItem.props} headerActions={<ProfileButton onProfileClick={handleProfileClick} onSignOut={handleSignOut} />} /> : <p>Screen not found</p>}
+           {renderScreen(activeStackItem, true)}
         </div>
 
       </div>

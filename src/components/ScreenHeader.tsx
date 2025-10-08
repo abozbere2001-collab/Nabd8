@@ -2,8 +2,6 @@
 "use client";
 import { ArrowLeft, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SearchSheet } from './SearchSheet';
-import type { ScreenProps } from '@/app/page';
 
 interface ScreenHeaderProps {
   title: string;
@@ -15,7 +13,7 @@ interface ScreenHeaderProps {
 
 export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActions }: ScreenHeaderProps) {
   return (
-    <header className="relative flex h-14 flex-shrink-0 items-center justify-between border-b bg-background px-2">
+    <header data-id={`screen-header-${title.replace(/\s+/g, '-').toLowerCase()}`} className="relative flex h-14 flex-shrink-0 items-center justify-between border-b bg-background px-2">
       <div className="flex items-center">
          {canGoBack && (
             <Button
@@ -33,7 +31,7 @@ export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActio
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1">
         {secondaryActions}
       </div>
-      <div className="flex items-center gap-1">
+      <div data-id="screen-header-actions" className="flex items-center gap-1">
         {actions}
       </div>
     </header>

@@ -358,7 +358,7 @@ type TabName = 'all-matches' | 'my-results';
 type Cache<T> = { [date: string]: T };
 
 // Main Screen Component
-export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
+export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: ScreenProps & { isVisible: boolean }) {
   const { user } = useAuth();
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
@@ -366,18 +366,28 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
 
-  // State for data and loading status
   const [fixturesCache, setFixturesCache] = useState<Cache<Fixture[]>>({});
   const [loadingFixtures, setLoadingFixtures] = useState(true);
   const [loadedTabs, setLoadedTabs] = useState<Set<TabName>>(new Set(['my-results']));
 
-  // Controls for UI toggles
   const [showLiveOnly, setShowLiveOnly] = useState(false);
 
   const [matchDetails, setMatchDetails] = useState<{ [matchId: string]: MatchDetails }>({});
   
+  useEffect(() => {
+    if (!isVisible) return;
 
-  // Fetch user favorites
+    const screenHeader = document.querySelector('[data-id="screen-header-matches"]');
+    const searchButton = document.querySelector('[data-id="search-button"]');
+    const liveSwitch = document.querySelector('[data-id="live-switch-container"]');
+    const actionsContainer = document.querySelector('[data-id="screen-header-actions"]');
+
+    if (screenHeader && searchButton && liveSwitch && actionsContainer) {
+        actionsContainer.appendChild(searchButton);
+        actionsContainer.appendChild(liveSwitch);
+    }
+  }, [isVisible]);
+
   useEffect(() => {
     if (!user || !db) {
         setFavorites({userId: ''});
@@ -397,7 +407,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
     return () => unsubscribe();
   }, [user, db]);
   
-  // Listen to match details from Firestore
   useEffect(() => {
       if (!db) return;
       const matchesColRef = collection(db, 'matches');
@@ -418,7 +427,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
   const fetchFixturesForDate = useCallback(async (dateKey: string) => {
     if (fixturesCache[dateKey]) {
       setLoadingFixtures(false);
-      return; // Use cached data
+      return;
     }
     setLoadingFixtures(true);
     const url = `/api/football/fixtures?date=${dateKey}`;
@@ -430,14 +439,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
         setFixturesCache(prev => ({ ...prev, [dateKey]: fixtures }));
     } catch (error) {
         console.error(`Failed to fetch fixtures for ${dateKey}:`, error);
-        setFixturesCache(prev => ({ ...prev, [dateKey]: [] })); // Cache empty array on error
+        setFixturesCache(prev => ({ ...prev, [dateKey]: [] }));
     } finally {
         setLoadingFixtures(false);
     }
   }, [fixturesCache]);
 
   
-  // Effect to trigger data fetching based on selected date and active tab
   useEffect(() => {
     const tabValue = activeTab as 'all-matches' | 'my-results' | 'global-predictions';
     if (tabValue === 'global-predictions') return;
@@ -454,7 +462,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
 
   const handleDateChange = (dateKey: string) => {
       setSelectedDateKey(dateKey);
-      // Reset loaded tabs for the new date to enforce lazy loading again
       setLoadedTabs(new Set([activeTab]));
   };
   
@@ -472,32 +479,26 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
     
-  const screenHeaderActions = (
-    <div className='flex items-center gap-2'>
-        <SearchSheet navigate={navigate}>
-            <Button variant="ghost" size="icon">
-                <Search className="h-5 w-5" />
-            </Button>
-        </SearchSheet>
-         <div className="flex items-center space-x-2 bg-card border rounded-md p-1">
-            <Label htmlFor="live-mode" className={cn("text-xs px-1", showLiveOnly ? "text-green-500" : "text-muted-foreground")}>مباشر</Label>
-            <Switch
-                id="live-mode"
-                checked={showLiveOnly}
-                onCheckedChange={setShowLiveOnly}
-                className="h-4 w-7 data-[state=checked]:bg-green-500"
-            />
-        </div>
-        {headerActions}
-    </div>
-  )
-
   const currentFixtures = fixturesCache[selectedDateKey] || [];
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={screenHeaderActions} />
-      <div className="flex flex-1 flex-col min-h-0">
+    <div className="flex-1 flex flex-col min-h-0">
+        <div id="matches-header-portal" className="hidden">
+             <SearchSheet navigate={navigate}>
+                <Button data-id="search-button" variant="ghost" size="icon">
+                    <Search className="h-5 w-5" />
+                </Button>
+            </SearchSheet>
+             <div data-id="live-switch-container" className="flex items-center gap-2 bg-card border rounded-md p-1">
+                <RadioTower className={cn("h-4 w-4 transition-colors", showLiveOnly ? "text-green-500" : "text-muted-foreground")} />
+                <Switch
+                    id="live-mode"
+                    checked={showLiveOnly}
+                    onCheckedChange={setShowLiveOnly}
+                />
+            </div>
+        </div>
+      
         <div className="flex flex-col border-b bg-card">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
               <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none">
@@ -525,7 +526,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
             />
         }
         </div>
-      </div>
     </div>
   );
 }
