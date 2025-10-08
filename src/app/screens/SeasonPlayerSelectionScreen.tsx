@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FootballIcon } from '@/components/icons/FootballIcon';
+import { FixedSizeList as List } from 'react-window';
 
 
 interface SeasonPlayerSelectionScreenProps extends ScreenProps {
@@ -141,6 +142,23 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
     }, [predictionDocRef, user, leagueId, leagueName, predictedTopScorerId]);
 
 
+    const Row = ({ index, style }: { index: number, style: React.CSSProperties }) => {
+        const playerResponse = players[index];
+        if (!playerResponse) return null;
+        const { player } = playerResponse;
+
+        return (
+             <div style={style} className="px-4 py-1">
+                <PlayerListItem
+                    player={player}
+                    isPredictedTopScorer={predictedTopScorerId === player.id}
+                    onScorerSelect={handleScorerSelect}
+                />
+            </div>
+        )
+    };
+
+
     if (loading) {
         return (
             <div className="flex h-full flex-col bg-background">
@@ -156,15 +174,17 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
              <div className='p-4 text-center text-sm text-muted-foreground border-b'>
                 <p>اختر الهداف المتوقع للدوري بالضغط على أيقونة الكرة.</p>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {players.length > 0 ? players.map(({ player }) => (
-                    <PlayerListItem
-                        key={player.id}
-                        player={player}
-                        isPredictedTopScorer={predictedTopScorerId === player.id}
-                        onScorerSelect={handleScorerSelect}
-                    />
-                )) : (
+            <div className="flex-1 overflow-y-auto">
+                {players.length > 0 ? (
+                     <List
+                        height={window.innerHeight - 150} // Adjust height based on your layout
+                        itemCount={players.length}
+                        itemSize={76} // The height of each PlayerListItem + padding
+                        width="100%"
+                    >
+                        {Row}
+                    </List>
+                ) : (
                     <p className="text-center pt-8 text-muted-foreground">لا يوجد لاعبون متاحون لهذا الفريق.</p>
                 )}
             </div>
