@@ -91,7 +91,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
     const handleChampionSelect = useCallback((teamId: number) => {
         const newChampionId = predictedChampionId === teamId ? undefined : teamId;
         
-        setPredictedChampionId(prevId => prevId === teamId ? undefined : teamId);
+        setPredictedChampionId(newChampionId);
         
         if (predictionDocRef && user) {
             const predictionData: Partial<SeasonPrediction> = {
