@@ -280,7 +280,6 @@ const LALIGA_ID = 140;
 const SERIE_A_ID = 135;
 const BUNDESLIGA_ID = 78;
 const CURRENT_SEASON = 2025;
-const PREVIOUS_SEASON = 2024;
 
 
 const seasonLeagues = [
@@ -290,11 +289,13 @@ const seasonLeagues = [
     { id: BUNDESLIGA_ID, name: "الدوري الألماني" },
 ];
 
-interface TeamWithPlayers extends Team {
-    players: { player: Player }[];
+interface PlayerWithTeam extends Player {
+    teamLogo: string;
+    teamName: string;
 }
 interface LeagueData {
-    teams: TeamWithPlayers[];
+    teams: Team[];
+    players: PlayerWithTeam[];
 }
 interface AllLeaguesData {
     [leagueId: number]: LeagueData;
@@ -304,12 +305,61 @@ interface CustomNames {
     players: Map<number, string>;
 }
 
+const TeamPlayersAccordion = ({ team, leagueId, onPlayerSelect, selectedPlayerId, customNames }: { team: Team; leagueId: number; onPlayerSelect: (playerId: number) => void; selectedPlayerId?: number; customNames: CustomNames; }) => {
+    const [players, setPlayers] = useState<{ player: Player }[]>([]);
+    const [loadingPlayers, setLoadingPlayers] = useState(false);
+    const getDisplayName = (type: 'team' | 'player', id: number, defaultName: string) => {
+        return (type === 'team' ? customNames.teams.get(id) : customNames.players.get(id)) || defaultName;
+    };
+    const fetchPlayers = async () => {
+        if (players.length > 0) return;
+        setLoadingPlayers(true);
+        try {
+            const playersRes = await fetch(`/api/football/players?team=${team.id}&season=${CURRENT_SEASON}`);
+            const playersData = await playersRes.json();
+            setPlayers(playersData.response || []);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingPlayers(false);
+        }
+    };
+    return (
+        <AccordionItem value={`team-${team.id}`} className="rounded-lg border bg-background">
+            <div className="flex items-center pr-4">
+                <AccordionTrigger onClick={fetchPlayers} className="flex-1 py-2 hover:no-underline">
+                    <div className="flex items-center gap-3">
+                        <Avatar className="h-6 w-6"><AvatarImage src={team.logo} /></Avatar>
+                        <span>{getDisplayName('team', team.id, team.name)}</span>
+                    </div>
+                </AccordionTrigger>
+                {/* Champion selection logic is handled one level up */}
+            </div>
+            <AccordionContent className="p-2 space-y-1 max-h-60 overflow-y-auto">
+                {loadingPlayers ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> :
+                    (players.map(({ player }) => (
+                        <div key={player.id} className="flex items-center pr-4">
+                            <div className="flex-1 flex items-center gap-3 py-1">
+                                <Avatar className="h-5 w-5"><AvatarImage src={player.photo} /></Avatar>
+                                <span className="text-xs">{getDisplayName('player', player.id, player.name)}</span>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => onPlayerSelect(player.id)}>
+                                <FootballIcon className={cn("h-5 w-5 text-muted-foreground", selectedPlayerId === player.id && "text-yellow-400")} />
+                            </Button>
+                        </div>
+                    )))
+                }
+            </AccordionContent>
+        </AccordionItem>
+    );
+};
+
 
 const SeasonPredictionsTab = () => {
     const { user } = useAuth();
     const { db } = useFirestore();
     const { toast } = useToast();
-    const [allLeaguesData, setAllLeaguesData] = useState<AllLeaguesData>({});
+    const [allLeaguesData, setAllLeaguesData] = useState<Record<number, { teams: Team[] }>>({});
     const [predictions, setPredictions] = useState<Record<number, Partial<SeasonPrediction>>>({});
     const [customNames, setCustomNames] = useState<CustomNames>({ teams: new Map(), players: new Map() });
     const [loading, setLoading] = useState(true);
@@ -321,7 +371,7 @@ const SeasonPredictionsTab = () => {
     }, [customNames]);
 
     useEffect(() => {
-        if (!user) {
+        if (!user || !db) {
             setLoading(false);
             return;
         }
@@ -343,29 +393,20 @@ const SeasonPredictionsTab = () => {
                     const teamsRes = await fetch(`/api/football/teams?league=${league.id}&season=${CURRENT_SEASON}`);
                     const teamsData = await teamsRes.json();
                     const teams = teamsData.response?.map((r: { team: Team }) => r.team) || [];
-
-                    const teamsWithPlayersPromises = teams.map(async (team: Team) => {
-                        const playersRes = await fetch(`/api/football/players?team=${team.id}&season=${CURRENT_SEASON}`);
-                        const playersData = await playersRes.json();
-                        return { ...team, players: playersData.response || [] };
-                    });
-
-                    const teamsWithPlayers = await Promise.all(teamsWithPlayersPromises);
-
+                    
                     const predictionDocRef = doc(db, 'seasonPredictions', `${user.uid}_${league.id}_${CURRENT_SEASON}`);
                     const docSnap = await getDoc(predictionDocRef);
                     const existingPrediction = docSnap.exists() ? docSnap.data() as SeasonPrediction : {};
                     
                     return {
                         leagueId: league.id,
-                        data: { teams: teamsWithPlayers },
+                        data: { teams },
                         prediction: existingPrediction,
                     };
                 });
 
                 const results = await Promise.all(dataPromises);
-
-                const leaguesData: AllLeaguesData = {};
+                const leaguesData: Record<number, { teams: Team[] }> = {};
                 const predsData: Record<number, Partial<SeasonPrediction>> = {};
 
                 results.forEach(res => {
@@ -392,8 +433,6 @@ const SeasonPredictionsTab = () => {
         setPredictions(prev => {
             const leaguePrediction = prev[leagueId] || {};
             const key = type === 'champion' ? 'predictedChampionId' : 'predictedTopScorerId';
-
-            // If the same item is clicked again, deselect it. Otherwise, select the new one.
             const newItemId = leaguePrediction[key] === itemId ? undefined : itemId;
 
             return {
@@ -463,32 +502,20 @@ const SeasonPredictionsTab = () => {
                                     <>
                                         <Accordion type="multiple" className="w-full space-y-2">
                                             {(allLeaguesData[league.id].teams || []).map(team => (
-                                                <AccordionItem value={`team-${team.id}`} key={team.id} className="rounded-lg border bg-background">
-                                                    <div className="flex items-center pr-4">
-                                                        <AccordionTrigger className="flex-1 py-2 hover:no-underline">
-                                                            <div className="flex items-center gap-3">
-                                                                <Avatar className="h-6 w-6"><AvatarImage src={team.logo} /></Avatar>
-                                                                <span>{getDisplayName('team', team.id, team.name)}</span>
-                                                            </div>
-                                                        </AccordionTrigger>
-                                                        <Button variant="ghost" size="icon" onClick={() => handleSelect(league.id, 'champion', team.id)}>
-                                                            <Trophy className={cn("h-5 w-5 text-muted-foreground", predictions[league.id]?.predictedChampionId === team.id && "text-yellow-400 fill-current")} />
-                                                        </Button>
-                                                    </div>
-                                                    <AccordionContent className="p-2 space-y-1 max-h-60 overflow-y-auto">
-                                                        {(team.players || []).map(({ player }) => (
-                                                            <div key={player.id} className="flex items-center pr-4">
-                                                                <div className="flex-1 flex items-center gap-3 py-1">
-                                                                    <Avatar className="h-5 w-5"><AvatarImage src={player.photo} /></Avatar>
-                                                                    <span className="text-xs">{getDisplayName('player', player.id, player.name)}</span>
-                                                                </div>
-                                                                <Button variant="ghost" size="icon" onClick={() => handleSelect(league.id, 'scorer', player.id)}>
-                                                                    <FootballIcon className={cn("h-5 w-5 text-muted-foreground", predictions[league.id]?.predictedTopScorerId === player.id && "text-yellow-400")} />
-                                                                </Button>
-                                                            </div>
-                                                        ))}
-                                                    </AccordionContent>
-                                                </AccordionItem>
+                                                <div key={team.id} className="flex items-center pr-4 border rounded-lg bg-background">
+                                                    <Accordion type="single" collapsible className="w-full">
+                                                        <TeamPlayersAccordion
+                                                            team={team}
+                                                            leagueId={league.id}
+                                                            onPlayerSelect={(playerId) => handleSelect(league.id, 'scorer', playerId)}
+                                                            selectedPlayerId={predictions[league.id]?.predictedTopScorerId}
+                                                            customNames={customNames}
+                                                        />
+                                                    </Accordion>
+                                                    <Button variant="ghost" size="icon" onClick={() => handleSelect(league.id, 'champion', team.id)}>
+                                                         <Trophy className={cn("h-5 w-5 text-muted-foreground", predictions[league.id]?.predictedChampionId === team.id && "text-yellow-400 fill-current")} />
+                                                    </Button>
+                                                </div>
                                             ))}
                                         </Accordion>
                                         <Button onClick={() => handleSave(league.id)} disabled={saving[league.id]} className="w-full mt-2">
@@ -997,3 +1024,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    
