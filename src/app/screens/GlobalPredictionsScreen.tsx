@@ -282,43 +282,24 @@ interface LeagueData {
     scorers: TopScorer[];
 }
 
-const useLeagueData = (leagueId: number) => {
-    const [data, setData] = useState<LeagueData>({ teams: [], scorers: [] });
-    const [loading, setLoading] = useState(true);
-    
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!leagueId) {
-                 setLoading(false);
-                 return;
-            }
-            setLoading(true);
-            try {
-                // Fetch teams from current season and scorers from previous to have a list to predict from
-                const [teamsRes, scorersRes] = await Promise.all([
-                    fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`),
-                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON - 1}`)
-                ]);
-                const teamsData = await teamsRes.json();
-                const scorersData = await scorersRes.json();
-                setData({
-                    teams: teamsData.response || [],
-                    scorers: scorersData.response || []
-                });
-            } catch (error) {
-                console.error(`Failed to fetch data for league ${leagueId}`, error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, [leagueId]);
+interface AllLeaguesData {
+    [leagueId: number]: LeagueData;
+}
 
-    return { ...data, loading };
-};
-
-const LeaguePredictionCard = ({ league, userId }: { league: { id: number, name: string }, userId: string }) => {
-    const { teams, scorers, loading } = useLeagueData(league.id);
+const LeaguePredictionCard = ({ 
+    league, 
+    userId, 
+    leagueData,
+    getCustomTeamName,
+    getCustomPlayerName
+}: { 
+    league: { id: number, name: string }, 
+    userId: string, 
+    leagueData: LeagueData,
+    getCustomTeamName: (id: number, defaultName: string) => string,
+    getCustomPlayerName: (id: number, defaultName: string) => string
+}) => {
+    const { teams, scorers } = leagueData;
     const { db } = useFirestore();
     const { toast } = useToast();
     
@@ -380,43 +361,154 @@ const LeaguePredictionCard = ({ league, userId }: { league: { id: number, name: 
             });
     };
     
-    const isLoading = loading || initialLoading;
+    if (initialLoading) {
+        return (
+            <div className="p-4 border rounded-lg bg-card space-y-4">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+            </div>
+        )
+    }
 
     return (
         <div className="p-4 border rounded-lg bg-card">
             <h3 className="font-bold mb-4">{league.name}</h3>
-            {isLoading ? <Loader2 className="mx-auto h-6 w-6 animate-spin" /> : (
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-sm font-medium mb-1 block">توقع البطل</label>
-                         <Select value={championId} onValueChange={setChampionId} dir="rtl">
-                            <SelectTrigger><SelectValue placeholder="اختر الفريق البطل..." /></SelectTrigger>
-                            <SelectContent>
-                                {teams.map(({ team }) => (
-                                    <SelectItem key={team.id} value={String(team.id)}>{team.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium mb-1 block">توقع الهداف</label>
-                         <Select value={scorerId} onValueChange={setScorerId} dir="rtl">
-                            <SelectTrigger><SelectValue placeholder="اختر الهداف..." /></SelectTrigger>
-                            <SelectContent>
-                                {scorers.map(({ player }) => (
-                                    <SelectItem key={player.id} value={String(player.id)}>{player.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                     <Button onClick={handleSave} disabled={saving} className="w-full">
-                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ'}
-                    </Button>
+            <div className="space-y-4">
+                <div>
+                    <label className="text-sm font-medium mb-1 block">توقع البطل</label>
+                     <Select value={championId} onValueChange={setChampionId} dir="rtl">
+                        <SelectTrigger><SelectValue placeholder="اختر الفريق البطل..." /></SelectTrigger>
+                        <SelectContent>
+                            {teams.map(({ team }) => (
+                                <SelectItem key={team.id} value={String(team.id)}>
+                                    {getCustomTeamName(team.id, team.name)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
-            )}
+                <div>
+                    <label className="text-sm font-medium mb-1 block">توقع الهداف</label>
+                     <Select value={scorerId} onValueChange={setScorerId} dir="rtl">
+                        <SelectTrigger><SelectValue placeholder="اختر الهداف..." /></SelectTrigger>
+                        <SelectContent>
+                            {scorers.map(({ player }) => (
+                                <SelectItem key={player.id} value={String(player.id)}>
+                                     {getCustomPlayerName(player.id, player.name)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                 <Button onClick={handleSave} disabled={saving} className="w-full">
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ'}
+                </Button>
+            </div>
         </div>
     );
 };
+
+const SeasonPredictionsTab = () => {
+    const { user } = useAuth();
+    const { db } = useFirestore();
+    const [allLeaguesData, setAllLeaguesData] = useState<AllLeaguesData>({});
+    const [loading, setLoading] = useState(true);
+    const [customNames, setCustomNames] = useState<{ teams: Map<number, string>, players: Map<number, string> }>({ teams: new Map(), players: new Map() });
+
+
+     const fetchAllCustomNames = useCallback(async () => {
+        if (!db) return;
+        try {
+            const [teamsSnapshot, playersSnapshot] = await Promise.all([
+                getDocs(collection(db, 'teamCustomizations')),
+                getDocs(collection(db, 'playerCustomizations'))
+            ]);
+            
+            const teamNames = new Map<number, string>();
+            teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+            
+            const playerNames = new Map<number, string>();
+            playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
+            
+            setCustomNames({ teams: teamNames, players: playerNames });
+        } catch (error) {
+            const permissionError = new FirestorePermissionError({ path: 'customizations collections', operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    }, [db]);
+
+
+    useEffect(() => {
+        const fetchAllData = async () => {
+            setLoading(true);
+            await fetchAllCustomNames();
+
+            const dataPromises = seasonLeagues.map(async (league) => {
+                try {
+                    const [teamsRes, scorersRes] = await Promise.all([
+                        fetch(`/api/football/teams?league=${league.id}&season=${CURRENT_SEASON}`),
+                        fetch(`/api/football/players/topscorers?league=${league.id}&season=${CURRENT_SEASON - 1}`)
+                    ]);
+                    const teamsData = await teamsRes.json();
+                    const scorersData = await scorersRes.json();
+                    return {
+                        leagueId: league.id,
+                        data: {
+                            teams: teamsData.response || [],
+                            scorers: scorersData.response || []
+                        }
+                    };
+                } catch (error) {
+                    console.error(`Failed to fetch data for league ${league.id}`, error);
+                    return { leagueId: league.id, data: { teams: [], scorers: [] } };
+                }
+            });
+
+            const results = await Promise.all(dataPromises);
+            const dataByLeague: AllLeaguesData = {};
+            results.forEach(result => {
+                dataByLeague[result.leagueId] = result.data;
+            });
+            
+            setAllLeaguesData(dataByLeague);
+            setLoading(false);
+        };
+
+        fetchAllData();
+    }, [fetchAllCustomNames]);
+    
+    const getCustomTeamName = (id: number, defaultName: string) => customNames.teams.get(id) || defaultName;
+    const getCustomPlayerName = (id: number, defaultName: string) => customNames.players.get(id) || defaultName;
+
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>توقع بطل الموسم وهداف الدوري</CardTitle>
+                <CardDescription>
+                    سيتم منح 50 نقطة لتوقع البطل الصحيح و 25 نقطة لتوقع الهداف الصحيح في نهاية الموسم لكل دوري.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+            {loading ? <Loader2 className="mx-auto h-8 w-8 animate-spin" /> :
+             !user ? <p>الرجاء تسجيل الدخول للمشاركة.</p> :
+             seasonLeagues.map(league => (
+                <LeaguePredictionCard 
+                    key={league.id} 
+                    league={league} 
+                    userId={user.uid}
+                    leagueData={allLeaguesData[league.id] || { teams: [], scorers: [] }}
+                    getCustomTeamName={getCustomTeamName}
+                    getCustomPlayerName={getCustomPlayerName}
+                />
+            ))}
+            </CardContent>
+        </Card>
+    );
+};
+
 // --- Main Screen ---
 export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
     const { isAdmin } = useAdmin();
@@ -725,19 +817,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     </TabsContent>
                     
                     <TabsContent value="season_predictions" className="p-4 mt-0">
-                         <Card>
-                            <CardHeader>
-                                <CardTitle>توقع بطل الموسم وهداف الدوري</CardTitle>
-                                <CardDescription>
-                                    سيتم منح 50 نقطة لتوقع البطل الصحيح و 25 نقطة لتوقع الهداف الصحيح في نهاية الموسم لكل دوري.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                            {user ? seasonLeagues.map(league => (
-                                    <LeaguePredictionCard key={league.id} league={league} userId={user.uid} />
-                                )) : <p>الرجاء تسجيل الدخول للمشاركة.</p>}
-                            </CardContent>
-                        </Card>
+                         <SeasonPredictionsTab />
                     </TabsContent>
 
 
@@ -823,3 +903,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+
+    
