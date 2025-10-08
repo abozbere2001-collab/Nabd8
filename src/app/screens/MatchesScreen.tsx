@@ -10,7 +10,7 @@ import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
-import { Loader2, RadioTower, Search } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -367,8 +367,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   const [fixturesCache, setFixturesCache] = useState<Cache<Fixture[]>>({});
   const [loadingFixtures, setLoadingFixtures] = useState(true);
-  const [loadedTabs, setLoadedTabs] = useState<Set<TabName>>(new Set(['my-results']));
-
+  
   const [showLiveOnly, setShowLiveOnly] = useState(false);
 
   const [matchDetails, setMatchDetails] = useState<{ [matchId: string]: MatchDetails }>({});
@@ -432,22 +431,12 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   
   useEffect(() => {
-    const tabValue = activeTab as 'all-matches' | 'my-results' | 'global-predictions';
-    if (tabValue === 'global-predictions') return;
-    
-    setLoadedTabs(prev => new Set(prev).add(activeTab));
-
-    const loadData = async () => {
-        await fetchFixturesForDate(selectedDateKey);
-    };
-
-    loadData();
-  }, [selectedDateKey, activeTab, fetchFixturesForDate]);
+    fetchFixturesForDate(selectedDateKey);
+  }, [selectedDateKey, fetchFixturesForDate]);
 
 
   const handleDateChange = (dateKey: string) => {
       setSelectedDateKey(dateKey);
-      setLoadedTabs(new Set([activeTab]));
   };
   
   const handleTabChange = (value: string) => {
@@ -479,36 +468,31 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                           <Search className="h-5 w-5" />
                       </Button>
                   </SearchSheet>
+                   <div className="flex items-center gap-1 border-r pr-1">
+                     <Switch
+                        id="live-only-switch"
+                        checked={showLiveOnly}
+                        onCheckedChange={setShowLiveOnly}
+                    />
+                  </div>
                   <ProfileButton onProfileClick={() => navigate('Profile')} />
               </div>
             }
         />
         <div className="flex flex-col border-b bg-background">
-             <div className='flex items-center justify-between px-4 pt-2'>
-                 <div className="flex items-center gap-2 rounded-lg bg-card p-1 border">
-                    <RadioTower className={cn("h-4 w-4 text-muted-foreground transition-colors", showLiveOnly && "text-green-500")} />
-                    <Switch
-                        id="live-only-switch"
-                        checked={showLiveOnly}
-                        onCheckedChange={setShowLiveOnly}
-                    />
-                 </div>
-                 <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full max-w-sm mx-auto">
-                   <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
-                       <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>كل المباريات</TabsTrigger>
-                       <TabsTrigger value="global-predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
-                       <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
-                   </TabsList>
-                 </Tabs>
-                <div className="w-12"></div>
-            </div>
+             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+               <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
+                   <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>كل المباريات</TabsTrigger>
+                   <TabsTrigger value="global-predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
+                   <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
+               </TabsList>
+             </Tabs>
 
             <div className="py-2">
                 <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
             </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {loadedTabs.has(activeTab) && 
             <FixturesList 
                 fixtures={currentFixtures}
                 loading={loadingFixtures}
@@ -520,7 +504,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                 matchDetails={matchDetails}
                 navigate={navigate}
             />
-        }
         </div>
     </div>
   );
