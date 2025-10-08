@@ -324,8 +324,15 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
     const [players, setPlayers] = useState<Map<number, Player>>(new Map());
     const [userScore, setUserScore] = useState<UserScore | null>(null);
     const [loading, setLoading] = useState(true);
+    const [customNames, setCustomNames] = useState<{ teams: Map<number, string>, players: Map<number, string> }>({ teams: new Map(), players: new Map() });
+
 
     const leagueOrder = [PREMIER_LEAGUE_ID, LALIGA_ID, SERIE_A_ID, BUNDESLIGA_ID, CHAMPIONS_LEAGUE_ID];
+    
+    const getDisplayName = useCallback((type: 'team' | 'player', id: number, defaultName: string) => {
+        const map = type === 'team' ? customNames.teams : customNames.players;
+        return map.get(id) || defaultName;
+    }, [customNames]);
 
     useEffect(() => {
         if (!db || !userId) return;
@@ -333,12 +340,24 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
         const fetchInitialData = async () => {
             setLoading(true);
             try {
-                // Fetch all of the user's season predictions and their leaderboard entry
-                const [predsSnapshot, scoreDoc] = await Promise.all([
+                // Fetch all necessary data in parallel
+                const [predsSnapshot, scoreDoc, teamsCustomSnap, playersCustomSnap] = await Promise.all([
                     getDocs(query(collection(db, "seasonPredictions"), where("userId", "==", userId), where("season", "==", CURRENT_SEASON))),
-                    getDoc(doc(db, 'leaderboard', userId))
+                    getDoc(doc(db, 'leaderboard', userId)),
+                    getDocs(collection(db, 'teamCustomizations')),
+                    getDocs(collection(db, 'playerCustomizations'))
                 ]);
+                
+                // Process custom names
+                const teamNames = new Map<number, string>();
+                teamsCustomSnap.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+                
+                const playerNames = new Map<number, string>();
+                playersCustomSnap.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
+                
+                setCustomNames({ teams: teamNames, players: playerNames });
     
+                // Process user predictions
                 const predictions = predsSnapshot.docs.map(doc => doc.data() as SeasonPrediction);
                 setUserPredictions(predictions);
     
@@ -346,7 +365,7 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                     setUserScore(scoreDoc.data() as UserScore);
                 }
     
-                // Using maps to prevent duplicate fetches
+                // Gather all unique IDs to fetch from API
                 const teamIds = new Set<number>();
                 const playerIds = new Set<number>();
                 predictions.forEach(p => {
@@ -357,33 +376,25 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                 const teamPromises = Array.from(teamIds).map(async (teamId) => {
                     const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
                     const teamResData = await teamRes.json();
-                    if (teamResData.response?.[0]) {
-                        return { id: teamId, data: teamResData.response[0].team };
-                    }
-                    return null;
+                    return teamResData.response?.[0]?.team ? { id: teamId, data: teamResData.response[0].team } : null;
                 });
     
                 const playerPromises = Array.from(playerIds).map(async (playerId) => {
                     const playerRes = await fetch(`/api/football/players?id=${playerId}&season=${CURRENT_SEASON}`);
                     const playerResData = await playerRes.json();
-                    if (playerResData.response?.[0]) {
-                        return { id: playerId, data: playerResData.response[0].player };
-                    }
-                    return null;
+                    return playerResData.response?.[0]?.player ? { id: playerId, data: playerResData.response[0].player } : null;
                 });
     
-                const teamResults = await Promise.all(teamPromises);
-                const playerResults = await Promise.all(playerPromises);
+                const [teamResults, playerResults] = await Promise.all([
+                    Promise.all(teamPromises),
+                    Promise.all(playerPromises)
+                ]);
 
                 const newTeams = new Map<number, Team>();
-                teamResults.forEach(result => {
-                    if(result) newTeams.set(result.id, result.data);
-                });
+                teamResults.forEach(result => result && newTeams.set(result.id, result.data));
 
                 const newPlayers = new Map<number, Player>();
-                playerResults.forEach(result => {
-                    if(result) newPlayers.set(result.id, result.data);
-                });
+                playerResults.forEach(result => result && newPlayers.set(result.id, result.data));
     
                 setTeams(newTeams);
                 setPlayers(newPlayers);
@@ -423,7 +434,7 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                 return map;
             }, new Map<number, SeasonPrediction>())
             .values()
-    ).sort((a,b) => leagueOrder.indexOf(a.leagueId) - leagueOrder.indexOf(b.leagueId)); // Then sort by defined order
+    ).sort((a,b) => leagueOrder.indexOf(a.leagueId) - leagueOrder.indexOf(b.leagueId));
 
     return (
         <Card className="mb-4">
@@ -450,11 +461,21 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                                 <div className="space-y-2">
                                      <div className="flex flex-col items-center">
                                         <Trophy className="h-5 w-5 text-yellow-500" />
-                                        {champion ? <Avatar className="h-6 w-6 mt-1"><AvatarImage src={champion.logo} /></Avatar> : <div className="h-6 w-6 bg-muted rounded-full mt-1"/>}
+                                        {champion ? (
+                                            <>
+                                            <Avatar className="h-6 w-6 mt-1"><AvatarImage src={champion.logo} /></Avatar>
+                                            <p className="text-[10px] mt-1 truncate w-full">{getDisplayName('team', champion.id, champion.name)}</p>
+                                            </>
+                                        ) : <div className="h-6 w-6 bg-muted rounded-full mt-1"/>}
                                     </div>
                                     <div className="flex flex-col items-center">
                                         <FootballIcon className="h-5 w-5" />
-                                        {topScorer ? <Avatar className="h-6 w-6 mt-1"><AvatarImage src={topScorer.photo} /></Avatar> : <div className="h-6 w-6 bg-muted rounded-full mt-1"/>}
+                                        {topScorer ? (
+                                             <>
+                                             <Avatar className="h-6 w-6 mt-1"><AvatarImage src={topScorer.photo} /></Avatar>
+                                             <p className="text-[10px] mt-1 truncate w-full">{getDisplayName('player', topScorer.id, topScorer.name)}</p>
+                                             </>
+                                        ) : <div className="h-6 w-6 bg-muted rounded-full mt-1"/>}
                                     </div>
                                 </div>
                             </div>
@@ -894,5 +915,3 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
-
-    

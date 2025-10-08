@@ -121,7 +121,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
 
     const handleScorerSelect = useCallback((playerId: number) => {
         const newScorerId = predictedTopScorerId === playerId ? undefined : playerId;
-        setPredictedTopScorerId(newScorerId);
+        setPredictedTopScorerId(prevId => prevId === playerId ? undefined : playerId);
         
         if (predictionDocRef && user) {
             const predictionData: Partial<SeasonPrediction> = {
@@ -130,6 +130,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                 leagueName: leagueName,
                 season: CURRENT_SEASON,
                 predictedTopScorerId: newScorerId,
+                timestamp: new Date(),
             };
             setDoc(predictionDocRef, predictionData, { merge: true })
                 .catch(serverError => {

@@ -89,7 +89,8 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
 
     const handleChampionSelect = useCallback((teamId: number) => {
         const newChampionId = predictedChampionId === teamId ? undefined : teamId;
-        setPredictedChampionId(newChampionId);
+        
+        setPredictedChampionId(prevId => prevId === teamId ? undefined : teamId);
         
         if (predictionDocRef && user) {
             const predictionData: Partial<SeasonPrediction> = {
@@ -98,6 +99,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
                 leagueName: leagueName,
                 season: CURRENT_SEASON,
                 predictedChampionId: newChampionId,
+                timestamp: new Date()
             };
             setDoc(predictionDocRef, predictionData, { merge: true })
                 .catch(serverError => {
@@ -125,8 +127,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
         <div className="flex h-full flex-col bg-background">
             <ScreenHeader title={`توقع بطل ${leagueName}`} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
             <div className='p-4 text-center text-sm text-muted-foreground border-b'>
-                <p>اختر الفريق البطل بالضغط على أيقونة الكأس.</p>
-                <p>ثم اضغط على أي فريق لاختيار الهداف من لاعبيه.</p>
+                <p>اختر الفريق البطل بالضغط على أيقونة الكأس. ثم اضغط على أي فريق لاختيار الهداف من لاعبيه.</p>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
                 {teams.map(({ team }) => (
