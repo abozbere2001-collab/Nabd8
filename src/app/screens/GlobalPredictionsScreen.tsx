@@ -32,6 +32,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
   AlertDialogFooter,
+  AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 
 
@@ -82,12 +83,18 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                         ref={isSelected ? selectedButtonRef : null}
                         className={cn(
                             "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors ml-2",
-                            isSelected ? "text-primary bg-primary/10" : "text-foreground/80 hover:text-primary"
+                            "text-foreground/80 hover:text-primary",
+                            isSelected && "text-primary"
                         )}
                         onClick={() => onDateSelect(dateKey)}
+                        data-state={isSelected ? 'active' : 'inactive'}
                     >
                         <span className="text-xs font-normal">{getDayLabel(date)}</span>
                         <span className="font-bold text-sm">{format(date, 'd')}</span>
+                        <span className={cn(
+                            "absolute bottom-0 h-0.5 w-4 rounded-full bg-primary transition-transform scale-x-0",
+                            isSelected && "scale-x-100"
+                        )} />
                     </button>
                 )
             })}
@@ -314,7 +321,10 @@ const SeasonPredictionsTab = () => {
     }, [customNames]);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
 
         const fetchData = async () => {
@@ -496,7 +506,7 @@ const PredictionsInfoDialog = () => (
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>شرح نظام التوقعات</AlertDialogTitle>
-                <AlertDialogDescription>
+                <AlertDialogDescription asChild>
                     <div className="space-y-4 mt-4 text-right text-foreground">
                         <div>
                             <h4 className="font-bold mb-2">التوقعات اليومية:</h4>
@@ -520,12 +530,7 @@ const PredictionsInfoDialog = () => (
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                 <Button onClick={() => {
-                    const trigger = document.querySelector('[aria-label="Close"]');
-                    if (trigger instanceof HTMLElement) {
-                      trigger.click();
-                    }
-                  }}>فهمت</Button>
+                 <AlertDialogCancel>فهمت</AlertDialogCancel>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
@@ -546,12 +551,13 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
+    const [userRank, setUserRank] = useState<UserScore | null>(null);
 
     const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
 
     const [calculatingPoints, setCalculatingPoints] = useState(false);
     
-    const LEADERBOARD_PAGE_SIZE = 20;
+    const LEADERBOARD_PAGE_SIZE = 100;
 
     const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
 
@@ -662,11 +668,13 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     useEffect(() => {
         if (!db) return;
         setLoadingLeaderboard(true);
+
         const leaderboardRef = collection(db, 'leaderboard');
         const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), limit(LEADERBOARD_PAGE_SIZE));
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const scores = snapshot.docs.map(doc => doc.data() as UserScore);
+        const unsubscribeLeaderboard = onSnapshot(q, (snapshot) => {
+            const scores = snapshot.docs.map(doc => ({...doc.data(), rank: 0 }) as UserScore & {rank: number});
+            
             const lastDoc = snapshot.docs[snapshot.docs.length - 1];
             setLeaderboard(scores);
             setLastVisible(lastDoc);
@@ -677,9 +685,25 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             errorEmitter.emit('permission-error', permissionError);
             setLoadingLeaderboard(false);
         });
+        
+        let unsubscribeUserRank = () => {};
+        if (user) {
+            const userRankRef = doc(db, 'leaderboard', user.uid);
+            unsubscribeUserRank = onSnapshot(userRankRef, (doc) => {
+                if (doc.exists()) {
+                    setUserRank(doc.data() as UserScore);
+                } else {
+                    setUserRank(null);
+                }
+            });
+        }
 
-        return () => unsubscribe();
-    }, [db]);
+
+        return () => {
+            unsubscribeLeaderboard();
+            unsubscribeUserRank();
+        }
+    }, [db, user]);
     
     const fetchMoreLeaderboard = async () => {
         if (!db || !lastVisible || !hasMore || loadingMore) return;
@@ -740,7 +764,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             setSelectedMatches(fetchedFixtures);
     
             // 3. Fetch user's predictions ONLY for these specific fixtures
-            if (fixtureIds.length > 0) {
+            if (fixtureIds.length > 0 && user) {
                 const predsRef = collection(db, 'predictions');
                 const userPredsQuery = query(predsRef, where('userId', '==', user.uid), where('fixtureId', 'in', fixtureIds));
                 const userPredsSnapshot = await getDocs(userPredsQuery);
@@ -792,6 +816,10 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         });
     }, [user, db]);
 
+    const userIsOnLeaderboard = useMemo(() => {
+        if (!user || !leaderboard) return false;
+        return leaderboard.some(entry => entry.userId === user.uid);
+    }, [user, leaderboard]);
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -886,21 +914,43 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                             </TableRow>
                                         ))
                                     ) : leaderboard.length > 0 ? (
-                                        leaderboard.map((score, index) => (
-                                            <TableRow key={`${score.userId}-${index}`}>
-                                                <TableCell>{index + 1}</TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        <Avatar className="h-6 w-6">
-                                                            <AvatarImage src={score.userPhoto}/>
-                                                            <AvatarFallback>{score.userName.charAt(0)}</AvatarFallback>
-                                                        </Avatar>
-                                                        {score.userName}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
-                                            </TableRow>
-                                        ))
+                                        <>
+                                            {leaderboard.map((score, index) => (
+                                                <TableRow key={`${score.userId}-${index}`} className={cn(user && score.userId === user.uid && 'bg-primary/10')}>
+                                                    <TableCell>{index + 1}</TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <Avatar className="h-6 w-6">
+                                                                <AvatarImage src={score.userPhoto}/>
+                                                                <AvatarFallback>{score.userName.charAt(0)}</AvatarFallback>
+                                                            </Avatar>
+                                                            {score.userName}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                            {user && userRank && !userIsOnLeaderboard && (
+                                                <>
+                                                 <TableRow>
+                                                    <TableCell colSpan={3} className="text-center h-4">...</TableCell>
+                                                 </TableRow>
+                                                 <TableRow className="bg-accent/20">
+                                                    <TableCell className="font-bold">ترتيبك</TableCell>
+                                                     <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <Avatar className="h-6 w-6">
+                                                                <AvatarImage src={userRank.userPhoto}/>
+                                                                <AvatarFallback>{userRank.userName.charAt(0)}</AvatarFallback>
+                                                            </Avatar>
+                                                            {userRank.userName}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-center font-bold">{userRank.totalPoints}</TableCell>
+                                                 </TableRow>
+                                                </>
+                                            )}
+                                        </>
                                     ) : (
                                         <TableRow>
                                             <TableCell colSpan={3} className="text-center text-muted-foreground h-24">
@@ -910,7 +960,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                     )}
                                 </TableBody>
                             </Table>
-                            {hasMore && (
+                            {hasMore && !loadingLeaderboard && (
                                 <div className="p-2">
                                     <Button
                                         variant="outline"
@@ -940,5 +990,3 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 }
 
     
-
-      
