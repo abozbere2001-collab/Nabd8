@@ -78,7 +78,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                         ref={isSelected ? selectedButtonRef : null}
                         className={cn(
                             "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors ml-2",
-                            dateKey === selectedDateKey ? "text-primary bg-primary/10" : "text-foreground/80 hover:text-primary"
+                            isSelected ? "text-primary bg-primary/10" : "text-foreground/80 hover:text-primary"
                         )}
                         onClick={() => onDateSelect(dateKey)}
                     >
@@ -823,5 +823,3 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
-
-    
