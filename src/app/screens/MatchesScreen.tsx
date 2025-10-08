@@ -10,14 +10,16 @@ import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
-import { Loader2, RadioTower } from 'lucide-react';
+import { Loader2, RadioTower, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from '@/components/ui/switch';
-
+import { Button } from '@/components/ui/button';
+import { SearchSheet } from '@/components/SearchSheet';
+import { ProfileButton } from '../AppContentWrapper';
 
 // Interfaces
 interface Fixture {
@@ -212,7 +214,7 @@ const FixturesList = ({
                 favoritedLeagueIds.includes(f.league.id)
             );
         }
-        return []; // Return empty for 'global-predictions' as it has its own screen
+        return [];
     }, [fixtures, activeTab, favoritedTeamIds, favoritedLeagueIds, showLiveOnly]);
 
     const groupedFixtures = useMemo(() => {
@@ -355,7 +357,7 @@ type TabName = 'all-matches' | 'my-results';
 type Cache<T> = { [date: string]: T };
 
 // Main Screen Component
-export function MatchesScreen({ navigate, goBack, canGoBack, isVisible, headerActions }: ScreenProps & { isVisible: boolean, headerActions: React.ReactNode }) {
+export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: ScreenProps & { isVisible: boolean }) {
   const { user } = useAuth();
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
@@ -466,9 +468,25 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible, headerAc
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex flex-col border-b bg-card">
-            <div className='flex items-center justify-between px-4 pt-2'>
+        <ScreenHeader 
+            title="" 
+            canGoBack={false}
+            onBack={() => {}} 
+            actions={
+              <div className="flex items-center gap-1">
+                  <SearchSheet navigate={navigate}>
+                      <Button variant="ghost" size="icon">
+                          <Search className="h-5 w-5" />
+                      </Button>
+                  </SearchSheet>
+                  <ProfileButton onProfileClick={() => navigate('Profile')} />
+              </div>
+            }
+        />
+        <div className="flex flex-col border-b bg-background">
+             <div className='flex items-center justify-between px-4 pt-2'>
                  <div className="flex items-center gap-2 rounded-lg bg-card p-1 border">
+                    <RadioTower className={cn("h-4 w-4 text-muted-foreground transition-colors", showLiveOnly && "text-green-500")} />
                     <Switch
                         id="live-only-switch"
                         checked={showLiveOnly}
@@ -507,5 +525,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible, headerAc
     </div>
   );
 }
-
-    

@@ -21,8 +21,10 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Users } from 'lucide-react';
+import { Loader2, Users, Search } from 'lucide-react';
 import { useDebounce } from '@/hooks/use-debounce';
+import { SearchSheet } from '@/components/SearchSheet';
+import { ProfileButton } from '../AppContentWrapper';
 
 
 const IRAQI_LEAGUE_ID = 542;
@@ -550,11 +552,25 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     );
 }
 
-export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
+export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+      <ScreenHeader 
+        title="العراق" 
+        onBack={goBack} 
+        canGoBack={canGoBack} 
+        actions={
+          <div className="flex items-center gap-1">
+              <SearchSheet navigate={navigate}>
+                  <Button variant="ghost" size="icon">
+                      <Search className="h-5 w-5" />
+                  </Button>
+              </SearchSheet>
+              <ProfileButton onProfileClick={() => navigate('Profile')} />
+          </div>
+        }
+      />
       <div className="flex-1 overflow-y-auto px-4">
         <Tabs defaultValue="our-league" className="w-full">
           <div className="sticky top-0 bg-background z-10">
@@ -578,8 +594,3 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
     </div>
   );
 }
-
-    
-
-    
-

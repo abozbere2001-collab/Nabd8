@@ -5,7 +5,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Star, Pencil, Plus, Trash2, Loader2, Copy, Users } from 'lucide-react';
+import { Star, Pencil, Plus, Trash2, Loader2, Copy, Users, Search } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,6 +30,8 @@ import { useToast } from '@/hooks/use-toast';
 import type { Team, Player as PlayerType, Favorites } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { SearchSheet } from '@/components/SearchSheet';
+import { ProfileButton } from '../AppContentWrapper';
 
 
 // --- TYPE DEFINITIONS ---
@@ -236,7 +238,7 @@ const LeagueItem = ({ comp, navigate, onFavorite, isFavorited, onRename, isAdmin
 
 
 // --- MAIN SCREEN COMPONENT ---
-export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
+export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const [managedCompetitions, setManagedCompetitions] = useState<ManagedCompetition[] | null>(null);
     const [loading, setLoading] = useState(true);
     const { isAdmin } = useAdmin();
@@ -451,7 +453,21 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
 
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title="البطولات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+            <ScreenHeader 
+                title="البطولات" 
+                onBack={goBack} 
+                canGoBack={canGoBack} 
+                actions={
+                  <div className="flex items-center gap-1">
+                      <SearchSheet navigate={navigate}>
+                          <Button variant="ghost" size="icon">
+                              <Search className="h-5 w-5" />
+                          </Button>
+                      </SearchSheet>
+                      <ProfileButton onProfileClick={() => navigate('Profile')} />
+                  </div>
+                }
+            />
             <div className="flex-1 overflow-y-auto p-4">
                 {loading ? (
                     <div className="space-y-4">
@@ -547,7 +563,3 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         </div>
     );
 }
-
-    
-
-    

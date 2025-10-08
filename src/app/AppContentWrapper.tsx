@@ -24,7 +24,6 @@ import { AddEditNewsScreen } from './screens/AddEditNewsScreen';
 import { ManageTopScorersScreen } from './screens/ManageTopScorersScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
-import { SearchSheet } from '@/components/SearchSheet';
 import type { ScreenKey } from './page';
 
 import { useAuth } from '@/firebase/provider';
@@ -38,32 +37,31 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LogOut, User as UserIcon, Search } from 'lucide-react';
+import { LogOut, User as UserIcon } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
-import { ScreenHeader } from '@/components/ScreenHeader';
 
-const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>; title: string; }> = {
-  Matches: { component: MatchesScreen, title: '' },
-  Competitions: { component: CompetitionsScreen, title: 'البطولات' },
-  Iraq: { component: IraqScreen, title: 'العراق' },
-  News: { component: NewsScreen, title: 'الأخبار' },
-  Settings: { component: SettingsScreen, title: 'الإعدادات' },
-  CompetitionDetails: { component: CompetitionDetailScreen, title: 'تفاصيل البطولة' },
-  MatchDetails: { component: MatchDetailScreen, title: 'تفاصيل المباراة' },
-  TeamDetails: { component: TeamDetailScreen, title: 'تفاصيل الفريق' },
-  AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen, title: 'الفريق المفضل للمدير' },
-  Comments: { component: CommentsScreen, title: 'التعليقات' },
-  Notifications: { component: NotificationsScreen, title: 'الإشعارات' },
-  GlobalPredictions: { component: GlobalPredictionsScreen, title: 'التوقعات' },
-  AdminMatchSelection: { component: AdminMatchSelectionScreen, title: 'اختيار المباريات' },
-  Profile: { component: ProfileScreen, title: 'الملف الشخصي' },
-  SeasonPredictions: { component: SeasonPredictionsScreen, title: 'توقعات الموسم' },
-  SeasonTeamSelection: { component: SeasonTeamSelectionScreen, title: 'اختيار الفريق' },
-  SeasonPlayerSelection: { component: SeasonPlayerSelectionScreen, title: 'اختيار اللاعب' },
-  AddEditNews: { component: AddEditNewsScreen, title: 'إضافة/تعديل خبر' },
-  ManageTopScorers: { component: ManageTopScorersScreen, title: 'إدارة الهدافين' },
-  Login: { component: LoginScreen, title: 'تسجيل الدخول'},
-  SignUp: { component: LoginScreen, title: 'تسجيل'},
+const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> = {
+  Matches: { component: MatchesScreen },
+  Competitions: { component: CompetitionsScreen },
+  Iraq: { component: IraqScreen },
+  News: { component: NewsScreen },
+  Settings: { component: SettingsScreen },
+  CompetitionDetails: { component: CompetitionDetailScreen },
+  MatchDetails: { component: MatchDetailScreen },
+  TeamDetails: { component: TeamDetailScreen },
+  AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen },
+  Comments: { component: CommentsScreen },
+  Notifications: { component: NotificationsScreen },
+  GlobalPredictions: { component: GlobalPredictionsScreen },
+  AdminMatchSelection: { component: AdminMatchSelectionScreen },
+  Profile: { component: ProfileScreen },
+  SeasonPredictions: { component: SeasonPredictionsScreen },
+  SeasonTeamSelection: { component: SeasonTeamSelectionScreen },
+  SeasonPlayerSelection: { component: SeasonPlayerSelectionScreen },
+  AddEditNews: { component: AddEditNewsScreen },
+  ManageTopScorers: { component: ManageTopScorersScreen },
+  Login: { component: LoginScreen },
+  SignUp: { component: LoginScreen },
 };
 
 
@@ -75,12 +73,54 @@ type StackItem = {
   props?: Record<string, any>;
 };
 
+export const ProfileButton = ({ onProfileClick }: { onProfileClick: () => void }) => {
+    const { user } = useAuth();
+
+    const handleSignOut = async () => {
+        await signOut();
+    };
+
+    if (!user) return null;
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
+                        <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                            {user.email}
+                        </p>
+                    </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onProfileClick}>
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    <span>الملف الشخصي</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>تسجيل الخروج</span>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+};
+
 
 export function AppContentWrapper() {
   const [stack, setStack] = useState<StackItem[]>([{ key: 'Matches-0', screen: 'Matches' }]);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const [isEntering, setIsEntering] = useState(false);
-  const { user } = useAuth();
   
   const goBack = useCallback(() => {
     if (stack.length > 1) {
@@ -110,7 +150,6 @@ export function AppContentWrapper() {
         }
         return [newItem];
       } else {
-        // Prevent pushing the same screen twice
         if (prevStack.length > 0 && prevStack[prevStack.length - 1].screen === screen) {
             return prevStack;
         }
@@ -118,14 +157,6 @@ export function AppContentWrapper() {
       }
     });
   }, []);
-
-  const handleSignOut = async () => {
-    await signOut();
-  };
-
-  const handleProfileClick = () => {
-    navigate('Profile');
-  }
 
   if (!stack || stack.length === 0) {
     return (
@@ -146,89 +177,19 @@ export function AppContentWrapper() {
   const activeScreenKey = activeStackItem.screen;
   const showBottomNav = mainTabs.includes(activeScreenKey);
 
-  const getScreenTitle = (item: StackItem) => {
-    if (item.screen === 'CompetitionDetails' && item.props?.title) {
-        return item.props.title;
-    }
-    if (item.screen === 'TeamDetails' && item.props?.teamName) {
-        return item.props.teamName;
-    }
-    if (item.screen === 'AddEditNews' && item.props?.isEditing) {
-        return 'تعديل الخبر';
-    }
-    if (item.screen === 'AddEditNews' && !item.props?.isEditing) {
-        return 'إضافة خبر جديد';
-    }
-    return screenConfig[item.screen].title;
-  };
-
-  const itemTitle = getScreenTitle(activeStackItem);
-  
-  const ProfileButton = () => {
-      if (!user) return null;
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
-                <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{user.displayName}</p>
-                <p className="text-xs leading-none text-muted-foreground">
-                  {user.email}
-                </p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleProfileClick}>
-              <UserIcon className="mr-2 h-4 w-4" />
-              <span>الملف الشخصي</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>تسجيل الخروج</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    };
-
-    const headerActions = (
-        <div className="flex items-center gap-1">
-            <SearchSheet navigate={navigate}>
-                <Button variant="ghost" size="icon">
-                    <Search className="h-5 w-5" />
-                </Button>
-            </SearchSheet>
-            <ProfileButton />
-        </div>
-    );
-
-
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
       <div className="relative flex-1 flex flex-col overflow-hidden">
-        
         <div className="relative flex-1 overflow-hidden">
             {stack.map((item, index) => {
                 const ScreenComponent = screenConfig[item.screen].component;
                 const isActive = index === stack.length - 1;
                 const isPrevious = index === stack.length - 2;
 
-                // Pass headerActions only to the active screen
                 const screenProps = {
                     ...navigationProps,
                     ...item.props,
                     isVisible: isActive,
-                    headerActions: isActive ? headerActions : undefined
                 };
 
                 return (
@@ -237,17 +198,11 @@ export function AppContentWrapper() {
                         className={cn(
                             "absolute inset-0 bg-background flex flex-col",
                             isActive ? 'z-20' : 'z-10',
-                            !isActive && !isPrevious && 'hidden', // Hide non-visible screens
+                            !isActive && !isPrevious && 'hidden',
                             isActive && isEntering && !mainTabs.includes(item.screen) && 'animate-slide-in-from-right',
                             isActive && isAnimatingOut && 'animate-slide-out-to-right'
                         )}
                     >
-                         <ScreenHeader
-                            title={getScreenTitle(item)}
-                            canGoBack={navigationProps.canGoBack && index > 0}
-                            onBack={navigationProps.goBack}
-                            actions={screenProps.headerActions}
-                        />
                          <ScreenComponent {...screenProps} />
                     </div>
                 );

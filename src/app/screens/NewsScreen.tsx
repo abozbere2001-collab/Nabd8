@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { ScreenProps } from '@/app/page';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Search } from 'lucide-react';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { collection, onSnapshot, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import type { NewsArticle } from '@/lib/types';
@@ -28,8 +28,10 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { SearchSheet } from '@/components/SearchSheet';
+import { ProfileButton } from '../AppContentWrapper';
 
-export function NewsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps & { headerActions?: React.ReactNode }) {
+export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { isAdmin } = useAdmin();
   const { db } = useFirestore();
   const [news, setNews] = useState<NewsArticle[]>([]);
@@ -75,7 +77,21 @@ export function NewsScreen({ navigate, goBack, canGoBack, headerActions }: Scree
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="الأخبار" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+      <ScreenHeader 
+        title="الأخبار" 
+        onBack={goBack} 
+        canGoBack={canGoBack} 
+        actions={
+          <div className="flex items-center gap-1">
+              <SearchSheet navigate={navigate}>
+                  <Button variant="ghost" size="icon">
+                      <Search className="h-5 w-5" />
+                  </Button>
+              </SearchSheet>
+              <ProfileButton onProfileClick={() => navigate('Profile')} />
+          </div>
+        }
+      />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {loading ? (
             Array.from({ length: 3 }).map((_, i) => (
@@ -91,16 +107,20 @@ export function NewsScreen({ navigate, goBack, canGoBack, headerActions }: Scree
         ) : news.length > 0 ? (
             news.map((article) => (
               <Card key={article.id}>
+                {article.imageUrl && (
+                    <CardHeader>
+                        <div className="relative aspect-video w-full mb-4">
+                        <Image 
+                            src={article.imageUrl}
+                            alt={article.title}
+                            fill
+                            className="rounded-md object-cover"
+                            data-ai-hint={article.imageHint || "football match"}
+                        />
+                        </div>
+                    </CardHeader>
+                )}
                 <CardHeader>
-                  <div className="relative aspect-video w-full mb-4">
-                    <Image 
-                      src={article.imageUrl}
-                      alt={article.title}
-                      fill
-                      className="rounded-md object-cover"
-                      data-ai-hint={article.imageHint || "football match"}
-                    />
-                  </div>
                   <CardTitle>{article.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
