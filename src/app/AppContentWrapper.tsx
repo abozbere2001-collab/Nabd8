@@ -184,67 +184,54 @@ export function AppContentWrapper() {
   const showBottomNav = mainTabs.includes(activeScreenKey);
 
   const getScreenTitle = (item: StackItem) => {
-    // For specific screens, use dynamic titles from props if available
     if (item.screen === 'CompetitionDetails' && item.props?.title) {
         return item.props.title;
     }
     if (item.screen === 'TeamDetails' && item.props?.teamName) {
         return item.props.teamName;
     }
-    // Default to static title from config
     return screenConfig[item.screen].title;
   };
 
-
-  const renderScreen = (item: StackItem, isActive: boolean) => {
-    const ScreenComponent = screenConfig[item.screen].component;
-    const itemTitle = getScreenTitle(item);
-    
-    if (!ScreenComponent) return <p>Screen not found</p>;
-    
-    return (
-        <div className="flex h-full flex-col bg-background">
-            <ScreenHeader
-                title={itemTitle}
-                canGoBack={navigationProps.canGoBack}
-                onBack={navigationProps.goBack}
-                actions={<ProfileButton onProfileClick={handleProfileClick} onSignOut={handleSignOut} />}
-            />
-            <ScreenComponent {...navigationProps} {...item.props} isVisible={isActive} />
-        </div>
-    );
-  }
+  const itemTitle = getScreenTitle(activeStackItem);
+  const currentProps = { ...navigationProps, ...activeStackItem.props, isVisible: true };
 
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
        <SearchSheet navigate={navigate}>
           <div className='hidden'></div>
        </SearchSheet>
-      <div className="relative flex-1 overflow-hidden">
-        {/* Previous screen for animation */}
-        {previousStackItem && isAnimatingOut && (
-             <div
-                key={previousStackItem.key}
-                className="absolute inset-0 bg-background"
-                style={{ zIndex: stack.length - 2 }}
-             >
-                {renderScreen(previousStackItem, false)}
-             </div>
-        )}
+      
+      <div className="relative flex-1 flex flex-col overflow-hidden">
+        <ScreenHeader
+            title={itemTitle}
+            canGoBack={navigationProps.canGoBack}
+            onBack={navigationProps.goBack}
+            actions={<ProfileButton onProfileClick={handleProfileClick} onSignOut={handleSignOut} />}
+        />
         
-        {/* Active screen */}
-        <div
-            key={activeStackItem.key}
-            className={cn(
-            "absolute inset-0 bg-background",
-            isEntering && !mainTabs.includes(activeStackItem.screen) && 'animate-slide-in-from-right',
-            isAnimatingOut && 'animate-slide-out-to-right'
-            )}
-            style={{ zIndex: stack.length -1 }}
-        >
-           {renderScreen(activeStackItem, true)}
-        </div>
+        <div className="relative flex-1 overflow-hidden">
+            {stack.map((item, index) => {
+                const ScreenComponent = screenConfig[item.screen].component;
+                const isActive = index === stack.length - 1;
+                const isPrevious = index === stack.length - 2;
 
+                return (
+                    <div
+                        key={item.key}
+                        className={cn(
+                            "absolute inset-0 bg-background flex flex-col",
+                            isActive ? 'z-20' : 'z-10',
+                            !isActive && !isPrevious && 'hidden', // Hide non-visible screens
+                            isActive && isEntering && !mainTabs.includes(item.screen) && 'animate-slide-in-from-right',
+                            isActive && isAnimatingOut && 'animate-slide-out-to-right'
+                        )}
+                    >
+                         <ScreenComponent {...navigationProps} {...item.props} isVisible={isActive} />
+                    </div>
+                );
+            })}
+        </div>
       </div>
       
       {showBottomNav && <BottomNav activeScreen={activeScreenKey} onNavigate={navigate} />}

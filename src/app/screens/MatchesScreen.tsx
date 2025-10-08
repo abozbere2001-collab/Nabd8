@@ -375,16 +375,15 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [matchDetails, setMatchDetails] = useState<{ [matchId: string]: MatchDetails }>({});
   
   useEffect(() => {
-    if (!isVisible) return;
-
-    const screenHeader = document.querySelector('[data-id="screen-header-matches"]');
-    const searchButton = document.querySelector('[data-id="search-button"]');
-    const liveSwitch = document.querySelector('[data-id="live-switch-container"]');
-    const actionsContainer = document.querySelector('[data-id="screen-header-actions"]');
-
-    if (screenHeader && searchButton && liveSwitch && actionsContainer) {
-        actionsContainer.appendChild(searchButton);
-        actionsContainer.appendChild(liveSwitch);
+    const screenHeader = document.querySelector('[data-id="screen-header-"]');
+    if (screenHeader) {
+      const actionsContainer = screenHeader.querySelector('[data-id="screen-header-actions"]');
+      const searchButtonContainer = document.getElementById('search-button-container');
+      const liveSwitchContainer = document.getElementById('live-switch-container');
+      if (actionsContainer && searchButtonContainer && liveSwitchContainer) {
+          actionsContainer.appendChild(searchButtonContainer);
+          actionsContainer.appendChild(liveSwitchContainer);
+      }
     }
   }, [isVisible]);
 
@@ -483,13 +482,15 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-        <div id="matches-header-portal" className="hidden">
-             <SearchSheet navigate={navigate}>
-                <Button data-id="search-button" variant="ghost" size="icon">
-                    <Search className="h-5 w-5" />
-                </Button>
-            </SearchSheet>
-             <div data-id="live-switch-container" className="flex items-center gap-2 bg-card border rounded-md p-1">
+        <div id="portal-container" className="fixed top-2 right-2 flex items-center gap-2 z-50">
+             <div id="search-button-container">
+                <SearchSheet navigate={navigate}>
+                    <Button variant="ghost" size="icon">
+                        <Search className="h-5 w-5" />
+                    </Button>
+                </SearchSheet>
+             </div>
+             <div id="live-switch-container" className="flex items-center gap-2 bg-card border rounded-lg p-1.5 shadow">
                 <RadioTower className={cn("h-4 w-4 transition-colors", showLiveOnly ? "text-green-500" : "text-muted-foreground")} />
                 <Switch
                     id="live-mode"
