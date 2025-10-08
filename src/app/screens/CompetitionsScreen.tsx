@@ -323,19 +323,26 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         if (!user || !db) return;
         
         const favRef = doc(db, 'favorites', user.uid);
+        const itemId = type === 'league' ? item.leagueId : item.id;
         const itemPath = `${type}s`;
-        const fieldPath = `${itemPath}.${item.id}`;
-        const isFavorited = !!(favorites as any)?.[itemPath]?.[item.id];
+        const fieldPath = `${itemPath}.${itemId}`;
+        const isFavorited = !!(favorites as any)?.[itemPath]?.[itemId];
 
         let favoriteData: Partial<Favorites> = { userId: user.uid };
-        const payload = {
-            [`${type}Id`]: item.id,
-            name: getName(type, item.id, item.name),
-            logo: type !== 'player' ? item.logo : undefined,
-            photo: type === 'player' ? item.photo : undefined,
-        };
         
-        favoriteData[itemPath as 'leagues' | 'teams' | 'players'] = { [item.id]: payload };
+        const payload: any = { name: getName(type, itemId, item.name) };
+        if (type === 'league') {
+          payload.leagueId = itemId;
+          payload.logo = item.logo;
+        } else if (type === 'team') {
+          payload.teamId = itemId;
+          payload.logo = item.logo;
+        } else if (type === 'player') {
+          payload.playerId = itemId;
+          payload.photo = item.photo;
+        }
+        
+        favoriteData[itemPath as 'leagues' | 'teams' | 'players'] = { [itemId]: payload };
 
         try {
             if (isFavorited) {
