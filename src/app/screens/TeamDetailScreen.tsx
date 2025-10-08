@@ -71,14 +71,16 @@ function useTeamData(teamId?: number) {
         const teamData = await teamRes.json();
         const teamInfo: TeamInfo | null = teamData.response?.[0] || null;
 
+        const seasonForData = teamInfo?.team.type === 'National' ? CURRENT_SEASON - 1 : CURRENT_SEASON;
+        
         // Fetch players for the current season
-        const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`);
+        const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${seasonForData}`);
         if (!playersRes.ok) throw new Error('Failed to fetch players data');
         const playersData = await playersRes.json();
         const allPlayers: PlayerInfoFromApi[] = playersData.response || [];
         
         // Fetch fixtures for the current season only for performance
-        const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
+        const fixturesRes = await fetch(`/api/football/fixtures?team=${teamId}&season=${seasonForData}`);
         if (!fixturesRes.ok) throw new Error('Failed to fetch fixtures data');
         const fixturesData = await fixturesRes.json();
         const fixtures: Fixture[] = fixturesData.response || [];
@@ -92,7 +94,7 @@ function useTeamData(teamId?: number) {
         let standingsData = { response: [] };
         let scorersData = { response: [] };
         if (leagueIdForStandings) {
-            const seasonForStandings = teamInfo?.team.type === 'National' ? new Date(fixtures[0].fixture.date).getFullYear() : CURRENT_SEASON;
+            const seasonForStandings = teamInfo?.team.type === 'National' ? new Date(fixtures[0].fixture.date).getFullYear() : seasonForData;
             const [standingsRes, scorersRes] = await Promise.all([
                  fetch(`/api/football/standings?league=${leagueIdForStandings}&season=${seasonForStandings}`),
                  fetch(`/api/football/players/topscorers?league=${leagueIdForStandings}&season=${seasonForStandings}`)

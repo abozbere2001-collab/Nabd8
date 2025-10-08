@@ -46,6 +46,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [customNames, setCustomNames] = useState<{ teams: Map<number, string>, players: Map<number, string> }>({ teams: new Map(), players: new Map() });
+  const [season, setSeason] = useState<number>(CURRENT_SEASON);
 
   
   const fetchAllCustomNames = useCallback(async () => {
@@ -118,11 +119,27 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       try {
         await fetchAllCustomNames();
 
+        const leagueRes = await fetch(`/api/football/leagues?id=${leagueId}`);
+        const leagueData = await leagueRes.json();
+        const leagueInfo = leagueData.response?.[0];
+        
+        const isNational = leagueInfo?.league.type.toLowerCase() === 'cup' && leagueInfo?.country.name.toLowerCase() === 'world';
+
+        let seasonToFetch = CURRENT_SEASON;
+        if (isNational && leagueInfo?.seasons?.length > 0) {
+            const latestSeason = leagueInfo.seasons.sort((a: any, b: any) => b.year - a.year)[0];
+            if (latestSeason) {
+                seasonToFetch = latestSeason.year;
+            }
+        }
+        setSeason(seasonToFetch);
+
+
         const [fixturesRes, standingsRes, scorersRes, teamsRes] = await Promise.all([
-          fetch(`/api/football/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`),
-          fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
-          fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON}`),
-          fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`)
+          fetch(`/api/football/fixtures?league=${leagueId}&season=${seasonToFetch}`),
+          fetch(`/api/football/standings?league=${leagueId}&season=${seasonToFetch}`),
+          fetch(`/api/football/players/topscorers?league=${leagueId}&season=${seasonToFetch}`),
+          fetch(`/api/football/teams?league=${leagueId}&season=${seasonToFetch}`)
         ]);
 
         const fixturesData = await fixturesRes.json();
@@ -280,7 +297,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
        <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="matches" className="w-full">
            <div className="sticky top-0 bg-background z-10 border-b">
-             <p className="text-center text-xs text-muted-foreground pt-2 pb-2">جميع البيانات تخص موسم {CURRENT_SEASON}</p>
+             <p className="text-center text-xs text-muted-foreground pt-2 pb-2">جميع البيانات تخص موسم {season}</p>
              <TabsList className="grid w-full grid-cols-4 rounded-none h-auto p-0 border-t">
               <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
               <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
