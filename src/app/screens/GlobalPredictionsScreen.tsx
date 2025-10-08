@@ -294,10 +294,9 @@ const useLeagueData = (leagueId: number) => {
             }
             setLoading(true);
             try {
-                // Fetch teams and scorers from the CURRENT season to allow predictions
+                // Fetch teams from current season and scorers from previous to have a list to predict from
                 const [teamsRes, scorersRes] = await Promise.all([
                     fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`),
-                    // Scorers list might be empty for a new season, so we get it from the previous one for selection purposes.
                     fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON - 1}`)
                 ]);
                 const teamsData = await teamsRes.json();
@@ -597,18 +596,11 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             return;
         }
         setLoading(true);
+        setSelectedMatches([]);
+        setPredictions({});
+    
         try {
-            const predsRef = collection(db, 'predictions');
-            const userPredsQuery = query(predsRef, where('userId', '==', user.uid));
-            const userPredsSnapshot = await getDocs(userPredsQuery);
-
-            const allUserPredictions: { [key: number]: Prediction } = {};
-            userPredsSnapshot.forEach(doc => {
-                const pred = doc.data() as Prediction;
-                allUserPredictions[pred.fixtureId] = pred;
-            });
-            setPredictions(allUserPredictions);
-
+            // 1. Get fixture IDs for the selected date
             const dailyDocRef = doc(db, 'dailyGlobalPredictions', dateKey);
             const docSnap = await getDoc(dailyDocRef);
             
@@ -619,20 +611,33 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     fixtureIds = dailyData.selectedMatches.map(m => m.fixtureId);
                 }
             }
-            
+    
             if (fixtureIds.length === 0) {
-                setSelectedMatches([]);
                 setLoading(false);
                 return;
             }
-
+    
+            // 2. Fetch fixture details from API
             const res = await fetch(`/api/football/fixtures?ids=${fixtureIds.join('-')}`);
+            if (!res.ok) throw new Error('Failed to fetch fixtures');
             const data = await res.json();
             const fetchedFixtures = data.response || [];
             setSelectedMatches(fetchedFixtures);
-            
+    
+            // 3. Fetch user's predictions ONLY for these specific fixtures
+            const predsRef = collection(db, 'predictions');
+            const userPredsQuery = query(predsRef, where('userId', '==', user.uid), where('fixtureId', 'in', fixtureIds));
+            const userPredsSnapshot = await getDocs(userPredsQuery);
+    
+            const userPredictionsForDay: { [key: number]: Prediction } = {};
+            userPredsSnapshot.forEach(doc => {
+                const pred = doc.data() as Prediction;
+                userPredictionsForDay[pred.fixtureId] = pred;
+            });
+            setPredictions(userPredictionsForDay);
+    
         } catch (error) {
-             const permissionError = new FirestorePermissionError({ path: `dailyGlobalPredictions or predictions where userId == ${user.uid}`, operation: 'list' });
+             const permissionError = new FirestorePermissionError({ path: `dailyGlobalPredictions or predictions for user ${user.uid}`, operation: 'list' });
              errorEmitter.emit('permission-error', permissionError);
         } finally {
             setLoading(false);
@@ -818,3 +823,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    
