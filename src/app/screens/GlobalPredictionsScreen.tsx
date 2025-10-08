@@ -241,29 +241,37 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 setCalculatingPoints(false);
                 return;
             }
+            
+            // Chunking fixtureIds to avoid Firestore 'in' query limit of 30
+            const chunkSize = 30;
+            const chunks = [];
+            for (let i = 0; i < fixtureIds.length; i += chunkSize) {
+                chunks.push(fixtureIds.slice(i, i + chunkSize));
+            }
 
             const predictionsRef = collection(db, 'predictions');
-            const q = query(predictionsRef, where('fixtureId', 'in', fixtureIds));
-            const predictionsSnapshot = await getDocs(q);
+            const predictionPromises = chunks.map(chunk => getDocs(query(predictionsRef, where('fixtureId', 'in', chunk))));
+            const predictionSnapshots = await Promise.all(predictionPromises);
+
+            const predictionsToUpdate: { ref: DocumentData, points: number, userId: string }[] = [];
+
+            predictionSnapshots.forEach(snapshot => {
+                 snapshot.forEach(doc => {
+                    const prediction = { ...doc.data() } as Prediction;
+                    const fixture = finishedFixtures.find(f => f.fixture.id === prediction.fixtureId);
+
+                    if (fixture) {
+                        const points = calculatePoints(prediction, fixture);
+                        if (prediction.points !== points) {
+                            predictionsToUpdate.push({ ref: doc.ref, points, userId: prediction.userId });
+                        }
+                    }
+                });
+            })
 
             const batch = writeBatch(db);
-            const usersWithNewPoints: { [userId: string]: { points: number, docRef: QueryDocumentSnapshot<DocumentData> } } = {};
-
-            predictionsSnapshot.forEach(doc => {
-                const prediction = { ...doc.data() } as Prediction;
-                const fixture = finishedFixtures.find(f => f.fixture.id === prediction.fixtureId);
-
-                if (fixture) {
-                    const points = calculatePoints(prediction, fixture);
-                    if (prediction.points !== points) {
-                        batch.update(doc.ref, { points: points });
-                    }
-                    if (!usersWithNewPoints[prediction.userId]) {
-                        usersWithNewPoints[prediction.userId] = { points: 0, docRef: doc };
-                    }
-                }
-            });
-
+            predictionsToUpdate.forEach(p => batch.update(p.ref, { points: p.points }));
+            
             // Recalculate total scores for all users
             const allUsersSnapshot = await getDocs(collection(db, 'users'));
             const allUsers = allUsersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as UserProfile }));
@@ -304,13 +312,13 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
         } catch (error: any) {
             console.error("Error calculating points:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل احتساب النقاط.' });
             const permissionError = new FirestorePermissionError({ 
                 path: 'predictions/ or leaderboard/', 
                 operation: 'update',
                 requestResourceData: { details: error.message }
             });
             errorEmitter.emit('permission-error', permissionError);
+            toast({ variant: 'destructive', title: 'خطأ', description: error.message || 'فشل احتساب النقاط.' });
         } finally {
             setCalculatingPoints(false);
         }
@@ -588,3 +596,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+
+    
