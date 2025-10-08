@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { FixedSizeList as List } from 'react-window';
 
 interface SeasonTeamSelectionScreenProps extends ScreenProps {
     leagueId: number;
@@ -103,7 +104,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
             };
             setDoc(predictionDocRef, predictionData, { merge: true })
                 .catch(serverError => {
-                    const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'create', requestResourceData: predictionData });
+                    const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'write', requestResourceData: predictionData });
                     errorEmitter.emit('permission-error', permissionError);
                 });
         }
@@ -112,6 +113,21 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
 
     const handleTeamClick = (teamId: number, teamName: string) => {
         navigate('SeasonPlayerSelection', { leagueId, leagueName, teamId, teamName });
+    };
+
+    const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+        const { team } = teams[index];
+        if (!team) return null;
+        return (
+            <div style={style} className="px-4 py-1">
+                <TeamListItem
+                    team={team}
+                    isPredictedChampion={predictedChampionId === team.id}
+                    onChampionSelect={() => handleChampionSelect(team.id)}
+                    onTeamClick={() => handleTeamClick(team.id, team.name)}
+                />
+            </div>
+        );
     };
 
     if (loading) {
@@ -129,16 +145,19 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
             <div className='p-4 text-center text-sm text-muted-foreground border-b'>
                 <p>اختر الفريق البطل بالضغط على أيقونة الكأس. ثم اضغط على أي فريق لاختيار الهداف من لاعبيه.</p>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {teams.map(({ team }) => (
-                    <TeamListItem
-                        key={team.id}
-                        team={team}
-                        isPredictedChampion={predictedChampionId === team.id}
-                        onChampionSelect={() => handleChampionSelect(team.id)}
-                        onTeamClick={() => handleTeamClick(team.id, team.name)}
-                    />
-                ))}
+            <div className="flex-1 overflow-y-auto">
+                {teams.length > 0 ? (
+                     <List
+                        height={window.innerHeight - 150} // Adjust height based on your layout
+                        itemCount={teams.length}
+                        itemSize={68} // The height of each TeamListItem + padding
+                        width="100%"
+                    >
+                        {Row}
+                    </List>
+                ) : (
+                    <p className="text-center pt-8 text-muted-foreground">لا توجد فرق متاحة لهذا الدوري.</p>
+                )}
             </div>
         </div>
     );
