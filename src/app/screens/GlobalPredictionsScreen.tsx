@@ -10,11 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trophy, Award } from 'lucide-react';
 import { format, isPast, subDays, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
-import type { Fixture, UserScore, Prediction, DailyGlobalPredictions, UserProfile, Team, TopScorer, SeasonPrediction } from '@/lib/types';
+import type { Fixture, UserScore, Prediction, DailyGlobalPredictions, UserProfile, Team, SeasonPrediction, Player } from '@/lib/types';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, where, getDocs, limit, startAfter, type DocumentData, type QueryDocumentSnapshot, writeBatch } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -22,13 +22,8 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { FootballIcon } from '@/components/icons/FootballIcon';
 
 
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -263,7 +258,7 @@ const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
     return 0;
 };
 
-// Season Predictions Components
+// --- Season Predictions Components ---
 const PREMIER_LEAGUE_ID = 39;
 const LALIGA_ID = 140;
 const SERIE_A_ID = 135;
@@ -277,211 +272,121 @@ const seasonLeagues = [
     { id: BUNDESLIGA_ID, name: "الدوري الألماني" },
 ];
 
+interface TeamWithPlayers extends Team {
+    players: { player: Player }[];
+}
 interface LeagueData {
-    teams: { team: Team }[];
-    scorers: TopScorer[];
+    teams: TeamWithPlayers[];
 }
-
-interface AllLeaguesData {
-    [leagueId: number]: LeagueData;
-}
-
-const LeaguePredictionCard = ({ 
-    league, 
-    userId, 
-    leagueData,
-    getCustomTeamName,
-    getCustomPlayerName
-}: { 
-    league: { id: number, name: string }, 
-    userId: string, 
-    leagueData: LeagueData,
-    getCustomTeamName: (id: number, defaultName: string) => string,
-    getCustomPlayerName: (id: number, defaultName: string) => string
-}) => {
-    const { teams, scorers } = leagueData;
-    const { db } = useFirestore();
-    const { toast } = useToast();
-    
-    const [championId, setChampionId] = useState<string | undefined>();
-    const [scorerId, setScorerId] = useState<string | undefined>();
-    const [saving, setSaving] = useState(false);
-    const [initialLoading, setInitialLoading] = useState(true);
-
-
-    const predictionDocRef = useMemo(() => {
-        if (!db) return null;
-        return doc(db, 'seasonPredictions', `${userId}_${league.id}_${CURRENT_SEASON}`);
-    }, [db, userId, league.id]);
-
-    useEffect(() => {
-        if (!predictionDocRef) return;
-        
-        setInitialLoading(true);
-        getDoc(predictionDocRef).then(docSnap => {
-            if (docSnap.exists()) {
-                const data = docSnap.data() as SeasonPrediction;
-                setChampionId(String(data.predictedChampionId));
-                setScorerId(String(data.predictedTopScorerId));
-            }
-        }).catch(error => {
-            const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'get' });
-            errorEmitter.emit('permission-error', permissionError);
-        }).finally(() => {
-            setInitialLoading(false);
-        });
-    }, [predictionDocRef]);
-
-    const handleSave = async () => {
-        if (!championId || !scorerId || !predictionDocRef) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'يرجى اختيار البطل والهداف.' });
-            return;
-        }
-        setSaving(true);
-        const predictionData: SeasonPrediction = {
-            userId,
-            leagueId: league.id,
-            season: CURRENT_SEASON,
-            predictedChampionId: Number(championId),
-            predictedTopScorerId: Number(scorerId),
-            championPoints: 0,
-            topScorerPoints: 0
-        };
-        
-        setDoc(predictionDocRef, predictionData)
-            .then(() => {
-                toast({ title: 'تم الحفظ', description: `تم حفظ توقعاتك لـ ${league.name}.` });
-            })
-            .catch(serverError => {
-                 const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'create', requestResourceData: predictionData });
-                 errorEmitter.emit('permission-error', permissionError);
-            })
-            .finally(() => {
-                setSaving(false);
-            });
-    };
-    
-    if (initialLoading) {
-        return (
-            <div className="p-4 border rounded-lg bg-card space-y-4">
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-            </div>
-        )
-    }
-
-    return (
-        <div className="p-4 border rounded-lg bg-card">
-            <h3 className="font-bold mb-4">{league.name}</h3>
-            <div className="space-y-4">
-                <div>
-                    <label className="text-sm font-medium mb-1 block">توقع البطل</label>
-                     <Select value={championId} onValueChange={setChampionId} dir="rtl">
-                        <SelectTrigger><SelectValue placeholder="اختر الفريق البطل..." /></SelectTrigger>
-                        <SelectContent>
-                            {teams.map(({ team }) => (
-                                <SelectItem key={team.id} value={String(team.id)}>
-                                    {getCustomTeamName(team.id, team.name)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div>
-                    <label className="text-sm font-medium mb-1 block">توقع الهداف</label>
-                     <Select value={scorerId} onValueChange={setScorerId} dir="rtl">
-                        <SelectTrigger><SelectValue placeholder="اختر الهداف..." /></SelectTrigger>
-                        <SelectContent>
-                            {scorers.map(({ player }) => (
-                                <SelectItem key={player.id} value={String(player.id)}>
-                                     {getCustomPlayerName(player.id, player.name)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                 <Button onClick={handleSave} disabled={saving} className="w-full">
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ'}
-                </Button>
-            </div>
-        </div>
-    );
-};
 
 const SeasonPredictionsTab = () => {
     const { user } = useAuth();
     const { db } = useFirestore();
-    const [allLeaguesData, setAllLeaguesData] = useState<AllLeaguesData>({});
+    const { toast } = useToast();
+    const [allLeaguesData, setAllLeaguesData] = useState<Record<number, LeagueData>>({});
+    const [predictions, setPredictions] = useState<Record<number, Partial<SeasonPrediction>>>({});
     const [loading, setLoading] = useState(true);
-    const [customNames, setCustomNames] = useState<{ teams: Map<number, string>, players: Map<number, string> }>({ teams: new Map(), players: new Map() });
-
-
-     const fetchAllCustomNames = useCallback(async () => {
-        if (!db) return;
-        try {
-            const [teamsSnapshot, playersSnapshot] = await Promise.all([
-                getDocs(collection(db, 'teamCustomizations')),
-                getDocs(collection(db, 'playerCustomizations'))
-            ]);
-            
-            const teamNames = new Map<number, string>();
-            teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-            
-            const playerNames = new Map<number, string>();
-            playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
-            
-            setCustomNames({ teams: teamNames, players: playerNames });
-        } catch (error) {
-            const permissionError = new FirestorePermissionError({ path: 'customizations collections', operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
-        }
-    }, [db]);
-
+    const [saving, setSaving] = useState<Record<number, boolean>>({});
 
     useEffect(() => {
-        const fetchAllData = async () => {
-            setLoading(true);
-            await fetchAllCustomNames();
+        if (!user) return;
+        setLoading(true);
 
-            const dataPromises = seasonLeagues.map(async (league) => {
-                try {
-                    const [teamsRes, scorersRes] = await Promise.all([
-                        fetch(`/api/football/teams?league=${league.id}&season=${CURRENT_SEASON}`),
-                        fetch(`/api/football/players/topscorers?league=${league.id}&season=${CURRENT_SEASON - 1}`)
-                    ]);
+        const fetchData = async () => {
+            try {
+                // Fetch all data concurrently
+                const dataPromises = seasonLeagues.map(async (league) => {
+                    const teamsRes = await fetch(`/api/football/teams?league=${league.id}&season=${CURRENT_SEASON}`);
                     const teamsData = await teamsRes.json();
-                    const scorersData = await scorersRes.json();
+                    const teamsWithPlayers: TeamWithPlayers[] = await Promise.all(
+                        (teamsData.response || []).map(async (item: { team: Team }) => {
+                            const playersRes = await fetch(`/api/football/players?team=${item.team.id}&season=${CURRENT_SEASON}`);
+                            const playersData = await playersRes.json();
+                            return { ...item.team, players: playersData.response || [] };
+                        })
+                    );
+                    
+                    const predictionDocRef = doc(db, 'seasonPredictions', `${user.uid}_${league.id}_${CURRENT_SEASON}`);
+                    const docSnap = await getDoc(predictionDocRef);
+                    const existingPrediction = docSnap.exists() ? docSnap.data() as SeasonPrediction : {};
+                    
                     return {
                         leagueId: league.id,
-                        data: {
-                            teams: teamsData.response || [],
-                            scorers: scorersData.response || []
-                        }
+                        data: { teams: teamsWithPlayers },
+                        prediction: existingPrediction,
                     };
-                } catch (error) {
-                    console.error(`Failed to fetch data for league ${league.id}`, error);
-                    return { leagueId: league.id, data: { teams: [], scorers: [] } };
-                }
-            });
+                });
 
-            const results = await Promise.all(dataPromises);
-            const dataByLeague: AllLeaguesData = {};
-            results.forEach(result => {
-                dataByLeague[result.leagueId] = result.data;
-            });
-            
-            setAllLeaguesData(dataByLeague);
-            setLoading(false);
+                const results = await Promise.all(dataPromises);
+                
+                const leaguesData: Record<number, LeagueData> = {};
+                const predsData: Record<number, Partial<SeasonPrediction>> = {};
+                
+                results.forEach(res => {
+                    leaguesData[res.leagueId] = res.data;
+                    predsData[res.leagueId] = res.prediction;
+                });
+                
+                setAllLeaguesData(leaguesData);
+                setPredictions(predsData);
+
+            } catch (error) {
+                console.error("Failed to fetch season prediction data:", error);
+                toast({ variant: 'destructive', title: "خطأ", description: "فشل في تحميل بيانات توقعات الموسم." });
+            } finally {
+                setLoading(false);
+            }
         };
 
-        fetchAllData();
-    }, [fetchAllCustomNames]);
-    
-    const getCustomTeamName = (id: number, defaultName: string) => customNames.teams.get(id) || defaultName;
-    const getCustomPlayerName = (id: number, defaultName: string) => customNames.players.get(id) || defaultName;
+        fetchData();
+    }, [user, db, toast]);
 
+    const handleSelect = (leagueId: number, type: 'champion' | 'scorer', itemId: number) => {
+        setPredictions(prev => ({
+            ...prev,
+            [leagueId]: {
+                ...prev[leagueId],
+                [type === 'champion' ? 'predictedChampionId' : 'predictedTopScorerId']: itemId,
+            },
+        }));
+    };
+
+    const handleSave = async (leagueId: number) => {
+        if (!user) return;
+        const currentPrediction = predictions[leagueId];
+        if (!currentPrediction?.predictedChampionId || !currentPrediction?.predictedTopScorerId) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'يرجى اختيار البطل والهداف.' });
+            return;
+        }
+
+        setSaving(prev => ({ ...prev, [leagueId]: true }));
+        
+        const predictionDocRef = doc(db, 'seasonPredictions', `${user.uid}_${leagueId}_${CURRENT_SEASON}`);
+        const predictionData: SeasonPrediction = {
+            userId: user.uid,
+            leagueId: leagueId,
+            season: CURRENT_SEASON,
+            predictedChampionId: currentPrediction.predictedChampionId,
+            predictedTopScorerId: currentPrediction.predictedTopScorerId,
+        };
+
+        try {
+            await setDoc(predictionDocRef, predictionData, { merge: true });
+            toast({ title: 'تم الحفظ', description: `تم حفظ توقعاتك.` });
+        } catch (serverError) {
+            const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'create', requestResourceData: predictionData });
+            errorEmitter.emit('permission-error', permissionError);
+        } finally {
+            setSaving(prev => ({ ...prev, [leagueId]: false }));
+        }
+    };
+
+    if (loading) {
+        return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    }
+    if (!user) {
+        return <p className="p-4 text-center text-muted-foreground">الرجاء تسجيل الدخول للمشاركة.</p>;
+    }
 
     return (
         <Card>
@@ -492,18 +397,54 @@ const SeasonPredictionsTab = () => {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-            {loading ? <Loader2 className="mx-auto h-8 w-8 animate-spin" /> :
-             !user ? <p>الرجاء تسجيل الدخول للمشاركة.</p> :
-             seasonLeagues.map(league => (
-                <LeaguePredictionCard 
-                    key={league.id} 
-                    league={league} 
-                    userId={user.uid}
-                    leagueData={allLeaguesData[league.id] || { teams: [], scorers: [] }}
-                    getCustomTeamName={getCustomTeamName}
-                    getCustomPlayerName={getCustomPlayerName}
-                />
-            ))}
+                <Accordion type="multiple" className="w-full space-y-4">
+                    {seasonLeagues.map(league => (
+                        <AccordionItem value={`league-${league.id}`} key={league.id} className="rounded-lg border bg-card/50">
+                            <AccordionTrigger className="px-4 py-3 hover:no-underline font-bold text-lg">
+                                {league.name}
+                            </AccordionTrigger>
+                            <AccordionContent className="p-2 space-y-2">
+                                {!allLeaguesData[league.id] ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : (
+                                    <>
+                                        <Accordion type="multiple" className="w-full space-y-2">
+                                            {(allLeaguesData[league.id].teams || []).map(team => (
+                                                <AccordionItem value={`team-${team.id}`} key={team.id} className="rounded-lg border bg-background">
+                                                    <div className="flex items-center pr-4">
+                                                        <AccordionTrigger className="flex-1 py-2 hover:no-underline">
+                                                            <div className="flex items-center gap-3">
+                                                                <Avatar className="h-6 w-6"><AvatarImage src={team.logo} /></Avatar>
+                                                                <span>{team.name}</span>
+                                                            </div>
+                                                        </AccordionTrigger>
+                                                        <Button variant="ghost" size="icon" onClick={() => handleSelect(league.id, 'champion', team.id)}>
+                                                            <Trophy className={cn("h-5 w-5 text-muted-foreground", predictions[league.id]?.predictedChampionId === team.id && "text-yellow-400 fill-current")} />
+                                                        </Button>
+                                                    </div>
+                                                    <AccordionContent className="p-2 space-y-1 max-h-60 overflow-y-auto">
+                                                        {(team.players || []).map(({ player }) => (
+                                                            <div key={player.id} className="flex items-center pr-4">
+                                                                <div className="flex-1 flex items-center gap-3 py-1">
+                                                                    <Avatar className="h-5 w-5"><AvatarImage src={player.photo} /></Avatar>
+                                                                    <span className="text-xs">{player.name}</span>
+                                                                </div>
+                                                                <Button variant="ghost" size="icon" onClick={() => handleSelect(league.id, 'scorer', player.id)}>
+                                                                    <FootballIcon className={cn("h-5 w-5 text-muted-foreground", predictions[league.id]?.predictedTopScorerId === player.id && "text-yellow-400")} />
+                                                                </Button>
+                                                            </div>
+                                                        ))}
+                                                    </AccordionContent>
+                                                </AccordionItem>
+                                            ))}
+                                        </Accordion>
+                                        <Button onClick={() => handleSave(league.id)} disabled={saving[league.id]} className="w-full mt-2">
+                                            {saving[league.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : `حفظ توقعات ${league.name}`}
+                                        </Button>
+                                    </>
+                                )}
+                            </AccordionContent>
+                        </AccordionItem>
+                    ))}
+                </Accordion>
             </CardContent>
         </Card>
     );
@@ -557,19 +498,19 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             }
             
             const chunkSize = 30;
-            const chunks = [];
+            const chunks: number[][] = [];
             for (let i = 0; i < fixtureIds.length; i += chunkSize) {
                 chunks.push(fixtureIds.slice(i, i + chunkSize));
             }
 
-            const predictionsRef = collection(db, 'predictions');
-            const predictionPromises = chunks.map(chunk => getDocs(query(predictionsRef, where('fixtureId', 'in', chunk))));
-            const predictionSnapshots = await Promise.all(predictionPromises);
-
             const predictionsToUpdate: { ref: DocumentData, points: number, userId: string }[] = [];
+            
+            for (const chunk of chunks) {
+                const predictionsRef = collection(db, 'predictions');
+                const q = query(predictionsRef, where('fixtureId', 'in', chunk));
+                const predictionSnapshots = await getDocs(q);
 
-            predictionSnapshots.forEach(snapshot => {
-                 snapshot.forEach(doc => {
+                predictionSnapshots.forEach(doc => {
                     const prediction = { ...doc.data() } as Prediction;
                     const fixture = finishedFixtures.find(f => f.fixture.id === prediction.fixtureId);
 
@@ -580,7 +521,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                         }
                     }
                 });
-            })
+            }
 
             const batch = writeBatch(db);
             predictionsToUpdate.forEach(p => batch.update(p.ref, { points: p.points }));
@@ -717,16 +658,18 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             setSelectedMatches(fetchedFixtures);
     
             // 3. Fetch user's predictions ONLY for these specific fixtures
-            const predsRef = collection(db, 'predictions');
-            const userPredsQuery = query(predsRef, where('userId', '==', user.uid), where('fixtureId', 'in', fixtureIds));
-            const userPredsSnapshot = await getDocs(userPredsQuery);
-    
-            const userPredictionsForDay: { [key: number]: Prediction } = {};
-            userPredsSnapshot.forEach(doc => {
-                const pred = doc.data() as Prediction;
-                userPredictionsForDay[pred.fixtureId] = pred;
-            });
-            setPredictions(userPredictionsForDay);
+            if (fixtureIds.length > 0) {
+                const predsRef = collection(db, 'predictions');
+                const userPredsQuery = query(predsRef, where('userId', '==', user.uid), where('fixtureId', 'in', fixtureIds));
+                const userPredsSnapshot = await getDocs(userPredsQuery);
+        
+                const userPredictionsForDay: { [key: number]: Prediction } = {};
+                userPredsSnapshot.forEach(doc => {
+                    const pred = doc.data() as Prediction;
+                    userPredictionsForDay[pred.fixtureId] = pred;
+                });
+                setPredictions(userPredictionsForDay);
+            }
     
         } catch (error) {
              const permissionError = new FirestorePermissionError({ path: `dailyGlobalPredictions or predictions for user ${user.uid}`, operation: 'list' });
@@ -903,6 +846,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
-
 
     

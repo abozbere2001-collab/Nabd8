@@ -127,3 +127,5 @@ export interface SeasonPrediction {
     championPoints?: number;
     topScorerPoints?: number;
 }
+
+    
