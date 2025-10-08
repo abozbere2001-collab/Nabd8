@@ -71,7 +71,7 @@ interface PlayerInfoFromApi {
 
 
 // --- CONSTANTS ---
-const CURRENT_SEASON = new Date().getFullYear();
+const CURRENT_SEASON = 2025;
 const countryToContinent: { [key: string]: string } = {
     "World": "World", "England": "Europe", "Spain": "Europe", "Germany": "Europe", "Italy": "Europe", "France": "Europe",
     "Netherlands": "Europe", "Portugal": "Europe", "Belgium": "Europe", "Russia": "Europe", "Turkey": "Europe",
@@ -323,7 +323,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         if (!user || !db) return;
         
         const favRef = doc(db, 'favorites', user.uid);
-        const itemId = type === 'league' ? item.leagueId : item.id;
+        const itemId = item.id ?? item.leagueId;
         const itemPath = `${type}s`;
         const fieldPath = `${itemPath}.${itemId}`;
         const isFavorited = !!(favorites as any)?.[itemPath]?.[itemId];
@@ -331,7 +331,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         let favoriteData: Partial<Favorites> = { userId: user.uid };
         
         const payload: any = { name: getName(type, itemId, item.name) };
-        if (type === 'league') {
+         if (type === 'league') {
           payload.leagueId = itemId;
           payload.logo = item.logo;
         } else if (type === 'team') {
@@ -353,7 +353,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         } catch (error) {
              const permissionError = new FirestorePermissionError({ 
                 path: favRef.path, 
-                operation: 'update',
+                operation: isFavorited ? 'update' : 'create',
                 requestResourceData: favoriteData 
             });
             errorEmitter.emit('permission-error', permissionError);
@@ -546,3 +546,5 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack, headerActions 
         </div>
     );
 }
+
+    

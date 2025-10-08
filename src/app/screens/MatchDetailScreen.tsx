@@ -93,7 +93,7 @@ type RenameType = 'team' | 'player' | 'coach';
 
 type EventFilter = "all" | "highlights";
 
-const CURRENT_SEASON = new Date().getFullYear();
+const CURRENT_SEASON = 2025;
 
 // --- API FETCH HOOK ---
 function useMatchData(fixture?: Fixture) {
@@ -667,5 +667,7 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
     </div>
   );
 }
+
+    
 
     

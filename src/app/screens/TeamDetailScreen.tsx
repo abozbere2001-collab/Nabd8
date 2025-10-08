@@ -42,7 +42,7 @@ interface PlayerInfoFromApi {
 }
 type RenameType = 'team' | 'player';
 
-const CURRENT_SEASON = new Date().getFullYear();
+const CURRENT_SEASON = 2025;
 
 // --- HOOKS ---
 function useTeamData(teamId?: number) {  
@@ -462,3 +462,5 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     </div>
   );
 }
+
+    

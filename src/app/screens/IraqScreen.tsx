@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -25,7 +26,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 
 
 const IRAQI_LEAGUE_ID = 542;
-const CURRENT_SEASON = new Date().getFullYear();
+const CURRENT_SEASON = 2025;
 
 
 const FixtureItem = React.memo(({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
@@ -557,3 +558,5 @@ export function IraqScreen({ navigate, goBack, canGoBack, headerActions }: Scree
     </div>
   );
 }
+
+    

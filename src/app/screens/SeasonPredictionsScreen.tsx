@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -25,7 +26,7 @@ const PREMIER_LEAGUE_ID = 39;
 const LALIGA_ID = 140;
 const SERIE_A_ID = 135;
 const BUNDESLIGA_ID = 78;
-const CURRENT_SEASON = new Date().getFullYear();
+const CURRENT_SEASON = 2025;
 
 const leagues = [
     { id: PREMIER_LEAGUE_ID, name: "الدوري الإنجليزي الممتاز" },
@@ -51,9 +52,10 @@ const useLeagueData = (leagueId: number) => {
             }
             setLoading(true);
             try {
+                // Fetch teams for the upcoming season, but scorers from the previous one
                 const [teamsRes, scorersRes] = await Promise.all([
                     fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`),
-                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON}`)
+                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON - 1}`)
                 ]);
                 const teamsData = await teamsRes.json();
                 const scorersData = await scorersRes.json();
@@ -199,6 +201,8 @@ export function SeasonPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    
 
     
 

@@ -23,7 +23,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 
 type RenameType = 'league' | 'team' | 'player';
 
-const CURRENT_SEASON = new Date().getFullYear();
+const CURRENT_SEASON = 2025;
 
 export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo, headerActions }: ScreenProps & { title?: string, leagueId?: number, logo?: string, headerActions?: React.ReactNode }) {
   const { isAdmin } = useAdmin();
@@ -501,3 +501,5 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+
+    
