@@ -106,7 +106,6 @@ const FixtureSelectionItem = ({ fixture, isSelected, onSelectionChange }: { fixt
 export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
     const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
     const [allFixtures, setAllFixtures] = useState<Fixture[]>([]);
-    const [filteredFixtures, setFilteredFixtures] = useState<Fixture[]>([]);
     const [selectedFixtureIds, setSelectedFixtureIds] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -115,47 +114,32 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
 
     const MAX_SELECTIONS = 15;
 
-    // Fetch admin's favorite teams and then filter fixtures
+    // Fetch fixtures for the selected date
     useEffect(() => {
-        const fetchAndFilter = async () => {
-            if (!db) return;
+        const fetchFixtures = async () => {
             setLoading(true);
-            const adminFavsRef = collection(db, 'adminFavorites');
-            
             try {
-                // 1. Fetch Admin Favorite Teams
-                const adminFavsSnapshot = await getDocs(adminFavsRef);
-                const adminFavoriteTeamIds = new Set<number>();
-                adminFavsSnapshot.forEach(doc => {
-                    adminFavoriteTeamIds.add((doc.data() as AdminFavorite).teamId);
-                });
-
-                // 2. Fetch all fixtures for the date
                 const res = await fetch(`/api/football/fixtures?date=${selectedDateKey}`);
-                const data = await res.json();
-                const allFetchedFixtures = data.response || [];
-                setAllFixtures(allFetchedFixtures);
-
-                // 3. Filter fixtures based on admin favorites
-                if (adminFavoriteTeamIds.size > 0) {
-                    const filtered = allFetchedFixtures.filter((f: Fixture) =>
-                        adminFavoriteTeamIds.has(f.teams.home.id) ||
-                        adminFavoriteTeamIds.has(f.teams.away.id)
-                    );
-                    setFilteredFixtures(filtered);
-                } else {
-                    setFilteredFixtures(allFetchedFixtures); // If no favs, show all
+                if (!res.ok) {
+                    throw new Error('Failed to fetch fixtures');
                 }
-
+                const data = await res.json();
+                setAllFixtures(data.response || []);
             } catch (error) {
-                const permissionError = new FirestorePermissionError({ path: adminFavsRef.path, operation: 'list' });
-                errorEmitter.emit('permission-error', permissionError);
+                console.error("Error fetching fixtures:", error);
+                toast({
+                    variant: "destructive",
+                    title: "خطأ في الشبكة",
+                    description: "فشل في جلب مباريات اليوم.",
+                });
+                setAllFixtures([]);
             } finally {
                 setLoading(false);
             }
         };
-        fetchAndFilter();
-    }, [selectedDateKey, db]);
+        fetchFixtures();
+    }, [selectedDateKey, toast]);
+
 
     // Fetch existing selections for the selected date from Firestore
     useEffect(() => {
@@ -247,8 +231,8 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {loading ? (
                     Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
-                ) : filteredFixtures.length > 0 ? (
-                    filteredFixtures.map(fixture => (
+                ) : allFixtures.length > 0 ? (
+                    allFixtures.map(fixture => (
                         <FixtureSelectionItem
                             key={fixture.fixture.id}
                             fixture={fixture}
@@ -259,7 +243,7 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
                 ) : (
                     <Card>
                         <CardContent className="p-6 text-center text-muted-foreground">
-                            <p>لا توجد مباريات لفرقك المفضلة في هذا اليوم.</p>
+                            <p>لا توجد مباريات في هذا اليوم.</p>
                         </CardContent>
                     </Card>
                 )}
@@ -276,4 +260,3 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
         </div>
     );
 }
-
