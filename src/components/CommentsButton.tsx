@@ -76,21 +76,23 @@ export function CommentsButton({ matchId, navigate, commentsEnabled }: CommentsB
         });
   }
 
-  const handleTouchStart = () => {
+  const handleTouchStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
     pressTimer.current = setTimeout(() => {
         setDeactivateAlertOpen(true);
     }, 700); // 700ms for long press
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
     if (pressTimer.current) {
         clearTimeout(pressTimer.current);
         pressTimer.current = null;
     }
   };
   
-  const handleClick = () => {
-    // This ensures that the click event doesn't fire if a long press was detected.
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if(pressTimer.current === null) {
       navigate('Comments', { matchId });
     }
