@@ -391,65 +391,31 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
 
 const ODDS_STORAGE_KEY = 'goalstack-showOdds';
 
+type TabName = 'all-matches' | 'my-results';
+type Cache<T> = { [date: string]: T };
+
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: baseHeaderActions }: ScreenProps & { headerActions?: React.ReactNode }) {
   const { user } = useAuth();
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
-  const [activeTab, setActiveTab] = useState<'all-matches' | 'my-results' | 'global-predictions'>('my-results');
+  const [activeTab, setActiveTab] = useState<TabName>('my-results');
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
-  const [fixtures, setFixtures] = useState<Fixture[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  const [odds, setOdds] = useState<{ [fixtureId: number]: any }>({});
-  const [showOdds, setShowOdds] = useState(false);
+
+  // State for data and loading status
+  const [fixturesCache, setFixturesCache] = useState<Cache<Fixture[]>>({});
+  const [oddsCache, setOddsCache] = useState<Cache<{ [fixtureId: number]: any }>>({});
+  const [loadingFixtures, setLoadingFixtures] = useState(true);
   const [loadingOdds, setLoadingOdds] = useState(false);
+  const [loadedTabs, setLoadedTabs] = useState<Set<TabName>>(new Set(['my-results']));
+
+  // Controls for UI toggles
+  const [showOdds, setShowOdds] = useState(false);
   const [showLiveOnly, setShowLiveOnly] = useState(false);
 
   const [matchDetails, setMatchDetails] = useState<{ [matchId: string]: MatchDetails }>({});
-
-
-  useEffect(() => {
-      if (!db) return;
-      const fetchAndListenToMatchDetails = () => {
-          const matchesColRef = collection(db, 'matches');
-          
-          // Initial fetch
-          getDocs(matchesColRef).then(snapshot => {
-              const details: { [matchId: string]: MatchDetails } = {};
-              snapshot.forEach(doc => {
-                  details[doc.id] = doc.data() as MatchDetails;
-              });
-              setMatchDetails(details);
-          }).catch(error => {
-              const permissionError = new FirestorePermissionError({
-                  path: matchesColRef.path,
-                  operation: 'list',
-              });
-              errorEmitter.emit('permission-error', permissionError);
-          });
-          
-          // Real-time listener
-          const unsubscribe = onSnapshot(matchesColRef, (snapshot) => {
-              const details: { [matchId: string]: MatchDetails } = {};
-              snapshot.forEach(doc => {
-                  details[doc.id] = doc.data() as MatchDetails;
-              });
-              setMatchDetails(prevDetails => ({ ...prevDetails, ...details }));
-          }, (error) => {
-              const permissionError = new FirestorePermissionError({ path: 'matches', operation: 'list' });
-              errorEmitter.emit('permission-error', permissionError);
-          });
-
-          return unsubscribe;
-      };
-      
-      const unsubscribe = fetchAndListenToMatchDetails();
-      return () => unsubscribe && unsubscribe();
-  }, [db]);
-
-
+  
   useEffect(() => {
     try {
       const savedState = localStorage.getItem(ODDS_STORAGE_KEY);
@@ -458,58 +424,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
       console.warn('Could not access localStorage:', error);
     }
   }, []);
-  
-  const fetchOddsForDate = useCallback(async (dateKey: string) => {
-      setLoadingOdds(true);
-      const url = `/api/football/odds?date=${dateKey}&bookmaker=8&bet=1`;
-      try {
-          const response = await fetch(url);
-          if (!response.ok) throw new Error('Failed to fetch odds');
-          const data = await response.json();
-          const oddsByFixture: { [fixtureId: number]: any } = {};
-          (data.response as Odds[]).forEach(item => {
-              const matchWinnerBet = item.bookmakers[0]?.bets.find(b => b.id === 1);
-              if (matchWinnerBet) {
-                  oddsByFixture[item.fixture.id] = matchWinnerBet.values;
-              }
-          });
-          setOdds(oddsByFixture);
-      } catch (error) {
-          console.error("Error fetching odds:", error);
-          setOdds({});
-      } finally {
-          setLoadingOdds(false);
-      }
-  }, []);
 
-
-  useEffect(() => {
-    if (activeTab === 'global-predictions') {
-      return;
-    }
-    async function fetchFixturesForDate(dateKey: string) {
-        setLoading(true);
-        if(showOdds) {
-            fetchOddsForDate(dateKey);
-        } else {
-            setOdds({});
-        }
-        const url = `/api/football/fixtures?date=${dateKey}`;
-        try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Failed to fetch');
-            const data = await response.json();
-            setFixtures(data.response || []);
-        } catch (error) {
-            console.error(`Failed to fetch fixtures for ${dateKey}:`, error);
-            setFixtures([]);
-        } finally {
-            setLoading(false);
-        }
-    }
-    fetchFixturesForDate(selectedDateKey);
-  }, [selectedDateKey, showOdds, activeTab, fetchOddsForDate]);
-  
+  // Fetch user favorites
   useEffect(() => {
     if (!user || !db) {
         setFavorites({userId: ''});
@@ -529,11 +445,99 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
     return () => unsubscribe();
   }, [user, db]);
   
+  // Listen to match details from Firestore
+  useEffect(() => {
+      if (!db) return;
+      const matchesColRef = collection(db, 'matches');
+      const unsubscribe = onSnapshot(matchesColRef, (snapshot) => {
+          const details: { [matchId: string]: MatchDetails } = {};
+          snapshot.forEach(doc => {
+              details[doc.id] = doc.data() as MatchDetails;
+          });
+          setMatchDetails(prevDetails => ({ ...prevDetails, ...details }));
+      }, (error) => {
+          const permissionError = new FirestorePermissionError({ path: 'matches', operation: 'list' });
+          errorEmitter.emit('permission-error', permissionError);
+      });
+      return () => unsubscribe();
+  }, [db]);
+
+
+  const fetchFixturesForDate = useCallback(async (dateKey: string) => {
+    if (fixturesCache[dateKey]) {
+      setLoadingFixtures(false);
+      return; // Use cached data
+    }
+    setLoadingFixtures(true);
+    const url = `/api/football/fixtures?date=${dateKey}`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch fixtures');
+        const data = await response.json();
+        const fixtures = data.response || [];
+        setFixturesCache(prev => ({ ...prev, [dateKey]: fixtures }));
+    } catch (error) {
+        console.error(`Failed to fetch fixtures for ${dateKey}:`, error);
+        setFixturesCache(prev => ({ ...prev, [dateKey]: [] })); // Cache empty array on error
+    } finally {
+        setLoadingFixtures(false);
+    }
+  }, [fixturesCache]);
+
+
+  const fetchOddsForDate = useCallback(async (dateKey: string) => {
+    if (!showOdds || oddsCache[dateKey]) {
+        setLoadingOdds(false);
+        return; // Don't fetch if not requested or already cached
+    }
+    setLoadingOdds(true);
+    const url = `/api/football/odds?date=${dateKey}&bookmaker=8&bet=1`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch odds');
+        const data = await response.json();
+        const oddsByFixture: { [fixtureId: number]: any } = {};
+        (data.response as Odds[]).forEach(item => {
+            const matchWinnerBet = item.bookmakers[0]?.bets.find(b => b.id === 1);
+            if (matchWinnerBet) {
+                oddsByFixture[item.fixture.id] = matchWinnerBet.values;
+            }
+        });
+        setOddsCache(prev => ({ ...prev, [dateKey]: oddsByFixture }));
+    } catch (error) {
+        console.error("Error fetching odds:", error);
+        setOddsCache(prev => ({ ...prev, [dateKey]: {} })); // Cache empty object on error
+    } finally {
+        setLoadingOdds(false);
+    }
+  }, [showOdds, oddsCache]);
+  
+  // Effect to trigger data fetching based on selected date and active tab
+  useEffect(() => {
+    if (activeTab === 'global-predictions') return;
+    
+    setLoadedTabs(prev => new Set(prev).add(activeTab));
+
+    const loadData = async () => {
+        await fetchFixturesForDate(selectedDateKey);
+        // Fetch odds only after fixtures have been fetched (or are already cached)
+        fetchOddsForDate(selectedDateKey);
+    };
+
+    loadData();
+  }, [selectedDateKey, activeTab, fetchFixturesForDate, fetchOddsForDate]);
+
+
+  const handleDateChange = (dateKey: string) => {
+      setSelectedDateKey(dateKey);
+      // Reset loaded tabs for the new date to enforce lazy loading again
+      setLoadedTabs(new Set([activeTab]));
+  };
+  
   const handleTabChange = (value: string) => {
     const tabValue = value as 'all-matches' | 'my-results' | 'global-predictions';
     if (tabValue === 'global-predictions') {
       navigate('GlobalPredictions');
-      // Keep the old tab active visually until navigation happens
     } else {
       setActiveTab(tabValue);
     }
@@ -547,6 +551,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   const toggleShowOdds = () => {
     const newShowOdds = !showOdds;
     setShowOdds(newShowOdds);
+    if(newShowOdds) {
+      // Trigger odds fetching for the current date if not already cached
+      fetchOddsForDate(selectedDateKey);
+    }
     try {
       localStorage.setItem(ODDS_STORAGE_KEY, String(newShowOdds));
     } catch (error) {
@@ -578,6 +586,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
     </div>
   )
 
+  const currentFixtures = fixturesCache[selectedDateKey] || [];
+  const currentOdds = oddsCache[selectedDateKey] || {};
+
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={screenHeaderActions} />
@@ -591,22 +602,24 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
               </TabsList>
             </Tabs>
             <div className="py-2">
-                <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
+                <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
             </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <FixturesList 
-            fixtures={fixtures}
-            loading={loading}
-            activeTab={activeTab}
-            showLiveOnly={showLiveOnly} 
-            favoritedLeagueIds={favoritedLeagueIds}
-            favoritedTeamIds={favoritedTeamIds}
-            hasAnyFavorites={hasAnyFavorites}
-            odds={odds}
-            matchDetails={matchDetails}
-            navigate={navigate}
-        />
+        {loadedTabs.has(activeTab) && 
+            <FixturesList 
+                fixtures={currentFixtures}
+                loading={loadingFixtures}
+                activeTab={activeTab}
+                showLiveOnly={showLiveOnly} 
+                favoritedLeagueIds={favoritedLeagueIds}
+                favoritedTeamIds={favoritedTeamIds}
+                hasAnyFavorites={hasAnyFavorites}
+                odds={currentOdds}
+                matchDetails={matchDetails}
+                navigate={navigate}
+            />
+        }
         </div>
       </div>
     </div>
