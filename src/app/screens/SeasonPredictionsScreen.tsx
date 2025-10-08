@@ -26,6 +26,8 @@ const LALIGA_ID = 140;
 const SERIE_A_ID = 135;
 const BUNDESLIGA_ID = 78;
 const CURRENT_SEASON = 2025;
+const PREVIOUS_SEASON = 2024;
+
 
 const leagues = [
     { id: PREMIER_LEAGUE_ID, name: "الدوري الإنجليزي الممتاز" },
@@ -53,7 +55,7 @@ const useLeagueData = (leagueId: number) => {
             try {
                 const [teamsRes, scorersRes] = await Promise.all([
                     fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`),
-                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON}`)
+                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${PREVIOUS_SEASON}`)
                 ]);
                 const teamsData = await teamsRes.json();
                 const scorersData = await scorersRes.json();
@@ -186,7 +188,7 @@ export function SeasonPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     <CardHeader>
                         <CardTitle>توقع بطل الموسم وهداف الدوري</CardTitle>
                         <CardDescription>
-                            سيتم منح 50 نقطة لتوقع البطل الصحيح و 25 نقطة لتوقع الهداف الصحيح في نهاية الموسم لكل دوري.
+                            سيتم منح 100 نقطة لتوقع البطل الصحيح و 75 نقطة لتوقع الهداف الصحيح في نهاية الموسم لكل دوري.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -201,3 +203,5 @@ export function SeasonPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 }
 
     
+
+      

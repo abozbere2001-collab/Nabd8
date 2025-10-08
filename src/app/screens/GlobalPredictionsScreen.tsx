@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, Trophy, Award } from 'lucide-react';
+import { Loader2, Trophy, Award, Info } from 'lucide-react';
 import { format, isPast, subDays, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
@@ -24,6 +24,15 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { FootballIcon } from '@/components/icons/FootballIcon';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+  AlertDialogFooter,
+} from "@/components/ui/alert-dialog";
 
 
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -264,6 +273,8 @@ const LALIGA_ID = 140;
 const SERIE_A_ID = 135;
 const BUNDESLIGA_ID = 78;
 const CURRENT_SEASON = 2025;
+const PREVIOUS_SEASON = 2024;
+
 
 const seasonLeagues = [
     { id: PREMIER_LEAGUE_ID, name: "الدوري الإنجليزي الممتاز" },
@@ -278,15 +289,29 @@ interface TeamWithPlayers extends Team {
 interface LeagueData {
     teams: TeamWithPlayers[];
 }
+interface AllLeaguesData {
+    [leagueId: number]: LeagueData;
+}
+interface CustomNames {
+    teams: Map<number, string>;
+    players: Map<number, string>;
+}
+
 
 const SeasonPredictionsTab = () => {
     const { user } = useAuth();
     const { db } = useFirestore();
     const { toast } = useToast();
-    const [allLeaguesData, setAllLeaguesData] = useState<Record<number, LeagueData>>({});
+    const [allLeaguesData, setAllLeaguesData] = useState<AllLeaguesData>({});
     const [predictions, setPredictions] = useState<Record<number, Partial<SeasonPrediction>>>({});
+    const [customNames, setCustomNames] = useState<CustomNames>({ teams: new Map(), players: new Map() });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<Record<number, boolean>>({});
+
+    const getDisplayName = useCallback((type: 'team' | 'player', id: number, defaultName: string) => {
+        const map = type === 'team' ? customNames.teams : customNames.players;
+        return map.get(id) || defaultName;
+    }, [customNames]);
 
     useEffect(() => {
         if (!user) return;
@@ -294,7 +319,18 @@ const SeasonPredictionsTab = () => {
 
         const fetchData = async () => {
             try {
-                // Fetch all data concurrently
+                // 1. Fetch custom names first
+                const [teamsSnapshot, playersSnapshot] = await Promise.all([
+                    getDocs(collection(db, 'teamCustomizations')),
+                    getDocs(collection(db, 'playerCustomizations')),
+                ]);
+                const teamNames = new Map<number, string>();
+                teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+                const playerNames = new Map<number, string>();
+                playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
+                setCustomNames({ teams: teamNames, players: playerNames });
+
+                // 2. Fetch all league data concurrently
                 const dataPromises = seasonLeagues.map(async (league) => {
                     const teamsRes = await fetch(`/api/football/teams?league=${league.id}&season=${CURRENT_SEASON}`);
                     const teamsData = await teamsRes.json();
@@ -305,11 +341,11 @@ const SeasonPredictionsTab = () => {
                             return { ...item.team, players: playersData.response || [] };
                         })
                     );
-                    
+
                     const predictionDocRef = doc(db, 'seasonPredictions', `${user.uid}_${league.id}_${CURRENT_SEASON}`);
                     const docSnap = await getDoc(predictionDocRef);
                     const existingPrediction = docSnap.exists() ? docSnap.data() as SeasonPrediction : {};
-                    
+
                     return {
                         leagueId: league.id,
                         data: { teams: teamsWithPlayers },
@@ -318,15 +354,15 @@ const SeasonPredictionsTab = () => {
                 });
 
                 const results = await Promise.all(dataPromises);
-                
+
                 const leaguesData: Record<number, LeagueData> = {};
                 const predsData: Record<number, Partial<SeasonPrediction>> = {};
-                
+
                 results.forEach(res => {
                     leaguesData[res.leagueId] = res.data;
                     predsData[res.leagueId] = res.prediction;
                 });
-                
+
                 setAllLeaguesData(leaguesData);
                 setPredictions(predsData);
 
@@ -350,7 +386,7 @@ const SeasonPredictionsTab = () => {
             },
         }));
     };
-
+    
     const handleSave = async (leagueId: number) => {
         if (!user) return;
         const currentPrediction = predictions[leagueId];
@@ -393,7 +429,7 @@ const SeasonPredictionsTab = () => {
             <CardHeader>
                 <CardTitle>توقع بطل الموسم وهداف الدوري</CardTitle>
                 <CardDescription>
-                    سيتم منح 50 نقطة لتوقع البطل الصحيح و 25 نقطة لتوقع الهداف الصحيح في نهاية الموسم لكل دوري.
+                    سيتم منح 100 نقطة لتوقع البطل الصحيح و 75 نقطة لتوقع الهداف الصحيح في نهاية الموسم لكل دوري.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -413,7 +449,7 @@ const SeasonPredictionsTab = () => {
                                                         <AccordionTrigger className="flex-1 py-2 hover:no-underline">
                                                             <div className="flex items-center gap-3">
                                                                 <Avatar className="h-6 w-6"><AvatarImage src={team.logo} /></Avatar>
-                                                                <span>{team.name}</span>
+                                                                <span>{getDisplayName('team', team.id, team.name)}</span>
                                                             </div>
                                                         </AccordionTrigger>
                                                         <Button variant="ghost" size="icon" onClick={() => handleSelect(league.id, 'champion', team.id)}>
@@ -425,7 +461,7 @@ const SeasonPredictionsTab = () => {
                                                             <div key={player.id} className="flex items-center pr-4">
                                                                 <div className="flex-1 flex items-center gap-3 py-1">
                                                                     <Avatar className="h-5 w-5"><AvatarImage src={player.photo} /></Avatar>
-                                                                    <span className="text-xs">{player.name}</span>
+                                                                    <span className="text-xs">{getDisplayName('player', player.id, player.name)}</span>
                                                                 </div>
                                                                 <Button variant="ghost" size="icon" onClick={() => handleSelect(league.id, 'scorer', player.id)}>
                                                                     <FootballIcon className={cn("h-5 w-5 text-muted-foreground", predictions[league.id]?.predictedTopScorerId === player.id && "text-yellow-400")} />
@@ -449,6 +485,52 @@ const SeasonPredictionsTab = () => {
         </Card>
     );
 };
+
+const PredictionsInfoDialog = () => (
+    <AlertDialog>
+        <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="icon">
+                <Info className="h-5 w-5" />
+            </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>شرح نظام التوقعات</AlertDialogTitle>
+                <AlertDialogDescription>
+                    <div className="space-y-4 mt-4 text-right text-foreground">
+                        <div>
+                            <h4 className="font-bold mb-2">التوقعات اليومية:</h4>
+                            <ul className="list-disc pr-4 space-y-1">
+                                <li>يمكنك توقع نتيجة المباريات المختارة لكل يوم.</li>
+                                <li>يتم إغلاق التوقع مع بداية المباراة.</li>
+                                <li><span className="font-semibold text-green-500">5 نقاط</span> لتوقع النتيجة الصحيحة تمامًا.</li>
+                                <li><span className="font-semibold text-yellow-500">3 نقاط</span> لتوقع الفائز الصحيح أو التعادل (بنتيجة مختلفة).</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-bold mb-2">توقعات الموسم:</h4>
+                            <ul className="list-disc pr-4 space-y-1">
+                                <li>يمكنك توقع بطل وهداف الدوريات الكبرى في بداية الموسم.</li>
+                                <li><span className="font-semibold text-blue-500">100 نقطة</span> لتوقع البطل الصحيح في نهاية الموسم.</li>
+                                <li><span className="font-semibold text-purple-500">75 نقطة</span> لتوقع الهداف الصحيح في نهاية الموسم.</li>
+                            </ul>
+                        </div>
+                        <p className="font-bold pt-4">يتم تحديث لوحة الصدارة بناءً على مجموع نقاطك من جميع أنواع التوقعات. بالتوفيق!</p>
+                    </div>
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                 <Button onClick={() => {
+                    const trigger = document.querySelector('[aria-label="Close"]');
+                    if (trigger instanceof HTMLElement) {
+                      trigger.click();
+                    }
+                  }}>فهمت</Button>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+);
+
 
 // --- Main Screen ---
 export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
@@ -713,7 +795,17 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title="التوقعات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+             <ScreenHeader 
+                title="التوقعات" 
+                onBack={goBack} 
+                canGoBack={canGoBack} 
+                actions={
+                    <>
+                        <PredictionsInfoDialog />
+                        {headerActions}
+                    </>
+                }
+            />
             <div className="flex-1 overflow-y-auto">
                 <Tabs defaultValue="predictions" className="w-full">
                     <div className="sticky top-0 bg-background z-10 border-b">
@@ -848,3 +940,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 }
 
     
+
+      
