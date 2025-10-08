@@ -129,7 +129,7 @@ const LiveTimer = ({ startTime, status, elapsed }: { startTime: number, status: 
 };
 
 // Fixture Item Component
-const FixtureItem = React.memo(({ fixture, navigate, odds, commentsEnabled }: { fixture: Fixture, navigate: ScreenProps['navigate'], odds?: Odds['bookmakers'][0]['bets'][0]['values'], commentsEnabled?: boolean }) => {
+const FixtureItem = React.memo(({ fixture, navigate, odds, commentsEnabled }: { fixture: Fixture, navigate: ScreenProps['navigate'], odds?: { value: string; odd: string }[], commentsEnabled?: boolean }) => {
     
     const homeOdd = odds?.find(o => o.value === 'Home')?.odd;
     const drawOdd = odds?.find(o => o.value === 'Draw')?.odd;
@@ -228,7 +228,7 @@ const FixturesList = ({
     hasAnyFavorites: boolean,
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
-    odds: { [fixtureId: number]: Odds['bookmakers'][0]['bets'][0]['values'] },
+    odds: { [fixtureId: number]: { value: string; odd: string }[] },
     matchDetails: { [matchId: string]: MatchDetails },
     navigate: ScreenProps['navigate'],
 }) => {
@@ -291,10 +291,10 @@ const FixturesList = ({
         )
     }
 
-    if (fixtures.length > 0 && filteredFixtures.length === 0) {
+    if (fixtures.length > 0 && filteredFixtures.length === 0 && activeTab === 'my-results') {
        return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
-                <p className="font-bold text-lg">لا توجد مباريات لهذا اليوم</p>
+                <p className="font-bold text-lg">لا توجد مباريات لمفضلاتك هذا اليوم</p>
             </div>
         );
     }
@@ -315,12 +315,16 @@ const FixturesList = ({
             {sortedLeagues.map(leagueName => {
                 const { league, fixtures } = groupedFixtures[leagueName];
                 return (
-                    <div key={leagueName} className="space-y-2">
-                        <h3 className="font-bold text-foreground px-1 py-2">{leagueName}</h3>
-                        <div className="space-y-2">
-                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} odds={odds[f.fixture.id]} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} />)}
-                        </div>
-                    </div>
+                    <Accordion type="single" collapsible defaultValue="item-1" key={leagueName}>
+                        <AccordionItem value="item-1">
+                            <AccordionTrigger className="font-bold text-foreground">
+                               {leagueName}
+                            </AccordionTrigger>
+                            <AccordionContent className="space-y-2">
+                                {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} odds={odds[f.fixture.id]} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} />)}
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                 )
             })}
         </div>
@@ -455,7 +459,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
     }
   }, []);
   
-  const fetchOddsForDate = async (dateKey: string) => {
+  const fetchOddsForDate = useCallback(async (dateKey: string) => {
       setLoadingOdds(true);
       const url = `/api/football/odds?date=${dateKey}&bookmaker=8&bet=1`;
       try {
@@ -464,7 +468,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
           const data = await response.json();
           const oddsByFixture: { [fixtureId: number]: any } = {};
           (data.response as Odds[]).forEach(item => {
-              // Find the "Match Winner" bet
               const matchWinnerBet = item.bookmakers[0]?.bets.find(b => b.id === 1);
               if (matchWinnerBet) {
                   oddsByFixture[item.fixture.id] = matchWinnerBet.values;
@@ -477,7 +480,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
       } finally {
           setLoadingOdds(false);
       }
-  };
+  }, []);
 
 
   useEffect(() => {
@@ -505,7 +508,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
         }
     }
     fetchFixturesForDate(selectedDateKey);
-  }, [selectedDateKey, showOdds, activeTab]);
+  }, [selectedDateKey, showOdds, activeTab, fetchOddsForDate]);
   
   useEffect(() => {
     if (!user || !db) {
@@ -609,4 +612,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
     </div>
   );
 }
-

@@ -49,6 +49,11 @@ export function ProfileButton({ navigate }: ProfileButtonProps) {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+           <DropdownMenuItem onClick={() => navigate('Profile')}>
+            <UserIcon className="mr-2 h-4 w-4" />
+            <span>الملف الشخصي</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut}>
             <LogOut className="mr-2 h-4 w-4" />
             <span>تسجيل الخروج</span>
@@ -64,5 +69,3 @@ export function ProfileButton({ navigate }: ProfileButtonProps) {
     </Button>
   );
 }
-
-    
