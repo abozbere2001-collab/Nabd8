@@ -22,9 +22,22 @@ import { SeasonTeamSelectionScreen } from './screens/SeasonTeamSelectionScreen';
 import { SeasonPlayerSelectionScreen } from './screens/SeasonPlayerSelectionScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
-import { ProfileButton } from '@/components/ProfileButton';
 import { SearchSheet } from '@/components/SearchSheet';
 import type { ScreenKey } from './page';
+
+import { useAuth } from '@/firebase/provider';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { LogOut, User as UserIcon } from 'lucide-react';
+import { signOut } from '@/lib/firebase-client';
 
 const screens: Record<Exclude<ScreenKey, 'Search' | 'Login' | 'SignUp' | 'Profile'>, React.ComponentType<any>> = {
   Matches: MatchesScreen,
@@ -52,6 +65,50 @@ type StackItem = {
   screen: ScreenKey;
   props?: Record<string, any>;
 };
+
+const ProfileButton = ({ navigate }: { navigate: (screen: ScreenKey, props?: Record<string, any>) => void; }) => {
+  const { user } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  if (!user) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
+            <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="end" forceMount>
+        <DropdownMenuLabel className="font-normal">
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm font-medium leading-none">{user.displayName}</p>
+            <p className="text-xs leading-none text-muted-foreground">
+              {user.email}
+            </p>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate('Profile')}>
+          <UserIcon className="mr-2 h-4 w-4" />
+          <span>الملف الشخصي</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleSignOut}>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>تسجيل الخروج</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
 
 export function AppContentWrapper() {
   const [stack, setStack] = useState<StackItem[]>([{ key: 'Matches-0', screen: 'Matches' }]);
