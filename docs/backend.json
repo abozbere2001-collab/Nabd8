@@ -290,7 +290,7 @@
         "imageHint": { "type": "string" },
         "timestamp": { "type": "string", "format": "date-time" }
       },
-      "required": ["title", "content", "imageUrl", "timestamp"]
+      "required": ["title", "content", "timestamp"]
     },
     "ManualTopScorer": {
       "title": "Manual Top Scorer",

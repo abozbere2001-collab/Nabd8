@@ -1,4 +1,5 @@
 
+
 // --- TYPE DEFINITIONS ---
 export interface Fixture {
   fixture: { id: number; date: string; timestamp: number; status: { short: string; long: string; elapsed: number | null; }; };
@@ -134,7 +135,7 @@ export interface NewsArticle {
     id?: string;
     title: string;
     content: string;
-    imageUrl: string;
+    imageUrl?: string;
     imageHint?: string;
     timestamp: any; // Firestore ServerTimestamp
 }
