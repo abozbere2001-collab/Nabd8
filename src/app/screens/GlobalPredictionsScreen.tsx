@@ -35,7 +35,7 @@ import {
   AlertDialogCancel,
   AlertDialogClose,
 } from "@/components/ui/alert-dialog";
-import { PREMIER_LEAGUE_ID, LALIGA_ID, SERIE_A_ID, BUNDESLIGA_ID, CHAMPIONS_LEAGUE_ID } from '@/lib/constants';
+import { PREMIER_LEAGUE_ID, LALIGA_ID, SERIE_A_ID, BUNDESLIGA_ID, CHAMPIONS_LEAGUE_ID, CURRENT_SEASON } from '@/lib/constants';
 
 
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -335,7 +335,7 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
             try {
                 // Fetch all of the user's season predictions and their leaderboard entry
                 const [predsSnapshot, scoreDoc] = await Promise.all([
-                    getDocs(query(collection(db, "seasonPredictions"), where("userId", "==", userId))),
+                    getDocs(query(collection(db, "seasonPredictions"), where("userId", "==", userId), where("season", "==", CURRENT_SEASON))),
                     getDoc(doc(db, 'leaderboard', userId))
                 ]);
     
@@ -354,26 +354,36 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
                     if (p.predictedTopScorerId) playerIds.add(p.predictedTopScorerId);
                 });
     
-                const newTeams = new Map<number, Team>();
-                const newPlayers = new Map<number, Player>();
-    
                 const teamPromises = Array.from(teamIds).map(async (teamId) => {
                     const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
                     const teamResData = await teamRes.json();
                     if (teamResData.response?.[0]) {
-                        newTeams.set(teamId, teamResData.response[0].team);
+                        return { id: teamId, data: teamResData.response[0].team };
                     }
+                    return null;
                 });
     
                 const playerPromises = Array.from(playerIds).map(async (playerId) => {
-                    const playerRes = await fetch(`/api/football/players?id=${playerId}&season=2024`);
+                    const playerRes = await fetch(`/api/football/players?id=${playerId}&season=${CURRENT_SEASON}`);
                     const playerResData = await playerRes.json();
                     if (playerResData.response?.[0]) {
-                        newPlayers.set(playerId, playerResData.response[0].player);
+                        return { id: playerId, data: playerResData.response[0].player };
                     }
+                    return null;
                 });
     
-                await Promise.all([...teamPromises, ...playerPromises]);
+                const teamResults = await Promise.all(teamPromises);
+                const playerResults = await Promise.all(playerPromises);
+
+                const newTeams = new Map<number, Team>();
+                teamResults.forEach(result => {
+                    if(result) newTeams.set(result.id, result.data);
+                });
+
+                const newPlayers = new Map<number, Player>();
+                playerResults.forEach(result => {
+                    if(result) newPlayers.set(result.id, result.data);
+                });
     
                 setTeams(newTeams);
                 setPlayers(newPlayers);
@@ -402,7 +412,18 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
         return null;
     }
     
-    const sortedPredictions = userPredictions.sort((a, b) => leagueOrder.indexOf(a.leagueId) - leagueOrder.indexOf(b.leagueId));
+    // Sort predictions by leagueOrder and then filter for uniqueness, taking the latest one
+    const uniquePredictions = Array.from(
+        userPredictions
+            .sort((a, b) => (b.timestamp?.toMillis() ?? 0) - (a.timestamp?.toMillis() ?? 0)) // Sort descending by timestamp first
+            .reduce((map, pred) => {
+                if (!map.has(pred.leagueId)) {
+                    map.set(pred.leagueId, pred);
+                }
+                return map;
+            }, new Map<number, SeasonPrediction>())
+            .values()
+    ).sort((a,b) => leagueOrder.indexOf(a.leagueId) - leagueOrder.indexOf(b.leagueId)); // Then sort by defined order
 
     return (
         <Card className="mb-4">
@@ -420,7 +441,7 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
             </CardHeader>
             <CardContent>
                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-center">
-                    {sortedPredictions.map(pred => {
+                    {uniquePredictions.map(pred => {
                         const champion = pred.predictedChampionId ? teams.get(pred.predictedChampionId) : null;
                         const topScorer = pred.predictedTopScorerId ? players.get(pred.predictedTopScorerId) : null;
                         return (
@@ -706,7 +727,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             points: 0,
             timestamp: new Date().toISOString()
         };
-
         setDoc(predictionRef, predictionData, { merge: true }).catch(error => {
             const permissionError = new FirestorePermissionError({
               path: predictionRef.path,
@@ -874,3 +894,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    
