@@ -50,19 +50,6 @@ interface Fixture {
   };
 }
 
-interface Odds {
-    fixture: { id: number };
-    bookmakers: {
-        id: number;
-        name: string;
-        bets: {
-            id: number;
-            name: string;
-            values: { value: string; odd: string }[];
-        }[];
-    }[];
-}
-
 interface Favorites {
     userId: string;
     leagues?: { [key: string]: any };
@@ -129,12 +116,8 @@ const LiveTimer = ({ startTime, status, elapsed }: { startTime: number, status: 
 };
 
 // Fixture Item Component
-const FixtureItem = React.memo(({ fixture, navigate, odds, commentsEnabled }: { fixture: Fixture, navigate: ScreenProps['navigate'], odds?: { value: string; odd: string }[], commentsEnabled?: boolean }) => {
+const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: Fixture, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
     
-    const homeOdd = odds?.find(o => o.value === 'Home')?.odd;
-    const drawOdd = odds?.find(o => o.value === 'Draw')?.odd;
-    const awayOdd = odds?.find(o => o.value === 'Away')?.odd;
-
     return (
       <div 
         key={fixture.fixture.id} 
@@ -183,22 +166,6 @@ const FixtureItem = React.memo(({ fixture, navigate, odds, commentsEnabled }: { 
              </div>
          </div>
          </div>
-         {odds && (
-            <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground text-center grid grid-cols-3 gap-2">
-                <div>
-                    <p className="font-semibold text-foreground">{homeOdd}</p>
-                    <p>فوز المضيف</p>
-                </div>
-                <div>
-                    <p className="font-semibold text-foreground">{drawOdd}</p>
-                    <p>تعادل</p>
-                </div>
-                <div>
-                    <p className="font-semibold text-foreground">{awayOdd}</p>
-                    <p>فوز الضيف</p>
-                </div>
-            </div>
-         )}
          <div className="mt-2 pt-2 border-t border-border/50">
             <CommentsButton matchId={fixture.fixture.id} navigate={navigate} commentsEnabled={commentsEnabled} />
          </div>
@@ -217,7 +184,6 @@ const FixturesList = ({
     hasAnyFavorites,
     favoritedLeagueIds,
     favoritedTeamIds,
-    odds,
     matchDetails,
     navigate,
 }: { 
@@ -228,7 +194,6 @@ const FixturesList = ({
     hasAnyFavorites: boolean,
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
-    odds: { [fixtureId: number]: { value: string; odd: string }[] },
     matchDetails: { [matchId: string]: MatchDetails },
     navigate: ScreenProps['navigate'],
 }) => {
@@ -321,7 +286,7 @@ const FixturesList = ({
                                {leagueName}
                             </AccordionTrigger>
                             <AccordionContent className="space-y-2">
-                                {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} odds={odds[f.fixture.id]} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} />)}
+                                {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} />)}
                             </AccordionContent>
                         </AccordionItem>
                     </Accordion>
@@ -389,8 +354,6 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     );
 }
 
-const ODDS_STORAGE_KEY = 'goalstack-showOdds';
-
 type TabName = 'all-matches' | 'my-results';
 type Cache<T> = { [date: string]: T };
 
@@ -405,25 +368,14 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
   // State for data and loading status
   const [fixturesCache, setFixturesCache] = useState<Cache<Fixture[]>>({});
-  const [oddsCache, setOddsCache] = useState<Cache<{ [fixtureId: number]: any }>>({});
   const [loadingFixtures, setLoadingFixtures] = useState(true);
-  const [loadingOdds, setLoadingOdds] = useState(false);
   const [loadedTabs, setLoadedTabs] = useState<Set<TabName>>(new Set(['my-results']));
 
   // Controls for UI toggles
-  const [showOdds, setShowOdds] = useState(false);
   const [showLiveOnly, setShowLiveOnly] = useState(false);
 
   const [matchDetails, setMatchDetails] = useState<{ [matchId: string]: MatchDetails }>({});
   
-  useEffect(() => {
-    try {
-      const savedState = localStorage.getItem(ODDS_STORAGE_KEY);
-      setShowOdds(savedState === 'true');
-    } catch (error) {
-      console.warn('Could not access localStorage:', error);
-    }
-  }, []);
 
   // Fetch user favorites
   useEffect(() => {
@@ -484,33 +436,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
     }
   }, [fixturesCache]);
 
-
-  const fetchOddsForDate = useCallback(async (dateKey: string) => {
-    if (!showOdds || oddsCache[dateKey]) {
-        setLoadingOdds(false);
-        return; // Don't fetch if not requested or already cached
-    }
-    setLoadingOdds(true);
-    const url = `/api/football/odds?date=${dateKey}&bookmaker=8&bet=1`;
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Failed to fetch odds');
-        const data = await response.json();
-        const oddsByFixture: { [fixtureId: number]: any } = {};
-        (data.response as Odds[]).forEach(item => {
-            const matchWinnerBet = item.bookmakers[0]?.bets.find(b => b.id === 1);
-            if (matchWinnerBet) {
-                oddsByFixture[item.fixture.id] = matchWinnerBet.values;
-            }
-        });
-        setOddsCache(prev => ({ ...prev, [dateKey]: oddsByFixture }));
-    } catch (error) {
-        console.error("Error fetching odds:", error);
-        setOddsCache(prev => ({ ...prev, [dateKey]: {} })); // Cache empty object on error
-    } finally {
-        setLoadingOdds(false);
-    }
-  }, [showOdds, oddsCache]);
   
   // Effect to trigger data fetching based on selected date and active tab
   useEffect(() => {
@@ -521,11 +446,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
 
     const loadData = async () => {
         await fetchFixturesForDate(selectedDateKey);
-        fetchOddsForDate(selectedDateKey);
     };
 
     loadData();
-  }, [selectedDateKey, activeTab, fetchFixturesForDate, fetchOddsForDate]);
+  }, [selectedDateKey, activeTab, fetchFixturesForDate]);
 
 
   const handleDateChange = (dateKey: string) => {
@@ -548,20 +472,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
     
-  const toggleShowOdds = () => {
-    const newShowOdds = !showOdds;
-    setShowOdds(newShowOdds);
-    if(newShowOdds) {
-      // Trigger odds fetching for the current date if not already cached
-      fetchOddsForDate(selectedDateKey);
-    }
-    try {
-      localStorage.setItem(ODDS_STORAGE_KEY, String(newShowOdds));
-    } catch (error) {
-      console.warn('Could not access localStorage:', error);
-    }
-  }
-
   const screenHeaderActions = (
     <div className='flex items-center gap-2'>
         <SearchSheet navigate={navigate}>
@@ -569,25 +479,19 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
                 <Search className="h-5 w-5" />
             </Button>
         </SearchSheet>
-        <Switch
-            id="live-mode"
-            checked={showLiveOnly}
-            onCheckedChange={setShowLiveOnly}
-        />
-        <Button
-            variant={showOdds ? "default" : "secondary"}
-            className="h-7 px-2 text-xs"
-            onClick={toggleShowOdds}
-            disabled={loadingOdds}
-        >
-            {loadingOdds ? <Loader2 className="h-4 w-4 animate-spin" /> : '1X2'}
-        </Button>
+        <div className="flex items-center space-x-2">
+            <Switch
+                id="live-mode"
+                checked={showLiveOnly}
+                onCheckedChange={setShowLiveOnly}
+            />
+            <Label htmlFor="live-mode" className="text-xs">مباشر</Label>
+        </div>
         {baseHeaderActions}
     </div>
   )
 
   const currentFixtures = fixturesCache[selectedDateKey] || [];
-  const currentOdds = oddsCache[selectedDateKey] || {};
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -615,7 +519,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
                 favoritedLeagueIds={favoritedLeagueIds}
                 favoritedTeamIds={favoritedTeamIds}
                 hasAnyFavorites={hasAnyFavorites}
-                odds={currentOdds}
                 matchDetails={matchDetails}
                 navigate={navigate}
             />
