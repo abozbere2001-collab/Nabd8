@@ -70,5 +70,3 @@ export function ProfileButton({ navigate }: ProfileButtonProps) {
     </Button>
   );
 }
-
-      

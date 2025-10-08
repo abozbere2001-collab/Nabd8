@@ -68,18 +68,7 @@ export function AppContentWrapper() {
     const isMainTab = mainTabs.includes(screen);
     const newKey = `${screen}-${Date.now()}`;
     
-    // Handle special navigation cases that need a different component
-    if (screen === 'Profile') {
-        const profileItem = { key: 'Profile-Special', screen: 'Profile', props };
-         setIsEntering(true);
-        setTimeout(() => setIsEntering(false), 300);
-        setStack(prev => [...prev, profileItem]);
-        return;
-    }
-
-
     const newItem = { key: newKey, screen, props };
-
 
     if (!isMainTab) {
         setIsEntering(true);
@@ -120,12 +109,12 @@ export function AppContentWrapper() {
       goBack, 
       canGoBack: stack.length > 1,
   };
+
   const headerActions = (
     <>
       <ProfileButton navigate={navigate} />
     </>
   );
-
 
   const activeScreenKey = activeStackItem.screen;
   const showBottomNav = mainTabs.includes(activeScreenKey);

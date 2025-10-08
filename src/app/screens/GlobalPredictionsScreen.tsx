@@ -329,7 +329,6 @@ const SeasonPredictionsTab = () => {
 
         const fetchData = async () => {
             try {
-                // 1. Fetch custom names first
                 const [teamsSnapshot, playersSnapshot] = await Promise.all([
                     getDocs(collection(db, 'teamCustomizations')),
                     getDocs(collection(db, 'playerCustomizations')),
@@ -339,23 +338,24 @@ const SeasonPredictionsTab = () => {
                 const playerNames = new Map<number, string>();
                 playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
                 setCustomNames({ teams: teamNames, players: playerNames });
-
-                // 2. Fetch all league data concurrently
+                
                 const dataPromises = seasonLeagues.map(async (league) => {
                     const teamsRes = await fetch(`/api/football/teams?league=${league.id}&season=${CURRENT_SEASON}`);
                     const teamsData = await teamsRes.json();
-                    const teamsWithPlayers: TeamWithPlayers[] = await Promise.all(
-                        (teamsData.response || []).map(async (item: { team: Team }) => {
-                            const playersRes = await fetch(`/api/football/players?team=${item.team.id}&season=${CURRENT_SEASON}`);
-                            const playersData = await playersRes.json();
-                            return { ...item.team, players: playersData.response || [] };
-                        })
-                    );
+                    const teams = teamsData.response?.map((r: { team: Team }) => r.team) || [];
+
+                    const teamsWithPlayersPromises = teams.map(async (team: Team) => {
+                        const playersRes = await fetch(`/api/football/players?team=${team.id}&season=${CURRENT_SEASON}`);
+                        const playersData = await playersRes.json();
+                        return { ...team, players: playersData.response || [] };
+                    });
+
+                    const teamsWithPlayers = await Promise.all(teamsWithPlayersPromises);
 
                     const predictionDocRef = doc(db, 'seasonPredictions', `${user.uid}_${league.id}_${CURRENT_SEASON}`);
                     const docSnap = await getDoc(predictionDocRef);
                     const existingPrediction = docSnap.exists() ? docSnap.data() as SeasonPrediction : {};
-
+                    
                     return {
                         leagueId: league.id,
                         data: { teams: teamsWithPlayers },
@@ -365,7 +365,7 @@ const SeasonPredictionsTab = () => {
 
                 const results = await Promise.all(dataPromises);
 
-                const leaguesData: Record<number, LeagueData> = {};
+                const leaguesData: AllLeaguesData = {};
                 const predsData: Record<number, Partial<SeasonPrediction>> = {};
 
                 results.forEach(res => {
@@ -387,14 +387,23 @@ const SeasonPredictionsTab = () => {
         fetchData();
     }, [user, db, toast]);
 
+
     const handleSelect = (leagueId: number, type: 'champion' | 'scorer', itemId: number) => {
-        setPredictions(prev => ({
-            ...prev,
-            [leagueId]: {
-                ...prev[leagueId],
-                [type === 'champion' ? 'predictedChampionId' : 'predictedTopScorerId']: itemId,
-            },
-        }));
+        setPredictions(prev => {
+            const leaguePrediction = prev[leagueId] || {};
+            const key = type === 'champion' ? 'predictedChampionId' : 'predictedTopScorerId';
+
+            // If the same item is clicked again, deselect it. Otherwise, select the new one.
+            const newItemId = leaguePrediction[key] === itemId ? undefined : itemId;
+
+            return {
+                ...prev,
+                [leagueId]: {
+                    ...leaguePrediction,
+                    [key]: newItemId,
+                },
+            }
+        });
     };
     
     const handleSave = async (leagueId: number) => {
@@ -439,7 +448,7 @@ const SeasonPredictionsTab = () => {
             <CardHeader>
                 <CardTitle>توقع بطل الموسم وهداف الدوري</CardTitle>
                 <CardDescription>
-                    سيتم منح 100 نقطة لتوقع البطل الصحيح و 75 نقطة لتوقع الهداف الصحيح في نهاية الموسم لكل دوري.
+                   سيتم منح 100 نقطة لتوقع البطل الصحيح و 75 نقطة لتوقع الهداف الصحيح في نهاية الموسم لكل دوري.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -988,5 +997,3 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
-
-    

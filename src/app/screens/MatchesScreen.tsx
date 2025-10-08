@@ -514,13 +514,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
   
   // Effect to trigger data fetching based on selected date and active tab
   useEffect(() => {
-    if (activeTab === 'global-predictions') return;
+    const tabValue = activeTab as 'all-matches' | 'my-results' | 'global-predictions';
+    if (tabValue === 'global-predictions') return;
     
     setLoadedTabs(prev => new Set(prev).add(activeTab));
 
     const loadData = async () => {
         await fetchFixturesForDate(selectedDateKey);
-        // Fetch odds only after fixtures have been fetched (or are already cached)
         fetchOddsForDate(selectedDateKey);
     };
 
@@ -597,7 +597,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions: base
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
               <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none">
                   <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
-                  <TabsTrigger value="global-predictions">التوقعات العالمية</TabsTrigger>
+                  <TabsTrigger value="global-predictions">التوقعات</TabsTrigger>
                   <TabsTrigger value="my-results">نتائجي</TabsTrigger>
               </TabsList>
             </Tabs>
