@@ -1,3 +1,4 @@
+
 "use client";
 import { ArrowLeft, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,8 +30,10 @@ export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActio
          <div className='font-bold text-lg px-2'>{title}</div>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1">
         {secondaryActions}
+      </div>
+      <div className="flex items-center gap-1">
         {actions}
       </div>
     </header>

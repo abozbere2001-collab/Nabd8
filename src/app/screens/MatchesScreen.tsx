@@ -479,18 +479,15 @@ export function MatchesScreen({ navigate, goBack, canGoBack, headerActions }: Sc
                 <Search className="h-5 w-5" />
             </Button>
         </SearchSheet>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowLiveOnly(!showLiveOnly)}
-          className={cn(
-            "h-8 gap-1.5 px-2.5 bg-card border-border",
-            showLiveOnly && "bg-green-600/20 text-green-500 border-green-600/30"
-          )}
-        >
-          <RadioTower className={cn("h-4 w-4", showLiveOnly && "animate-pulse")} />
-          <span className="text-xs">مباشر</span>
-        </Button>
+         <div className="flex items-center space-x-2 bg-card border rounded-md p-1">
+            <Label htmlFor="live-mode" className={cn("text-xs px-1", showLiveOnly ? "text-green-500" : "text-muted-foreground")}>مباشر</Label>
+            <Switch
+                id="live-mode"
+                checked={showLiveOnly}
+                onCheckedChange={setShowLiveOnly}
+                className="h-4 w-7 data-[state=checked]:bg-green-500"
+            />
+        </div>
         {headerActions}
     </div>
   )

@@ -66,12 +66,8 @@ type StackItem = {
   props?: Record<string, any>;
 };
 
-const ProfileButton = ({ navigate }: { navigate: (screen: ScreenKey, props?: Record<string, any>) => void; }) => {
+const ProfileButton = ({ onProfileClick, onSignOut }: { onProfileClick: () => void, onSignOut: () => void }) => {
   const { user } = useAuth();
-
-  const handleSignOut = async () => {
-    await signOut();
-  };
 
   if (!user) return null;
 
@@ -95,12 +91,12 @@ const ProfileButton = ({ navigate }: { navigate: (screen: ScreenKey, props?: Rec
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate('Profile')}>
+        <DropdownMenuItem onClick={onProfileClick}>
           <UserIcon className="mr-2 h-4 w-4" />
           <span>الملف الشخصي</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut}>
+        <DropdownMenuItem onClick={onSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>تسجيل الخروج</span>
         </DropdownMenuItem>
@@ -152,6 +148,14 @@ export function AppContentWrapper() {
     });
   }, []);
 
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  const handleProfileClick = () => {
+    navigate('Profile');
+  }
+
   if (!stack || stack.length === 0) {
     return (
         <div className="flex items-center justify-center h-screen bg-background">
@@ -178,7 +182,7 @@ export function AppContentWrapper() {
     <main className="h-screen w-screen bg-background flex flex-col">
        <SearchSheet navigate={navigate}>
           <div className='hidden'></div>
-        </SearchSheet>
+       </SearchSheet>
       <div className="relative flex-1 overflow-hidden">
         {/* Previous screen for animation */}
         {previousStackItem && isAnimatingOut && (
@@ -191,7 +195,7 @@ export function AppContentWrapper() {
                         className="absolute inset-0 bg-background flex flex-col"
                         style={{ zIndex: stack.length - 2 }}
                      >
-                        <PreviousScreenComponent {...navigationProps} {...previousStackItem.props} headerActions={<ProfileButton navigate={navigate} />} />
+                        <PreviousScreenComponent {...navigationProps} {...previousStackItem.props} headerActions={<ProfileButton onProfileClick={handleProfileClick} onSignOut={handleSignOut} />} />
                      </div>
                 )
              })()
@@ -207,7 +211,7 @@ export function AppContentWrapper() {
             )}
             style={{ zIndex: stack.length -1 }}
         >
-           {ActiveScreenComponent ? <ActiveScreenComponent {...navigationProps} {...activeStackItem.props} headerActions={<ProfileButton navigate={navigate} />} /> : <p>Screen not found</p>}
+           {ActiveScreenComponent ? <ActiveScreenComponent {...navigationProps} {...activeStackItem.props} headerActions={<ProfileButton onProfileClick={handleProfileClick} onSignOut={handleSignOut} />} /> : <p>Screen not found</p>}
         </div>
 
       </div>
