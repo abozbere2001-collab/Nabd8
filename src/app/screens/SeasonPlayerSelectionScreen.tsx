@@ -38,14 +38,31 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
         return doc(db, 'seasonPredictions', `${user.uid}_${leagueId}_${CURRENT_SEASON}`);
     }, [user, db, leagueId]);
 
-    // Fetch players
+    // Fetch players with pagination
     useEffect(() => {
-        setLoading(true);
-        const fetchPlayers = async () => {
+        const fetchAllPlayers = async () => {
+            setLoading(true);
+            let allPlayers: { player: Player }[] = [];
+            let currentPage = 1;
+            let totalPages = 1;
+
             try {
-                const res = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`);
-                const data = await res.json();
-                setPlayers(data.response || []);
+                while (currentPage <= totalPages) {
+                    const res = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}&page=${currentPage}`);
+                    const data = await res.json();
+                    
+                    if (data.response) {
+                        allPlayers = [...allPlayers, ...data.response];
+                    }
+
+                    if (data.paging && data.paging.total > currentPage) {
+                        totalPages = data.paging.total;
+                        currentPage++;
+                    } else {
+                        break;
+                    }
+                }
+                setPlayers(allPlayers);
             } catch (e) {
                 console.error('Failed to fetch players:', e);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل اللاعبين.' });
@@ -53,7 +70,8 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                 setLoading(false);
             }
         };
-        fetchPlayers();
+
+        fetchAllPlayers();
     }, [teamId, toast]);
 
     // Fetch existing prediction
