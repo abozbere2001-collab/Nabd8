@@ -25,11 +25,17 @@ interface SeasonPlayerSelectionScreenProps extends ScreenProps {
     teamName: string;
 }
 
+interface PlayerResponse {
+    player: Player;
+    statistics: any[];
+}
+
+
 export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, headerActions, leagueId, leagueName, teamId, teamName }: SeasonPlayerSelectionScreenProps) {
     const { user } = useAuth();
     const { db } = useFirestore();
     const { toast } = useToast();
-    const [players, setPlayers] = useState<{ player: Player }[]>([]);
+    const [players, setPlayers] = useState<PlayerResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [predictedTopScorerId, setPredictedTopScorerId] = useState<number | undefined>();
 
@@ -42,7 +48,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
     useEffect(() => {
         const fetchAllPlayers = async () => {
             setLoading(true);
-            let allPlayers: { player: Player }[] = [];
+            const playerMap = new Map<number, PlayerResponse>();
             let currentPage = 1;
             let totalPages = 1;
 
@@ -52,7 +58,11 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                     const data = await res.json();
                     
                     if (data.response) {
-                        allPlayers = [...allPlayers, ...data.response];
+                        data.response.forEach((playerResponse: PlayerResponse) => {
+                            if (!playerMap.has(playerResponse.player.id)) {
+                                playerMap.set(playerResponse.player.id, playerResponse);
+                            }
+                        });
                     }
 
                     if (data.paging && data.paging.total > currentPage) {
@@ -62,7 +72,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                         break;
                     }
                 }
-                setPlayers(allPlayers);
+                setPlayers(Array.from(playerMap.values()));
             } catch (e) {
                 console.error('Failed to fetch players:', e);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل اللاعبين.' });
