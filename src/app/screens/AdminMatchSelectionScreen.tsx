@@ -245,7 +245,7 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
                 {loading ? (
                     Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)
                 ) : sortedLeagues.length > 0 ? (
-                    <Accordion type="multiple" defaultValue={sortedLeagues} className="w-full space-y-4">
+                    <Accordion type="multiple" className="w-full space-y-4">
                         {sortedLeagues.map(leagueName => {
                             const { league, fixtures } = groupedFixtures[leagueName];
                             return (
