@@ -470,13 +470,25 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible, headerAc
   return (
     <div className="flex-1 flex flex-col min-h-0">
         <div className="flex flex-col border-b bg-card">
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none">
-                  <TabsTrigger value="all-matches">كل المباريات</TabsTrigger>
-                  <TabsTrigger value="global-predictions">التوقعات</TabsTrigger>
-                  <TabsTrigger value="my-results">نتائجي</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className='flex items-center justify-between px-4 pt-2'>
+                 <div />
+                 <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full max-w-sm mx-auto">
+                   <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
+                       <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>كل المباريات</TabsTrigger>
+                       <TabsTrigger value="global-predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
+                       <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
+                   </TabsList>
+                 </Tabs>
+                 <div className="flex items-center space-x-2 bg-card border rounded-lg px-2">
+                    <RadioTower className={cn("h-4 w-4 text-muted-foreground", showLiveOnly && "text-green-500")} />
+                    <Switch
+                        id="live-only-switch"
+                        checked={showLiveOnly}
+                        onCheckedChange={setShowLiveOnly}
+                    />
+                </div>
+            </div>
+
             <div className="py-2">
                 <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
             </div>
