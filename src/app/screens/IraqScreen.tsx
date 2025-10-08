@@ -519,7 +519,7 @@ function PredictionsTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                     </TableHeader>
                     <TableBody>
                         {leaderboard.length > 0 ? leaderboard.map((score, index) => (
-                            <TableRow key={score.userId}>
+                            <TableRow key={`${score.userId}-${index}`}>
                                 <TableCell>{index + 1}</TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-2">
@@ -594,5 +594,3 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
