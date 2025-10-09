@@ -325,7 +325,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                         <Skeleton key={i} className="h-12 w-full rounded-lg" />
                     ))
                 ) : managedCompetitions && managedCompetitions.length > 0 && sortedGroupedCompetitions ? (
-                    <Accordion type="multiple" className="w-full space-y-4" collapsible>
+                    <Accordion type="multiple" className="w-full space-y-4">
                         {Object.entries(sortedGroupedCompetitions).map(([continent, content]) => (
                              <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card/50">
                                 <AccordionTrigger className="px-4 py-3 hover:no-underline">
@@ -364,7 +364,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                             }</ul>
                                         </div>
                                     ) : (
-                                        <Accordion type="multiple" className="w-full space-y-2" collapsible>
+                                        <Accordion type="multiple" className="w-full space-y-2">
                                             {Object.entries(content as CompetitionsByCountry).map(([country, { flag, leagues }]) => (
                                                  <AccordionItem value={country} key={country} className="rounded-lg border bg-card/50">
                                                       <AccordionTrigger className="px-4 py-3 hover:no-underline">
@@ -425,5 +425,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     );
 }
 
+
+    
 
     
