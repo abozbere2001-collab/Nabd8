@@ -20,7 +20,6 @@ import { Star, Pencil, Goal, ArrowLeftRight, RectangleVertical, Copy, Heart } fr
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { NoteDialog } from '@/components/NoteDialog';
 import { Progress } from '@/components/ui/progress';
-import Image from "next/image";
 
 
 // --- TYPE DEFINITIONS ---
@@ -168,114 +167,114 @@ function useMatchData(fixture?: Fixture): MatchData {
 
 // --- CHILD COMPONENTS ---
 
-function LineupField({ lineup }) {
-  if (!lineup || !lineup.startXI) {
-    return (
-      <div className="text-center text-gray-400 py-10">
-        لا توجد تشكيلة متاحة حاليًا.
-      </div>
-    );
+const LineupField: React.FC<{
+  lineup: LineupData;
+  isAdmin: boolean;
+  getPlayerName: (id: number, defaultName: string) => string;
+  onRename: (type: 'player' | 'team' | 'coach', id: number, name: string) => void;
+}> = ({ lineup, isAdmin, getPlayerName, onRename }) => {
+  if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
+    return <div className="flex items-center justify-center h-64 text-muted-foreground">التشكيلة غير متاحة حالياً</div>;
   }
 
-  // عكس الترتيب العمودي: الهجوم -> الوسط -> الدفاع -> الحارس
-  const grouped = {
-    attackers: lineup.startXI.filter((p) => p.player.pos === "F"),
-    midfielders: lineup.startXI.filter((p) => p.player.pos === "M"),
-    defenders: lineup.startXI.filter((p) => p.player.pos === "D"),
-    goalkeepers: lineup.startXI.filter((p) => p.player.pos === "G"),
-  };
+  // تحويل grid "row:col" إلى صفوف
+  const rows: (PlayerWithStats['player'])[][] = [];
+  lineup.startXI.forEach(({player}) => {
+    if (!player.grid) return;
+    const [rowStr] = player.grid.split(':');
+    const rowIndex = parseInt(rowStr, 10) - 1; // row يبدأ من 1 في API
+    if (!rows[rowIndex]) rows[rowIndex] = [];
+    rows[rowIndex].push(player);
+  });
 
-  // دالة لجلب صورة اللاعب من API Football
-  const getPlayerImage = (player) =>
-    player.player.photo ||
-    `https://media.api-sports.io/football/players/${player.player.id}.png`;
-
-  // ترتيب الخطوط من الأعلى للأسفل
-  const lines = [
-    { label: "الهجوم", players: grouped.attackers },
-    { label: "الوسط", players: grouped.midfielders },
-    { label: "الدفاع", players: grouped.defenders },
-    { label: "الحارس", players: grouped.goalkeepers },
-  ];
+  // لا نعكس الصفوف هنا، سيتم قلب الملعب بالكامل
+  const displayedRows = rows;
 
   return (
-    <div className="w-full flex flex-col items-center">
-      <div className="relative w-full max-w-3xl aspect-[2/3] bg-green-700 rounded-2xl overflow-hidden shadow-xl border-4 border-green-900">
-        {/* خلفية الملعب */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.15)_1px,_transparent_1px)] bg-[length:30px_30px]" />
-
-        {/* رسم الخطوط من الأعلى إلى الأسفل */}
-        <div className="absolute inset-0 flex flex-col justify-between py-6">
-          {lines.map((line, index) => (
-            <div
-              key={index}
-              className="flex justify-center gap-4 flex-wrap px-4"
-            >
-              {line.players.map((p, i) => (
-                <div
-                  key={i}
-                  className="flex flex-col items-center text-center space-y-1 w-[65px]"
-                >
-                  <div className="relative w-14 h-14 rounded-full border-2 border-white overflow-hidden shadow-md bg-green-900">
-                    <Image
-                      src={getPlayerImage(p)}
-                      alt={p.player.name}
-                      fill
-                      sizes="56px"
-                      className="object-cover"
-                    />
+    <Card className="p-3 bg-card/80">
+      <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center rounded-lg border border-green-500/20 overflow-hidden" style={{ backgroundImage: `url('/football-pitch-vertical.svg')`, transform: 'scaleY(-1)' }}>
+        <div className="absolute inset-0 flex flex-col justify-around p-2">
+          {displayedRows.map((row, rowIndex) => (
+            <div key={rowIndex} className="flex justify-around items-end w-full" style={{ transform: 'scaleY(-1)' }}>
+              {row.map(player => {
+                const displayName = getPlayerName(player.id, player.name);
+                return (
+                  <div key={player.id} className="flex flex-col items-center text-white text-xs w-16">
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50"
+                        onClick={() => onRename('player', player.id, displayName)}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
+                    <div className="relative w-12 h-12">
+                      <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
+                        {player.photo ? <AvatarImage src={player.photo} alt={displayName} /> : <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>}
+                      </Avatar>
+                      <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800">
+                        {player.number}
+                      </div>
+                    </div>
+                    <span className="mt-1 text-[11px] font-semibold text-center truncate w-full bg-black/50 px-1.5 py-0.5">{displayName}</span>
                   </div>
-                  <span className="text-xs text-white font-semibold leading-tight">
-                    {p.player.name.split(" ")[0]}
-                  </span>
-                  <span className="text-[10px] text-gray-300">
-                    {p.player.pos}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ))}
         </div>
       </div>
 
-      {/* المدرب */}
-      {lineup.coach && (
-        <div className="mt-4 text-center">
-          <div className="text-gray-200 text-sm">المدرب</div>
-          <div className="text-white font-bold">{lineup.coach.name}</div>
-        </div>
-      )}
-
-      {/* قائمة البدلاء */}
-      {lineup.substitutes?.length > 0 && (
-        <Card className="w-full max-w-3xl mt-6 bg-green-900/70 border-green-800 p-4">
-          <h3 className="text-white text-center mb-3 font-semibold">
-            البدلاء
-          </h3>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 justify-items-center">
-            {lineup.substitutes.map((sub, i) => (
-              <div key={i} className="flex flex-col items-center space-y-1">
-                <div className="relative w-12 h-12 rounded-full overflow-hidden border border-white">
-                  <Image
-                    src={getPlayerImage(sub)}
-                    alt={sub.player.name}
-                    fill
-                    sizes="48px"
-                    className="object-cover"
-                  />
-                </div>
-                <span className="text-[11px] text-white text-center leading-tight">
-                  {sub.player.name.split(" ")[0]}
-                </span>
+      {lineup.substitutes && lineup.substitutes.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <h4 className="font-bold text-center mb-2">الاحتياط</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {lineup.substitutes.map(({player}) => (
+              <div key={player.id} className="flex flex-col items-center gap-1 relative">
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-0 right-0 h-6 w-6 z-10"
+                    onClick={() => onRename('player', player.id, getPlayerName(player.id, player.name))}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                )}
+                <Avatar className="h-8 w-8">
+                  {player.photo ? <AvatarImage src={player.photo} alt={player.name} /> : <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>}
+                </Avatar>
+                <span className="text-xs font-medium text-center truncate w-full">{getPlayerName(player.id, player.name)}</span>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       )}
-    </div>
-  );
-}
 
+      {lineup.coach && (
+        <div className="mt-4 pt-4 border-t border-border flex flex-col items-center gap-2 relative">
+          <h4 className="font-bold mb-2">المدرب</h4>
+          {isAdmin && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 h-6 w-6 z-10"
+              onClick={() => onRename('coach', lineup.coach!.id, lineup.coach!.name)}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+          )}
+          <Avatar className="h-16 w-16">
+            {lineup.coach.photo ? <AvatarImage src={lineup.coach.photo} alt={lineup.coach.name} /> : <AvatarFallback>{lineup.coach.name.charAt(0)}</AvatarFallback>}
+          </Avatar>
+          <span className="font-semibold">{lineup.coach.name}</span>
+        </div>
+      )}
+    </Card>
+  );
+};
 
 const EventIcon = ({ event }: { event: MatchEvent }) => {
     if (event.type === 'Goal') {
@@ -504,9 +503,19 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                              <Button onClick={() => setActiveLineup('home')} variant={activeLineup === 'home' ? 'default' : 'outline'}>{fixture.teams.home.name}</Button>
                              <Button onClick={() => setActiveLineup('away')} variant={activeLineup === 'away' ? 'default' : 'outline'}>{fixture.teams.away.name}</Button>
                         </div>
-                        <LineupField 
-                            lineup={lineupToShow}
-                        />
+                        {lineupToShow && 
+                            <LineupField 
+                                lineup={lineupToShow as any}
+                                isAdmin={isAdmin}
+                                getPlayerName={getPlayerName}
+                                onRename={handleOpenRename as any}
+                            />
+                        }
+                        {!lineupToShow && !loading && 
+                             <div className="flex items-center justify-center h-64 text-muted-foreground">
+                                التشكيلة غير متاحة حالياً
+                             </div>
+                        }
                     </TabsContent>
                     <TabsContent value="details" className="mt-4 space-y-4">
                        <EventsView events={events} homeTeamId={fixture.teams.home.id} getPlayerName={getPlayerName} />
