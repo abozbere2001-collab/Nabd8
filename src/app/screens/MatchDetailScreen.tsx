@@ -74,13 +74,13 @@ function useMatchData(fixture?: Fixture): MatchData {
             const season = new Date(fixture.fixture.date).getFullYear();
 
             try {
-                const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.allSettled([
+                // 1. Fetch lineups and events
+                const [lineupsRes, eventsRes, statsRes] = await Promise.allSettled([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
                     fetch(`/api/football/statistics?fixture=${fixtureId}`),
-                    fetch(`/api/football/standings?league=${leagueId}&season=${season}`),
                 ]);
-                
+
                 const parseResult = async (res: PromiseSettledResult<Response>) => {
                     if (res.status === 'fulfilled' && res.value.ok) {
                         try {
@@ -93,34 +93,40 @@ function useMatchData(fixture?: Fixture): MatchData {
                     return [];
                 };
 
-                const [fetchedLineups, fetchedEvents, fetchedStats, standingsData] = await Promise.all([
+                const [fetchedLineups, fetchedEvents, fetchedStats] = await Promise.all([
                     parseResult(lineupsRes),
                     parseResult(eventsRes),
                     parseResult(statsRes),
-                    parseResult(standingsRes),
                 ]);
 
-                // Fallback for missing player photos
-                for (const lineup of fetchedLineups) {
-                    const allPlayers = [...lineup.startXI, ...lineup.substitutes];
-                    const teamPlayersRes = await fetch(`/api/football/players?team=${lineup.team.id}&season=${season}`);
-                    if (teamPlayersRes.ok) {
-                        const teamPlayersData = await teamPlayersRes.json();
-                        const teamPlayers: PlayerWithStats[] = teamPlayersData.response || [];
-                        const photoMap = new Map<number, string>();
-                        teamPlayers.forEach(p => { if (p.player.photo) photoMap.set(p.player.id, p.player.photo); });
-                        allPlayers.forEach(p => { if (!p.player.photo && photoMap.has(p.player.id)) { p.player.photo = photoMap.get(p.player.id)!; } });
+                // 2. Data fallback for player photos
+                 for (const lineup of fetchedLineups) {
+                    if (lineup.startXI.some((p: PlayerWithStats) => !p.player.photo) || lineup.substitutes.some((p: PlayerWithStats) => !p.player.photo)) {
+                         const teamPlayersRes = await fetch(`/api/football/players?team=${lineup.team.id}&season=${season}`);
+                         if (teamPlayersRes.ok) {
+                            const teamPlayersData = await teamPlayersRes.json();
+                            const teamPlayers: PlayerWithStats[] = teamPlayersData.response || [];
+                            const photoMap = new Map<number, string>();
+                            teamPlayers.forEach(p => { if (p.player.photo) photoMap.set(p.player.id, p.player.photo); });
+                            
+                            const allPlayersInLineup = [...lineup.startXI, ...lineup.substitutes];
+                            allPlayersInLineup.forEach(p => { 
+                                if (!p.player.photo && photoMap.has(p.player.id)) { 
+                                    p.player.photo = photoMap.get(p.player.id)!; 
+                                } 
+                            });
+                         }
                     }
                 }
                 
-                setData({
+                setData(prev => ({
+                    ...prev,
                     lineups: fetchedLineups,
                     events: fetchedEvents,
                     stats: fetchedStats,
-                    standings: standingsData[0]?.league?.standings[0] || [],
-                    loading: false,
+                    loading: false, // Initial data is loaded
                     error: null,
-                });
+                }));
 
             } catch (error: any) {
                 console.error("❌ Match data fetch error:", error);
@@ -183,15 +189,15 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
     const attackers = startXI.filter(p => p.player.pos === 'F');
 
     const rows: PlayerWithStats[][] = [];
-    if(goalkeeper) rows.push([goalkeeper]);
-    if(defenders.length > 0) rows.push(defenders);
-    if(midfielders.length > 0) rows.push(midfielders);
     if(attackers.length > 0) rows.push(attackers);
+    if(midfielders.length > 0) rows.push(midfielders);
+    if(defenders.length > 0) rows.push(defenders);
+    if(goalkeeper) rows.push([goalkeeper]);
 
     return (
         <Card className="p-3 bg-card/80">
             <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
-                <div className="absolute inset-0 flex flex-col justify-around p-2">
+                <div className="absolute inset-0 flex flex-col-reverse justify-around p-2">
                     {rows.map((row, rowIndex) => (
                         <div key={rowIndex} className="flex justify-around items-center">
                             {row.map((player) => (
@@ -407,7 +413,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         fetchCustomNames();
     };
 
-    if (loading) {
+    if (loading && lineups.length === 0) {
         return (
             <div className="flex h-full flex-col bg-background">
                 <ScreenHeader title="تفاصيل المباراة" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
@@ -466,4 +472,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
-
