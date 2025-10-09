@@ -26,7 +26,7 @@ import { Progress } from '@/components/ui/progress';
 // --- TYPE DEFINITIONS ---
 interface PlayerWithStats {
     player: PlayerType;
-    statistics: any[];
+    statistics?: any[];
 }
 interface LineupData {
     team: Team;
@@ -75,7 +75,7 @@ function useMatchData(fixture?: Fixture): MatchData {
             const season = new Date(fixture.fixture.date).getFullYear();
 
             try {
-                // Fetch lineups, events, and other data in parallel
+                // Main data fetching in parallel
                 const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.allSettled([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
@@ -93,29 +93,39 @@ function useMatchData(fixture?: Fixture): MatchData {
                     return [];
                 };
 
-                const fetchedLineups: LineupData[] = await parseResult(lineupsRes);
+                let fetchedLineups: LineupData[] = await parseResult(lineupsRes);
                 const fetchedEvents: MatchEvent[] = await parseResult(eventsRes);
                 const fetchedStats: any[] = await parseResult(statsRes);
                 const fetchedStandings: Standing[] = (await parseResult(standingsRes))[0]?.league?.standings[0] || [];
 
-                // "Double-attack" strategy for player photos
-                for (const lineup of fetchedLineups) {
-                    const hasMissingPhotos = lineup.startXI.some((p: PlayerWithStats) => !p.player.photo) || lineup.substitutes.some((p: PlayerWithStats) => !p.player.photo);
-                    if (hasMissingPhotos) {
-                         const teamPlayersRes = await fetch(`/api/football/players?team=${lineup.team.id}&season=${season}`);
-                         if (teamPlayersRes.ok) {
-                            const teamPlayersData = await teamPlayersRes.json();
-                            const teamPlayers: PlayerWithStats[] = teamPlayersData.response || [];
-                            const photoMap = new Map<number, string>();
-                            teamPlayers.forEach(p => { if (p.player.photo) photoMap.set(p.player.id, p.player.photo); });
-                            
-                            const allPlayersInLineup = [...lineup.startXI, ...lineup.substitutes];
-                            allPlayersInLineup.forEach(p => { 
-                                if (!p.player.photo && photoMap.has(p.player.id)) { 
-                                    p.player.photo = photoMap.get(p.player.id)!; 
-                                } 
-                            });
-                         }
+                // "Double-attack" strategy for player photos if missing
+                if (fetchedLineups.length > 0) {
+                     for (let i = 0; i < fetchedLineups.length; i++) {
+                        const lineup = fetchedLineups[i];
+                        const allLineupPlayers = [...lineup.startXI, ...lineup.substitutes];
+                        const hasMissingPhotos = allLineupPlayers.some((p: PlayerWithStats) => !p.player.photo);
+                        
+                        if (hasMissingPhotos) {
+                            const teamPlayersRes = await fetch(`/api/football/players?team=${lineup.team.id}&season=${season}`);
+                            if (teamPlayersRes.ok) {
+                                const teamPlayersData = await teamPlayersRes.json();
+                                const teamPlayersList: PlayerWithStats[] = teamPlayersData.response || [];
+                                const photoMap = new Map<number, string>();
+                                teamPlayersList.forEach(p => { if (p.player.photo) photoMap.set(p.player.id, p.player.photo); });
+
+                                // Update photos for both starting XI and substitutes
+                                lineup.startXI.forEach(p => { 
+                                    if (!p.player.photo && photoMap.has(p.player.id)) { 
+                                        p.player.photo = photoMap.get(p.player.id)!; 
+                                    } 
+                                });
+                                lineup.substitutes.forEach(p => { 
+                                    if (!p.player.photo && photoMap.has(p.player.id)) { 
+                                        p.player.photo = photoMap.get(p.player.id)!; 
+                                    } 
+                                });
+                            }
+                        }
                     }
                 }
                 
@@ -193,12 +203,11 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
     const midfielders = startXI.filter(p => p.player.pos === 'M');
     const attackers = startXI.filter(p => p.player.pos === 'F');
 
-    // Build the rows in the correct logical order for a football pitch
     const rows: PlayerWithStats[][] = [];
     if(goalkeeper) rows.push([goalkeeper]);
-    if(defenders.length > 0) rows.push(defenders);
-    if(midfielders.length > 0) rows.push(midfielders);
-    if(attackers.length > 0) rows.push(attackers);
+    if(defenders.length > 0) rows.push(defenders.reverse()); // Reverse for correct horizontal layout
+    if(midfielders.length > 0) rows.push(midfielders.reverse());
+    if(attackers.length > 0) rows.push(attackers.reverse());
 
     return (
         <Card className="p-3 bg-card/80">
@@ -295,7 +304,7 @@ const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName }: { events:
                         <TabsTrigger value="highlights">الأبرز</TabsTrigger>
                     </TabsList>
                 </Tabs>
-                <div className="relative flex flex-col-reverse items-center">
+                <div className="relative flex flex-col items-center">
                     <div className="absolute top-0 bottom-0 w-px bg-border/50"></div>
                     {filteredEvents.map((event, index) => {
                         const isHomeEvent = event.team.id === homeTeamId;
@@ -486,4 +495,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
+
 
