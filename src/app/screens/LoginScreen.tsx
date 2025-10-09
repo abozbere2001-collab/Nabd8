@@ -25,7 +25,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     } catch (e: any) {
       console.error("Login Error:", e);
       // Handle specific error for popup closed by user
-      if (e.code === 'auth/popup-closed-by-user') {
+      if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
         setError('تم إلغاء عملية تسجيل الدخول.');
       } else {
         setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');

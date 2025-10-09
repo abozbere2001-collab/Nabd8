@@ -1,45 +1,24 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Star, Pencil, Plus, Trash2, Loader2, Copy, Users, Search } from 'lucide-react';
+import { Star, Pencil, Plus, Search } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, deleteDoc, collection, onSnapshot, writeBatch, getDocs, query, orderBy, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot, query, updateDoc, deleteField, getDocs } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { useToast } from '@/hooks/use-toast';
-import type { Team, Player as PlayerType, Favorites } from '@/lib/types';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { cn } from '@/lib/utils';
+import type { Favorites } from '@/lib/types';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 
-
 // --- TYPE DEFINITIONS ---
-interface ApiLeague {
-  league: { id: number; name: string; type: string; logo: string; };
-  country: { name: string; code: string; flag: string | null; };
-  seasons: { year: number; }[];
-}
-
 interface ManagedCompetition {
     leagueId: number;
     name: string;
@@ -101,33 +80,6 @@ const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "N
 const WORLD_LEAGUES_KEYWORDS = ["world", "uefa", "champions league", "europa", "copa libertadores", "copa sudamericana", "caf champions", "afc champions", "conmebol", "concacaf"];
 
 
-// --- CHILD COMPONENTS ---
-
-const LeagueItem = ({ comp, navigate, onFavorite, isFavorited, onRename, isAdmin }: { comp: ManagedCompetition, navigate: ScreenProps['navigate'], onFavorite: (comp: ManagedCompetition) => void, isFavorited: boolean, onRename: (id: number, name: string) => void, isAdmin: boolean }) => {
-    return (
-        <div 
-            className="flex w-full items-center justify-between p-3 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
-            onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
-        >
-            <div className="flex items-center gap-3">
-               <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
-               <span className="text-sm">{comp.name}</span>
-            </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                {isAdmin && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onRename(comp.leagueId, comp.name); }}>
-                        <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                    </Button>
-                )}
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onFavorite(comp); }}>
-                    <Star className={isFavorited ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                </Button>
-            </div>
-        </div>
-    );
-};
-
-
 // --- MAIN SCREEN COMPONENT ---
 export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const [managedCompetitions, setManagedCompetitions] = useState<ManagedCompetition[] | null>(null);
@@ -135,19 +87,16 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     const { isAdmin } = useAdmin();
     const { user } = useAuth();
     const { db } = useFirestore();
-    const { toast } = useToast();
     const [favorites, setFavorites] = useState<Favorites>({ userId: '', leagues: {}, teams: {}, players: {} });
     const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, type: null, id: '', currentName: '' });
     const [isAddOpen, setAddOpen] = useState(false);
-    const [deletingId, setDeletingId] = useState<number | null>(null);
 
-    const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, countries: Map<string, string>, continents: Map<string, string>, teams: Map<number, string>, players: Map<number, string> }>({ leagues: new Map(), countries: new Map(), continents: new Map(), teams: new Map(), players: new Map() });
+    const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> }>({ leagues: new Map(), countries: new Map(), continents: new Map() });
 
-    const getName = useCallback((type: 'league' | 'country' | 'continent' | 'team' | 'player', id: string | number, defaultName: string) => {
+    const getName = useCallback((type: 'league' | 'country' | 'continent', id: string | number, defaultName: string) => {
         const key = `${type}s` as keyof typeof customNames;
         return customNames[key]?.get(id as any) || defaultName;
     }, [customNames]);
-
 
     useEffect(() => {
         if (!user || !db) return;
@@ -174,8 +123,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 leagues: new Map<number, string>(),
                 countries: new Map<string, string>(),
                 continents: new Map<string, string>(),
-                teams: new Map<number, string>(), // Keep empty maps to prevent crashes
-                players: new Map<number, string>()
             };
 
             leaguesSnapshot.forEach(doc => names.leagues.set(Number(doc.id), doc.data().customName));
@@ -201,32 +148,34 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             setManagedCompetitions(fetchedCompetitions);
             setLoading(false);
         }, (error) => {
-            const permissionError = new FirestorePermissionError({ path: compsRef.path, operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
+            // No need to emit error here for regular users, as it's handled by rules
+            if (isAdmin) {
+                const permissionError = new FirestorePermissionError({ path: compsRef.path, operation: 'list' });
+                errorEmitter.emit('permission-error', permissionError);
+            }
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, [db, fetchAllCustomNames]);
+    }, [db, fetchAllCustomNames, isAdmin]);
 
-    const handleFavorite = useCallback(async (type: 'league', item: any) => {
+    const handleFavorite = useCallback(async (item: ManagedCompetition) => {
         if (!user || !db) return;
         
         const favRef = doc(db, 'favorites', user.uid);
-        const itemId = item.id ?? item.leagueId;
-        const itemPath = `leagues`;
-        const fieldPath = `${itemPath}.${itemId}`;
-        const isFavorited = !!(favorites as any)?.[itemPath]?.[itemId];
+        const itemId = item.leagueId;
+        const fieldPath = `leagues.${itemId}`;
+        const isFavorited = !!favorites?.leagues?.[itemId];
 
         let favoriteData: Partial<Favorites> = { userId: user.uid };
         
-        const payload: any = { 
-            name: getName(type, itemId, item.name),
+        const payload = { 
+            name: getName('league', itemId, item.name),
             leagueId: itemId,
             logo: item.logo
         };
         
-        favoriteData[itemPath as 'leagues'] = { [itemId]: payload };
+        favoriteData.leagues = { [itemId]: payload };
 
         try {
             if (isFavorited) {
@@ -289,7 +238,13 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         for (const continent of continents) {
             if (continent === "World") {
                  const worldLeagues = (grouped.World as { leagues: ManagedCompetition[] }).leagues;
-                 worldLeagues.sort((a, b) => a.name.localeCompare(b.name));
+                 worldLeagues.sort((a, b) => {
+                    const aIsCustom = customNames.leagues.has(a.leagueId);
+                    const bIsCustom = customNames.leagues.has(b.leagueId);
+                    if (aIsCustom && !bIsCustom) return -1;
+                    if (!aIsCustom && bIsCustom) return 1;
+                    return a.name.localeCompare(b.name);
+                 });
                  sortedGrouped.World = { leagues: worldLeagues };
             } else {
                 const countries = grouped[continent] as CompetitionsByCountry;
@@ -297,7 +252,13 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 
                 const sortedCountriesObj: CompetitionsByCountry = {};
                 for (const country of sortedCountries) {
-                    countries[country].leagues.sort((a, b) => a.name.localeCompare(b.name));
+                    countries[country].leagues.sort((a, b) => {
+                        const aIsCustom = customNames.leagues.has(a.leagueId);
+                        const bIsCustom = customNames.leagues.has(b.leagueId);
+                        if (aIsCustom && !bIsCustom) return -1;
+                        if (!aIsCustom && bIsCustom) return 1;
+                        return a.name.localeCompare(b.name);
+                    });
                     sortedCountriesObj[country] = countries[country];
                 }
                 sortedGrouped[continent] = sortedCountriesObj;
@@ -306,7 +267,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         
         return sortedGrouped;
 
-    }, [managedCompetitions, getName, customNames.countries]);
+    }, [managedCompetitions, getName, customNames]);
 
     const handleSaveRename = async (newName: string) => {
         if (!renameState.type || !renameState.id || !db) return;
@@ -329,8 +290,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
       setRenameState({ isOpen: true, type, id: String(id), currentName });
     };
 
-
-    const itemTypeMap: {[key: string]: string} = { league: 'البطولة', country: 'الدولة', continent: 'القارة', team: 'الفريق', player: 'اللاعب' };
+    const itemTypeMap: {[key: string]: string} = { league: 'البطولة', country: 'الدولة', continent: 'القارة' };
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -349,72 +309,83 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                   </div>
                 }
             />
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {loading ? (
-                    <div className="space-y-4">
-                        {Array.from({ length: 10 }).map((_, i) => (
-                            <div key={i} className="rounded-lg border bg-card p-4"><Skeleton className="h-6 w-1/3" /></div>
-                        ))}
-                    </div>
-                ) : managedCompetitions && managedCompetitions.length > 0 ? (
-                    <Accordion type="multiple" className="w-full space-y-4">
-                        {Object.entries(sortedGroupedCompetitions || {}).map(([continent, content]) => (
-                            <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card">
-                                <div className="flex w-full items-center justify-between">
-                                    <AccordionTrigger className="px-4 text-lg font-bold flex-1 hover:no-underline">{getName('continent', continent, continent)}</AccordionTrigger>
-                                    {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('continent', continent, getName('continent', continent, continent)); }}>
-                                            <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                                    </Button>)}
-                                </div>
-                                <AccordionContent className="px-1">
-                                    {"leagues" in content ? (
-                                        <ul className="flex flex-col">{(content.leagues as ManagedCompetition[]).map(comp => 
-                                             <LeagueItem 
-                                                key={comp.leagueId}
-                                                comp={{...comp, name: getName('league', comp.leagueId, comp.name)}}
-                                                navigate={navigate}
-                                                onFavorite={() => handleFavorite('league', comp)}
-                                                isFavorited={!!favorites.leagues?.[comp.leagueId]}
-                                                onRename={(id, name) => openRenameDialog('league', id, name)}
-                                                isAdmin={isAdmin}
-                                             />
-                                        )}</ul>
-                                    ) : (
-                                        <Accordion type="multiple" className="w-full space-y-2 px-2">
-                                            {Object.entries(content as CompetitionsByCountry).map(([country, { flag, leagues }]) => (
-                                                <AccordionItem value={country} key={country} className="rounded-lg border bg-background">
-                                                    <div className="flex w-full items-center justify-between">
-                                                        <AccordionTrigger className="px-4 text-base font-semibold flex-1 hover:no-underline">
-                                                          <div className="flex items-center gap-3">
-                                                              {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
-                                                              <span>{getName('country', country, country)}</span>
-                                                          </div>
-                                                        </AccordionTrigger>
-                                                         <div className="flex items-center pr-2">
-                                                            {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getName('country', country, country)); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
-                                                        </div>
+                    Array.from({ length: 10 }).map((_, i) => (
+                        <Skeleton key={i} className="h-12 w-full rounded-lg" />
+                    ))
+                ) : managedCompetitions && managedCompetitions.length > 0 && sortedGroupedCompetitions ? (
+                    Object.entries(sortedGroupedCompetitions).map(([continent, content]) => (
+                        <div key={continent} className="rounded-lg border bg-card p-2">
+                             <div className="flex w-full items-center justify-between px-2 py-2">
+                                <h3 className="text-lg font-bold">{getName('continent', continent, continent)}</h3>
+                                {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openRenameDialog('continent', continent, getName('continent', continent, continent)); }}>
+                                        <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                </Button>)}
+                            </div>
+
+                            {"leagues" in content ? (
+                                <ul className="flex flex-col">{(content.leagues as ManagedCompetition[]).map(comp => 
+                                     <li key={comp.leagueId} 
+                                        className="flex w-full items-center justify-between p-3 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
+                                        onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
+                                     >
+                                        <div className="flex items-center gap-3">
+                                           <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+                                           <span className="text-sm">{comp.name}</span>
+                                        </div>
+                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                             {isAdmin && (
+                                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openRenameDialog('league', comp.leagueId, comp.name); }}>
+                                                     <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                                 </Button>
+                                             )}
+                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp); }}>
+                                                 <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                             </Button>
+                                         </div>
+                                     </li>
+                                )}</ul>
+                            ) : (
+                                <div className="space-y-2">
+                                    {Object.entries(content as CompetitionsByCountry).map(([country, { flag, leagues }]) => (
+                                        <div key={country} className="rounded-lg border bg-background p-1">
+                                             <div className="flex w-full items-center justify-between px-2 py-1">
+                                                  <div className="flex items-center gap-3">
+                                                      {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
+                                                      <span className="font-semibold">{getName('country', country, country)}</span>
+                                                  </div>
+                                                  <div className="flex items-center">
+                                                    {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getName('country', country, country)); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
+                                                </div>
+                                             </div>
+                                            <ul className="flex flex-col border-t pt-1">{leagues.map(comp => 
+                                                 <li key={comp.leagueId} 
+                                                    className="flex w-full items-center justify-between p-3 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
+                                                    onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
+                                                 >
+                                                    <div className="flex items-center gap-3">
+                                                       <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+                                                       <span className="text-sm">{comp.name}</span>
                                                     </div>
-                                                    <AccordionContent className="px-1">
-                                                        <ul className="flex flex-col">{leagues.map(comp => 
-                                                             <LeagueItem 
-                                                                key={comp.leagueId}
-                                                                comp={{...comp, name: getName('league', comp.leagueId, comp.name)}}
-                                                                navigate={navigate}
-                                                                onFavorite={() => handleFavorite('league', comp)}
-                                                                isFavorited={!!favorites.leagues?.[comp.leagueId]}
-                                                                onRename={(id, name) => openRenameDialog('league', id, name)}
-                                                                isAdmin={isAdmin}
-                                                             />
-                                                        )}</ul>
-                                                    </AccordionContent>
-                                                </AccordionItem>
-                                            ))}
-                                        </Accordion>
-                                    )}
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
-                    </Accordion>
+                                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                         {isAdmin && (
+                                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openRenameDialog('league', comp.leagueId, comp.name); }}>
+                                                                 <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                                             </Button>
+                                                         )}
+                                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp); }}>
+                                                             <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                         </Button>
+                                                     </div>
+                                                 </li>
+                                            )}</ul>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))
                 ) : (
                     <div className="text-center text-muted-foreground py-10">
                         <p className="text-lg font-semibold">لم تتم إضافة بطولات بعد.</p>
@@ -434,5 +405,3 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
-
-    
