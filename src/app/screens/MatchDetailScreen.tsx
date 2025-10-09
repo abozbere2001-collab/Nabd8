@@ -197,15 +197,20 @@ const H2HView = ({ h2h, fixture, homeName, awayName }: { h2h: H2HData[], fixture
     let draws = 0;
 
     h2h.forEach(match => {
+        const matchHomeId = match.teams.home.id;
+        const fixtureHomeId = fixture.teams.home.id;
+
+        if (match.goals.home === null || match.goals.away === null) return;
+        
         if (match.goals.home === match.goals.away) {
             draws++;
-        } else if (match.teams.home.id === fixture.teams.home.id) {
-            if (match.goals.home! > match.goals.away!) homeWins++; else awayWins++;
-        } else {
-            if (match.goals.home! > match.goals.away!) awayWins++; else homeWins++;
+        } else if (match.goals.home > match.goals.away) {
+            if (matchHomeId === fixtureHomeId) homeWins++; else awayWins++;
+        } else { // away wins
+            if (matchHomeId === fixtureHomeId) awayWins++; else homeWins++;
         }
     });
-
+    
     const total = homeWins + awayWins + draws;
     const homeWinPercentage = total > 0 ? (homeWins / total) * 100 : 0;
     const awayWinPercentage = total > 0 ? (awayWins / total) * 100 : 0;
@@ -292,7 +297,7 @@ const SubstitutionsView = ({ events, homeTeamId, awayTeamId, getPlayerName, onRe
     );
 };
 
-const LineupField = ({ lineup, opponentTeam, events, getPlayerName, onRename }: { lineup: LineupData, opponentTeam?: Team, events: MatchEvent[], getPlayerName: (id: number, defaultName: string) => string; getCoachName: (id: number, defaultName: string) => string; onRename: (type: RenameType, id: number, name: string) => void }) => {
+const LineupField = ({ lineup, opponentTeam, events, getPlayerName, getCoachName, onRename }: { lineup: LineupData, opponentTeam?: Team, events: MatchEvent[], getPlayerName: (id: number, defaultName: string) => string; getCoachName: (id: number, defaultName: string) => string; onRename: (type: RenameType, id: number, name: string) => void }) => {
   const { isAdmin } = useAdmin();
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
     return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا</div>;
@@ -657,3 +662,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
     
 
 
+
+
+    
