@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -127,7 +128,13 @@ const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixtur
           onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
          <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
-              <div className="flex items-center gap-2">
+              <div 
+                className="flex items-center gap-2 cursor-pointer hover:underline"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('CompetitionDetails', { leagueId: fixture.league.id, title: fixture.league.name, logo: fixture.league.logo });
+                }}
+              >
                   <Avatar className="h-4 w-4">
                       <AvatarImage src={fixture.league.logo} alt={fixture.league.name} />
                       <AvatarFallback>{fixture.league.name.substring(0,1)}</AvatarFallback>
@@ -440,12 +447,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   };
   
   const handleTabChange = (value: string) => {
-    const tabValue = value as 'all-matches' | 'my-results' | 'global-predictions';
-    if (tabValue === 'global-predictions') {
-      navigate('GlobalPredictions');
-    } else {
-      setActiveTab(tabValue);
-    }
+    const tabValue = value as 'all-matches' | 'my-results';
+    setActiveTab(tabValue);
   };
 
 
@@ -479,9 +482,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         />
         <div className="flex flex-col border-b bg-background">
              <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-               <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
+               <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none bg-transparent">
                    <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>كل المباريات</TabsTrigger>
-                   <TabsTrigger value="global-predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
                    <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
                </TabsList>
              </Tabs>

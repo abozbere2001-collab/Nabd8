@@ -41,7 +41,7 @@ interface GroupedCompetitions {
 
 interface RenameState {
     isOpen: boolean;
-    type: 'league' | 'country' | 'continent' | 'player' | 'team' | null;
+    type: 'league' | 'country' | 'continent' | null;
     id: string;
     currentName: string;
 }
@@ -149,12 +149,16 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             setManagedCompetitions(fetchedCompetitions);
             setLoading(false);
         }, (error) => {
-            setManagedCompetitions([]); // Set to empty array on error for non-admins
+            setManagedCompetitions([]);
             setLoading(false);
+            if (!isAdmin) { // Only emit error for non-admins if it's a permission issue
+               const permissionError = new FirestorePermissionError({ path: 'managedCompetitions', operation: 'list' });
+               errorEmitter.emit('permission-error', permissionError);
+            }
         });
 
         return () => unsubscribe();
-    }, [db, fetchAllCustomNames]);
+    }, [db, fetchAllCustomNames, isAdmin]);
 
     const handleFavorite = useCallback(async (item: ManagedCompetition) => {
         if (!user || !db) return;
@@ -225,7 +229,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 const bIsCustom = customNamesMap.has(b);
                 if (aIsCustom && !bIsCustom) return -1;
                 if (!aIsCustom && bIsCustom) return 1;
-                return a.localeCompare(b);
+                return getName('country', a, a).localeCompare(getName('country', b, b), 'ar');
             });
         };
         

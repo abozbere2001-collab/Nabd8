@@ -8,11 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
-import { Star, Pencil, Shield, Users, Trophy, BarChart2, Heart, Copy } from 'lucide-react';
+import { Star, Pencil, Shield, Users, Trophy, BarChart2, Heart, Copy, Trash2, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { doc, setDoc, onSnapshot, updateDoc, deleteField, getDocs, collection } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, updateDoc, deleteField, getDocs, collection, deleteDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
@@ -20,10 +20,20 @@ import type { Fixture, Standing, TopScorer, Team, Favorites } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type RenameType = 'league' | 'team' | 'player';
 
-const CURRENT_SEASON = 2025;
+const CURRENT_SEASON = 2024;
 
 export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo, headerActions }: ScreenProps & { title?: string, leagueId?: number, logo?: string, headerActions?: React.ReactNode }) {
   const { isAdmin } = useAdmin();
@@ -40,6 +50,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   const [noteTeam, setNoteTeam] = useState<{id: number, name: string, logo: string} | null>(null);
   const [isNoteOpen, setIsNoteOpen] = useState(false);
+  
+  const [isDeleteAlertOpen, setDeleteAlertOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
 
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
@@ -88,7 +102,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !db) return;
     const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
         setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {}, teams: {}, players: {} });
     });
@@ -96,7 +110,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   }, [user, db]);
 
  useEffect(() => {
-    if (leagueId) {
+    if (leagueId && db) {
         const unsub = onSnapshot(doc(db, "leagueCustomizations", String(leagueId)), (doc) => {
             if (doc.exists()) {
                 setDisplayTitle(doc.data().customName);
@@ -166,7 +180,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   }, [leagueId, initialTitle, fetchAllCustomNames]);
 
   const handleFavorite = async (type: 'league' | 'team' | 'player', item: any) => {
-    if (!user) return;
+    if (!user || !db) return;
     const favRef = doc(db, 'favorites', user.uid);
     
     let fieldPath = '';
@@ -211,7 +225,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   };
 
   const handleSaveRename = async (newName: string) => {
-    if (!renameItem) return;
+    if (!renameItem || !db) return;
     const { id, type } = renameItem;
     let collectionName = '';
     switch(type) {
@@ -238,7 +252,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   }
 
   const handleSaveNote = async (note: string) => {
-    if (!noteTeam) return;
+    if (!noteTeam || !db) return;
     const docRef = doc(db, "adminFavorites", String(noteTeam.id));
     const data = {
       teamId: noteTeam.id,
@@ -258,16 +272,67 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     }
   }
 
+  const handleDeleteCompetition = async () => {
+    if (!isAdmin || !db || !leagueId) return;
+    setIsDeleting(true);
+    const docRef = doc(db, 'managedCompetitions', String(leagueId));
+
+    try {
+        await deleteDoc(docRef);
+        toast({ title: 'نجاح', description: 'تم حذف البطولة بنجاح.' });
+        goBack();
+    } catch (error) {
+        const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    } finally {
+        setIsDeleting(false);
+        setDeleteAlertOpen(false);
+    }
+  }
+
+
   const secondaryActions = (
     <div className="flex items-center gap-1">
       {isAdmin && leagueId && (
-         <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => handleOpenRename('league', leagueId, displayTitle || '')}
-        >
-          <Pencil className="h-5 w-5" />
-        </Button>
+        <>
+            <AlertDialog open={isDeleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => { e.stopPropagation(); setDeleteAlertOpen(true); }}
+                >
+                    <Trash2 className="h-5 w-5 text-destructive" />
+                </Button>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            سيؤدي هذا إلى حذف البطولة من قائمة البطولات المدارة في التطبيق. لا يمكن التراجع عن هذا الإجراء.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive hover:bg-destructive/90"
+                            onClick={handleDeleteCompetition}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "حذف"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleOpenRename('league', leagueId, displayTitle || '')}
+            >
+                <Pencil className="h-5 w-5" />
+            </Button>
+        </>
       )}
       {leagueId &&
         <Button variant="ghost" size="icon" onClick={() => handleFavorite('league', {})}>
@@ -312,7 +377,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             ) : fixtures.length > 0 ? (
                 <div className="space-y-3">
                     {fixtures.map(({ fixture, teams, goals }) => (
-                        <div key={fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.id, fixture: { fixture, teams, goals, league: {id: leagueId, name: displayTitle, logo, round: ''}} })}>
+                        <div key={fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.id, fixture: { fixture, teams, goals, league: {id: leagueId!, name: displayTitle || '', logo, round: ''}} })}>
                            <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
                                 <span>{new Date(fixture.date).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                 <span>{fixture.status.short}</span>
@@ -501,7 +566,3 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
-
-    
-
-    
