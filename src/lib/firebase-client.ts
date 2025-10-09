@@ -25,18 +25,11 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Automatically authorize the development domain for authentication
-if (typeof window !== 'undefined' && window.location.hostname === "localhost" && process.env.NODE_ENV === 'development') {
-    auth.tenantId = null; 
-    auth.settings.appVerificationDisabledForTesting = true;
-    
-    const config = (auth.config.emulator || {});
-    const authEmulatorHost = config.host || "localhost";
-    const authEmulatorPort = config.port || 9099;
-
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     const currentHost = window.location.hostname;
     const isAuthorized = auth.config.authorizedDomains?.includes(currentHost);
     
-    if(!isAuthorized) {
+    if (!isAuthorized) {
         auth.config.authorizedDomains = [...(auth.config.authorizedDomains || []), currentHost];
     }
 }
