@@ -98,12 +98,10 @@ const CURRENT_SEASON = 2025;
 
 // --- API FETCH HOOK ---
 function useMatchData(fixture?: Fixture) {
-    const [data, setData] = useState<{
-        lineups: TeamLineup[];
-        events: Event[];
-        stats: MatchStats[];
-        standings: Standing[][];
-    }>({ lineups: [], events: [], stats: [], standings: [] });
+    const [lineups, setLineups] = useState<TeamLineup[]>([]);
+    const [events, setEvents] = useState<Event[]>([]);
+    const [stats, setStats] = useState<MatchStats[]>([]);
+    const [standings, setStandings] = useState<Standing[][]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -111,30 +109,25 @@ function useMatchData(fixture?: Fixture) {
             setLoading(false);
             return;
         }
-        const { fixture: { id: fixtureId, date }, league, teams } = fixture;
 
         const fetchData = async () => {
             setLoading(true);
             try {
-                const isNational = fixture.teams.home.winner !== null && fixture.teams.away.winner !== null;
-                const seasonForStandings = isNational ? new Date(date).getFullYear() : CURRENT_SEASON;
+                const { fixture: { id: fixtureId, date }, league, teams } = fixture;
 
-                // Fetch lineups using the 'players' endpoint for rich data
+                // Fetch lineups and other data in parallel
                 const [homePlayersRes, awayPlayersRes, eventsRes, statsRes, standingsRes] = await Promise.all([
-                    fetch(`/api/football/players?fixture=${fixtureId}&team=${teams.home.id}`),
-                    fetch(`/api/football/players?fixture=${fixtureId}&team=${teams.away.id}`),
-                    fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
-                    fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
-                    fetch(`/api/football/standings?league=${league.id}&season=${seasonForStandings}`),
+                    fetch(`/api/football/players?fixture=${fixtureId}&team=${teams.home.id}`).catch(() => null),
+                    fetch(`/api/football/players?fixture=${fixtureId}&team=${teams.away.id}`).catch(() => null),
+                    fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).catch(() => null),
+                    fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`).catch(() => null),
+                    fetch(`/api/football/standings?league=${league.id}&season=${new Date(date).getFullYear()}`).catch(() => null),
                 ]);
 
-                const homePlayersData = await homePlayersRes.json();
-                const awayPlayersData = await awayPlayersRes.json();
-                const eventsData = await eventsRes.json();
-                const statsData = await statsRes.json();
-                const standingsData = await standingsRes.json();
-
-                const processLineupData = (lineupData: any): TeamLineup | null => {
+                // Process Lineups
+                const processLineupData = async (res: Response | null): Promise<TeamLineup | null> => {
+                    if (!res || !res.ok) return null;
+                    const lineupData = await res.json();
                     if (!lineupData?.response?.[0]) return null;
                     const response = lineupData.response[0];
                     const allPlayers: PlayerInfoFromApi[] = response.players || [];
@@ -148,16 +141,15 @@ function useMatchData(fixture?: Fixture) {
                     };
                 };
 
-                const homeLineup = processLineupData(homePlayersData);
-                const awayLineup = processLineupData(awayPlayersData);
+                const homeLineup = await processLineupData(homePlayersRes);
+                const awayLineup = await processLineupData(awayPlayersRes);
                 const finalLineups = [homeLineup, awayLineup].filter(Boolean) as TeamLineup[];
+                setLineups(finalLineups);
 
-                setData({
-                    lineups: finalLineups,
-                    events: eventsData.response || [],
-                    stats: statsData.response || [],
-                    standings: standingsData.response?.[0]?.league?.standings || [],
-                });
+                // Process other data
+                if (eventsRes && eventsRes.ok) setEvents((await eventsRes.json()).response || []);
+                if (statsRes && statsRes.ok) setStats((await statsRes.json()).response || []);
+                if (standingsRes && standingsRes.ok) setStandings((await standingsRes.json()).response?.[0]?.league?.standings || []);
 
             } catch (error) {
                 console.error("Failed to fetch match details:", error);
@@ -165,10 +157,11 @@ function useMatchData(fixture?: Fixture) {
                 setLoading(false);
             }
         };
+
         fetchData();
     }, [fixture]);
 
-    return { ...data, loading };
+    return { lineups, events, stats, standings, loading };
 }
 
 
@@ -263,7 +256,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
     return <Skeleton className="w-full h-[600px] rounded-lg m-4" />;
   }
 
-  if (!lineups || lineups.length < 1) {
+  if (!lineups || lineups.length === 0) {
     return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة.</p>;
   }
   
@@ -276,29 +269,32 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
       return <p className="text-center text-muted-foreground p-8">تشكيلة الفريق المحدد غير متاحة.</p>;
   }
 
-  const groupPlayersByLine = (players: PlayerInfoFromApi[]) => {
-    const lines: { [key: string]: PlayerInfoFromApi[] } = {
-        Goalkeeper: [],
-        Defender: [],
-        Midfielder: [],
-        Attacker: [],
-    };
-    players.forEach(p => {
-        const position = p.statistics[0].games.position;
-        if(lines[position]) {
-            lines[position].push(p);
-        }
-    });
+  const groupPlayersByLine = (players: PlayerInfoFromApi[], formation: string) => {
+    const formationLines = formation?.split('-').map(Number);
+    if (!formationLines || formationLines.some(isNaN)) { // Fallback for invalid formation
+        const lines: { [key: string]: PlayerInfoFromApi[] } = { Goalkeeper: [], Defender: [], Midfielder: [], Attacker: [] };
+        players.forEach(p => {
+            const position = p.statistics[0].games.position;
+            if (lines[position]) lines[position].push(p);
+        });
+        return [lines.Attacker, lines.Midfielder, lines.Defender, lines.Goalkeeper].filter(line => line?.length > 0);
+    }
+    
+    const goalkeeper = players.filter(p => p.statistics[0].games.position === 'Goalkeeper');
+    const fieldPlayers = players.filter(p => p.statistics[0].games.position !== 'Goalkeeper');
+    
+    const defensiveLine = fieldPlayers.slice(0, formationLines[0]);
+    const midfieldLine = fieldPlayers.slice(formationLines[0], formationLines[0] + formationLines[1]);
+    const attackLine = fieldPlayers.slice(formationLines[0] + formationLines[1]);
 
-    // Return in logical pitch order (reversed for display)
-    return [lines.Attacker, lines.Midfielder, lines.Defender, lines.Goalkeeper].filter(line => line && line.length > 0);
+    return [attackLine, midfieldLine, defensiveLine, goalkeeper].filter(line => line.length > 0);
   };
   
-  const playerLines = groupPlayersByLine(lineupToShow.startXI);
+  const playerLines = groupPlayersByLine(lineupToShow.startXI, lineupToShow.formation);
 
   const renderPlayerRow = (playerInfo: PlayerInfoFromApi) => {
     if(!playerInfo) return null;
-    const { player, statistics } = playerInfo;
+    const { player } = playerInfo;
     return (
          <div key={player.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted">
             <span className="text-muted-foreground w-6 text-center font-mono">{player.number}</span>
@@ -581,7 +577,7 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[], fixt
 
 
 // --- MAIN SCREEN COMPONENT ---
-export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: Fixture, headerActions?: React.ReactNode }) {
+export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: Fixture; headerActions?: React.ReactNode; }) {
   const { lineups, events, stats, standings, loading } = useMatchData(fixture);
   const { isAdmin } = useAdmin();
   const { user } = useAuth();
@@ -713,4 +709,3 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
     </div>
   );
 }
-
