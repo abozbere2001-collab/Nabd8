@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -9,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestore } from '@/firebase/provider';
-import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Upload } from 'lucide-react';
 import type { NewsArticle } from '@/lib/types';
@@ -78,7 +79,7 @@ export function AddEditNewsScreen({ goBack, canGoBack, article, isEditing }: Add
     const newsData: Omit<NewsArticle, 'id'> = {
       title: title.trim(),
       content: content.trim(),
-      timestamp: serverTimestamp(),
+      timestamp: new Date(),
       ...(finalImageUrl && { imageUrl: finalImageUrl }),
       ...(imageHint.trim() && { imageHint: imageHint.trim() }),
     };

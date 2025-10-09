@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Send, MoreVertical, Edit, Trash2, CornerDownRight, Heart } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, setDoc, limit } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, setDoc, limit } from 'firebase/firestore';
 import type { MatchComment, Like } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -327,7 +327,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
       userId: user.uid,
       userName: user.displayName,
       userPhoto: user.photoURL,
-      timestamp: serverTimestamp(),
+      timestamp: new Date(),
       parentId: parentId || null,
     };
     
@@ -351,7 +351,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
                     commentId: parentId,
                     commentText: text.trim(),
                     read: false,
-                    timestamp: serverTimestamp(),
+                    timestamp: new Date(),
                 };
                 addDoc(notificationsCollectionRef, notificationData)
                 .catch((serverError) => {
@@ -538,7 +538,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
                 commentId: commentId,
                 commentText: originalComment.text,
                 read: false,
-                timestamp: serverTimestamp(),
+                timestamp: new Date(),
             };
             addDoc(notificationsCollectionRef, notificationData).catch((serverError) => {
                  const permissionError = new FirestorePermissionError({
