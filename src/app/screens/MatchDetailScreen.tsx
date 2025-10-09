@@ -191,59 +191,23 @@ const MatchHeader = ({ fixture, onBack, headerActions, navigate, isAdmin, onCopy
   </header>
 );
 
-const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isAdmin, onCopy }: { player: LineupPlayer, isHomeTeam: boolean, onRename: () => void, onFavorite: () => void, isFavorited: boolean, isAdmin: boolean, onCopy: (url: string) => void }) => {
-    if (!player.player.grid) return null;
-
-    const [row, col] = player.player.grid.split(':').map(Number);
-    
-    // Normalize grid positions to a 0-100 scale for CSS positioning
-    // The grid is typically 1-11 for rows and 1-5 for columns
-    let top = (row / 12) * 100;
-    let left = ((col - 1) / 4) * 100;
-    
-    // Reverse positions for the away team to appear on the opposite side
-    if (!isHomeTeam) {
-       top = 100 - top;
-       left = 100 - left;
-    }
-
-    return (
-        <div 
-          className="absolute text-center flex flex-col items-center transition-all duration-300" 
-          style={{ 
-            top: `${top}%`, 
-            left: `${left}%`,
-            width: '60px',
-            transform: 'translate(-50%, -50%)',
-          }}
-        >
-            <div className="relative">
-                <Avatar className="w-10 h-10 border-2 bg-slate-800 border-white/50 shadow-md text-white font-bold flex items-center justify-center">
-                   <AvatarImage src={player.player.photo} alt={player.player.name} />
-                   <AvatarFallback>{player.player.pos ? player.player.pos.charAt(0) : 'P'}</AvatarFallback>
-                </Avatar>
-                <span className={cn(
-                  "absolute -top-1 -right-1 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background",
-                   isHomeTeam ? "bg-primary" : "bg-destructive"
-                  )}>
-                    {player.player.number}
-                </span>
-                <div className='absolute -bottom-1 left-1 flex opacity-80'>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {e.stopPropagation(); onFavorite(); }}>
-                        <Star className={cn("h-4 w-4", isFavorited ? "text-yellow-400 fill-current" : "text-white")} />
-                    </Button>
-                    {isAdmin && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename(); }}>
-                        <Pencil className="h-4 w-4 text-white" />
-                    </Button>}
-                </div>
-                 {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(player.player.photo); }}><Copy className="h-3 w-3 text-white" /></Button>}
-            </div>
-            <p className="text-[10px] font-semibold bg-black/50 text-white rounded-sm px-1 py-0.5 mt-1 whitespace-nowrap shadow-lg truncate w-full">
-                {player.player.name}
-                {isAdmin && <span className="text-[8px] text-white/50 ml-1">(ID: {player.player.id})</span>}
-            </p>
+const PlayerOnPitch = ({ player }: { player: LineupPlayerInfo }) => {
+  return (
+    <div className="relative flex flex-col items-center justify-center w-16">
+      <div className="relative">
+        <Avatar className="w-10 h-10 border-2 bg-slate-800/80 border-white/50 shadow-md">
+          <AvatarImage src={player.photo} alt={player.name} />
+          <AvatarFallback className="bg-slate-700 text-white font-bold">{player.name?.[0]}</AvatarFallback>
+        </Avatar>
+        <div className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background bg-slate-900">
+          {player.number}
         </div>
-    );
+      </div>
+      <p className="text-[10px] font-semibold bg-black/50 text-white rounded-sm px-1.5 py-0.5 mt-1 whitespace-nowrap shadow-lg truncate max-w-full">
+        {player.name}
+      </p>
+    </div>
+  );
 };
 
 
@@ -266,7 +230,20 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
   if (!lineupToShow) {
       return <p className="text-center text-muted-foreground p-8">تشكيلة الفريق المحدد غير متاحة.</p>;
   }
+
+  const groupPlayersByLine = (players: LineupPlayer[]) => {
+      const lines: { [key: string]: LineupPlayerInfo[] } = { G: [], D: [], M: [], F: [] };
+      players.forEach(p => {
+          const position = p.player.pos;
+          if (lines[position]) {
+              lines[position].push(p.player);
+          }
+      });
+      return [lines.G, lines.D, lines.M, lines.F].filter(line => line.length > 0);
+  };
   
+  const playerLines = groupPlayersByLine(lineupToShow.startXI);
+
   const renderPlayerRow = (playerInfo: LineupPlayerInfo) => {
     return (
          <div key={playerInfo.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted">
@@ -323,23 +300,13 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
 
       <div className="space-y-4 px-4">
         <div 
-            className="relative w-full max-w-md mx-auto aspect-[3/4] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-500/30 shadow-2xl" 
-            style={{
-                backgroundImage: "url(/football-pitch-3d.svg)",
-                backgroundSize: '100% 100%',
-            }}
+            className="relative w-full max-w-md mx-auto aspect-[3/4] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-500/30 shadow-2xl flex flex-col justify-around py-4" 
+            style={{ backgroundImage: "url(/football-pitch-3d.svg)", backgroundSize: '100% 100%' }}
         >
-          {lineupToShow?.startXI.map(p => (
-              <PlayerIcon 
-                key={p.player.id} 
-                player={p} 
-                isHomeTeam={lineupToShow.team.id === fixture.teams.home.id}
-                onRename={() => onRename('player', p.player.id, p.player.name)}
-                onFavorite={() => onFavorite('player', p.player)}
-                isFavorited={!!favorites?.players?.[p.player.id]}
-                isAdmin={isAdmin}
-                onCopy={onCopy}
-              />
+          {playerLines.map((line, lineIndex) => (
+            <div key={lineIndex} className="flex justify-around items-center">
+              {line.map(player => <PlayerOnPitch key={player.id} player={player} />)}
+            </div>
           ))}
           <div className="absolute bottom-2 left-2 bg-black/50 text-white text-sm font-bold px-2 py-1 rounded">
              {lineupToShow?.formation}
@@ -366,7 +333,6 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
                     </p>
                 </div>
                  <div className='flex opacity-80'>
-                    {/* Favorite for coach can be added if needed */}
                     {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onRename('coach', lineupToShow.coach.id, lineupToShow.coach.name)}>
                         <Pencil className="h-4 w-4 text-muted-foreground" />
                     </Button>}
@@ -666,10 +632,3 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
     </div>
   );
 }
-
-    
-
-    
-
-    
-
