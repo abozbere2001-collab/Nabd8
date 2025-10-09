@@ -1,11 +1,12 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from "@/components/ui/button";
 import { cn } from '@/lib/utils';
@@ -16,7 +17,7 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
-import { Star, Pencil, Goal, ArrowLeftRight, RectangleVertical, Copy, Heart } from 'lucide-react';
+import { Star, Pencil, Goal, ArrowLeftRight, RectangleVertical, Copy, Heart, User, ShieldCheck, Repeat } from 'lucide-react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { NoteDialog } from '@/components/NoteDialog';
 import { Progress } from '@/components/ui/progress';
@@ -53,122 +54,29 @@ interface MatchEvent {
     detail: string;
     comments: string | null;
 }
+interface H2HData {
+    fixture: { id: number, status: { long: string }, date: string };
+    teams: { home: Team, away: Team };
+    goals: { home: number | null, away: number | null };
+}
+
 interface MatchData {
     lineups: LineupData[];
     events: MatchEvent[];
     stats: any[];
     standings: Standing[];
+    h2h: H2HData[];
     loading: boolean;
     error: string | null;
 }
 type RenameType = 'team' | 'player' | 'coach';
 
 
-// --- FINAL LINEUP COMPONENT ---
-export function LineupField({ lineup, getPlayerName }: { lineup: LineupData, getPlayerName: (id: number, defaultName: string) => string }) {
-    if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
-      return <div className="flex items-center justify-center h-64 text-muted-foreground">التشكيلة غير متاحة حالياً</div>;
-    }
-  
-    // ترتيب اللاعبين حسب grid (row:col)
-    const rows: { player: Player, colIndex?: number }[][] = [];
-    lineup.startXI.forEach(({player}) => {
-      if (!player.grid) return;
-      const [rowStr, colStr] = player.grid.split(':');
-      const rowIndex = parseInt(rowStr, 10) - 1;
-      const colIndex = parseInt(colStr, 10) - 1;
-      if (!rows[rowIndex]) rows[rowIndex] = [];
-      rows[rowIndex].push({ player: { ...player, colIndex } });
-    });
-  
-    // ترتيب الصفوف من الأسفل إلى الأعلى (الحارس أسفل)
-    const displayedRows = rows.reverse();
-  
-    // فرز أفقي صحيح لضمان عدم انعكاس اللاعبين
-    displayedRows.forEach(row => row && row.sort((a, b) => (a.player.colIndex || 0) - (b.player.colIndex || 0)));
-  
-    return (
-      <Card className="p-3 bg-card/80">
-        <div
-          className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center rounded-lg border border-green-500/20 overflow-hidden"
-          style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}
-        >
-          <div className="absolute inset-0 flex flex-col justify-around p-2">
-            {displayedRows.map((row, rowIndex) => (
-              row && <div key={rowIndex} className="flex justify-around items-end w-full">
-                {row.map(({player}) => {
-                  const displayName = getPlayerName(player.id, player.name);
-                  const playerPhoto = player.photo || `https://media.api-sports.io/football/players/${player.id}.png`;
-  
-                  return (
-                    <div key={player.id} className="flex flex-col items-center text-white text-xs w-16">
-                      <div className="relative w-12 h-12">
-                        <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
-                          <AvatarImage src={playerPhoto} alt={displayName} />
-                          <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        {player.number && (
-                          <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800">
-                            {player.number}
-                          </div>
-                        )}
-                      </div>
-                      <span className="mt-1 text-[11px] font-semibold text-center truncate w-full bg-black/50 px-1.5 py-0.5">
-                        {displayName}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-  
-        {lineup.substitutes && lineup.substitutes.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-border">
-            <h4 className="font-bold text-center mb-2">الاحتياط</h4>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {lineup.substitutes.map(({player}) => {
-                const displayName = getPlayerName(player.id, player.name);
-                const playerPhoto = player.photo || `https://media.api-sports.io/football/players/${player.id}.png`;
-  
-                return (
-                  <div key={player.id} className="flex flex-col items-center gap-1">
-                    <Avatar className="h-10 w-10 border border-white/30 bg-black/30">
-                      <AvatarImage src={playerPhoto} alt={displayName} />
-                      <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs font-medium text-center truncate w-full text-white/90">
-                      {displayName}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-  
-        {lineup.coach && (
-          <div className="mt-4 pt-4 border-t border-border flex flex-col items-center gap-2">
-            <Avatar className="h-16 w-16 border-2 border-white/40 bg-black/30">
-              <AvatarImage
-                src={lineup.coach.photo || `https://media.api-sports.io/football/coachs/${lineup.coach.id}.png`}
-                alt={lineup.coach.name}
-              />
-              <AvatarFallback>{lineup.coach.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <span className="font-semibold text-white">{lineup.coach.name}</span>
-          </div>
-        )}
-      </Card>
-    );
-}
-
 // --- HOOKS ---
 function useMatchData(fixture?: FixtureType): MatchData {
     const { toast } = useToast();
     const [data, setData] = useState<MatchData>({
-        lineups: [], events: [], stats: [], standings: [], loading: true, error: null,
+        lineups: [], events: [], stats: [], standings: [], h2h: [], loading: true, error: null,
     });
     
     const CURRENT_SEASON = useMemo(() => {
@@ -194,13 +102,16 @@ function useMatchData(fixture?: FixtureType): MatchData {
             setData(prev => ({ ...prev, loading: true, error: null }));
             const fixtureId = fixture.fixture.id;
             const leagueId = fixture.league.id;
+            const homeTeamId = fixture.teams.home.id;
+            const awayTeamId = fixture.teams.away.id;
 
             try {
-                const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.allSettled([
+                const [lineupsRes, eventsRes, statsRes, standingsRes, h2hRes] = await Promise.allSettled([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
                     fetch(`/api/football/statistics?fixture=${fixtureId}`),
                     fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
+                    fetch(`/api/football/fixtures/headtohead?h2h=${homeTeamId}-${awayTeamId}`),
                 ]);
 
                 const parseResult = async (res: PromiseSettledResult<Response>) => {
@@ -217,6 +128,7 @@ function useMatchData(fixture?: FixtureType): MatchData {
                 const fetchedEvents: MatchEvent[] = await parseResult(eventsRes);
                 const fetchedStats: any[] = await parseResult(statsRes);
                 const fetchedStandings: Standing[] = (await parseResult(standingsRes))[0]?.league?.standings[0] || [];
+                const fetchedH2H: H2HData[] = await parseResult(h2hRes);
                 
                  if (fetchedLineups.length > 0) {
                      for (let i = 0; i < fetchedLineups.length; i++) {
@@ -250,6 +162,7 @@ function useMatchData(fixture?: FixtureType): MatchData {
                     events: fetchedEvents.sort((a, b) => a.time.elapsed - b.time.elapsed),
                     stats: fetchedStats,
                     standings: fetchedStandings,
+                    h2h: fetchedH2H,
                     loading: false,
                     error: null,
                 });
@@ -262,7 +175,7 @@ function useMatchData(fixture?: FixtureType): MatchData {
                     description: "فشل في جلب بيانات المباراة. يرجى التحقق من اتصالك بالإنترنت.",
                 });
                 setData({
-                    lineups: [], events: [], stats: [], standings: [], loading: false,
+                    lineups: [], events: [], stats: [], standings: [], h2h: [], loading: false,
                     error: error.message || "Unknown error",
                 });
             }
@@ -275,6 +188,166 @@ function useMatchData(fixture?: FixtureType): MatchData {
 }
 
 // --- CHILD COMPONENTS ---
+const H2HView = ({ h2h, fixture }: { h2h: H2HData[], fixture: FixtureType }) => {
+    if (!h2h || h2h.length === 0) return null;
+
+    let homeWins = 0;
+    let awayWins = 0;
+    let draws = 0;
+
+    h2h.forEach(match => {
+        if(match.teams.home.winner) {
+            if (match.teams.home.id === fixture.teams.home.id) homeWins++;
+            else awayWins++;
+        } else if (match.teams.away.winner) {
+            if (match.teams.away.id === fixture.teams.home.id) homeWins++;
+            else awayWins++;
+        } else {
+            draws++;
+        }
+    });
+
+    const total = homeWins + awayWins + draws;
+    const homeWinPercentage = total > 0 ? (homeWins / total) * 100 : 0;
+    const awayWinPercentage = total > 0 ? (awayWins / total) * 100 : 0;
+    const drawPercentage = total > 0 ? (draws / total) * 100 : 0;
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-center text-lg">المواجهات المباشرة (آخر {total} مباريات)</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="flex justify-around items-center">
+                    <div className="text-center">
+                        <p className="font-bold text-xl">{homeWins}</p>
+                        <p className="text-sm text-muted-foreground">فوز {fixture.teams.home.name}</p>
+                    </div>
+                     <div className="text-center">
+                        <p className="font-bold text-xl">{draws}</p>
+                        <p className="text-sm text-muted-foreground">تعادل</p>
+                    </div>
+                    <div className="text-center">
+                        <p className="font-bold text-xl">{awayWins}</p>
+                         <p className="text-sm text-muted-foreground">فوز {fixture.teams.away.name}</p>
+                    </div>
+                </div>
+                 <div className="flex w-full h-2 rounded-full overflow-hidden mt-4">
+                    <div style={{ width: `${homeWinPercentage}%`}} className="bg-primary h-full"></div>
+                    <div style={{ width: `${drawPercentage}%`}} className="bg-muted h-full"></div>
+                    <div style={{ width: `${awayWinPercentage}%`}} className="bg-destructive h-full"></div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+const SubstitutionsView = ({ events, homeTeam, awayTeam, getPlayerName }: { events: MatchEvent[], homeTeam: Team, awayTeam: Team, getPlayerName: (id: number, defaultName: string) => string }) => {
+    const substitutions = events.filter(e => e.type === 'subst');
+    if (substitutions.length === 0) return null;
+
+    const homeSubs = substitutions.filter(s => s.team.id === homeTeam.id);
+    const awaySubs = substitutions.filter(s => s.team.id === awayTeam.id);
+
+    return (
+        <div className="mt-4 pt-4 border-t border-border">
+            <h4 className="font-bold text-center mb-3">التبديلات</h4>
+            <div className="grid grid-cols-2 gap-4">
+                {/* Home Team Subs */}
+                <div className="space-y-2 text-right">
+                    <div className="flex items-center justify-end gap-2 font-semibold">
+                        <p>{homeTeam.name}</p>
+                        <Avatar className="h-6 w-6"><AvatarImage src={homeTeam.logo} /></Avatar>
+                    </div>
+                    {homeSubs.map((sub, i) => (
+                        <div key={`home-sub-${i}`} className="text-xs">
+                             <p>{sub.time.elapsed}'</p>
+                             <p className="text-green-500">دخول: {getPlayerName(sub.player.id, sub.player.name)}</p>
+                             <p className="text-red-500">خروج: {getPlayerName(sub.assist.id!, sub.assist.name!)}</p>
+                        </div>
+                    ))}
+                </div>
+                {/* Away Team Subs */}
+                <div className="space-y-2 text-left">
+                     <div className="flex items-center justify-start gap-2 font-semibold">
+                        <Avatar className="h-6 w-6"><AvatarImage src={awayTeam.logo} /></Avatar>
+                        <p>{awayTeam.name}</p>
+                    </div>
+                     {awaySubs.map((sub, i) => (
+                        <div key={`away-sub-${i}`} className="text-xs">
+                             <p>{sub.time.elapsed}'</p>
+                             <p className="text-green-500">دخول: {getPlayerName(sub.player.id, sub.player.name)}</p>
+                             <p className="text-red-500">خروج: {getPlayerName(sub.assist.id!, sub.assist.name!)}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const LineupField = ({ lineup, getPlayerName }: { lineup: LineupData, getPlayerName: (id: number, defaultName: string) => string }) => {
+  if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
+    return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا</div>;
+  }
+
+  const rowsMap: { [key: number]: PlayerWithStats[] } = {};
+  lineup.startXI.forEach(p => {
+    if (!p.player.grid) return;
+    const [row] = p.player.grid.split(':').map(Number);
+    if (!rowsMap[row]) rowsMap[row] = [];
+    rowsMap[row].push(p);
+  });
+  
+  const sortedRows = Object.keys(rowsMap)
+    .map(row => ({ row: parseInt(row), players: rowsMap[parseInt(row)].sort((a, b) => {
+        const [, colA] = a.player.grid.split(':').map(Number);
+        const [, colB] = b.player.grid.split(':').map(Number);
+        return colA - colB;
+    })}))
+    .sort((a, b) => a.row - b.row);
+
+  const finalRows = sortedRows.reverse();
+
+  return (
+    <Card className="p-3 bg-card/80">
+      <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
+        <div className="absolute inset-0 flex flex-col justify-around p-2">
+          {finalRows.map(({row, players}, rowIndex) => (
+            <div key={rowIndex} className="flex justify-around items-center w-full">
+              {players.map(({player}) => {
+                const displayName = getPlayerName(player.id, player.name);
+                const playerPhoto = player.photo || `https://media.api-sports.io/football/players/${player.id}.png`;
+                
+                return (
+                  <div key={player.id} className="flex flex-col items-center text-xs text-white w-16 text-center">
+                    <div className="relative w-12 h-12">
+                      <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
+                        <AvatarImage src={playerPhoto} alt={displayName} />
+                        <AvatarFallback>{displayName ? displayName.charAt(0) : '?'}</AvatarFallback>
+                      </Avatar>
+                      {player.number && (
+                        <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
+                          {player.number}
+                        </div>
+                      )}
+                    </div>
+                    <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">{displayName}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {lineup.substitutes && lineup.substitutes.length > 0 && (
+        <SubstitutionsView events={useMatchData().events} homeTeam={lineup.team} awayTeam={lineups.find(l => l.team.id !== lineup.team.id)?.team!} getPlayerName={getPlayerName} />
+      )}
+    </Card>
+  );
+};
+
 
 const EventIcon = ({ event }: { event: MatchEvent }) => {
     if (event.type === 'Goal') {
@@ -414,7 +487,7 @@ const StatsView = ({ stats, fixture }: { stats: any[], fixture: FixtureType }) =
 
 // --- MAIN SCREEN COMPONENT ---
 export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: FixtureType, headerActions?: React.ReactNode }) {
-    const { lineups, events, stats, loading, error } = useMatchData(fixture);
+    const { lineups, events, stats, h2h, loading, error } = useMatchData(fixture);
     const [activeLineup, setActiveLineup] = useState<'home' | 'away'>('home');
     const { isAdmin } = useAdmin();
     const { db } = useFirestore();
@@ -499,7 +572,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         <TabsTrigger value="details">تفاصيل</TabsTrigger>
                     </TabsList>
                     <TabsContent value="lineups" className="mt-4">
-                        <div className="flex justify-center gap-4 mb-4">
+                        {h2h && h2h.length > 0 && <H2HView h2h={h2h} fixture={fixture} />}
+                        <div className="flex justify-center gap-4 my-4">
                              <Button onClick={() => setActiveLineup('home')} variant={activeLineup === 'home' ? 'default' : 'outline'}>{fixture.teams.home.name}</Button>
                              <Button onClick={() => setActiveLineup('away')} variant={activeLineup === 'away' ? 'default' : 'outline'}>{fixture.teams.away.name}</Button>
                         </div>
@@ -526,3 +600,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
 }
 
     
+
