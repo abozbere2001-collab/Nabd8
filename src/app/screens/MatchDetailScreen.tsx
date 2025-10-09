@@ -258,6 +258,23 @@ const SubstitutionsView = ({ events, homeTeamId, awayTeamId, getPlayerName, onRe
         <div className="mt-4 pt-4 border-t border-border">
             <h4 className="font-bold text-center mb-3">التبديلات</h4>
             <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2 text-left">
+                     {awaySubs.map((sub, i) => (
+                        <div key={`away-sub-${i}`} className="text-xs flex items-center justify-start gap-2">
+                             <div>
+                                <p className="text-green-500 flex items-center gap-1">
+                                  دخول: {getPlayerName(sub.player.id, sub.player.name)}
+                                  {isAdmin && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.player.id, getPlayerName(sub.player.id, sub.player.name))}><Pencil className="h-3 w-3" /></Button>}
+                                </p>
+                                <p className="text-red-500 flex items-center gap-1">
+                                    خروج: {sub.assist.id ? getPlayerName(sub.assist.id, sub.assist.name!) : ''}
+                                    {isAdmin && sub.assist.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.assist.id!, getPlayerName(sub.assist.id!, sub.assist.name!))}><Pencil className="h-3 w-3" /></Button>}
+                                </p>
+                             </div>
+                             <p>{sub.time.elapsed}'</p>
+                        </div>
+                    ))}
+                </div>
                 <div className="space-y-2 text-right">
                     {homeSubs.map((sub, i) => (
                         <div key={`home-sub-${i}`} className="text-xs flex items-center justify-end gap-2">
@@ -275,23 +292,6 @@ const SubstitutionsView = ({ events, homeTeamId, awayTeamId, getPlayerName, onRe
                         </div>
                     ))}
                 </div>
-                <div className="space-y-2 text-left">
-                     {awaySubs.map((sub, i) => (
-                        <div key={`away-sub-${i}`} className="text-xs flex items-center justify-start gap-2">
-                             <div>
-                                <p className="text-green-500 flex items-center gap-1">
-                                  دخول: {getPlayerName(sub.player.id, sub.player.name)}
-                                  {isAdmin && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.player.id, getPlayerName(sub.player.id, sub.player.name))}><Pencil className="h-3 w-3" /></Button>}
-                                </p>
-                                <p className="text-red-500 flex items-center gap-1">
-                                    خروج: {sub.assist.id ? getPlayerName(sub.assist.id, sub.assist.name!) : ''}
-                                    {isAdmin && sub.assist.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.assist.id!, getPlayerName(sub.assist.id!, sub.assist.name!))}><Pencil className="h-3 w-3" /></Button>}
-                                </p>
-                             </div>
-                             <p>{sub.time.elapsed}'</p>
-                        </div>
-                    ))}
-                </div>
             </div>
         </div>
     );
@@ -303,15 +303,16 @@ const LineupField = ({ lineup, opponentTeam, events, getPlayerName, getCoachName
     return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا</div>;
   }
 
-  const rowsMap: { [key: number]: Player[] } = {};
-  lineup.startXI.forEach(({player}) => {
+  const rowsMap: { [key: number]: PlayerWithStats[] } = {};
+  lineup.startXI.forEach((playerWithStats) => {
+    const { player } = playerWithStats;
     if (!player.grid) return;
     const [row, col] = player.grid.split(':').map(Number);
     if (!rowsMap[row]) rowsMap[row] = [];
-    rowsMap[row].push({ ...player, colIndex: col });
+    rowsMap[row].push({ ...playerWithStats, player: { ...player, colIndex: col }});
   });
   
-  const sortedRows = Object.values(rowsMap).map(row => row.sort((a, b) => a.colIndex! - b.colIndex!)).sort((a,b) => (b[0].grid.split(':')[0] as any) - (a[0].grid.split(':')[0] as any));
+  const sortedRows = Object.values(rowsMap).map(row => row.sort((a, b) => a.player.colIndex! - b.player.colIndex!)).sort((a,b) => (b[0].player.grid.split(':')[0] as any) - (a[0].player.grid.split(':')[0] as any));
 
 
   return (
@@ -320,23 +321,24 @@ const LineupField = ({ lineup, opponentTeam, events, getPlayerName, getCoachName
         <div className="absolute inset-0 flex flex-col justify-around p-2">
           {sortedRows.map((row, rowIndex) => (
             <div key={rowIndex} className="flex justify-around items-center w-full">
-              {row.map((player) => {
+              {row.map(({ player, statistics }) => {
                 const displayName = getPlayerName(player.id, player.name);
                 const playerPhoto = player.photo || `https://media.api-sports.io/football/players/${player.id}.png`;
+                const rating = statistics?.[0]?.games?.rating;
                 
                 return (
                   <div key={player.id} className="flex flex-col items-center text-xs text-white w-16 text-center group">
                     <div className="relative w-12 h-12">
+                      {rating && (
+                        <div className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
+                          {parseFloat(rating).toFixed(1)}
+                        </div>
+                      )}
                       <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
                         <AvatarImage src={playerPhoto} alt={displayName} />
                         <AvatarFallback>{displayName ? displayName.charAt(0) : '?'}</AvatarFallback>
                       </Avatar>
-                      {player.number && (
-                        <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
-                          {player.number}
-                        </div>
-                      )}
-                      {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-1 -right-1 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => onRename('player', player.id, displayName)}><Pencil className="h-3 w-3 text-white" /></Button>}
+                      {isAdmin && <Button variant="ghost" size="icon" className="absolute -bottom-1 -left-1 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => onRename('player', player.id, displayName)}><Pencil className="h-3 w-3 text-white" /></Button>}
                     </div>
                     <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">{displayName}</span>
                   </div>
@@ -364,13 +366,23 @@ const LineupField = ({ lineup, opponentTeam, events, getPlayerName, getCoachName
         <div className="mt-4 pt-4 border-t border-border">
           <h4 className="font-bold text-center mb-3">الاحتياط</h4>
            <div className="grid grid-cols-2 gap-2">
-            {lineup.substitutes.map(({ player }) => (
+            {lineup.substitutes.map(({ player, statistics }) => {
+              const rating = statistics?.[0]?.games?.rating;
+              return (
                 <div key={player.id} className="flex items-center gap-2 p-1 border rounded bg-card/50 group">
-                    <Avatar className="h-8 w-8"><AvatarImage src={player.photo} /></Avatar>
+                    <div className="relative">
+                      <Avatar className="h-8 w-8"><AvatarImage src={player.photo} /></Avatar>
+                      {rating && (
+                        <div className="absolute -top-1 -right-1 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center border border-background bg-gray-600 z-10">
+                          {parseFloat(rating).toFixed(1)}
+                        </div>
+                      )}
+                    </div>
                     <p className="text-xs font-semibold flex-1">{getPlayerName(player.id, player.name)}</p>
                     {isAdmin && <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => onRename('player', player.id, getPlayerName(player.id, player.name))}><Pencil className="h-3 w-3" /></Button>}
                 </div>
-            ))}
+              )
+            })}
            </div>
         </div>
        )}
@@ -402,10 +414,10 @@ const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: Matc
         const eventContent = (
             <div className="flex items-center gap-2">
                 <Avatar className="w-5 h-5"><AvatarImage src={ev.team.logo} /></Avatar>
-                <div className="text-xs">
-                    <div className="font-semibold flex items-center gap-1">
-                        {playerName}
+                <div className="text-xs text-right">
+                    <div className="font-semibold flex items-center gap-1 justify-end">
                         {isAdmin && ev.player?.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => {e.stopPropagation(); onRename('player', ev.player.id, playerName)}}><Pencil className="h-3 w-3" /></Button>}
+                        {playerName}
                     </div>
                     <div className="text-muted-foreground">
                         {icon} {ev.detail}
@@ -415,19 +427,35 @@ const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: Matc
             </div>
         );
 
+         const eventContentAway = (
+            <div className="flex items-center gap-2">
+                <div className="text-xs text-left">
+                    <div className="font-semibold flex items-center gap-1">
+                        {playerName}
+                        {isAdmin && ev.player?.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => {e.stopPropagation(); onRename('player', ev.player.id, playerName)}}><Pencil className="h-3 w-3" /></Button>}
+                    </div>
+                    <div className="text-muted-foreground">
+                        {assistName && `(صناعة: ${assistName}) `}
+                        {ev.detail} {icon}
+                    </div>
+                </div>
+                 <Avatar className="w-5 h-5"><AvatarImage src={ev.team.logo} /></Avatar>
+            </div>
+        );
+
         return (
              <div className="flex items-center my-2">
                 {isHomeEvent ? (
                     <>
-                        <div className="flex-1 text-right">{eventContent}</div>
-                        <div className="w-12 text-center text-xs text-muted-foreground font-mono">{ev.time.elapsed}'</div>
                         <div className="flex-1"></div>
+                        <div className="w-12 text-center text-xs text-muted-foreground font-mono">{ev.time.elapsed}'</div>
+                        <div className="flex-1 text-right">{eventContent}</div>
                     </>
                 ) : (
                     <>
-                        <div className="flex-1"></div>
+                        <div className="flex-1 text-left">{eventContentAway}</div>
                         <div className="w-12 text-center text-xs text-muted-foreground font-mono">{ev.time.elapsed}'</div>
-                        <div className="flex-1 text-left">{eventContent}</div>
+                        <div className="flex-1"></div>
                     </>
                 )}
             </div>
@@ -493,7 +521,7 @@ const StatsView = ({ stats, fixture }: { stats: any[], fixture: FixtureType }) =
                                 <span className="text-muted-foreground text-xs">{STATS_TRANSLATIONS[stat.type] || stat.type}</span>
                                 <span>{stat.awayValue ?? 0}</span>
                             </div>
-                            <Progress value={homePercentage} className="h-2 [&>div]:bg-primary" />
+                            <Progress value={100 - homePercentage} className="h-2 [&>div]:bg-primary" />
                         </div>
                     )
                 })}
@@ -663,5 +691,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
 
 
 
+
+    
 
     
