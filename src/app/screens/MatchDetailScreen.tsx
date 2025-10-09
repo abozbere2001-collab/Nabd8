@@ -1,9 +1,9 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
-import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Star, Pencil, Shirt, Users, Trophy, BarChart2, Goal, ArrowLeftRight, RectangleVertical } from 'lucide-react';
 import Image from "next/image";
 import { Progress } from '@/components/ui/progress';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 
 // --- TYPE DEFINITIONS ---
@@ -62,7 +63,7 @@ function useMatchData(fixture?: Fixture): MatchData {
 
     useEffect(() => {
         if (!fixture) {
-            setData(prev => ({ ...prev, loading: false }));
+            setData(prev => ({ ...prev, loading: false, error: "No fixture data provided" }));
             return;
         }
 
@@ -79,11 +80,15 @@ function useMatchData(fixture?: Fixture): MatchData {
                     fetch(`/api/football/statistics?fixture=${fixtureId}`),
                     fetch(`/api/football/standings?league=${leagueId}&season=${season}`),
                 ]);
-
+                
                 const parseResult = async (res: PromiseSettledResult<Response>) => {
                     if (res.status === 'fulfilled' && res.value.ok) {
-                        const json = await res.value.json();
-                        return json.response || [];
+                        try {
+                            const json = await res.value.json();
+                            return json.response || [];
+                        } catch (e) {
+                             return [];
+                        }
                     }
                     return [];
                 };
@@ -178,19 +183,16 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
     const attackers = startXI.filter(p => p.player.pos === 'F');
 
     const rows: PlayerWithStats[][] = [];
-    if(attackers.length > 0) rows.push(attackers);
-    if(midfielders.length > 0) rows.push(midfielders);
-    if(defenders.length > 0) rows.push(defenders);
     if(goalkeeper) rows.push([goalkeeper]);
-
-    // Reverse the rows for correct display order (GK at bottom)
-    const reversedRows = [...rows].reverse();
+    if(defenders.length > 0) rows.push(defenders);
+    if(midfielders.length > 0) rows.push(midfielders);
+    if(attackers.length > 0) rows.push(attackers);
 
     return (
         <Card className="p-3 bg-card/80">
             <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
                 <div className="absolute inset-0 flex flex-col justify-around p-2">
-                    {reversedRows.map((row, rowIndex) => (
+                    {rows.map((row, rowIndex) => (
                         <div key={rowIndex} className="flex justify-around items-center">
                             {row.map((player) => (
                                 <PlayerOnPitch key={player.player.id} player={{...player, player: {...player.player, name: getPlayerName(player.player.id, player.player.name)}}} onRename={() => onRename('player', player.player.id, getPlayerName(player.player.id, player.player.name))} isAdmin={isAdmin} />
@@ -257,12 +259,16 @@ const STATS_TRANSLATIONS: { [key: string]: string } = {
 const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName }: { events: MatchEvent[], homeTeamId: number, awayTeamId: number, getPlayerName: (id: number, defaultName: string) => string }) => {
     const [filter, setFilter] = useState<'highlights' | 'all'>('all');
     
+    const sortedEvents = useMemo(() => {
+        return [...events].sort((a, b) => a.time.elapsed - b.time.elapsed);
+    }, [events]);
+
     const filteredEvents = useMemo(() => {
         if (filter === 'highlights') {
-            return events.filter(e => e.type === 'Goal');
+            return sortedEvents.filter(e => e.type === 'Goal');
         }
-        return events;
-    }, [events, filter]);
+        return sortedEvents;
+    }, [sortedEvents, filter]);
 
     if (!events || events.length === 0) {
         return <div className="text-muted-foreground text-center py-4">لا توجد أحداث متاحة لعرضها.</div>
@@ -359,7 +365,7 @@ const StatsView = ({ stats, fixture }: { stats: any[], fixture: Fixture }) => {
 
 
 // --- MAIN SCREEN COMPONENT ---
-export function MatchDetailScreen({ goBack, canGoBack, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: Fixture, headerActions?: React.ReactNode }) {
+export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: Fixture, headerActions?: React.ReactNode }) {
     const { lineups, events, stats, loading, error } = useMatchData(fixture);
     const [activeLineup, setActiveLineup] = useState<'home' | 'away'>('home');
     const { isAdmin } = useAdmin();
@@ -429,7 +435,7 @@ export function MatchDetailScreen({ goBack, canGoBack, fixture, headerActions }:
                             <h2 className="text-lg font-bold">{fixture.teams.home.name}</h2>
                         </div>
                         <div className="text-4xl font-bold">
-                            {fixture.goals.home} - {fixture.goals.away}
+                            {fixture.goals.home ?? '-'} - {fixture.goals.away ?? '-'}
                         </div>
                          <div className="flex flex-col items-center gap-2 w-1/3">
                             <Avatar className="h-16 w-16"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
@@ -460,3 +466,4 @@ export function MatchDetailScreen({ goBack, canGoBack, fixture, headerActions }:
         </div>
     );
 }
+
