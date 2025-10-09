@@ -67,10 +67,14 @@ type RenameType = 'team' | 'player' | 'coach';
 // --- USER'S FINAL LINUP COMPONENT ---
 function LineupField({
   lineup,
-  getPlayerName
+  getPlayerName,
+  onRename,
+  isAdmin
 }: {
   lineup: LineupData;
   getPlayerName: (id: number, defaultName: string) => string;
+  onRename: (type: RenameType, id: number, name: string) => void;
+  isAdmin: boolean;
 }) {
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">التشكيلة غير متاحة حالياً</div>;
@@ -78,7 +82,7 @@ function LineupField({
 
   // ترتيب اللاعبين حسب grid (row:col)
   const rows: { player: Player, colIndex?: number }[][] = [];
-  lineup.startXI.forEach(({ player }) => {
+  lineup.startXI.forEach(({player}) => {
     if (!player.grid) return;
     const [rowStr, colStr] = player.grid.split(':');
     const rowIndex = parseInt(rowStr, 10) - 1;
@@ -90,8 +94,8 @@ function LineupField({
   // ترتيب الصفوف من الأسفل إلى الأعلى (الحارس أسفل)
   const displayedRows = rows.reverse();
 
-  // عكس الترتيب الأفقي (يمين ويسار)
-  displayedRows.forEach(row => row && row.sort((a, b) => (b.player.colIndex || 0) - (a.player.colIndex || 0)));
+  // فرز أفقي صحيح لضمان عدم انعكاس اللاعبين
+  displayedRows.forEach(row => row && row.sort((a, b) => (a.player.colIndex || 0) - (b.player.colIndex || 0)));
 
   return (
     <Card className="p-3 bg-card/80">
@@ -134,7 +138,7 @@ function LineupField({
         <div className="mt-4 pt-4 border-t border-border">
           <h4 className="font-bold text-center mb-2">الاحتياط</h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {lineup.substitutes.map(({ player }) => {
+            {lineup.substitutes.map(({player}) => {
               const displayName = getPlayerName(player.id, player.name);
               const playerPhoto = player.photo || `https://media.api-sports.io/football/players/${player.id}.png`;
 
@@ -237,7 +241,7 @@ function useMatchData(fixture?: FixtureType): MatchData {
                             const photoMap = new Map<number, string>();
                             teamPlayersList.forEach(p => { if (p.player.photo) photoMap.set(p.player.id, p.player.photo); });
 
-                            const updatePhotos = (playerList: { player: Player }[] | undefined) => {
+                            const updatePhotos = (playerList: PlayerWithStats[] | undefined) => {
                                 if (!playerList) return;
                                 playerList.forEach(p => {
                                     if (p.player && !p.player.photo && photoMap.has(p.player.id)) {
@@ -514,6 +518,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                             <LineupField 
                                 lineup={lineupToShow}
                                 getPlayerName={getPlayerName}
+                                onRename={handleOpenRename}
+                                isAdmin={isAdmin}
                             />
                         }
                         {!lineupToShow && !loading && 
@@ -531,3 +537,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
+
+    
