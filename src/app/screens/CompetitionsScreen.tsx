@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -67,14 +66,7 @@ interface RenameState {
     currentName: string;
 }
 
-interface PlayerInfoFromApi {
-    player: PlayerType;
-    statistics: any[];
-}
-
-
 // --- CONSTANTS ---
-const CURRENT_SEASON = 2025;
 const countryToContinent: { [key: string]: string } = {
     "World": "World", "England": "Europe", "Spain": "Europe", "Germany": "Europe", "Italy": "Europe", "France": "Europe",
     "Netherlands": "Europe", "Portugal": "Europe", "Belgium": "Europe", "Russia": "Europe", "Turkey": "Europe",
@@ -111,128 +103,27 @@ const WORLD_LEAGUES_KEYWORDS = ["world", "uefa", "champions league", "europa", "
 
 // --- CHILD COMPONENTS ---
 
-const PlayerItem = ({ player, onFavorite, isFavorited, onRename, isAdmin }: { player: PlayerType, onFavorite: (player: PlayerType) => void, isFavorited: boolean, onRename: (id: number, name: string) => void, isAdmin: boolean }) => (
-    <div className="flex items-center gap-2 py-1 px-2 rounded-md hover:bg-slate-700/50">
-        <Avatar className="h-6 w-6"><AvatarImage src={player.photo} /><AvatarFallback>{player.name.charAt(0)}</AvatarFallback></Avatar>
-        <span className="flex-1 text-xs truncate">{player.name}</span>
-        {isAdmin && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onRename(player.id, player.name); }}><Pencil className="h-3 w-3" /></Button>}
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onFavorite(player); }}><Star className={cn("h-4 w-4", isFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} /></Button>
-    </div>
-);
-
-const TeamItem = ({ team, onFavorite, isFavorited, onRename, isAdmin, favorites, onPlayerFavorite, onPlayerRename }: { team: Team, onFavorite: (team: Team) => void, isFavorited: boolean, onRename: (id: number, name: string) => void, isAdmin: boolean, favorites: Favorites, onPlayerFavorite: (player: PlayerType) => void, onPlayerRename: (id: number, name: string) => void }) => {
-    const [players, setPlayers] = useState<PlayerInfoFromApi[]>([]);
-    const [loadingPlayers, setLoadingPlayers] = useState(false);
-
-    const fetchPlayers = async () => {
-        setLoadingPlayers(true);
-        try {
-            const res = await fetch(`/api/football/players?team=${team.id}&season=${CURRENT_SEASON}`);
-            const data = await res.json();
-            setPlayers(data.response || []);
-        } catch (error) {
-            console.error('Failed to fetch players:', error);
-        } finally {
-            setLoadingPlayers(false);
-        }
-    };
-    
+const LeagueItem = ({ comp, navigate, onFavorite, isFavorited, onRename, isAdmin }: { comp: ManagedCompetition, navigate: ScreenProps['navigate'], onFavorite: (comp: ManagedCompetition) => void, isFavorited: boolean, onRename: (id: number, name: string) => void, isAdmin: boolean }) => {
     return (
-        <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value={`team-${team.id}`} className="border-none">
-                 <div className="flex items-center gap-2 py-1 px-2 rounded-md hover:bg-slate-600/50">
-                    <AccordionTrigger onClick={fetchPlayers} className="flex-1 p-0 hover:no-underline">
-                        <div className="flex items-center gap-2">
-                           <Avatar className="h-6 w-6"><AvatarImage src={team.logo} /><AvatarFallback>{team.name.charAt(0)}</AvatarFallback></Avatar>
-                           <span className="flex-1 text-sm truncate">{team.name}</span>
-                        </div>
-                    </AccordionTrigger>
-                    {isAdmin && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onRename(team.id, team.name); }}><Pencil className="h-4 w-4" /></Button>}
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onFavorite(team); }}><Star className={cn("h-5 w-5", isFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} /></Button>
-                </div>
-                <AccordionContent className="pt-2 pl-6">
-                    {loadingPlayers ? <Loader2 className="h-4 w-4 animate-spin my-2 mx-auto" /> : (
-                         players.length > 0 ? (
-                            players.map(({ player }) => (
-                                <PlayerItem 
-                                    key={player.id} 
-                                    player={player} 
-                                    onFavorite={onPlayerFavorite} 
-                                    isFavorited={!!favorites?.players?.[player.id]}
-                                    onRename={onPlayerRename}
-                                    isAdmin={isAdmin}
-                                />
-                            ))
-                         ) : <p className="text-xs text-muted-foreground p-2">لا يوجد لاعبون متاحون.</p>
-                    )}
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
-    );
-};
-
-const LeagueItem = ({ comp, navigate, onFavorite, isFavorited, onRename, isAdmin, favorites, onTeamFavorite, onPlayerFavorite, onTeamRename, onPlayerRename }: { comp: ManagedCompetition, navigate: ScreenProps['navigate'], onFavorite: (comp: ManagedCompetition) => void, isFavorited: boolean, onRename: (id: number, name: string) => void, isAdmin: boolean, favorites: Favorites, onTeamFavorite: (team: Team) => void, onPlayerFavorite: (player: PlayerType) => void, onTeamRename: (id: number, name: string) => void, onPlayerRename: (id: number, name: string) => void }) => {
-    const [teams, setTeams] = useState<{team: Team}[]>([]);
-    const [loadingTeams, setLoadingTeams] = useState(false);
-    
-    const fetchTeams = async () => {
-        setLoadingTeams(true);
-        try {
-            const res = await fetch(`/api/football/teams?league=${comp.leagueId}&season=${CURRENT_SEASON}`);
-            const data = await res.json();
-            setTeams(data.response || []);
-        } catch (error) {
-            console.error("Failed to fetch teams", error);
-        } finally {
-            setLoadingTeams(false);
-        }
-    };
-    
-    return (
-        <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value={`league-${comp.leagueId}`} className="border-none">
-                <div className="flex w-full items-center justify-between p-3 hover:bg-accent/80 transition-colors rounded-md group">
-                    <AccordionTrigger onClick={fetchTeams} className="flex-1 p-0 hover:no-underline">
-                         <div className="flex items-center gap-3">
-                           <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
-                           <span className="text-sm">{comp.name}</span>
-                        </div>
-                    </AccordionTrigger>
-                    <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo }) }}>
-                            <Users className="h-4 w-4" />
-                        </Button>
-                        {isAdmin && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onRename(comp.leagueId, comp.name); }}>
-                                <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                            </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onFavorite(comp); }}>
-                            <Star className={isFavorited ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                        </Button>
-                    </div>
-                </div>
-                <AccordionContent className="pt-2 pl-6">
-                    {loadingTeams ? <Loader2 className="h-4 w-4 animate-spin my-2 mx-auto" /> : (
-                        teams.length > 0 ? (
-                            teams.map(({ team }) => (
-                                <TeamItem 
-                                    key={team.id}
-                                    team={team} 
-                                    onFavorite={onTeamFavorite}
-                                    isFavorited={!!favorites?.teams?.[team.id]}
-                                    onRename={onTeamRename}
-                                    isAdmin={isAdmin}
-                                    favorites={favorites}
-                                    onPlayerFavorite={onPlayerFavorite}
-                                    onPlayerRename={onPlayerRename}
-                                />
-                            ))
-                        ) : <p className="text-xs text-muted-foreground p-2">لا توجد فرق متاحة.</p>
-                    )}
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
+        <div 
+            className="flex w-full items-center justify-between p-3 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
+            onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
+        >
+            <div className="flex items-center gap-3">
+               <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+               <span className="text-sm">{comp.name}</span>
+            </div>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {isAdmin && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onRename(comp.leagueId, comp.name); }}>
+                        <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                    </Button>
+                )}
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onFavorite(comp); }}>
+                    <Star className={isFavorited ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                </Button>
+            </div>
+        </div>
     );
 };
 
@@ -273,27 +164,23 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     const fetchAllCustomNames = useCallback(async () => {
         if (!db) return;
         try {
-            const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, teamsSnapshot, playersSnapshot] = await Promise.all([
+            const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
                 getDocs(collection(db, 'leagueCustomizations')),
                 getDocs(collection(db, 'countryCustomizations')),
                 getDocs(collection(db, 'continentCustomizations')),
-                getDocs(collection(db, 'teamCustomizations')),
-                getDocs(collection(db, 'playerCustomizations'))
             ]);
             
             const names = {
                 leagues: new Map<number, string>(),
                 countries: new Map<string, string>(),
                 continents: new Map<string, string>(),
-                teams: new Map<number, string>(),
+                teams: new Map<number, string>(), // Keep empty maps to prevent crashes
                 players: new Map<number, string>()
             };
 
             leaguesSnapshot.forEach(doc => names.leagues.set(Number(doc.id), doc.data().customName));
             countriesSnapshot.forEach(doc => names.countries.set(doc.id, doc.data().customName));
             continentsSnapshot.forEach(doc => names.continents.set(doc.id, doc.data().customName));
-            teamsSnapshot.forEach(doc => names.teams.set(Number(doc.id), doc.data().customName));
-            playersSnapshot.forEach(doc => names.players.set(Number(doc.id), doc.data().customName));
             
             setCustomNames(names);
 
@@ -322,30 +209,24 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         return () => unsubscribe();
     }, [db, fetchAllCustomNames]);
 
-    const handleFavorite = useCallback(async (type: 'league' | 'team' | 'player', item: any) => {
+    const handleFavorite = useCallback(async (type: 'league', item: any) => {
         if (!user || !db) return;
         
         const favRef = doc(db, 'favorites', user.uid);
         const itemId = item.id ?? item.leagueId;
-        const itemPath = `${type}s`;
+        const itemPath = `leagues`;
         const fieldPath = `${itemPath}.${itemId}`;
         const isFavorited = !!(favorites as any)?.[itemPath]?.[itemId];
 
         let favoriteData: Partial<Favorites> = { userId: user.uid };
         
-        const payload: any = { name: getName(type, itemId, item.name) };
-         if (type === 'league') {
-          payload.leagueId = itemId;
-          payload.logo = item.logo;
-        } else if (type === 'team') {
-          payload.teamId = itemId;
-          payload.logo = item.logo;
-        } else if (type === 'player') {
-          payload.playerId = itemId;
-          payload.photo = item.photo;
-        }
+        const payload: any = { 
+            name: getName(type, itemId, item.name),
+            leagueId: itemId,
+            logo: item.logo
+        };
         
-        favoriteData[itemPath as 'leagues' | 'teams' | 'players'] = { [itemId]: payload };
+        favoriteData[itemPath as 'leagues'] = { [itemId]: payload };
 
         try {
             if (isFavorited) {
@@ -496,11 +377,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                                 isFavorited={!!favorites.leagues?.[comp.leagueId]}
                                                 onRename={(id, name) => openRenameDialog('league', id, name)}
                                                 isAdmin={isAdmin}
-                                                favorites={favorites}
-                                                onTeamFavorite={(team) => handleFavorite('team', team)}
-                                                onPlayerFavorite={(player) => handleFavorite('player', player)}
-                                                onTeamRename={(id, name) => openRenameDialog('team', id, name)}
-                                                onPlayerRename={(id, name) => openRenameDialog('player', id, name)}
                                              />
                                         )}</ul>
                                     ) : (
@@ -528,11 +404,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                                                 isFavorited={!!favorites.leagues?.[comp.leagueId]}
                                                                 onRename={(id, name) => openRenameDialog('league', id, name)}
                                                                 isAdmin={isAdmin}
-                                                                favorites={favorites}
-                                                                onTeamFavorite={(team) => handleFavorite('team', team)}
-                                                                onPlayerFavorite={(player) => handleFavorite('player', player)}
-                                                                onTeamRename={(id, name) => openRenameDialog('team', id, name)}
-                                                                onPlayerRename={(id, name) => openRenameDialog('player', id, name)}
                                                              />
                                                         )}</ul>
                                                     </AccordionContent>
@@ -563,3 +434,5 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
+
+    
