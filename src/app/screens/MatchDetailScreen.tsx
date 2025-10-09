@@ -628,7 +628,7 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
           itemType="العنصر"
         />}
       <div className="flex-1 overflow-y-auto">
-        <Tabs defaultValue="standings" className="w-full">
+        <Tabs defaultValue="lineups" className="w-full">
           <div className="sticky top-0 bg-background z-10 border-b">
             <TabsList className="grid w-full grid-cols-4 rounded-none flex-row-reverse">
               <TabsTrigger value="details">التفاصيل</TabsTrigger>
