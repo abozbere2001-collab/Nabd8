@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -138,7 +137,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         const leagueInfo = leagueData.response?.[0];
         
         let seasonToFetch = CURRENT_SEASON;
-        // For national team competitions (like World Cup, Euros), find the latest available season from the API response.
         if (leagueInfo?.league.type.toLowerCase() === 'cup' && leagueInfo.seasons.length > 0) {
             const latestSeason = leagueInfo.seasons.sort((a: any, b: any) => b.year - a.year)[0];
             if (latestSeason) {
@@ -235,7 +233,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     }
     try {
       await setDoc(doc(db, collectionName, String(id)), { customName: newName });
-      await fetchAllCustomNames(); // Refetch names after saving
+      await fetchAllCustomNames(); 
     } catch(error) {
       const permissionError = new FirestorePermissionError({
           path: `${collectionName}/${id}`,

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -151,7 +150,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         }, (error) => {
             setManagedCompetitions([]);
             setLoading(false);
-            if (!isAdmin) { // Only emit error for non-admins if it's a permission issue
+            if (!isAdmin) { 
                const permissionError = new FirestorePermissionError({ path: 'managedCompetitions', operation: 'list' });
                errorEmitter.emit('permission-error', permissionError);
             }
