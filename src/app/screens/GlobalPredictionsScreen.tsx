@@ -75,7 +75,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     }, [selectedDateKey]);
 
     return (
-        <div ref={scrollerRef} className="flex flex-row-reverse overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none' }}>
+        <div ref={scrollerRef} className="flex flex-row overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none' }}>
             {dates.map(date => {
                 const dateKey = formatDateKey(date);
                 const isSelected = dateKey === selectedDateKey;
@@ -84,7 +84,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                         key={dateKey}
                         ref={isSelected ? selectedButtonRef : null}
                         className={cn(
-                            "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors ml-2",
+                            "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors mr-2",
                             "text-foreground/80 hover:text-primary",
                             isSelected && "text-primary"
                         )}
@@ -941,5 +941,3 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
-
-    

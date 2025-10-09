@@ -10,7 +10,7 @@ import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, RadioTower } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -324,7 +324,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     }, [selectedDateKey]);
 
     return (
-        <div ref={scrollerRef} className="flex flex-row-reverse overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div ref={scrollerRef} className="flex flex-row overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {dates.map(date => {
                 const dateKey = formatDateKey(date);
                 const isSelected = dateKey === selectedDateKey;
@@ -333,7 +333,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                         key={dateKey}
                         ref={isSelected ? selectedButtonRef : null}
                         className={cn(
-                            "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors ml-2",
+                            "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors mr-2",
                             "text-foreground/80 hover:text-primary",
                             isSelected && "text-primary"
                         )}
@@ -462,19 +462,17 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             canGoBack={false}
             onBack={() => {}} 
             actions={
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                   <SearchSheet navigate={navigate}>
                       <Button variant="ghost" size="icon">
                           <Search className="h-5 w-5" />
                       </Button>
                   </SearchSheet>
-                   <div className="flex items-center gap-1 border-r pr-1">
-                     <Switch
-                        id="live-only-switch"
-                        checked={showLiveOnly}
-                        onCheckedChange={setShowLiveOnly}
-                    />
-                  </div>
+                  <Switch
+                    id="live-only-switch"
+                    checked={showLiveOnly}
+                    onCheckedChange={setShowLiveOnly}
+                  />
                   <ProfileButton onProfileClick={() => navigate('Profile')} />
               </div>
             }
