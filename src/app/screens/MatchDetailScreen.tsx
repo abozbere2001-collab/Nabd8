@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -25,7 +24,7 @@ import { Progress } from '@/components/ui/progress';
 
 // --- TYPE DEFINITIONS ---
 interface PlayerWithStats {
-    player: PlayerType;
+    player: PlayerType & { pos?: string; grid?: string; }; // Added pos and grid for lineup
     statistics?: any[];
 }
 interface LineupData {
@@ -63,9 +62,9 @@ function useMatchData(fixture?: Fixture): MatchData {
     
     const CURRENT_SEASON = useMemo(() => {
         if (!fixture) return new Date().getFullYear();
-        // Extract season year from the league name if available (e.g., "Premier League - 2023/2024")
-        const match = fixture.league.round.match(/(\d{4})/);
-        return match ? parseInt(match[0], 10) : new Date(fixture.fixture.date).getFullYear();
+        // Extract season year from the league round string if available (e.g., "Regular Season - 38")
+        const seasonYear = fixture.league.round.match(/(\d{4})/);
+        return seasonYear ? parseInt(seasonYear[0], 10) : new Date(fixture.fixture.date).getFullYear();
     }, [fixture]);
 
 
@@ -115,16 +114,16 @@ function useMatchData(fixture?: Fixture): MatchData {
                             const photoMap = new Map<number, string>();
                             teamPlayersList.forEach(p => { if (p.player.photo) photoMap.set(p.player.id, p.player.photo); });
 
-                            lineup.startXI.forEach(p => { 
-                                if (!p.player.photo && photoMap.has(p.player.id)) { 
-                                    p.player.photo = photoMap.get(p.player.id)!; 
-                                } 
-                            });
-                            lineup.substitutes.forEach(p => { 
-                                if (!p.player.photo && photoMap.has(p.player.id)) { 
-                                    p.player.photo = photoMap.get(p.player.id)!; 
-                                } 
-                            });
+                            const updatePhotos = (playerList: PlayerWithStats[]) => {
+                                playerList.forEach(p => {
+                                    if (!p.player.photo && photoMap.has(p.player.id)) {
+                                        p.player.photo = photoMap.get(p.player.id)!;
+                                    }
+                                });
+                            };
+
+                            updatePhotos(lineup.startXI);
+                            updatePhotos(lineup.substitutes);
                         }
                     }
                 }
@@ -160,16 +159,21 @@ function useMatchData(fixture?: Fixture): MatchData {
 
 // --- CHILD COMPONENTS ---
 
-const PlayerOnPitch = ({ player }: { player: PlayerWithStats }) => {
+const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: PlayerWithStats, onRename: (type: RenameType, id: number, name: string) => void, isAdmin: boolean, getPlayerName: (id: number, defaultName: string) => string }) => {
     const { player: playerData, statistics } = player;
     const rating = (statistics && statistics[0]?.games?.rating) ? parseFloat(statistics[0].games.rating).toFixed(1) : null;
-
+    const displayName = getPlayerName(playerData.id, playerData.name);
     return (
         <div className="relative flex flex-col items-center justify-center text-white text-xs w-16 text-center">
+            {isAdmin && (
+                <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50" onClick={(e) => { e.stopPropagation(); onRename('player', playerData.id, displayName); }}>
+                    <Pencil className="h-3 w-3" />
+                </Button>
+            )}
             <div className="relative w-12 h-12">
                  <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
-                    <AvatarImage src={playerData.photo} alt={playerData.name} />
-                    <AvatarFallback>{playerData.name ? playerData.name.charAt(0) : '?'}</AvatarFallback>
+                    <AvatarImage src={playerData.photo} alt={displayName} />
+                    <AvatarFallback>{displayName ? displayName.charAt(0) : '?'}</AvatarFallback>
                 </Avatar>
                 {playerData.number && (
                     <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
@@ -182,7 +186,7 @@ const PlayerOnPitch = ({ player }: { player: PlayerWithStats }) => {
                     </div>
                  )}
             </div>
-            <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">{playerData.name}</span>
+            <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">{displayName}</span>
         </div>
     );
 };
@@ -200,10 +204,10 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
     const attackers = startXI.filter(p => p.player.pos === 'F').reverse();
     
     const rows: PlayerWithStats[][] = [];
-    if(attackers.length > 0) rows.push(attackers);
-    if(midfielders.length > 0) rows.push(midfielders);
-    if(defenders.length > 0) rows.push(defenders);
-    if(goalkeeper) rows.push([goalkeeper]);
+    if (attackers.length > 0) rows.push(attackers);
+    if (midfielders.length > 0) rows.push(midfielders);
+    if (defenders.length > 0) rows.push(defenders);
+    if (goalkeeper) rows.push([goalkeeper]);
     
     return (
         <Card className="p-3 bg-card/80">
@@ -212,14 +216,13 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
                     {rows.map((row, rowIndex) => (
                         <div key={rowIndex} className="flex justify-around items-center w-full">
                             {row.map((player) => (
-                                <div key={player.player.id} className="relative">
-                                     {isAdmin && (
-                                        <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50" onClick={() => onRename('player', player.player.id, getPlayerName(player.player.id, player.player.name))}>
-                                            <Pencil className="h-3 w-3" />
-                                        </Button>
-                                    )}
-                                    <PlayerOnPitch player={{...player, player: {...player.player, name: getPlayerName(player.player.id, player.player.name)}}} />
-                                </div>
+                                <PlayerOnPitch 
+                                  key={player.player.id} 
+                                  player={player} 
+                                  onRename={onRename} 
+                                  isAdmin={isAdmin}
+                                  getPlayerName={getPlayerName}
+                                />
                             ))}
                         </div>
                     ))}
@@ -498,9 +501,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
-
-
-
-
 
     
