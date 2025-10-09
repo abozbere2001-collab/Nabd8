@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -17,7 +16,7 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
-import { Star, Pencil, Shirt, Users, Trophy, BarChart2, Goal, ArrowLeftRight, RectangleVertical } from 'lucide-react';
+import { Star, Pencil, Goal, ArrowLeftRight, RectangleVertical } from 'lucide-react';
 import Image from "next/image";
 import { Progress } from '@/components/ui/progress';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -74,11 +73,12 @@ function useMatchData(fixture?: Fixture): MatchData {
             const season = new Date(fixture.fixture.date).getFullYear();
 
             try {
-                // 1. Fetch lineups and events
-                const [lineupsRes, eventsRes, statsRes] = await Promise.allSettled([
+                // Fetch lineups and other data in parallel
+                const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.allSettled([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
                     fetch(`/api/football/statistics?fixture=${fixtureId}`),
+                    fetch(`/api/football/standings?league=${leagueId}&season=${season}`),
                 ]);
 
                 const parseResult = async (res: PromiseSettledResult<Response>) => {
@@ -86,22 +86,20 @@ function useMatchData(fixture?: Fixture): MatchData {
                         try {
                             const json = await res.value.json();
                             return json.response || [];
-                        } catch (e) {
-                             return [];
-                        }
+                        } catch (e) { return []; }
                     }
                     return [];
                 };
 
-                const [fetchedLineups, fetchedEvents, fetchedStats] = await Promise.all([
-                    parseResult(lineupsRes),
-                    parseResult(eventsRes),
-                    parseResult(statsRes),
-                ]);
+                const fetchedLineups: LineupData[] = await parseResult(lineupsRes);
+                const fetchedEvents: MatchEvent[] = await parseResult(eventsRes);
+                const fetchedStats: any[] = await parseResult(statsRes);
+                const fetchedStandings: Standing[] = (await parseResult(standingsRes))[0]?.league?.standings[0] || [];
 
-                // 2. Data fallback for player photos
-                 for (const lineup of fetchedLineups) {
-                    if (lineup.startXI.some((p: PlayerWithStats) => !p.player.photo) || lineup.substitutes.some((p: PlayerWithStats) => !p.player.photo)) {
+                // "Double-attack" strategy for player photos
+                for (const lineup of fetchedLineups) {
+                    const hasMissingPhotos = lineup.startXI.some((p: PlayerWithStats) => !p.player.photo) || lineup.substitutes.some((p: PlayerWithStats) => !p.player.photo);
+                    if (hasMissingPhotos) {
                          const teamPlayersRes = await fetch(`/api/football/players?team=${lineup.team.id}&season=${season}`);
                          if (teamPlayersRes.ok) {
                             const teamPlayersData = await teamPlayersRes.json();
@@ -119,14 +117,14 @@ function useMatchData(fixture?: Fixture): MatchData {
                     }
                 }
                 
-                setData(prev => ({
-                    ...prev,
+                setData({
                     lineups: fetchedLineups,
                     events: fetchedEvents,
                     stats: fetchedStats,
-                    loading: false, // Initial data is loaded
+                    standings: fetchedStandings,
+                    loading: false,
                     error: null,
-                }));
+                });
 
             } catch (error: any) {
                 console.error("❌ Match data fetch error:", error);
@@ -295,31 +293,39 @@ const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName }: { events:
                         const isHomeEvent = event.team.id === homeTeamId;
                         return (
                             <div key={index} className="relative flex w-full justify-center items-center my-3">
-                                <div className={cn("w-1/2 p-2 text-sm", isHomeEvent ? "text-right pr-12" : "text-left pl-12")}>
-                                    {isHomeEvent && (
-                                        <div className="flex items-center justify-end gap-2">
-                                            <div className="flex-1">
-                                                <p className="font-bold">{getPlayerName(event.player.id, event.player.name)}</p>
-                                                {event.assist.name && <p className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</p>}
-                                            </div>
-                                            <EventIcon event={event} />
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="absolute left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-card border flex items-center justify-center text-xs font-bold z-10">
-                                    {event.time.elapsed}{event.time.extra ? `+${event.time.extra}` : ''}'
-                                </div>
-                                <div className={cn("w-1/2 p-2 text-sm", !isHomeEvent ? "text-left pl-12" : "text-right pr-12")}>
-                                     {!isHomeEvent && (
-                                        <div className="flex items-center justify-start gap-2">
-                                            <EventIcon event={event} />
-                                            <div className="flex-1">
-                                                <p className="font-bold">{getPlayerName(event.player.id, event.player.name)}</p>
-                                                {event.assist.name && <p className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</p>}
+                                {isHomeEvent ? (
+                                    <>
+                                        <div className="w-1/2 p-2 text-sm text-right pr-12">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <div className="flex-1">
+                                                    <p className="font-bold">{getPlayerName(event.player.id, event.player.name)}</p>
+                                                    {event.assist.name && <p className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</p>}
+                                                </div>
+                                                <EventIcon event={event} />
                                             </div>
                                         </div>
-                                    )}
-                                </div>
+                                        <div className="absolute left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-card border flex items-center justify-center text-xs font-bold z-10">
+                                            {event.time.elapsed}{event.time.extra ? `+${event.time.extra}` : ''}'
+                                        </div>
+                                        <div className="w-1/2 p-2"></div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="w-1/2 p-2"></div>
+                                        <div className="absolute left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-card border flex items-center justify-center text-xs font-bold z-10">
+                                            {event.time.elapsed}{event.time.extra ? `+${event.time.extra}` : ''}'
+                                        </div>
+                                        <div className="w-1/2 p-2 text-sm text-left pl-12">
+                                            <div className="flex items-center justify-start gap-2">
+                                                <EventIcon event={event} />
+                                                <div className="flex-1">
+                                                    <p className="font-bold">{getPlayerName(event.player.id, event.player.name)}</p>
+                                                    {event.assist.name && <p className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</p>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         );
                     })}
@@ -342,7 +348,7 @@ const StatsView = ({ stats, fixture }: { stats: any[], fixture: Fixture }) => {
             homeValue: stat.value,
             awayValue: awayStat ? awayStat.value : null
         };
-    });
+    }).filter((s: any) => STATS_TRANSLATIONS[s.type]); // Filter only for stats we can translate
 
     return (
         <Card>
@@ -472,3 +478,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
+
+    
