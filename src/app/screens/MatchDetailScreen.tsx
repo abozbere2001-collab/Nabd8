@@ -98,9 +98,8 @@ function useMatchData(fixture?: Fixture): MatchData {
                 // Fallback for missing player photos
                 for (const lineup of fetchedLineups) {
                     const allPlayers = [...lineup.startXI, ...lineup.substitutes];
-                    const playersNeedingPhotos = allPlayers.filter(p => !p.player.photo);
-                    if (playersNeedingPhotos.length > 0) {
-                        const teamPlayersRes = await fetch(`/api/football/players?team=${lineup.team.id}&season=${season}`);
+                    const teamPlayersRes = await fetch(`/api/football/players?team=${lineup.team.id}&season=${season}`);
+                    if (teamPlayersRes.ok) {
                         const teamPlayersData = await teamPlayersRes.json();
                         const teamPlayers: PlayerWithStats[] = teamPlayersData.response || [];
                         const photoMap = new Map<number, string>();
@@ -135,7 +134,8 @@ function useMatchData(fixture?: Fixture): MatchData {
 
 // --- CHILD COMPONENTS ---
 
-const PlayerOnPitch = ({ player, statistics, onRename, isAdmin }: { player: PlayerType, statistics: any[], onRename: () => void, isAdmin: boolean }) => {
+const PlayerOnPitch = ({ player, onRename, isAdmin }: { player: PlayerWithStats, onRename: () => void, isAdmin: boolean }) => {
+    const { player: playerData, statistics } = player;
     const rating = (statistics && statistics[0]?.games?.rating) ? parseFloat(statistics[0].games.rating).toFixed(1) : null;
     return (
         <div className="relative flex flex-col items-center justify-center text-white text-xs w-20">
@@ -146,12 +146,12 @@ const PlayerOnPitch = ({ player, statistics, onRename, isAdmin }: { player: Play
             )}
             <div className="relative w-12 h-12">
                  <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
-                    <AvatarImage src={player.photo} alt={player.name} />
-                    <AvatarFallback>{player.name ? player.name.charAt(0) : '?'}</AvatarFallback>
+                    <AvatarImage src={playerData.photo} alt={playerData.name} />
+                    <AvatarFallback>{playerData.name ? playerData.name.charAt(0) : '?'}</AvatarFallback>
                 </Avatar>
-                {player.number && (
+                {playerData.number && (
                     <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
-                        {player.number}
+                        {playerData.number}
                     </div>
                 )}
                  {rating && parseFloat(rating) > 0 && (
@@ -160,7 +160,7 @@ const PlayerOnPitch = ({ player, statistics, onRename, isAdmin }: { player: Play
                     </div>
                  )}
             </div>
-            <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold text-center truncate w-20 text-[11px]">{player.name}</span>
+            <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold text-center truncate w-20 text-[11px]">{playerData.name}</span>
         </div>
     );
 };
@@ -170,7 +170,7 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
         return <div className="flex items-center justify-center h-full text-center text-muted-foreground py-6 bg-card rounded-lg">التشكيلة غير متاحة حاليًا</div>;
     }
     
-    const { startXI, formation, coach, substitutes } = lineup;
+    const { startXI, coach, substitutes } = lineup;
 
     const goalkeeper = startXI.find(p => p.player.pos === 'G');
     const defenders = startXI.filter(p => p.player.pos === 'D');
@@ -178,19 +178,22 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
     const attackers = startXI.filter(p => p.player.pos === 'F');
 
     const rows: PlayerWithStats[][] = [];
-    if(goalkeeper) rows.push([goalkeeper]);
-    if(defenders.length > 0) rows.push(defenders);
-    if(midfielders.length > 0) rows.push(midfielders);
     if(attackers.length > 0) rows.push(attackers);
+    if(midfielders.length > 0) rows.push(midfielders);
+    if(defenders.length > 0) rows.push(defenders);
+    if(goalkeeper) rows.push([goalkeeper]);
+
+    // Reverse the rows for correct display order (GK at bottom)
+    const reversedRows = [...rows].reverse();
 
     return (
         <Card className="p-3 bg-card/80">
             <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
                 <div className="absolute inset-0 flex flex-col justify-around p-2">
-                    {rows.map((row, rowIndex) => (
+                    {reversedRows.map((row, rowIndex) => (
                         <div key={rowIndex} className="flex justify-around items-center">
-                            {row.map(({ player, statistics }) => (
-                                <PlayerOnPitch key={player.id} player={{...player, name: getPlayerName(player.id, player.name)}} statistics={statistics} onRename={() => onRename('player', player.id, getPlayerName(player.id, player.name))} isAdmin={isAdmin} />
+                            {row.map((player) => (
+                                <PlayerOnPitch key={player.player.id} player={{...player, player: {...player.player, name: getPlayerName(player.player.id, player.player.name)}}} onRename={() => onRename('player', player.player.id, getPlayerName(player.player.id, player.player.name))} isAdmin={isAdmin} />
                             ))}
                         </div>
                     ))}
@@ -213,11 +216,11 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
                  <div className="mt-4 pt-4 border-t border-border">
                     <h4 className="font-bold text-center mb-3">الاحتياط</h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                         {substitutes.map(({ player }) => (
-                            <div key={player.id} className="relative flex items-center gap-2 p-2 rounded-lg bg-background/50 border">
-                                {isAdmin && <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-6 w-6 z-10" onClick={() => onRename('player', player.id, getPlayerName(player.id, player.name))}><Pencil className="h-3 w-3" /></Button>}
-                                <Avatar className="h-8 w-8"><AvatarImage src={player.photo} alt={player.name} /><AvatarFallback>{player.name ? player.name.charAt(0) : '?'}</AvatarFallback></Avatar>
-                                <span className="text-xs font-medium truncate">{getPlayerName(player.id, player.name)}</span>
+                         {substitutes.map((player) => (
+                            <div key={player.player.id} className="relative flex items-center gap-2 p-2 rounded-lg bg-background/50 border">
+                                {isAdmin && <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-6 w-6 z-10" onClick={() => onRename('player', player.player.id, getPlayerName(player.player.id, player.player.name))}><Pencil className="h-3 w-3" /></Button>}
+                                <Avatar className="h-8 w-8"><AvatarImage src={player.player.photo} alt={player.player.name} /><AvatarFallback>{player.player.name ? player.player.name.charAt(0) : '?'}</AvatarFallback></Avatar>
+                                <span className="text-xs font-medium truncate">{getPlayerName(player.player.id, player.player.name)}</span>
                             </div>
                         ))}
                     </div>
@@ -251,7 +254,7 @@ const STATS_TRANSLATIONS: { [key: string]: string } = {
     "Total passes": "إجمالي التمريرات", "Passes accurate": "تمريرات صحيحة", "Passes %": "دقة التمرير",
 };
 
-const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName, fixture }: { events: MatchEvent[], homeTeamId: number, awayTeamId: number, getPlayerName: (id: number, defaultName: string) => string, fixture: Fixture }) => {
+const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName }: { events: MatchEvent[], homeTeamId: number, awayTeamId: number, getPlayerName: (id: number, defaultName: string) => string }) => {
     const [filter, setFilter] = useState<'highlights' | 'all'>('all');
     
     const filteredEvents = useMemo(() => {
@@ -280,7 +283,7 @@ const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName, fixture }: 
                         const isHomeEvent = event.team.id === homeTeamId;
                         return (
                             <div key={index} className="relative flex w-full justify-center items-center my-3">
-                                <div className={cn("w-1/2 p-2 text-sm", isHomeEvent ? "text-right" : "text-left")}>
+                                <div className={cn("w-1/2 p-2 text-sm", isHomeEvent ? "text-right pr-12" : "text-left pl-12")}>
                                     {isHomeEvent && (
                                         <div className="flex items-center justify-end gap-2">
                                             <div className="flex-1">
@@ -294,7 +297,7 @@ const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName, fixture }: 
                                 <div className="absolute left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-card border flex items-center justify-center text-xs font-bold z-10">
                                     {event.time.elapsed}{event.time.extra ? `+${event.time.extra}` : ''}'
                                 </div>
-                                <div className={cn("w-1/2 p-2 text-sm", !isHomeEvent ? "text-left" : "text-right")}>
+                                <div className={cn("w-1/2 p-2 text-sm", !isHomeEvent ? "text-left pl-12" : "text-right pr-12")}>
                                      {!isHomeEvent && (
                                         <div className="flex items-center justify-start gap-2">
                                             <EventIcon event={event} />
@@ -357,7 +360,7 @@ const StatsView = ({ stats, fixture }: { stats: any[], fixture: Fixture }) => {
 
 // --- MAIN SCREEN COMPONENT ---
 export function MatchDetailScreen({ goBack, canGoBack, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: Fixture, headerActions?: React.ReactNode }) {
-    const { lineups, events, stats, standings, loading, error } = useMatchData(fixture);
+    const { lineups, events, stats, loading, error } = useMatchData(fixture);
     const [activeLineup, setActiveLineup] = useState<'home' | 'away'>('home');
     const { isAdmin } = useAdmin();
     const { db } = useFirestore();
@@ -449,7 +452,7 @@ export function MatchDetailScreen({ goBack, canGoBack, fixture, headerActions }:
                         <LineupField lineup={lineupToShow} onRename={handleOpenRename} isAdmin={isAdmin} getPlayerName={getPlayerName} />
                     </TabsContent>
                     <TabsContent value="details" className="mt-4 space-y-4">
-                       <EventsView events={events} homeTeamId={fixture.teams.home.id} awayTeamId={fixture.teams.away.id} getPlayerName={getPlayerName} fixture={fixture} />
+                       <EventsView events={events} homeTeamId={fixture.teams.home.id} awayTeamId={fixture.teams.away.id} getPlayerName={getPlayerName} />
                        <StatsView stats={stats} fixture={fixture} />
                     </TabsContent>
                 </Tabs>
@@ -457,5 +460,3 @@ export function MatchDetailScreen({ goBack, canGoBack, fixture, headerActions }:
         </div>
     );
 }
-
-    
