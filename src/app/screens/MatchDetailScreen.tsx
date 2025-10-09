@@ -63,8 +63,12 @@ function useMatchData(fixture?: Fixture): MatchData {
     const CURRENT_SEASON = useMemo(() => {
         if (!fixture) return new Date().getFullYear();
         // Extract season year from the league round string if available (e.g., "Regular Season - 38")
-        const seasonYear = fixture.league.round.match(/(\d{4})/);
-        return seasonYear ? parseInt(seasonYear[0], 10) : new Date(fixture.fixture.date).getFullYear();
+        if (fixture.league && fixture.league.round) {
+          const seasonYear = fixture.league.round.match(/(\d{4})/);
+          if (seasonYear) return parseInt(seasonYear[0], 10);
+        }
+        // Fallback to fixture date if round doesn't have a year
+        return new Date(fixture.fixture.date).getFullYear();
     }, [fixture]);
 
 
@@ -159,105 +163,171 @@ function useMatchData(fixture?: Fixture): MatchData {
 
 // --- CHILD COMPONENTS ---
 
+// ⚽ Player Component
 const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: PlayerWithStats, onRename: (type: RenameType, id: number, name: string) => void, isAdmin: boolean, getPlayerName: (id: number, defaultName: string) => string }) => {
-    const { player: playerData, statistics } = player;
-    const rating = (statistics && statistics[0]?.games?.rating) ? parseFloat(statistics[0].games.rating).toFixed(1) : null;
-    const displayName = getPlayerName(playerData.id, playerData.name);
-    return (
-        <div className="relative flex flex-col items-center justify-center text-white text-xs w-16 text-center">
-            {isAdmin && (
-                <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50" onClick={(e) => { e.stopPropagation(); onRename('player', playerData.id, displayName); }}>
-                    <Pencil className="h-3 w-3" />
-                </Button>
-            )}
-            <div className="relative w-12 h-12">
-                 <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
-                    <AvatarImage src={playerData.photo} alt={displayName} />
-                    <AvatarFallback>{displayName ? displayName.charAt(0) : '?'}</AvatarFallback>
-                </Avatar>
-                {playerData.number && (
-                    <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
-                        {playerData.number}
-                    </div>
-                )}
-                 {rating && parseFloat(rating) > 0 && (
-                    <div className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-blue-600 z-10">
-                        {rating}
-                    </div>
-                 )}
-            </div>
-            <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">{displayName}</span>
-        </div>
-    );
+  const { player: info, statistics } = player;
+  const name = getPlayerName(info.id, info.name);
+  const rating = statistics?.[0]?.games?.rating
+    ? parseFloat(statistics[0].games.rating).toFixed(1)
+    : null;
+
+  return (
+    <div className="relative flex flex-col items-center text-white text-xs w-16">
+      {isAdmin && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRename("player", info.id, name);
+          }}
+        >
+          <Pencil className="h-3 w-3" />
+        </Button>
+      )}
+      <div className="relative w-12 h-12">
+        <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
+          <AvatarImage
+            src={info.photo || "/images/player-placeholder.png"}
+            alt={name}
+          />
+          <AvatarFallback>{name ? name.charAt(0) : "?"}</AvatarFallback>
+        </Avatar>
+        {info.number && (
+          <div className="absolute -top-1 -left-1 bg-gray-800 text-[10px] h-5 w-5 rounded-full flex items-center justify-center border border-white">
+            {info.number}
+          </div>
+        )}
+        {rating && (
+          <div className="absolute -top-1 -right-1 bg-blue-600 text-[10px] h-5 w-5 rounded-full flex items-center justify-center border border-white">
+            {rating}
+          </div>
+        )}
+      </div>
+      <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px] text-center">
+        {name}
+      </span>
+    </div>
+  );
 };
 
-function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: LineupData | undefined, onRename: (type: RenameType, id: number, name: string) => void, isAdmin: boolean, getPlayerName: (id: number, defaultName: string) => string }) {
-    if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
-        return <div className="flex items-center justify-center h-full text-center text-muted-foreground py-6 bg-card rounded-lg">التشكيلة غير متاحة حاليًا</div>;
-    }
-    
-    const { startXI, coach, substitutes } = lineup;
-
-    const goalkeeper = startXI.find(p => p.player.pos === 'G');
-    const defenders = startXI.filter(p => p.player.pos === 'D').reverse();
-    const midfielders = startXI.filter(p => p.player.pos === 'M').reverse();
-    const attackers = startXI.filter(p => p.player.pos === 'F').reverse();
-    
-    const rows: PlayerWithStats[][] = [];
-    if (attackers.length > 0) rows.push(attackers);
-    if (midfielders.length > 0) rows.push(midfielders);
-    if (defenders.length > 0) rows.push(defenders);
-    if (goalkeeper) rows.push([goalkeeper]);
-    
+// ⚽️ Field Layout Component
+const LineupField = ({ lineup, onRename, isAdmin, getPlayerName }: { lineup: LineupData | undefined, onRename: (type: RenameType, id: number, name: string) => void, isAdmin: boolean, getPlayerName: (id: number, defaultName: string) => string }) => {
+  if (!lineup || !lineup.startXI?.length)
     return (
-        <Card className="p-3 bg-card/80">
-             <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
-                 <div className="absolute inset-0 flex flex-col-reverse justify-around p-2">
-                    {rows.map((row, rowIndex) => (
-                        <div key={rowIndex} className="flex justify-around items-center w-full">
-                            {row.map((player) => (
-                                <PlayerOnPitch 
-                                  key={player.player.id} 
-                                  player={player} 
-                                  onRename={onRename} 
-                                  isAdmin={isAdmin}
-                                  getPlayerName={getPlayerName}
-                                />
-                            ))}
-                        </div>
-                    ))}
-                </div>
-            </div>
-            
-            {coach && (
-                <div className="mt-4 pt-4 border-t border-border">
-                    <h4 className="font-bold text-center mb-2">المدرب</h4>
-                    <div className="flex flex-col items-center gap-2">
-                         <Avatar className="h-16 w-16">
-                            <AvatarImage src={coach.photo} alt={coach.name} />
-                            <AvatarFallback>{coach.name ? coach.name.charAt(0) : 'C'}</AvatarFallback>
-                        </Avatar>
-                        <span className="font-semibold">{coach.name}</span>
-                    </div>
-                </div>
-            )}
-            {substitutes && substitutes.length > 0 && (
-                 <div className="mt-4 pt-4 border-t border-border">
-                    <h4 className="font-bold text-center mb-3">الاحتياط</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                         {substitutes.map((player) => (
-                            <div key={player.player.id} className="relative flex items-center gap-2 p-2 rounded-lg bg-background/50 border">
-                                {isAdmin && <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-6 w-6 z-10" onClick={() => onRename('player', player.player.id, getPlayerName(player.player.id, player.player.name))}><Pencil className="h-3 w-3" /></Button>}
-                                <Avatar className="h-8 w-8"><AvatarImage src={player.player.photo} alt={player.player.name} /><AvatarFallback>{player.player.name ? player.player.name.charAt(0) : '?'}</AvatarFallback></Avatar>
-                                <span className="text-xs font-medium truncate">{getPlayerName(player.player.id, player.player.name)}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </Card>
+      <div className="flex items-center justify-center h-full text-muted-foreground py-6 bg-card rounded-lg">
+        التشكيلة غير متاحة حاليًا
+      </div>
     );
-}
+
+  // ترتيب الصفوف: من الأعلى إلى الأسفل
+  const attackers = lineup.startXI.filter((p) => p.player.pos === "F");
+  const midfielders = lineup.startXI.filter((p) => p.player.pos === "M");
+  const defenders = lineup.startXI.filter((p) => p.player.pos === "D");
+  const goalkeeper = lineup.startXI.find((p) => p.player.pos === "G");
+
+  const rows = [];
+  if (attackers.length) rows.push(attackers);
+  if (midfielders.length) rows.push(midfielders);
+  if (defenders.length) rows.push(defenders);
+  if (goalkeeper) rows.push([goalkeeper]);
+
+  return (
+    <Card className="p-3 bg-card/80">
+      {/* ملعب عمودي صحيح */}
+      <div
+        className="relative w-full aspect-[2/3] bg-green-700 rounded-lg overflow-hidden border border-green-500/20"
+        style={{
+          backgroundImage: "url('/football-pitch-vertical.svg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        <div className="absolute inset-0 flex flex-col-reverse justify-around p-2">
+          {rows.map((row, i) => (
+            <div
+              key={i}
+              className="flex justify-evenly items-center w-full space-x-1"
+            >
+              {row.map((player) => (
+                <PlayerOnPitch
+                  key={player.player.id}
+                  player={player}
+                  onRename={onRename}
+                  isAdmin={isAdmin}
+                  getPlayerName={getPlayerName}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* المدرب */}
+      {lineup.coach && (
+        <div className="mt-4 pt-4 border-t border-border text-center">
+          <h4 className="font-bold mb-2">المدرب</h4>
+          <Avatar className="h-16 w-16 mx-auto">
+            <AvatarImage
+              src={lineup.coach.photo || "/images/coach-placeholder.png"}
+              alt={lineup.coach.name}
+            />
+            <AvatarFallback>
+              {lineup.coach.name ? lineup.coach.name.charAt(0) : "C"}
+            </AvatarFallback>
+          </Avatar>
+          <p className="font-semibold mt-1">{lineup.coach.name}</p>
+        </div>
+      )}
+
+      {/* الاحتياط */}
+      {lineup.substitutes?.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <h4 className="font-bold text-center mb-3">الاحتياط</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {lineup.substitutes.map((player) => (
+              <div
+                key={player.player.id}
+                className="relative flex items-center gap-2 p-2 rounded-lg bg-background/50 border"
+              >
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-0 right-0 h-6 w-6 z-10"
+                    onClick={() =>
+                      onRename(
+                        "player",
+                        player.player.id,
+                        getPlayerName(player.player.id, player.player.name)
+                      )
+                    }
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                )}
+                <Avatar className="h-8 w-8">
+                  <AvatarImage
+                    src={player.player.photo || "/images/player-placeholder.png"}
+                    alt={player.player.name}
+                  />
+                  <AvatarFallback>
+                    {player.player.name ? player.player.name.charAt(0) : "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-xs font-medium truncate">
+                  {getPlayerName(player.player.id, player.player.name)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+};
+
 
 const EventIcon = ({ event }: { event: MatchEvent }) => {
     if (event.type === 'Goal') {
@@ -501,5 +571,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
-
-    
