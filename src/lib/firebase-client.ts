@@ -24,17 +24,6 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Automatically authorize the development domain for authentication
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    const currentHost = window.location.hostname;
-    const isAuthorized = auth.config.authorizedDomains?.includes(currentHost);
-    
-    if (!isAuthorized) {
-        auth.config.authorizedDomains = [...(auth.config.authorizedDomains || []), currentHost];
-    }
-}
-
-
 const handleNewUser = async (user: User) => {
     const userRef = doc(db, 'users', user.uid);
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
