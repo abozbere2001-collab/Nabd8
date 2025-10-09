@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,62 +10,55 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { Fixture, Standing } from '@/lib/types';
+import type { Fixture, Standing, Player as PlayerType, Team, Favorites } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
+import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
+import { doc, onSnapshot, setDoc, updateDoc, deleteField, getDoc, getDocs, collection } from 'firebase/firestore';
+import { RenameDialog } from '@/components/RenameDialog';
+import { NoteDialog } from '@/components/NoteDialog';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { useToast } from '@/hooks/use-toast';
+import { Star, Pencil, Heart, Copy, Shirt, Users, Trophy, BarChart2 } from 'lucide-react';
+import Image from "next/image";
 
 // --- TYPE DEFINITIONS ---
-interface Player {
-    id: number;
-    name: string;
-    number: number | null;
-    pos: string;
-    grid: string | null;
-    photo: string;
+interface PlayerWithStats {
+    player: PlayerType;
+    statistics: any[];
 }
 
-interface PlayerOnPitch {
-    player: Player;
-}
-
-interface Lineup {
-    team: { id: number; name: string; logo: string; };
-    coach: { id: number; name: string; photo: string; };
+interface LineupData {
+    team: Team;
+    coach: any;
     formation: string;
-    startXI: PlayerOnPitch[];
-    substitutes: PlayerOnPitch[];
+    startXI: PlayerWithStats[];
+    substitutes: PlayerWithStats[];
 }
 
-interface MatchEvent {
-    time: { elapsed: number; extra: number | null; };
-    team: { id: number; name: string; logo: string; };
-    player: { id: number; name: string; };
-    assist: { id: number | null; name: string | null; };
-    type: 'Goal' | 'Card' | 'subst' | 'Var';
-    detail: string;
-    comments: string | null;
+interface MatchData {
+    lineups: LineupData[];
+    events: any[];
+    stats: any[];
+    standings: Standing[];
+    loading: boolean;
+    error: string | null;
 }
 
-interface MatchStat {
-    type: string;
-    value: number | string | null;
-}
+const CURRENT_SEASON = 2025;
 
-interface TeamStats {
-    team: { id: number; name: string; logo: string; };
-    statistics: MatchStat[];
-}
 
 // --- HOOKS ---
-function useMatchData(fixture?: Fixture) {
-    const [data, setData] = useState<{
-        lineups: Lineup[];
-        events: MatchEvent[];
-        stats: TeamStats[];
-        standings: Standing[];
-        loading: boolean;
-        error: string | null;
-    }>({ lineups: [], events: [], stats: [], standings: [], loading: true, error: null });
+function useMatchData(fixture?: Fixture): MatchData {
+    const [data, setData] = useState<MatchData>({
+        lineups: [],
+        events: [],
+        stats: [],
+        standings: [],
+        loading: true,
+        error: null,
+    });
 
     useEffect(() => {
         if (!fixture) {
@@ -79,6 +72,7 @@ function useMatchData(fixture?: Fixture) {
             const leagueId = fixture.league.id;
 
             try {
+                // --- Primary Data Fetching ---
                 const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.allSettled([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
@@ -93,16 +87,41 @@ function useMatchData(fixture?: Fixture) {
                     }
                     return [];
                 };
-                
-                const lineups = await parseResult(lineupsRes);
-                const events = await parseResult(eventsRes);
-                const stats = await parseResult(statsRes);
+
+                const fetchedLineups: LineupData[] = await parseResult(lineupsRes);
+                const fetchedEvents = await parseResult(eventsRes);
+                const fetchedStats = await parseResult(statsRes);
                 const standingsData = await parseResult(standingsRes);
 
+                // --- Photo Fallback Logic ---
+                for (const lineup of fetchedLineups) {
+                    const allPlayers = [...lineup.startXI, ...lineup.substitutes];
+                    const playersNeedingPhotos = allPlayers.filter(p => !p.player.photo);
+
+                    if (playersNeedingPhotos.length > 0) {
+                        const teamPlayersRes = await fetch(`/api/football/players?team=${lineup.team.id}&season=${CURRENT_SEASON}`);
+                        const teamPlayersData = await teamPlayersRes.json();
+                        const teamPlayers: PlayerWithStats[] = teamPlayersData.response || [];
+                        
+                        const photoMap = new Map<number, string>();
+                        teamPlayers.forEach(p => {
+                            if (p.player.photo) {
+                                photoMap.set(p.player.id, p.player.photo);
+                            }
+                        });
+
+                        allPlayers.forEach(p => {
+                            if (!p.player.photo && photoMap.has(p.player.id)) {
+                                p.player.photo = photoMap.get(p.player.id)!;
+                            }
+                        });
+                    }
+                }
+                
                 setData({
-                    lineups,
-                    events,
-                    stats,
+                    lineups: fetchedLineups,
+                    events: fetchedEvents,
+                    stats: fetchedStats,
                     standings: standingsData[0]?.league?.standings[0] || [],
                     loading: false,
                     error: null,
@@ -123,13 +142,14 @@ function useMatchData(fixture?: Fixture) {
     return data;
 }
 
+
 // --- CHILD COMPONENTS ---
 
-const PlayerOnPitch = ({ player, number, name, photo, rating }: { player: PlayerOnPitch['player'], number: number|null, name:string, photo:string, rating:string|null}) => {
+const PlayerOnPitch = ({ player, number, name, photo, rating }: { player: PlayerWithStats['player'], number: number|null, name:string, photo:string, rating:string|null}) => {
     return (
         <div className="flex flex-col items-center justify-center text-white text-xs">
             <div className="relative w-12 h-12">
-                <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
+                 <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
                     <AvatarImage src={photo} alt={name} />
                     <AvatarFallback>{name ? name.charAt(0) : '?'}</AvatarFallback>
                 </Avatar>
@@ -150,7 +170,7 @@ const PlayerOnPitch = ({ player, number, name, photo, rating }: { player: Player
 };
 
 
-function LineupField({ lineup }: { lineup: Lineup | undefined }) {
+function LineupField({ lineup }: { lineup: LineupData | undefined }) {
     if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
         return (
             <div className="flex items-center justify-center h-full text-center text-muted-foreground py-6 bg-card rounded-lg">
@@ -161,31 +181,30 @@ function LineupField({ lineup }: { lineup: Lineup | undefined }) {
     
     const { startXI, formation, coach, substitutes } = lineup;
 
-    const formationArr = formation.split('-').map(Number);
-    const playersByRow = {
-        goalkeeper: startXI.filter(p => p.player.pos === 'G'),
-        defenders: startXI.filter(p => p.player.pos === 'D'),
-        midfielders: startXI.filter(p => p.player.pos === 'M'),
-        forwards: startXI.filter(p => p.player.pos === 'F'),
-        others: startXI.filter(p => !['G', 'D', 'M', 'F'].includes(p.player.pos)),
-    };
-    
-    // Sort players within each line based on grid position
-    const sortPlayers = (players: PlayerOnPitch[]) => {
-        return players.sort((a, b) => {
-            const gridA = a.player.grid ? parseInt(a.player.grid.split(':')[1]) : 0;
-            const gridB = b.player.grid ? parseInt(b.player.grid.split(':')[1]) : 0;
-            return gridA - gridB;
-        });
-    };
+    const formationArr = (formation || "1-4-4-2").split('-').map(Number);
 
-    const rows = [
-        sortPlayers(playersByRow.forwards),
-        sortPlayers(playersByRow.midfielders),
-        sortPlayers(playersByRow.defenders),
-        sortPlayers(playersByRow.goalkeeper),
-    ].filter(row => row.length > 0);
+    const playersByRow: PlayerWithStats[][] = [];
+    let playerIndex = 0;
 
+    // Goalkeeper
+    const goalkeeper = startXI.find(p => p.player.pos === 'G');
+    if (goalkeeper) {
+        playersByRow.push([goalkeeper]);
+        playerIndex = 1;
+    } else {
+        playersByRow.push([startXI[0]]); // Assume first is GK if not specified
+        playerIndex = 1;
+    }
+
+    formationArr.forEach(numInRow => {
+        const row = startXI.slice(playerIndex, playerIndex + numInRow);
+        if (row.length > 0) {
+            playersByRow.push(row);
+        }
+        playerIndex += numInRow;
+    });
+
+    const rows = playersByRow.reverse();
 
     return (
         <Card className="p-3 bg-card/80">
@@ -196,14 +215,14 @@ function LineupField({ lineup }: { lineup: Lineup | undefined }) {
                 <div className="absolute inset-0 flex flex-col justify-around p-2">
                     {rows.map((row, rowIndex) => (
                         <div key={rowIndex} className="flex justify-around items-center">
-                            {row.map(({ player }) => (
+                            {row.map(({ player, statistics }) => (
                                 <PlayerOnPitch 
                                     key={player.id} 
                                     player={player} 
                                     name={player.name}
                                     photo={player.photo}
                                     number={player.number}
-                                    rating={null} // Rating is not in lineup data
+                                    rating={statistics[0]?.games?.rating ? parseFloat(statistics[0].games.rating).toFixed(1) : null}
                                 />
                             ))}
                         </div>
@@ -211,19 +230,19 @@ function LineupField({ lineup }: { lineup: Lineup | undefined }) {
                 </div>
             </div>
             
-             {/* Coach Section */}
-            <div className="mt-4 pt-4 border-t border-border">
-                <h4 className="font-bold text-center mb-2">المدرب</h4>
-                <div className="flex flex-col items-center gap-2">
-                    <Avatar className="h-16 w-16">
-                        <AvatarImage src={coach.photo} alt={coach.name} />
-                        <AvatarFallback>{coach.name ? coach.name.charAt(0) : 'C'}</AvatarFallback>
-                    </Avatar>
-                    <span className="font-semibold">{coach.name}</span>
+            {coach && (
+                <div className="mt-4 pt-4 border-t border-border">
+                    <h4 className="font-bold text-center mb-2">المدرب</h4>
+                    <div className="flex flex-col items-center gap-2">
+                        <Avatar className="h-16 w-16">
+                            <AvatarImage src={coach.photo} alt={coach.name} />
+                            <AvatarFallback>{coach.name ? coach.name.charAt(0) : 'C'}</AvatarFallback>
+                        </Avatar>
+                        <span className="font-semibold">{coach.name}</span>
+                    </div>
                 </div>
-            </div>
+            )}
 
-            {/* Substitutes Section */}
             {substitutes && substitutes.length > 0 && (
                  <div className="mt-4 pt-4 border-t border-border">
                     <h4 className="font-bold text-center mb-3">الاحتياط</h4>
@@ -265,7 +284,6 @@ export function MatchDetailScreen({ goBack, canGoBack, fixture, headerActions }:
     const awayLineup = lineups.find(l => l.team.id === fixture.teams.away.id);
     const lineupToShow = activeLineup === 'home' ? homeLineup : awayLineup;
     
-
     return (
         <div className="flex h-full flex-col bg-background">
             <ScreenHeader title="تفاصيل المباراة" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
@@ -295,7 +313,7 @@ export function MatchDetailScreen({ goBack, canGoBack, fixture, headerActions }:
                             <CardContent>
                                 {events.length > 0 ? (
                                     <div className="space-y-4">
-                                        {events.map((event, index) => (
+                                        {events.map((event: any, index: number) => (
                                             <div key={index} className="flex items-center gap-3 text-sm">
                                                 <span className="font-bold w-12 text-center">{event.time.elapsed}'</span>
                                                 <Avatar className="h-6 w-6"><AvatarImage src={event.team.logo} /></Avatar>
@@ -314,7 +332,7 @@ export function MatchDetailScreen({ goBack, canGoBack, fixture, headerActions }:
                             <Card className="mt-4">
                                 <CardHeader><CardTitle>الإحصائيات</CardTitle></CardHeader>
                                 <CardContent className="space-y-2">
-                                    {stats[0].statistics.map((stat, index) => (
+                                    {stats[0].statistics.map((stat: any, index: number) => (
                                         <div key={index} className="flex items-center justify-between gap-2">
                                             <span className="font-bold">{stats[0].statistics[index].value ?? 0}</span>
                                             <span className="text-muted-foreground text-sm">{stat.type}</span>
