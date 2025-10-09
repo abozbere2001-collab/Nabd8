@@ -381,15 +381,15 @@ const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: Matc
                      ev.type === "subst" ? "🔁" : "•";
 
         const eventContent = (
-            <div className={cn("flex items-center gap-1.5 text-xs", isHomeEvent ? "flex-row text-right" : "flex-row-reverse text-left")}>
+            <div className={cn("flex items-center gap-1.5 text-[11px]", isHomeEvent ? "flex-row-reverse text-left" : "flex-row text-right")}>
                  <Avatar className="w-4 h-4"><AvatarImage src={ev.team.logo} /></Avatar>
-                <div>
-                    <div className={cn("font-semibold flex items-center gap-1", isHomeEvent ? "justify-start" : "justify-end")}>
-                        {!isHomeEvent && isAdmin && ev.player?.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => {e.stopPropagation(); onRename('player', ev.player.id, playerName)}}><Pencil className="h-3 w-3" /></Button>}
-                        {playerName}
+                <div className="flex-1">
+                    <div className={cn("font-semibold flex items-center gap-1", isHomeEvent ? "justify-end" : "justify-start")}>
                         {isHomeEvent && isAdmin && ev.player?.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => {e.stopPropagation(); onRename('player', ev.player.id, playerName)}}><Pencil className="h-3 w-3" /></Button>}
+                        {playerName}
+                        {!isHomeEvent && isAdmin && ev.player?.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => {e.stopPropagation(); onRename('player', ev.player.id, playerName)}}><Pencil className="h-3 w-3" /></Button>}
                     </div>
-                    <div className="text-muted-foreground">
+                    <div className="text-muted-foreground text-[10px]">
                         {assistName && `(صناعة: ${assistName}) `}
                         {ev.detail} {icon}
                     </div>
@@ -398,11 +398,11 @@ const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: Matc
         );
 
         return (
-             <div className="flex items-center">
+             <div className="flex items-start">
                 <div className={cn("w-[45%]", !isHomeEvent && "opacity-0")}>
                     {isHomeEvent && eventContent}
                 </div>
-                <div className="w-[10%] text-center text-xs text-muted-foreground font-mono">{ev.time.elapsed}'</div>
+                <div className="w-[10%] text-center text-xs text-muted-foreground font-mono pt-1">{ev.time.elapsed}'</div>
                  <div className={cn("w-[45%]", isHomeEvent && "opacity-0")}>
                     {!isHomeEvent && eventContent}
                  </div>
@@ -418,9 +418,8 @@ const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: Matc
                     <TabsTrigger value="all">كل الأحداث</TabsTrigger>
                 </TabsList>
                 <CardContent className="p-2 relative h-[70vh] overflow-y-auto">
-                    <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
-                    
-                    <div className="flex flex-col-reverse space-y-reverse space-y-2 pt-2">
+                    <div className="absolute top-0 bottom-0 left-1/2 w-px bg-border -translate-x-1/2"></div>
+                    <div className="flex flex-col-reverse space-y-reverse space-y-1 pt-2">
                         {[...eventsToShow].reverse().map((ev, i) => (
                              <div key={i} className="relative">{renderEvent(ev)}</div>
                         ))}
@@ -469,7 +468,7 @@ const StatsView = ({ stats, fixture }: { stats: any[], fixture: FixtureType }) =
                                 <span className="text-muted-foreground text-xs">{STATS_TRANSLATIONS[stat.type] || stat.type}</span>
                                 <span>{stat.awayValue ?? 0}</span>
                             </div>
-                            <Progress value={homeVal} max={total} className="h-2 [&>div]:bg-primary" />
+                            <Progress value={homeVal} max={total > 0 ? total : 100} className="h-2 [&>div]:bg-primary" />
                         </div>
                     )
                 })}
@@ -632,3 +631,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
+
+    

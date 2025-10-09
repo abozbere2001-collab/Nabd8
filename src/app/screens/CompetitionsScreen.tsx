@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Star, Pencil, Plus, Search } from 'lucide-react';
+import { Star, Pencil, Plus, Search, Trash2, Loader2 } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +17,16 @@ import type { Favorites } from '@/lib/types';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // --- TYPE DEFINITIONS ---
 interface ManagedCompetition {
@@ -315,20 +325,20 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                         <Skeleton key={i} className="h-12 w-full rounded-lg" />
                     ))
                 ) : managedCompetitions && managedCompetitions.length > 0 && sortedGroupedCompetitions ? (
-                    <Accordion type="multiple" className="w-full space-y-4">
+                    <Accordion type="multiple" className="w-full space-y-4" collapsible>
                         {Object.entries(sortedGroupedCompetitions).map(([continent, content]) => (
-                             <AccordionItem value={continent} key={continent} className="border-b-0">
-                                <div className="flex items-center rounded-lg border bg-card pr-4">
-                                  <AccordionTrigger className="p-0 flex-1 hover:no-underline">
+                             <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card/50">
+                                <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                                    <div className="flex items-center gap-3">
                                       <h3 className="text-lg font-bold">{getName('continent', continent, continent)}</h3>
-                                  </AccordionTrigger>
-                                  {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9 ml-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('continent', continent, getName('continent', continent, continent)); }}>
-                                          <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                                  </Button>)}
-                                </div>
-                                <AccordionContent className="pt-2">
+                                    </div>
+                                    {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('continent', continent, getName('continent', continent, continent)); }}>
+                                            <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                    </Button>)}
+                                </AccordionTrigger>
+                                <AccordionContent className="p-2">
                                      {"leagues" in content ? (
-                                        <div className="rounded-lg border bg-card p-1">
+                                        <div className="p-1">
                                             <ul className="flex flex-col">{
                                                 (content.leagues as ManagedCompetition[]).map(comp => 
                                                     <li key={comp.leagueId} 
@@ -354,18 +364,16 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                             }</ul>
                                         </div>
                                     ) : (
-                                        <Accordion type="multiple" className="w-full space-y-2">
+                                        <Accordion type="multiple" className="w-full space-y-2" collapsible>
                                             {Object.entries(content as CompetitionsByCountry).map(([country, { flag, leagues }]) => (
                                                  <AccordionItem value={country} key={country} className="rounded-lg border bg-card/50">
-                                                    <div className="flex items-center pr-4">
-                                                      <AccordionTrigger className="px-0 py-3 flex-1 hover:no-underline">
+                                                      <AccordionTrigger className="px-4 py-3 hover:no-underline">
                                                           <div className="flex items-center gap-3">
                                                               {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
                                                               <span className="font-semibold">{getName('country', country, country)}</span>
                                                           </div>
+                                                        {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getName('country', country, country)); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
                                                       </AccordionTrigger>
-                                                      {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9 ml-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getName('country', country, country)); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
-                                                    </div>
                                                     <AccordionContent className="p-1">
                                                         <ul className="flex flex-col">{leagues.map(comp => 
                                                             <li key={comp.leagueId} 
@@ -416,3 +424,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
+
+
+    
