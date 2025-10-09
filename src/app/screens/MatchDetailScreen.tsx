@@ -239,7 +239,8 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
               lines[position].push(p.player);
           }
       });
-      return [lines.G, lines.D, lines.M, lines.F].filter(line => line.length > 0);
+      // Return in reverse order for correct on-pitch display (F, M, D, G)
+      return [lines.F, lines.M, lines.D, lines.G].filter(line => line && line.length > 0);
   };
   
   const playerLines = groupPlayersByLine(lineupToShow.startXI);
