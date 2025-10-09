@@ -13,7 +13,7 @@ import {
   type User, 
   type Auth, 
 } from "firebase/auth";
-import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { firebaseConfig } from "./firebase";
 import type { UserProfile, UserScore } from './types';

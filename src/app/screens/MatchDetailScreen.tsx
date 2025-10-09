@@ -188,7 +188,7 @@ function useMatchData(fixture?: FixtureType): MatchData {
 }
 
 // --- CHILD COMPONENTS ---
-const H2HView = ({ h2h, fixture }: { h2h: H2HData[], fixture: FixtureType }) => {
+const H2HView = ({ h2h, fixture, homeName, awayName }: { h2h: H2HData[], fixture: FixtureType, homeName: string, awayName: string }) => {
     if (!h2h || h2h.length === 0) return null;
 
     let homeWins = 0;
@@ -219,7 +219,7 @@ const H2HView = ({ h2h, fixture }: { h2h: H2HData[], fixture: FixtureType }) => 
                 <div className="flex justify-around items-center">
                     <div className="text-center">
                         <p className="font-bold text-xl">{homeWins}</p>
-                        <p className="text-sm text-muted-foreground">فوز {fixture.teams.home.name}</p>
+                        <p className="text-sm text-muted-foreground">فوز {homeName}</p>
                     </div>
                      <div className="text-center">
                         <p className="font-bold text-xl">{draws}</p>
@@ -227,7 +227,7 @@ const H2HView = ({ h2h, fixture }: { h2h: H2HData[], fixture: FixtureType }) => 
                     </div>
                     <div className="text-center">
                         <p className="font-bold text-xl">{awayWins}</p>
-                         <p className="text-sm text-muted-foreground">فوز {fixture.teams.away.name}</p>
+                         <p className="text-sm text-muted-foreground">فوز {awayName}</p>
                     </div>
                 </div>
                  <div className="flex w-full h-2 rounded-full overflow-hidden mt-4">
@@ -240,7 +240,7 @@ const H2HView = ({ h2h, fixture }: { h2h: H2HData[], fixture: FixtureType }) => 
     );
 }
 
-const SubstitutionsView = ({ events, homeTeam, awayTeam, getPlayerName }: { events: MatchEvent[], homeTeam: Team, awayTeam: Team, getPlayerName: (id: number, defaultName: string) => string }) => {
+const SubstitutionsView = ({ events, homeTeam, awayTeam, getPlayerName, onRename }: { events: MatchEvent[], homeTeam: Team, awayTeam: Team, getPlayerName: (id: number, defaultName: string) => string, onRename: (type: RenameType, id: number, name: string) => void }) => {
     const substitutions = events.filter(e => e.type === 'subst');
     if (substitutions.length === 0) return null;
 
@@ -251,31 +251,43 @@ const SubstitutionsView = ({ events, homeTeam, awayTeam, getPlayerName }: { even
         <div className="mt-4 pt-4 border-t border-border">
             <h4 className="font-bold text-center mb-3">التبديلات</h4>
             <div className="grid grid-cols-2 gap-4">
-                {/* Home Team Subs */}
                 <div className="space-y-2 text-right">
                     <div className="flex items-center justify-end gap-2 font-semibold">
                         <p>{homeTeam.name}</p>
                         <Avatar className="h-6 w-6"><AvatarImage src={homeTeam.logo} /></Avatar>
                     </div>
                     {homeSubs.map((sub, i) => (
-                        <div key={`home-sub-${i}`} className="text-xs">
-                             <p>{sub.time.elapsed}'</p>
-                             <p className="text-green-500">دخول: {getPlayerName(sub.player.id, sub.player.name)}</p>
-                             <p className="text-red-500">خروج: {getPlayerName(sub.assist.id!, sub.assist.name!)}</p>
+                        <div key={`home-sub-${i}`} className="text-xs flex items-center justify-end gap-2">
+                            <p>{sub.time.elapsed}'</p>
+                            <div>
+                               <p className="text-green-500 flex items-center gap-1">دخول: {getPlayerName(sub.player.id, sub.player.name)}
+                                 <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.player.id, getPlayerName(sub.player.id, sub.player.name))}><Pencil className="h-3 w-3" /></Button>
+                               </p>
+                               <p className="text-red-500 flex items-center gap-1">خروج: {getPlayerName(sub.assist.id!, sub.assist.name!)}
+                                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.assist.id!, getPlayerName(sub.assist.id!, sub.assist.name!))}><Pencil className="h-3 w-3" /></Button>
+                               </p>
+                            </div>
                         </div>
                     ))}
                 </div>
-                {/* Away Team Subs */}
                 <div className="space-y-2 text-left">
                      <div className="flex items-center justify-start gap-2 font-semibold">
                         <Avatar className="h-6 w-6"><AvatarImage src={awayTeam.logo} /></Avatar>
                         <p>{awayTeam.name}</p>
                     </div>
                      {awaySubs.map((sub, i) => (
-                        <div key={`away-sub-${i}`} className="text-xs">
+                        <div key={`away-sub-${i}`} className="text-xs flex items-center justify-start gap-2">
+                             <div>
+                                <p className="text-green-500 flex items-center gap-1">
+                                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.player.id, getPlayerName(sub.player.id, sub.player.name))}><Pencil className="h-3 w-3" /></Button>
+                                  دخول: {getPlayerName(sub.player.id, sub.player.name)}
+                                </p>
+                                <p className="text-red-500 flex items-center gap-1">
+                                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.assist.id!, getPlayerName(sub.assist.id!, sub.assist.name!))}><Pencil className="h-3 w-3" /></Button>
+                                    خروج: {getPlayerName(sub.assist.id!, sub.assist.name!)}
+                                </p>
+                             </div>
                              <p>{sub.time.elapsed}'</p>
-                             <p className="text-green-500">دخول: {getPlayerName(sub.player.id, sub.player.name)}</p>
-                             <p className="text-red-500">خروج: {getPlayerName(sub.assist.id!, sub.assist.name!)}</p>
                         </div>
                     ))}
                 </div>
@@ -284,7 +296,7 @@ const SubstitutionsView = ({ events, homeTeam, awayTeam, getPlayerName }: { even
     );
 };
 
-const LineupField = ({ lineup, awayTeam, events, getPlayerName }: { lineup: LineupData, awayTeam?: Team, events: MatchEvent[], getPlayerName: (id: number, defaultName: string) => string }) => {
+const LineupField = ({ lineup, opponentTeam, events, getPlayerName, onRename }: { lineup: LineupData, opponentTeam?: Team, events: MatchEvent[], getPlayerName: (id: number, defaultName: string) => string, onRename: (type: RenameType, id: number, name: string) => void }) => {
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
     return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا</div>;
   }
@@ -296,25 +308,22 @@ const LineupField = ({ lineup, awayTeam, events, getPlayerName }: { lineup: Line
     if (!rowsMap[row]) rowsMap[row] = [];
     rowsMap[row].push({ ...player, colIndex: col });
   });
+  
+  const sortedRows = Object.values(rowsMap).map(row => row.sort((a, b) => a.colIndex! - b.colIndex!)).sort((a,b) => (b[0].grid.split(':')[0] as any) - (a[0].grid.split(':')[0] as any));
 
-  const sortedRows = Object.keys(rowsMap)
-    .map(row => ({ row: parseInt(row), players: rowsMap[parseInt(row)].sort((a, b) => a.colIndex! - b.colIndex!) }))
-    .sort((a, b) => a.row - b.row);
-
-  const finalRows = sortedRows.reverse();
 
   return (
     <Card className="p-3 bg-card/80">
       <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
         <div className="absolute inset-0 flex flex-col justify-around p-2">
-          {finalRows.map(({row, players}, rowIndex) => (
+          {sortedRows.map((row, rowIndex) => (
             <div key={rowIndex} className="flex justify-around items-center w-full">
-              {players.map((player) => {
+              {row.map((player) => {
                 const displayName = getPlayerName(player.id, player.name);
                 const playerPhoto = player.photo || `https://media.api-sports.io/football/players/${player.id}.png`;
                 
                 return (
-                  <div key={player.id} className="flex flex-col items-center text-xs text-white w-16 text-center">
+                  <div key={player.id} className="flex flex-col items-center text-xs text-white w-16 text-center group">
                     <div className="relative w-12 h-12">
                       <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
                         <AvatarImage src={playerPhoto} alt={displayName} />
@@ -325,6 +334,7 @@ const LineupField = ({ lineup, awayTeam, events, getPlayerName }: { lineup: Line
                           {player.number}
                         </div>
                       )}
+                       <Button variant="ghost" size="icon" className="absolute -top-1 -right-1 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => onRename('player', player.id, displayName)}><Pencil className="h-3 w-3 text-white" /></Button>
                     </div>
                     <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">{displayName}</span>
                   </div>
@@ -335,24 +345,37 @@ const LineupField = ({ lineup, awayTeam, events, getPlayerName }: { lineup: Line
         </div>
       </div>
       
-      {awayTeam && lineup.substitutes && lineup.substitutes.length > 0 && (
-        <SubstitutionsView events={events} homeTeam={lineup.team} awayTeam={awayTeam} getPlayerName={getPlayerName} />
-      )}
+       {opponentTeam && lineup.substitutes && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <h4 className="font-bold text-center mb-3">الاحتياط</h4>
+           <div className="grid grid-cols-2 gap-2">
+            {lineup.substitutes.map(({ player }) => (
+                <div key={player.id} className="flex items-center gap-2 p-1 border rounded bg-card/50 group">
+                    <Avatar className="h-8 w-8"><AvatarImage src={player.photo} /></Avatar>
+                    <p className="text-xs font-semibold flex-1">{getPlayerName(player.id, player.name)}</p>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => onRename('player', player.id, getPlayerName(player.id, player.name))}><Pencil className="h-3 w-3" /></Button>
+                </div>
+            ))}
+           </div>
+          {lineup.substitutes.length > 0 && <SubstitutionsView events={events} homeTeam={lineup.team} awayTeam={opponentTeam} getPlayerName={getPlayerName} onRename={onRename} />}
+        </div>
+       )}
     </Card>
   );
 };
 
-const EventsView = ({ events, fixture, getPlayerName }: { events: MatchEvent[], fixture: FixtureType, getPlayerName: (id: number, defaultName: string) => string }) => {
+const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: MatchEvent[], fixture: FixtureType, getPlayerName: (id: number, defaultName: string) => string, onRename: (type: RenameType, id: number, name: string) => void }) => {
     if (!events || events.length === 0) {
         return <div className="text-muted-foreground text-center py-4">لا توجد أحداث متاحة لعرضها.</div>
     }
 
     return (
-        <div className="relative w-full h-[70vh] overflow-y-auto flex flex-col-reverse px-2">
-          {[...events].map((ev, idx) => {
+        <div className="relative w-full h-auto flex flex-col gap-2 p-2">
+          {[...events].reverse().map((ev, idx) => {
             const isHomeTeam = ev.team.id === fixture.teams.home.id;
-            const alignClass = isHomeTeam ? "justify-start" : "justify-end";
-            const sideColor = isHomeTeam ? "bg-green-800/30" : "bg-blue-800/30";
+            const alignClass = isHomeTeam ? "self-end" : "self-start";
+            const flexDirection = isHomeTeam ? "flex-row" : "flex-row-reverse";
+            const sideColor = isHomeTeam ? "bg-primary/10" : "bg-destructive/10";
 
             const icon =
               ev.type === "Goal" ? "⚽" :
@@ -362,25 +385,21 @@ const EventsView = ({ events, fixture, getPlayerName }: { events: MatchEvent[], 
               "•";
 
             return (
-              <div key={idx} className={`flex ${alignClass} mb-2`}>
+              <div key={idx} className={`w-full flex ${isHomeTeam ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-white shadow-md ${sideColor}`}
-                  style={{ minWidth: "40%", maxWidth: "80%" }}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm shadow-md w-full max-w-[80%] ${sideColor} ${flexDirection}`}
                 >
-                  {isHomeTeam && (
-                    <img
+                  <img
                       src={ev.team.logo}
                       alt={ev.team.name}
                       className="w-5 h-5 rounded-full"
                     />
-                  )}
 
-                  <div className="flex flex-col">
+                  <div className={`flex-1 ${isHomeTeam ? 'text-right' : 'text-left'}`}>
                     <div className="flex items-center gap-1">
-                      <span className="font-semibold truncate">{getPlayerName(ev.player.id, ev.player.name) || "مجهول"}</span>
-                      {ev.type === "Goal" && (
-                        <span className="inline-block">⚽</span>
-                      )}
+                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', ev.player.id, getPlayerName(ev.player.id, ev.player.name))}><Pencil className="h-3 w-3" /></Button>
+                      <span className="font-semibold truncate">{getPlayerName(ev.player.id, ev.player.name)}</span>
+                      {ev.type === "Goal" && <span className="inline-block">⚽</span>}
                     </div>
                     {ev.assist?.name && (
                       <span className="text-xs opacity-70">(مساعدة: {getPlayerName(ev.assist.id!, ev.assist.name)})</span>
@@ -390,19 +409,11 @@ const EventsView = ({ events, fixture, getPlayerName }: { events: MatchEvent[], 
                     </span>
                   </div>
 
-                  <div className="text-xs text-gray-300 ml-2">{ev.time.elapsed}'</div>
-
-                  {!isHomeTeam && (
-                    <img
-                      src={ev.team.logo}
-                      alt={ev.team.name}
-                      className="w-5 h-5 rounded-full"
-                    />
-                  )}
+                  <div className="text-xs text-muted-foreground">{ev.time.elapsed}'</div>
                 </div>
               </div>
             );
-          }).reverse()}
+          })}
         </div>
     );
 }
@@ -544,7 +555,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         <TabsTrigger value="details">تفاصيل</TabsTrigger>
                     </TabsList>
                     <TabsContent value="lineups" className="mt-4">
-                        {h2h && h2h.length > 0 && <H2HView h2h={h2h} fixture={fixture} />}
+                        {h2h && h2h.length > 0 && <H2HView h2h={h2h} fixture={fixture} homeName={fixture.teams.home.name} awayName={fixture.teams.away.name} />}
                         <div className="flex justify-center gap-4 my-4">
                              <Button onClick={() => setActiveLineup('home')} variant={activeLineup === 'home' ? 'default' : 'outline'}>{fixture.teams.home.name}</Button>
                              <Button onClick={() => setActiveLineup('away')} variant={activeLineup === 'away' ? 'default' : 'outline'}>{fixture.teams.away.name}</Button>
@@ -552,9 +563,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         {lineupToShow && 
                             <LineupField 
                                 lineup={lineupToShow}
-                                awayTeam={opponentTeam}
+                                opponentTeam={opponentTeam}
                                 events={events}
                                 getPlayerName={getPlayerName}
+                                onRename={handleOpenRename}
                             />
                         }
                         {!lineupToShow && !loading && 
@@ -564,7 +576,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         }
                     </TabsContent>
                     <TabsContent value="details" className="mt-4 space-y-4">
-                       <EventsView events={events} fixture={fixture} getPlayerName={getPlayerName} />
+                       <EventsView events={events} fixture={fixture} getPlayerName={getPlayerName} onRename={handleOpenRename} />
                        <StatsView stats={stats} fixture={fixture} />
                     </TabsContent>
                 </Tabs>
@@ -574,4 +586,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
 }
 
     
-
