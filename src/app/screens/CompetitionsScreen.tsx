@@ -17,6 +17,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import type { Favorites } from '@/lib/types';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 // --- TYPE DEFINITIONS ---
 interface ManagedCompetition {
@@ -315,77 +316,88 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                         <Skeleton key={i} className="h-12 w-full rounded-lg" />
                     ))
                 ) : managedCompetitions && managedCompetitions.length > 0 && sortedGroupedCompetitions ? (
-                    Object.entries(sortedGroupedCompetitions).map(([continent, content]) => (
-                        <div key={continent} className="rounded-lg border bg-card p-2">
-                             <div className="flex w-full items-center justify-between px-2 py-2">
-                                <h3 className="text-lg font-bold">{getName('continent', continent, continent)}</h3>
-                                {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openRenameDialog('continent', continent, getName('continent', continent, continent)); }}>
-                                        <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                                </Button>)}
-                            </div>
-
-                            {"leagues" in content ? (
-                                <ul className="flex flex-col">{(content.leagues as ManagedCompetition[]).map(comp => 
-                                     <li key={comp.leagueId} 
-                                        className="flex w-full items-center justify-between p-3 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
-                                        onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
-                                     >
-                                        <div className="flex items-center gap-3">
-                                           <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
-                                           <span className="text-sm">{comp.name}</span>
+                    <Accordion type="multiple" className="w-full space-y-4">
+                        {Object.entries(sortedGroupedCompetitions).map(([continent, content]) => (
+                             <AccordionItem value={continent} key={continent} className="border-b-0">
+                                <AccordionTrigger className="rounded-lg border bg-card p-4 hover:no-underline">
+                                    <div className="flex w-full items-center justify-between">
+                                        <h3 className="text-lg font-bold">{getName('continent', continent, continent)}</h3>
+                                        {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openRenameDialog('continent', continent, getName('continent', continent, continent)); }}>
+                                                <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                        </Button>)}
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="pt-2">
+                                     {"leagues" in content ? (
+                                        <div className="rounded-lg border bg-card p-1">
+                                            <ul className="flex flex-col">{
+                                                (content.leagues as ManagedCompetition[]).map(comp => 
+                                                    <li key={comp.leagueId} 
+                                                        className="flex w-full items-center justify-between p-3 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
+                                                        onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                        <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+                                                        <span className="text-sm">{comp.name}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            {isAdmin && (
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openRenameDialog('league', comp.leagueId, comp.name); }}>
+                                                                    <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                                                </Button>
+                                                            )}
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp); }}>
+                                                                <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                            </Button>
+                                                        </div>
+                                                    </li>
+                                                )
+                                            }</ul>
                                         </div>
-                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                             {isAdmin && (
-                                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openRenameDialog('league', comp.leagueId, comp.name); }}>
-                                                     <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                                                 </Button>
-                                             )}
-                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp); }}>
-                                                 <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                             </Button>
-                                         </div>
-                                     </li>
-                                )}</ul>
-                            ) : (
-                                <div className="space-y-2">
-                                    {Object.entries(content as CompetitionsByCountry).map(([country, { flag, leagues }]) => (
-                                        <div key={country} className="rounded-lg border bg-background p-1">
-                                             <div className="flex w-full items-center justify-between px-2 py-1">
-                                                  <div className="flex items-center gap-3">
-                                                      {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
-                                                      <span className="font-semibold">{getName('country', country, country)}</span>
-                                                  </div>
-                                                  <div className="flex items-center">
-                                                    {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getName('country', country, country)); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
-                                                </div>
-                                             </div>
-                                            <ul className="flex flex-col border-t pt-1">{leagues.map(comp => 
-                                                 <li key={comp.leagueId} 
-                                                    className="flex w-full items-center justify-between p-3 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
-                                                    onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
-                                                 >
-                                                    <div className="flex items-center gap-3">
-                                                       <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
-                                                       <span className="text-sm">{comp.name}</span>
-                                                    </div>
-                                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                         {isAdmin && (
-                                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openRenameDialog('league', comp.leagueId, comp.name); }}>
-                                                                 <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                                                             </Button>
-                                                         )}
-                                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp); }}>
-                                                             <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                                         </Button>
-                                                     </div>
-                                                 </li>
-                                            )}</ul>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    ))
+                                    ) : (
+                                        <Accordion type="multiple" className="w-full space-y-2">
+                                            {Object.entries(content as CompetitionsByCountry).map(([country, { flag, leagues }]) => (
+                                                 <AccordionItem value={country} key={country} className="rounded-lg border bg-card/50">
+                                                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                                                        <div className="flex w-full items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
+                                                                <span className="font-semibold">{getName('country', country, country)}</span>
+                                                            </div>
+                                                            {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getName('country', country, country)); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
+                                                        </div>
+                                                    </AccordionTrigger>
+                                                    <AccordionContent className="p-1">
+                                                        <ul className="flex flex-col">{leagues.map(comp => 
+                                                            <li key={comp.leagueId} 
+                                                                className="flex w-full items-center justify-between p-3 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
+                                                                onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+                                                                <span className="text-sm">{comp.name}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    {isAdmin && (
+                                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openRenameDialog('league', comp.leagueId, comp.name); }}>
+                                                                            <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                                                        </Button>
+                                                                    )}
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp); }}>
+                                                                        <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                                    </Button>
+                                                                </div>
+                                                            </li>
+                                                        )}</ul>
+                                                    </AccordionContent>
+                                                </AccordionItem>
+                                            ))}
+                                        </Accordion>
+                                    )}
+                                </AccordionContent>
+                            </AccordionItem>
+                        ))}
+                    </Accordion>
                 ) : (
                     <div className="text-center text-muted-foreground py-10">
                         <p className="text-lg font-semibold">لم تتم إضافة بطولات بعد.</p>
@@ -405,3 +417,5 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
+
+    
