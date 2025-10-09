@@ -379,33 +379,35 @@ const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: Matc
                      ev.detail === "Yellow Card" ? "🟨" :
                      ev.detail === "Red Card" ? "🟥" :
                      ev.type === "subst" ? "🔁" : "•";
-
-        const eventContent = (
-            <div className={cn("flex items-center gap-1.5 text-[11px]", isHomeEvent ? "flex-row-reverse text-left" : "flex-row text-right")}>
-                 <Avatar className="w-4 h-4"><AvatarImage src={ev.team.logo} /></Avatar>
-                <div className="flex-1">
-                    <div className={cn("font-semibold flex items-center gap-1", isHomeEvent ? "justify-end" : "justify-start")}>
-                        {isHomeEvent && isAdmin && ev.player?.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => {e.stopPropagation(); onRename('player', ev.player.id, playerName)}}><Pencil className="h-3 w-3" /></Button>}
-                        {playerName}
-                        {!isHomeEvent && isAdmin && ev.player?.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => {e.stopPropagation(); onRename('player', ev.player.id, playerName)}}><Pencil className="h-3 w-3" /></Button>}
-                    </div>
-                    <div className="text-muted-foreground text-[10px]">
-                        {assistName && `(صناعة: ${assistName}) `}
-                        {ev.detail} {icon}
-                    </div>
+        
+        const eventPlayerInfo = (
+             <div className="flex items-center gap-1">
+                <div className="flex flex-col">
+                    <span className="font-semibold">{playerName}</span>
+                    {assistName && <span className="text-[10px] text-muted-foreground">(صناعة: {assistName})</span>}
                 </div>
+                {isAdmin && ev.player.id && (
+                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => {e.stopPropagation(); onRename('player', ev.player.id, playerName)}}><Pencil className="h-3 w-3" /></Button>
+                )}
+            </div>
+        );
+
+        const eventDetails = (
+             <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <span>{icon}</span>
+                <span>{ev.detail}</span>
             </div>
         );
 
         return (
-             <div className="flex items-start">
-                <div className={cn("w-[45%]", !isHomeEvent && "opacity-0")}>
-                    {isHomeEvent && eventContent}
+             <div className={cn("w-full flex", isHomeEvent ? "justify-start" : "justify-end")}>
+                <div className={cn("flex items-center gap-2 w-[45%]", isHomeEvent ? "flex-row" : "flex-row-reverse")}>
+                    <Avatar className="w-4 h-4"><AvatarImage src={ev.team.logo} /></Avatar>
+                    <div className="flex flex-col">
+                        {eventPlayerInfo}
+                        {eventDetails}
+                    </div>
                 </div>
-                <div className="w-[10%] text-center text-xs text-muted-foreground font-mono pt-1">{ev.time.elapsed}'</div>
-                 <div className={cn("w-[45%]", isHomeEvent && "opacity-0")}>
-                    {!isHomeEvent && eventContent}
-                 </div>
             </div>
         );
     };
@@ -421,7 +423,11 @@ const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: Matc
                     <div className="absolute top-0 bottom-0 left-1/2 w-px bg-border -translate-x-1/2"></div>
                     <div className="flex flex-col-reverse space-y-reverse space-y-1 pt-2">
                         {[...eventsToShow].reverse().map((ev, i) => (
-                             <div key={i} className="relative">{renderEvent(ev)}</div>
+                             <div key={i} className="flex items-center">
+                                <div className={cn("w-[45%] text-left", ev.team.id !== fixture.teams.home.id && "opacity-0")}>{ev.team.id === fixture.teams.home.id && renderEvent(ev)}</div>
+                                <div className="w-[10%] text-center text-xs text-muted-foreground font-mono">{ev.time.elapsed}'</div>
+                                <div className={cn("w-[45%] text-right", ev.team.id !== fixture.teams.away.id && "opacity-0")}>{ev.team.id === fixture.teams.away.id && renderEvent(ev)}</div>
+                            </div>
                         ))}
                     </div>
                 </CardContent>
@@ -441,11 +447,13 @@ const STATS_TRANSLATIONS: { [key: string]: string } = {
 const StatsView = ({ stats, fixture }: { stats: any[], fixture: FixtureType }) => {
     if (stats.length < 2) return <p className="text-muted-foreground text-center py-4">الإحصائيات غير متاحة</p>;
 
-    const homeStats = stats.find(s => s.team.id === fixture.teams.home.id)?.statistics || [];
-    const awayStats = stats.find(s => s.team.id === fixture.teams.away.id)?.statistics || [];
+    const homeData = stats.find(s => s.team.id === fixture.teams.home.id);
+    const awayData = stats.find(s => s.team.id === fixture.teams.away.id);
 
-    const combinedStats = homeStats.map((stat: any) => {
-        const awayStat = awayStats.find((s: any) => s.type === stat.type);
+    if (!homeData || !awayData) return <p className="text-muted-foreground text-center py-4">بيانات أحد الفريقين غير متاحة</p>;
+
+    const combinedStats = homeData.statistics.map((stat: any) => {
+        const awayStat = awayData.statistics.find((s: any) => s.type === stat.type);
         return {
             type: stat.type,
             homeValue: stat.value,
@@ -631,5 +639,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
+
+    
 
     
