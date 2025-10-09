@@ -27,7 +27,7 @@ interface Player {
   id: number;
   name: string;
   number: number;
-  pos: string;
+  pos: string; // G, D, M, F
   grid: string; // "row:col"
   photo?: string;
   colIndex?: number;
@@ -63,8 +63,15 @@ interface MatchData {
 }
 type RenameType = 'team' | 'player' | 'coach';
 
+
 // --- USER'S FINAL LINUP COMPONENT ---
-function LineupField({ lineup, getPlayerName }: { lineup: LineupData, getPlayerName: (id: number, defaultName: string) => string }) {
+function LineupField({
+  lineup,
+  getPlayerName
+}: {
+  lineup: LineupData;
+  getPlayerName: (id: number, defaultName: string) => string;
+}) {
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">التشكيلة غير متاحة حالياً</div>;
   }
@@ -72,6 +79,7 @@ function LineupField({ lineup, getPlayerName }: { lineup: LineupData, getPlayerN
   // ترتيب اللاعبين حسب grid (row:col)
   const rows: { player: Player, colIndex?: number }[][] = [];
   lineup.startXI.forEach(({ player }) => {
+    if (!player.grid) return;
     const [rowStr, colStr] = player.grid.split(':');
     const rowIndex = parseInt(rowStr, 10) - 1;
     const colIndex = parseInt(colStr, 10) - 1;
@@ -83,7 +91,7 @@ function LineupField({ lineup, getPlayerName }: { lineup: LineupData, getPlayerN
   const displayedRows = rows.reverse();
 
   // عكس الترتيب الأفقي (يمين ويسار)
-  displayedRows.forEach(row => row.sort((a, b) => (b.player.colIndex ?? 0) - (a.player.colIndex ?? 0)));
+  displayedRows.forEach(row => row && row.sort((a, b) => (b.player.colIndex || 0) - (a.player.colIndex || 0)));
 
   return (
     <Card className="p-3 bg-card/80">
@@ -99,7 +107,7 @@ function LineupField({ lineup, getPlayerName }: { lineup: LineupData, getPlayerN
                 const playerPhoto = player.photo || `https://media.api-sports.io/football/players/${player.id}.png`;
 
                 return (
-                  <div key={player.id} className="flex flex-col items-center text-white text-xs w-16 text-center">
+                  <div key={player.id} className="flex flex-col items-center text-white text-xs w-16">
                     <div className="relative w-12 h-12">
                       <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
                         <AvatarImage src={playerPhoto} alt={displayName} />
@@ -160,8 +168,7 @@ function LineupField({ lineup, getPlayerName }: { lineup: LineupData, getPlayerN
       )}
     </Card>
   );
-};
-
+}
 
 
 // --- HOOKS ---
@@ -506,6 +513,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         {lineupToShow && 
                             <LineupField 
                                 lineup={lineupToShow}
+                                getPlayerName={getPlayerName}
                             />
                         }
                         {!lineupToShow && !loading && 
@@ -523,4 +531,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
-
