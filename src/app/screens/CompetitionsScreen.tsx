@@ -149,16 +149,12 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             setManagedCompetitions(fetchedCompetitions);
             setLoading(false);
         }, (error) => {
-            // No need to emit error here for regular users, as it's handled by rules
-            if (isAdmin) {
-                const permissionError = new FirestorePermissionError({ path: compsRef.path, operation: 'list' });
-                errorEmitter.emit('permission-error', permissionError);
-            }
+            setManagedCompetitions([]); // Set to empty array on error for non-admins
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, [db, fetchAllCustomNames, isAdmin]);
+    }, [db, fetchAllCustomNames]);
 
     const handleFavorite = useCallback(async (item: ManagedCompetition) => {
         if (!user || !db) return;
@@ -319,14 +315,14 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                     <Accordion type="multiple" className="w-full space-y-4">
                         {Object.entries(sortedGroupedCompetitions).map(([continent, content]) => (
                              <AccordionItem value={continent} key={continent} className="border-b-0">
-                                <AccordionTrigger className="rounded-lg border bg-card p-4 hover:no-underline">
-                                    <div className="flex w-full items-center justify-between">
-                                        <h3 className="text-lg font-bold">{getName('continent', continent, continent)}</h3>
-                                        {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openRenameDialog('continent', continent, getName('continent', continent, continent)); }}>
-                                                <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                                        </Button>)}
-                                    </div>
-                                </AccordionTrigger>
+                                <div className="flex items-center rounded-lg border bg-card pr-4">
+                                  <AccordionTrigger className="p-0 flex-1 hover:no-underline">
+                                      <h3 className="text-lg font-bold">{getName('continent', continent, continent)}</h3>
+                                  </AccordionTrigger>
+                                  {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9 ml-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('continent', continent, getName('continent', continent, continent)); }}>
+                                          <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                  </Button>)}
+                                </div>
                                 <AccordionContent className="pt-2">
                                      {"leagues" in content ? (
                                         <div className="rounded-lg border bg-card p-1">
@@ -358,15 +354,15 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                         <Accordion type="multiple" className="w-full space-y-2">
                                             {Object.entries(content as CompetitionsByCountry).map(([country, { flag, leagues }]) => (
                                                  <AccordionItem value={country} key={country} className="rounded-lg border bg-card/50">
-                                                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                                                        <div className="flex w-full items-center justify-between">
-                                                            <div className="flex items-center gap-3">
-                                                                {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
-                                                                <span className="font-semibold">{getName('country', country, country)}</span>
-                                                            </div>
-                                                            {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getName('country', country, country)); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
-                                                        </div>
-                                                    </AccordionTrigger>
+                                                    <div className="flex items-center pr-4">
+                                                      <AccordionTrigger className="px-0 py-3 flex-1 hover:no-underline">
+                                                          <div className="flex items-center gap-3">
+                                                              {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
+                                                              <span className="font-semibold">{getName('country', country, country)}</span>
+                                                          </div>
+                                                      </AccordionTrigger>
+                                                      {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9 ml-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getName('country', country, country)); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
+                                                    </div>
                                                     <AccordionContent className="p-1">
                                                         <ul className="flex flex-col">{leagues.map(comp => 
                                                             <li key={comp.leagueId} 
@@ -417,5 +413,3 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
-
-    
