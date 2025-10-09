@@ -145,7 +145,7 @@ function useMatchData(fixture?: Fixture): MatchData {
 
 // --- CHILD COMPONENTS ---
 
-const PlayerOnPitch = ({ player, number, name, photo, rating }: { player: PlayerWithStats['player'], number: number|null, name:string, photo:string, rating:string|null}) => {
+const PlayerOnPitch = ({ player, number, name, photo, rating }: { player: PlayerType, number: number|null, name:string, photo:string, rating:string|null}) => {
     return (
         <div className="flex flex-col items-center justify-center text-white text-xs">
             <div className="relative w-12 h-12">
@@ -190,18 +190,23 @@ function LineupField({ lineup }: { lineup: LineupData | undefined }) {
     const goalkeeper = startXI.find(p => p.player.pos === 'G');
     if (goalkeeper) {
         playersByRow.push([goalkeeper]);
-        playerIndex = 1;
-    } else {
+        playerIndex = startXI.indexOf(goalkeeper) + 1; // Start after GK
+    } else if (startXI.length > 0) {
         playersByRow.push([startXI[0]]); // Assume first is GK if not specified
         playerIndex = 1;
     }
+    
+    // Create a mutable copy of startXI to correctly handle player indexing
+    const remainingPlayers = startXI.filter(p => p !== playersByRow[0][0]);
+    let remainingPlayerIndex = 0;
+
 
     formationArr.forEach(numInRow => {
-        const row = startXI.slice(playerIndex, playerIndex + numInRow);
+        const row = remainingPlayers.slice(remainingPlayerIndex, remainingPlayerIndex + numInRow);
         if (row.length > 0) {
             playersByRow.push(row);
         }
-        playerIndex += numInRow;
+        remainingPlayerIndex += numInRow;
     });
 
     const rows = playersByRow.reverse();
@@ -222,7 +227,7 @@ function LineupField({ lineup }: { lineup: LineupData | undefined }) {
                                     name={player.name}
                                     photo={player.photo}
                                     number={player.number}
-                                    rating={statistics[0]?.games?.rating ? parseFloat(statistics[0].games.rating).toFixed(1) : null}
+                                    rating={statistics && statistics[0]?.games?.rating ? parseFloat(statistics[0].games.rating).toFixed(1) : null}
                                 />
                             ))}
                         </div>
