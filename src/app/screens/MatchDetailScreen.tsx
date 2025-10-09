@@ -145,9 +145,8 @@ function useMatchData(fixture?: FixtureType): MatchData {
                             const updatePhotos = (playerList: PlayerWithStats[] | undefined) => {
                                 if (!playerList) return;
                                 playerList.forEach(p => {
-                                    if (p.player && !p.player.photo && photoMap.has(p.player.id)) {
-                                        p.player.photo = photoMap.get(p.player.id)!;
-                                    }
+                                    const playerPhoto = photoMap.get(p.player.id) || `https://media.api-sports.io/football/players/${p.player.id}.png`;
+                                    p.player.photo = playerPhoto;
                                 });
                             };
 
@@ -298,9 +297,9 @@ const LineupField = ({ lineup, awayTeam, events, getPlayerName }: { lineup: Line
     if (!rowsMap[row]) rowsMap[row] = [];
     rowsMap[row].push({ ...player, colIndex: col });
   });
-  
+
   const sortedRows = Object.keys(rowsMap)
-    .map(row => ({ row: parseInt(row), players: rowsMap[parseInt(row)].sort((a, b) => a.colIndex - b.colIndex) }))
+    .map(row => ({ row: parseInt(row), players: rowsMap[parseInt(row)].sort((a, b) => a.colIndex! - b.colIndex!) }))
     .sort((a, b) => a.row - b.row);
 
   const finalRows = sortedRows.reverse();
