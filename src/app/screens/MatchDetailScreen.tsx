@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -115,6 +116,18 @@ function useMatchData(fixture?: Fixture): MatchData {
                                 p.player.photo = photoMap.get(p.player.id)!;
                             }
                         });
+                         // Fallback for players not in the main squad list (e.g. called up from youth)
+                        const individualPlayerFetches = playersNeedingPhotos
+                            .filter(p => !photoMap.has(p.player.id)) // Only fetch if still no photo
+                            .map(async p => {
+                                const playerRes = await fetch(`/api/football/players?id=${p.player.id}&season=${CURRENT_SEASON}`);
+                                const playerData = await playerRes.json();
+                                if (playerData.response?.[0]?.player?.photo) {
+                                    photoMap.set(p.player.id, playerData.response[0].player.photo);
+                                    p.player.photo = playerData.response[0].player.photo;
+                                }
+                            });
+                        await Promise.allSettled(individualPlayerFetches);
                     }
                 }
                 
@@ -145,7 +158,7 @@ function useMatchData(fixture?: Fixture): MatchData {
 
 // --- CHILD COMPONENTS ---
 
-const PlayerOnPitch = ({ player, number, name, photo, rating }: { player: PlayerType, number: number|null, name:string, photo:string, rating:string|null}) => {
+const PlayerOnPitch = ({ player, number, name, photo, rating, statistics }: { player: PlayerType, number: number|null, name:string, photo:string, rating:string|null, statistics: any[] }) => {
     return (
         <div className="flex flex-col items-center justify-center text-white text-xs">
             <div className="relative w-12 h-12">
@@ -181,35 +194,31 @@ function LineupField({ lineup }: { lineup: LineupData | undefined }) {
     
     const { startXI, formation, coach, substitutes } = lineup;
 
-    const formationArr = (formation || "1-4-4-2").split('-').map(Number);
-
-    const playersByRow: PlayerWithStats[][] = [];
-    let playerIndex = 0;
-
-    // Goalkeeper
     const goalkeeper = startXI.find(p => p.player.pos === 'G');
-    if (goalkeeper) {
-        playersByRow.push([goalkeeper]);
-        playerIndex = startXI.indexOf(goalkeeper) + 1; // Start after GK
-    } else if (startXI.length > 0) {
-        playersByRow.push([startXI[0]]); // Assume first is GK if not specified
-        playerIndex = 1;
-    }
+    const defenders = startXI.filter(p => p.player.pos === 'D');
+    const midfielders = startXI.filter(p => p.player.pos === 'M');
+    const attackers = startXI.filter(p => p.player.pos === 'F');
+
+    // Handle cases where API doesn't provide formation, create a fallback
+    const unknownPlayers = startXI.filter(p => p.player.pos !== 'G' && p.player.pos !== 'D' && p.player.pos !== 'M' && p.player.pos !== 'F');
+
+    const formationArr = formation ? formation.split('-').map(Number) : [defenders.length, midfielders.length, attackers.length].filter(n => n > 0);
     
-    // Create a mutable copy of startXI to correctly handle player indexing
-    const remainingPlayers = startXI.filter(p => p !== playersByRow[0][0]);
-    let remainingPlayerIndex = 0;
+    const rows: PlayerWithStats[][] = [];
+    if(attackers.length > 0) rows.push(attackers);
+    if(midfielders.length > 0) rows.push(midfielders);
+    if(defenders.length > 0) rows.push(defenders);
+    if(goalkeeper) rows.push([goalkeeper]);
 
+    if (unknownPlayers.length > 0 && rows.length === 0) {
+        // Fallback for completely unknown formation
+        let tempRows: PlayerWithStats[][] = [];
+        if (goalkeeper) tempRows.push([goalkeeper]);
+        const remaining = startXI.filter(p => p !== goalkeeper);
+        if (remaining.length > 0) tempRows.push(remaining);
+        rows.push(...tempRows.reverse());
+    }
 
-    formationArr.forEach(numInRow => {
-        const row = remainingPlayers.slice(remainingPlayerIndex, remainingPlayerIndex + numInRow);
-        if (row.length > 0) {
-            playersByRow.push(row);
-        }
-        remainingPlayerIndex += numInRow;
-    });
-
-    const rows = playersByRow.reverse();
 
     return (
         <Card className="p-3 bg-card/80">
@@ -227,6 +236,7 @@ function LineupField({ lineup }: { lineup: LineupData | undefined }) {
                                     name={player.name}
                                     photo={player.photo}
                                     number={player.number}
+                                    statistics={statistics}
                                     rating={statistics && statistics[0]?.games?.rating ? parseFloat(statistics[0].games.rating).toFixed(1) : null}
                                 />
                             ))}
@@ -252,7 +262,7 @@ function LineupField({ lineup }: { lineup: LineupData | undefined }) {
                  <div className="mt-4 pt-4 border-t border-border">
                     <h4 className="font-bold text-center mb-3">الاحتياط</h4>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                         {substitutes.map(({ player }) => (
+                         {substitutes.map(({ player, statistics }) => (
                             <div key={player.id} className="flex items-center gap-2 p-2 rounded-lg bg-background/50 border">
                                 <Avatar className="h-8 w-8">
                                     <AvatarImage src={player.photo} alt={player.name} />
