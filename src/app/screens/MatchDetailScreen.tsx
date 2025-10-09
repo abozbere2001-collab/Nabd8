@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from "@/components/ui/button";
 import { cn } from '@/lib/utils';
-import type { Fixture, Standing, Player as PlayerType, Team, Favorites } from '@/lib/types';
+import type { Fixture as FixtureType, Standing, Player as PlayerType, Team, Favorites } from '@/lib/types';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc, getDocs, collection, updateDoc, deleteField, getDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
@@ -25,7 +25,7 @@ import Image from 'next/image';
 
 // --- TYPE DEFINITIONS ---
 interface PlayerWithStats {
-    player: PlayerType & { pos?: string; grid?: string; };
+    player: PlayerType & { grid?: string; };
     statistics?: any[];
 }
 interface LineupData {
@@ -56,61 +56,55 @@ type RenameType = 'team' | 'player' | 'coach';
 
 
 // --- USER'S FINAL LINUP COMPONENT ---
-const LineupField: React.FC<{ lineup: any, getPlayerName: (id: number, defaultName: string) => string }> = ({ lineup, getPlayerName }) => {
+export function LineupField({ lineup }: { lineup: LineupData }) {
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
-    return <div className="flex items-center justify-center h-64 text-muted-foreground">التشكيلة غير متاحة حالياً</div>;
+    return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا</div>;
   }
 
-  // ترتيب اللاعبين حسب grid (row:col)
-  const rows: any[][] = [];
-  lineup.startXI.forEach((p: any) => {
-    const player = p.player;
-    const [rowStr, colStr] = player.grid.split(':');
-    const rowIndex = parseInt(rowStr, 10) - 1;
-    if (!rows[rowIndex]) rows[rowIndex] = [];
-    rows[rowIndex].push({ ...player, colIndex: parseInt(colStr, 10) - 1 });
+  // افصل اللاعبين حسب الصفوف والاعمدة حسب grid
+  const rowsMap: { [key: string]: PlayerType[] } = {};
+  lineup.startXI.forEach(({ player }) => {
+    if (!player.grid) return;
+    const [row] = player.grid.split(':').map(Number);
+    const key = String(row);
+    if (!rowsMap[key]) rowsMap[key] = [];
+    rowsMap[key].push(player);
   });
 
-  // ترتيب الصفوف من الأسفل إلى الأعلى (الحارس أسفل)
-  const displayedRows = rows.reverse();
+  // رتب اللاعبين في كل صف حسب العمود (من اليسار إلى اليمين كما هو)
+  const sortedRows = Object.keys(rowsMap)
+    .map(row => ({ row: parseInt(row), players: rowsMap[row].sort((a, b) => {
+      const [, colA] = (a.grid || "0:0").split(':').map(Number);
+      const [, colB] = (b.grid || "0:0").split(':').map(Number);
+      return colA - colB; // ترتيب صحيح أفقي
+    })}))
+    .sort((a, b) => a.row - b.row); // ترتيب عمودي من الحارس أسفل (row أقل) إلى الهجوم أعلى (row أكبر)
 
-  // عكس الترتيب الأفقي (يمين ويسار)
-  displayedRows.forEach(row => row.sort((a, b) => b.colIndex - a.colIndex));
-
-  const getPlayerImage = (player: any) =>
-    player.photo ||
-    `https://media.api-sports.io/football/players/${player.id}.png`;
+  // عكس الصفوف عموديًا: الحارس أسفل، الهجوم أعلى
+  const finalRows = sortedRows.reverse();
 
   return (
     <Card className="p-3 bg-card/80">
-      <div
-        className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center rounded-lg border border-green-500/20 overflow-hidden"
-        style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}
-      >
+      <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
         <div className="absolute inset-0 flex flex-col justify-around p-2">
-          {displayedRows.map((row, rowIndex) => (
-            <div key={rowIndex} className="flex justify-around items-end w-full">
-              {row.map(player => {
-                const displayName = getPlayerName(player.id, player.name);
-                const playerPhoto = getPlayerImage(player);
-
-                return (
-                  <div key={player.id} className="flex flex-col items-center text-white text-xs w-16">
-                    <div className="relative w-12 h-12">
-                      <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
-                        <AvatarImage src={playerPhoto} alt={displayName} />
-                        <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800">
+          {finalRows.map((row, rowIndex) => (
+            <div key={rowIndex} className="flex justify-around items-center w-full">
+              {row.players.map(player => (
+                <div key={player.id} className="flex flex-col items-center text-xs text-white w-16 text-center">
+                  <div className="relative w-12 h-12">
+                    <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
+                      <AvatarImage src={player.photo} alt={player.name} />
+                      <AvatarFallback>{player.name ? player.name.charAt(0) : '?'}</AvatarFallback>
+                    </Avatar>
+                    {player.number && (
+                      <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
                         {player.number}
                       </div>
-                    </div>
-                    <span className="mt-1 text-[11px] font-semibold text-center truncate w-full bg-black/50 px-1.5 py-0.5">
-                      {displayName}
-                    </span>
+                    )}
                   </div>
-                );
-              })}
+                  <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">{player.name}</span>
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -118,48 +112,27 @@ const LineupField: React.FC<{ lineup: any, getPlayerName: (id: number, defaultNa
 
       {lineup.substitutes && lineup.substitutes.length > 0 && (
         <div className="mt-4 pt-4 border-t border-border">
-          <h4 className="font-bold text-center mb-2">الاحتياط</h4>
+          <h4 className="font-bold text-center mb-3">الاحتياط</h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {lineup.substitutes.map((p: any) => {
-              const player = p.player;
-              const displayName = getPlayerName(player.id, player.name);
-              const playerPhoto = getPlayerImage(player);
-
-              return (
-                <div key={player.id} className="flex flex-col items-center gap-1">
-                  <Avatar className="h-10 w-10 border border-white/30 bg-black/30">
-                    <AvatarImage src={playerPhoto} alt={displayName} />
-                    <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs font-medium text-center truncate w-full text-white/90">
-                    {displayName}
-                  </span>
-                </div>
-              );
-            })}
+            {lineup.substitutes.map(({ player }) => (
+              <div key={player.id} className="relative flex items-center gap-2 p-2 rounded-lg bg-background/50 border">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={player.photo} alt={player.name} />
+                  <AvatarFallback>{player.name ? player.name.charAt(0) : '?'}</AvatarFallback>
+                </Avatar>
+                <span className="text-xs font-medium truncate">{player.name}</span>
+              </div>
+            ))}
           </div>
-        </div>
-      )}
-
-      {lineup.coach && (
-        <div className="mt-4 pt-4 border-t border-border flex flex-col items-center gap-2">
-          <Avatar className="h-16 w-16 border-2 border-white/40 bg-black/30">
-            <AvatarImage
-              src={lineup.coach.photo || `https://media.api-sports.io/football/coachs/${lineup.coach.id}.png`}
-              alt={lineup.coach.name}
-            />
-            <AvatarFallback>{lineup.coach.name.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <span className="font-semibold text-white">{lineup.coach.name}</span>
         </div>
       )}
     </Card>
   );
-};
+}
 
 
 // --- HOOKS ---
-function useMatchData(fixture?: Fixture): MatchData {
+function useMatchData(fixture?: FixtureType): MatchData {
     const { toast } = useToast();
     const [data, setData] = useState<MatchData>({
         lineups: [], events: [], stats: [], standings: [], loading: true, error: null,
@@ -171,11 +144,9 @@ function useMatchData(fixture?: Fixture): MatchData {
             const seasonYearMatch = fixture.league.round.match(/(\d{4})/);
             if (seasonYearMatch) {
               const year = parseInt(seasonYearMatch[0], 10);
-              // Handle cases like "2023-2024", we want the starting year
               return year;
             }
         }
-        // Fallback to fixture year if round doesn't have a year
         return new Date(fixture.fixture.date).getFullYear();
     }, [fixture]);
 
@@ -214,7 +185,7 @@ function useMatchData(fixture?: Fixture): MatchData {
                 const fetchedStats: any[] = await parseResult(statsRes);
                 const fetchedStandings: Standing[] = (await parseResult(standingsRes))[0]?.league?.standings[0] || [];
                 
-                if (fetchedLineups.length > 0) {
+                 if (fetchedLineups.length > 0) {
                      for (let i = 0; i < fetchedLineups.length; i++) {
                         const lineup = fetchedLineups[i];
                         if (!lineup.team?.id) continue;
@@ -226,7 +197,7 @@ function useMatchData(fixture?: Fixture): MatchData {
                             const photoMap = new Map<number, string>();
                             teamPlayersList.forEach(p => { if (p.player.photo) photoMap.set(p.player.id, p.player.photo); });
 
-                            const updatePhotos = (playerList: any[]) => {
+                            const updatePhotos = (playerList: any[] | undefined) => {
                                 if (!playerList) return;
                                 playerList.forEach(p => {
                                     if (p.player && !p.player.photo && photoMap.has(p.player.id)) {
@@ -367,7 +338,7 @@ const EventsView = ({ events, homeTeamId, getPlayerName }: { events: MatchEvent[
     )
 }
 
-const StatsView = ({ stats, fixture }: { stats: any[], fixture: Fixture }) => {
+const StatsView = ({ stats, fixture }: { stats: any[], fixture: FixtureType }) => {
     if (stats.length < 2) return <p className="text-muted-foreground text-center py-4">الإحصائيات غير متاحة</p>;
 
     const homeStats = stats.find(s => s.team.id === fixture.teams.home.id)?.statistics || [];
@@ -409,7 +380,7 @@ const StatsView = ({ stats, fixture }: { stats: any[], fixture: Fixture }) => {
 
 
 // --- MAIN SCREEN COMPONENT ---
-export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: Fixture, headerActions?: React.ReactNode }) {
+export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, headerActions }: ScreenProps & { fixtureId: number; fixture: FixtureType, headerActions?: React.ReactNode }) {
     const { lineups, events, stats, loading, error } = useMatchData(fixture);
     const [activeLineup, setActiveLineup] = useState<'home' | 'away'>('home');
     const { isAdmin } = useAdmin();
@@ -501,8 +472,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         </div>
                         {lineupToShow && 
                             <LineupField 
-                                lineup={lineupToShow as any}
-                                getPlayerName={getPlayerName}
+                                lineup={lineupToShow}
                             />
                         }
                         {!lineupToShow && !loading && 
@@ -520,5 +490,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
-
-    
