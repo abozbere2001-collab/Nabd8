@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Send, MoreVertical, Edit, Trash2, CornerDownRight, Heart } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, setDoc, limit } from 'firebase/firestore';
 import type { MatchComment, Like } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -246,7 +246,8 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     }
 
     setLoading(true);
-    const q = query(commentsColRef, orderBy('timestamp', 'asc'));
+    // Fetch the last 20 comments in descending order, then reverse them on the client.
+    const q = query(commentsColRef, orderBy('timestamp', 'desc'), limit(20));
     
     const unsubscribe = onSnapshot(q, async (snapshot) => {
         const commentPromises = snapshot.docs.map(async (doc) => {
@@ -278,7 +279,8 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
 
         try {
             const resolvedComments = await Promise.all(commentPromises);
-            setComments(resolvedComments);
+            // Reverse the array to show the oldest of the last 20 comments first.
+            setComments(resolvedComments.reverse());
         } catch(error) {
             // This could be a permission error on subcollections
             const permissionError = new FirestorePermissionError({
