@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -42,16 +43,14 @@ interface Player {
 
 interface PlayerResponse {
     player: Player;
-    statistics: any[];
 }
 
-
-interface Lineup {
-  team: { id: number; name: string; logo: string; isNational: boolean; };
+interface LineupResponse {
+  team: { id: number; name: string; logo: string; };
   coach: { id: number; name: string; photo: string; };
   formation: string;
-  startXI: Player[];
-  substitutes: Player[];
+  startXI: PlayerResponse[];
+  substitutes: PlayerResponse[];
 }
 
 interface Event {
@@ -101,7 +100,7 @@ const CURRENT_SEASON = 2025;
 // --- API FETCH HOOK ---
 function useMatchData(fixture?: Fixture) {
     const [data, setData] = useState<{
-        lineups: Lineup[];
+        lineups: LineupResponse[];
         events: Event[];
         stats: MatchStats[];
         standings: Standing[][];
@@ -113,58 +112,28 @@ function useMatchData(fixture?: Fixture) {
             setLoading(false);
             return;
         }
-        const { fixture: { id: fixtureId, date }, league, teams } = fixture;
+        const { fixture: { id: fixtureId, date }, league } = fixture;
 
         const fetchData = async () => {
             setLoading(true);
             try {
-                // Fetch lineups from the more detailed players endpoint
-                const homePlayersRes = await fetch(`/api/football/players?fixture=${fixtureId}&team=${teams.home.id}`);
-                const awayPlayersRes = await fetch(`/api/football/players?fixture=${fixtureId}&team=${teams.away.id}`);
-                
-                const homePlayersData = await homePlayersRes.json();
-                const awayPlayersData = await awayPlayersRes.json();
-
-                const parseLineup = (lineupData: any, teamInfo: any): Lineup | null => {
-                    if (!lineupData || !lineupData.response || lineupData.response.length === 0) return null;
-                    
-                    const coach = lineupData.response[0].statistics[0].team.coach;
-                    const formation = lineupData.response[0].statistics[0].formation;
-                    
-                    const startXI = lineupData.response.filter((p: any) => p.statistics[0].games.substitute === false).map((p:any) => p.player);
-                    const substitutes = lineupData.response.filter((p: any) => p.statistics[0].games.substitute === true).map((p:any) => p.player);
-                    
-                    return {
-                        team: { ...teamInfo, isNational: false },
-                        coach: coach || {id: 0, name: 'N/A', photo: ''},
-                        formation: formation,
-                        startXI: startXI,
-                        substitutes: substitutes,
-                    };
-                };
-
-                const homeLineup = parseLineup(homePlayersData, teams.home);
-                const awayLineup = parseLineup(awayPlayersData, teams.away);
-                
-                const finalLineups: Lineup[] = [];
-                if(homeLineup) finalLineups.push(homeLineup);
-                if(awayLineup) finalLineups.push(awayLineup);
-
-                const isNational = teams.home.winner !== null && teams.away.winner !== null;
+                const isNational = fixture.teams.home.winner !== null && fixture.teams.away.winner !== null;
                 const seasonForStandings = isNational ? new Date(date).getFullYear() : CURRENT_SEASON;
 
-                const [eventsRes, statsRes, standingsRes] = await Promise.all([
+                const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.all([
+                    fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
                     fetch(`/api/football/standings?league=${league.id}&season=${seasonForStandings}`),
                 ]);
 
+                const lineupsData = await lineupsRes.json();
                 const eventsData = await eventsRes.json();
                 const statsData = await statsRes.json();
                 const standingsData = await standingsRes.json();
-
+                
                 setData({
-                    lineups: finalLineups,
+                    lineups: lineupsData.response || [],
                     events: eventsData.response || [],
                     stats: statsData.response || [],
                     standings: standingsData.response?.[0]?.league?.standings || [],
@@ -249,7 +218,7 @@ const PlayerOnPitch = ({ player }: { player: Player }) => {
 };
 
 
-const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite, isAdmin, onCopy }: { lineups: Lineup[], loading: boolean, fixture: Fixture, favorites: Favorites, onRename: (type: RenameType, id: number, name: string) => void, onFavorite: (type: 'player' | 'coach', item: any) => void, isAdmin: boolean, onCopy: (url: string) => void }) => {
+const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite, isAdmin, onCopy }: { lineups: LineupResponse[], loading: boolean, fixture: Fixture, favorites: Favorites, onRename: (type: RenameType, id: number, name: string) => void, onFavorite: (type: 'player' | 'coach', item: any) => void, isAdmin: boolean, onCopy: (url: string) => void }) => {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(fixture.teams.home.id);
 
   if (loading) {
@@ -269,42 +238,55 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
       return <p className="text-center text-muted-foreground p-8">تشكيلة الفريق المحدد غير متاحة.</p>;
   }
 
-  const groupPlayersByLine = (players: Player[]) => {
-      const lines: { [key: string]: Player[] } = { G: [], D: [], M: [], F: [] };
-      players.forEach(p => {
-          if (!p) return;
-          const position = p.pos;
-          if (lines[position]) {
-              lines[position].push(p);
-          }
-      });
-      // Return in reverse order for correct on-pitch display (F, M, D, G)
-      return [lines.F, lines.M, lines.D, lines.G].filter(line => line && line.length > 0);
+  const groupPlayersByLine = (players: PlayerResponse[], formation: string) => {
+    if (!formation) return [];
+    
+    const linesFormation = formation.split('-').map(Number);
+    const playerLines: Player[][] = Array(linesFormation.length + 1).fill(0).map(() => []);
+
+    const gk = players.find(p => p.player.pos === 'G');
+    if (gk) playerLines[0] = [gk.player];
+    
+    const outfieldPlayers = players.filter(p => p.player.pos !== 'G');
+
+    let playerIndex = 0;
+    for (let i = 0; i < linesFormation.length; i++) {
+        const lineSize = linesFormation[i];
+        for (let j = 0; j < lineSize; j++) {
+            if (outfieldPlayers[playerIndex]) {
+                playerLines[i+1].push(outfieldPlayers[playerIndex].player);
+                playerIndex++;
+            }
+        }
+    }
+    
+    return playerLines.filter(line => line.length > 0).reverse();
   };
   
-  const playerLines = groupPlayersByLine(lineupToShow.startXI).reverse();
+  const playerLines = groupPlayersByLine(lineupToShow.startXI, lineupToShow.formation);
 
-  const renderPlayerRow = (playerInfo: Player) => {
+  const renderPlayerRow = (playerInfo: PlayerResponse) => {
     if(!playerInfo) return null;
+    const { player } = playerInfo;
     return (
-         <div key={playerInfo.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted">
-            <span className="text-muted-foreground w-6 text-center font-mono">{playerInfo.number}</span>
+         <div key={player.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted">
+            <span className="text-muted-foreground w-6 text-center font-mono">{player.number}</span>
              <div className="relative">
                 <Avatar className="w-6 h-6">
-                    <AvatarImage src={playerInfo.photo} />
-                    <AvatarFallback>{playerInfo.name.substring(0,1)}</AvatarFallback>
+                    <AvatarImage src={player.photo} />
+                    <AvatarFallback>{player.name.substring(0,1)}</AvatarFallback>
                 </Avatar>
-                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(playerInfo.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(player.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
             </div>
             <p className="font-medium truncate flex-1">
-                {playerInfo.name}
-                {isAdmin && <span className="text-xs text-muted-foreground/70 ml-2">(ID: {playerInfo.id})</span>}
+                {player.name}
+                {isAdmin && <span className="text-xs text-muted-foreground/70 ml-2">(ID: {player.id})</span>}
             </p>
             <div className='flex opacity-80'>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onFavorite('player', playerInfo)}>
-                    <Star className={cn("h-4 w-4", favorites?.players?.[playerInfo.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onFavorite('player', player)}>
+                    <Star className={cn("h-4 w-4", favorites?.players?.[player.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/60")} />
                 </Button>
-                {isAdmin && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRename('player', playerInfo.id, playerInfo.name)}>
+                {isAdmin && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRename('player', player.id, player.name)}>
                     <Pencil className="h-4 w-4 text-muted-foreground" />
                 </Button>}
             </div>
