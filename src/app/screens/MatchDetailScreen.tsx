@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from "@/components/ui/button";
 import { cn } from '@/lib/utils';
-import type { Fixture as FixtureType, Standing, Player as PlayerType, Team, Favorites } from '@/lib/types';
+import type { Fixture as FixtureType, Standing, Team, Favorites } from '@/lib/types';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc, getDocs, collection, updateDoc, deleteField, getDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
@@ -22,18 +22,26 @@ import { NoteDialog } from '@/components/NoteDialog';
 import { Progress } from '@/components/ui/progress';
 import Image from 'next/image';
 
-
 // --- TYPE DEFINITIONS ---
+interface Player {
+  id: number;
+  name: string;
+  number: number;
+  pos: string;
+  photo: string; // اجعل الصورة مطلوبة
+  grid: string; // "row:col"
+}
+
 interface PlayerWithStats {
-    player: PlayerType & { grid?: string; };
+    player: Player;
     statistics?: any[];
 }
 interface LineupData {
     team: Team;
     coach: any;
     formation: string;
-    startXI: PlayerWithStats[];
-    substitutes: PlayerWithStats[];
+    startXI: { player: Player }[];
+    substitutes: { player: Player }[];
 }
 interface MatchEvent {
     time: { elapsed: number; extra: number | null };
@@ -62,23 +70,22 @@ export function LineupField({ lineup }: { lineup: LineupData }) {
   }
 
   // افصل اللاعبين حسب الصفوف والاعمدة حسب grid
-  const rowsMap: { [key: string]: PlayerType[] } = {};
+  const rowsMap: { [key: string]: Player[] } = {};
   lineup.startXI.forEach(({ player }) => {
-    if (!player.grid) return;
-    const [row] = player.grid.split(':').map(Number);
+    const [row] = player.grid?.split(':').map(Number) || [0, 0];
     const key = String(row);
     if (!rowsMap[key]) rowsMap[key] = [];
     rowsMap[key].push(player);
   });
 
-  // رتب اللاعبين في كل صف حسب العمود (من اليسار إلى اليمين كما هو)
+  // رتب اللاعبين في كل صف حسب العمود
   const sortedRows = Object.keys(rowsMap)
     .map(row => ({ row: parseInt(row), players: rowsMap[row].sort((a, b) => {
-      const [, colA] = (a.grid || "0:0").split(':').map(Number);
-      const [, colB] = (b.grid || "0:0").split(':').map(Number);
-      return colA - colB; // ترتيب صحيح أفقي
+      const [, colA] = a.grid.split(':').map(Number);
+      const [, colB] = b.grid.split(':').map(Number);
+      return colA - colB; // ترتيب أفقي صحيح
     })}))
-    .sort((a, b) => a.row - b.row); // ترتيب عمودي من الحارس أسفل (row أقل) إلى الهجوم أعلى (row أكبر)
+    .sort((a, b) => a.row - b.row); // ترتيب عمودي من الحارس أسفل إلى الهجوم أعلى
 
   // عكس الصفوف عموديًا: الحارس أسفل، الهجوم أعلى
   const finalRows = sortedRows.reverse();
@@ -144,9 +151,11 @@ function useMatchData(fixture?: FixtureType): MatchData {
             const seasonYearMatch = fixture.league.round.match(/(\d{4})/);
             if (seasonYearMatch) {
               const year = parseInt(seasonYearMatch[0], 10);
-              return year;
+              // Handle cases like "2023/2024" by taking the first year
+              if (!isNaN(year)) return year;
             }
         }
+        // Fallback to the year of the fixture date
         return new Date(fixture.fixture.date).getFullYear();
     }, [fixture]);
 
@@ -193,11 +202,11 @@ function useMatchData(fixture?: FixtureType): MatchData {
                         const teamPlayersRes = await fetch(`/api/football/players?team=${lineup.team.id}&season=${CURRENT_SEASON}`);
                         if (teamPlayersRes.ok) {
                             const teamPlayersData = await teamPlayersRes.json();
-                            const teamPlayersList: PlayerWithStats[] = teamPlayersData.response || [];
+                            const teamPlayersList: { player: Player }[] = teamPlayersData.response || [];
                             const photoMap = new Map<number, string>();
                             teamPlayersList.forEach(p => { if (p.player.photo) photoMap.set(p.player.id, p.player.photo); });
 
-                            const updatePhotos = (playerList: any[] | undefined) => {
+                            const updatePhotos = (playerList: { player: Player }[] | undefined) => {
                                 if (!playerList) return;
                                 playerList.forEach(p => {
                                     if (p.player && !p.player.photo && photoMap.has(p.player.id)) {
