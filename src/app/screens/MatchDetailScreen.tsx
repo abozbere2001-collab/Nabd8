@@ -145,8 +145,9 @@ function useMatchData(fixture?: FixtureType): MatchData {
                             const updatePhotos = (playerList: PlayerWithStats[] | undefined) => {
                                 if (!playerList) return;
                                 playerList.forEach(p => {
-                                    const playerPhoto = photoMap.get(p.player.id) || `https://media.api-sports.io/football/players/${p.player.id}.png`;
-                                    p.player.photo = playerPhoto;
+                                    if (!p.player.photo) {
+                                      p.player.photo = photoMap.get(p.player.id) || `https://media.api-sports.io/football/players/${p.player.id}.png`;
+                                    }
                                 });
                             };
 
@@ -195,14 +196,12 @@ const H2HView = ({ h2h, fixture }: { h2h: H2HData[], fixture: FixtureType }) => 
     let draws = 0;
 
     h2h.forEach(match => {
-        if(match.teams.home.winner) {
-            if (match.teams.home.id === fixture.teams.home.id) homeWins++;
-            else awayWins++;
-        } else if (match.teams.away.winner) {
-            if (match.teams.away.id === fixture.teams.home.id) homeWins++;
-            else awayWins++;
-        } else {
+        if (!match.teams.home.winner && !match.teams.away.winner) {
             draws++;
+        } else if (match.teams.home.id === fixture.teams.home.id) {
+            if (match.teams.home.winner) homeWins++; else awayWins++;
+        } else {
+            if (match.teams.home.winner) awayWins++; else homeWins++;
         }
     });
 
@@ -343,22 +342,70 @@ const LineupField = ({ lineup, awayTeam, events, getPlayerName }: { lineup: Line
   );
 };
 
+const EventsView = ({ events, fixture, getPlayerName }: { events: MatchEvent[], fixture: FixtureType, getPlayerName: (id: number, defaultName: string) => string }) => {
+    if (!events || events.length === 0) {
+        return <div className="text-muted-foreground text-center py-4">لا توجد أحداث متاحة لعرضها.</div>
+    }
 
-const EventIcon = ({ event }: { event: MatchEvent }) => {
-    if (event.type === 'Goal') {
-        return <Goal className="h-5 w-5 text-foreground" />;
-    }
-    if (event.type === 'Card' && event.detail === 'Yellow Card') {
-        return <RectangleVertical className="h-5 w-5 text-yellow-400 fill-current" />;
-    }
-    if (event.type === 'Card' && (event.detail === 'Red Card' || event.detail === 'Second Yellow card')) {
-        return <RectangleVertical className="h-5 w-5 text-red-500 fill-current" />;
-    }
-    if (event.type === 'subst') {
-        return <ArrowLeftRight className="h-4 w-4 text-blue-400" />;
-    }
-    return null;
-};
+    return (
+        <div className="relative w-full h-[70vh] overflow-y-auto flex flex-col-reverse px-2">
+          {[...events].map((ev, idx) => {
+            const isHomeTeam = ev.team.id === fixture.teams.home.id;
+            const alignClass = isHomeTeam ? "justify-start" : "justify-end";
+            const sideColor = isHomeTeam ? "bg-green-800/30" : "bg-blue-800/30";
+
+            const icon =
+              ev.type === "Goal" ? "⚽" :
+              ev.type === "Card" && ev.detail.includes("Yellow") ? "🟨" :
+              ev.type === "Card" && ev.detail.includes("Red") ? "🟥" :
+              ev.type === "subst" ? "🔁" :
+              "•";
+
+            return (
+              <div key={idx} className={`flex ${alignClass} mb-2`}>
+                <div
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-white shadow-md ${sideColor}`}
+                  style={{ minWidth: "40%", maxWidth: "80%" }}
+                >
+                  {isHomeTeam && (
+                    <img
+                      src={ev.team.logo}
+                      alt={ev.team.name}
+                      className="w-5 h-5 rounded-full"
+                    />
+                  )}
+
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold truncate">{getPlayerName(ev.player.id, ev.player.name) || "مجهول"}</span>
+                      {ev.type === "Goal" && (
+                        <span className="inline-block">⚽</span>
+                      )}
+                    </div>
+                    {ev.assist?.name && (
+                      <span className="text-xs opacity-70">(مساعدة: {getPlayerName(ev.assist.id!, ev.assist.name)})</span>
+                    )}
+                    <span className="text-xs opacity-70">
+                      {icon} {ev.detail}
+                    </span>
+                  </div>
+
+                  <div className="text-xs text-gray-300 ml-2">{ev.time.elapsed}'</div>
+
+                  {!isHomeTeam && (
+                    <img
+                      src={ev.team.logo}
+                      alt={ev.team.name}
+                      className="w-5 h-5 rounded-full"
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          }).reverse()}
+        </div>
+    );
+}
 
 const STATS_TRANSLATIONS: { [key: string]: string } = {
     "Shots on Goal": "تسديدات على المرمى", "Shots off Goal": "تسديدات خارج المرمى", "Total Shots": "إجمالي التسديدات",
@@ -367,77 +414,6 @@ const STATS_TRANSLATIONS: { [key: string]: string } = {
     "Yellow Cards": "بطاقات صفراء", "Red Cards": "بطاقات حمراء", "Goalkeeper Saves": "تصديات الحارس",
     "Total passes": "إجمالي التمريرات", "Passes accurate": "تمريرات صحيحة", "Passes %": "دقة التمرير",
 };
-
-const EventsView = ({ events, homeTeamId, getPlayerName }: { events: MatchEvent[], homeTeamId: number, getPlayerName: (id: number, defaultName: string) => string }) => {
-    const [filter, setFilter] = useState<'highlights' | 'all'>('all');
-    
-    const filteredEvents = useMemo(() => {
-        if (filter === 'highlights') {
-            return events.filter(e => e.type === 'Goal');
-        }
-        return events;
-    }, [events, filter]);
-
-    if (!events || events.length === 0) {
-        return <div className="text-muted-foreground text-center py-4">لا توجد أحداث متاحة لعرضها.</div>
-    }
-
-    return (
-        <Card>
-            <CardContent className="p-4">
-                 <Tabs value={filter} onValueChange={(value) => setFilter(value as any)} className="w-full mb-4">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="all">كل الأحداث</TabsTrigger>
-                        <TabsTrigger value="highlights">الأبرز</TabsTrigger>
-                    </TabsList>
-                </Tabs>
-                <div className="relative flex flex-col items-center">
-                    <div className="absolute top-0 bottom-0 w-px bg-border/50"></div>
-                    {filteredEvents.map((event, index) => {
-                        const isHomeEvent = event.team.id === homeTeamId;
-                        return (
-                            <div key={index} className="relative flex w-full justify-center items-center my-3">
-                                {isHomeEvent ? (
-                                    <>
-                                        <div className="w-1/2 p-2 text-sm text-right pr-12">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <div className="flex-1">
-                                                    <p className="font-bold">{getPlayerName(event.player.id, event.player.name)}</p>
-                                                    {event.assist.name && <p className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</p>}
-                                                </div>
-                                                <EventIcon event={event} />
-                                            </div>
-                                        </div>
-                                        <div className="absolute left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-card border flex items-center justify-center text-xs font-bold z-10">
-                                            {event.time.elapsed}{event.time.extra ? `+${event.time.extra}` : ''}'
-                                        </div>
-                                        <div className="w-1/2 p-2"></div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="w-1/2 p-2"></div>
-                                        <div className="absolute left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-card border flex items-center justify-center text-xs font-bold z-10">
-                                            {event.time.elapsed}{event.time.extra ? `+${event.time.extra}` : ''}'
-                                        </div>
-                                        <div className="w-1/2 p-2 text-sm text-left pl-12">
-                                            <div className="flex items-center justify-start gap-2">
-                                                <EventIcon event={event} />
-                                                <div className="flex-1">
-                                                    <p className="font-bold">{getPlayerName(event.player.id, event.player.name)}</p>
-                                                    {event.assist.name && <p className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</p>}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </CardContent>
-        </Card>
-    )
-}
 
 const StatsView = ({ stats, fixture }: { stats: any[], fixture: FixtureType }) => {
     if (stats.length < 2) return <p className="text-muted-foreground text-center py-4">الإحصائيات غير متاحة</p>;
@@ -588,7 +564,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         }
                     </TabsContent>
                     <TabsContent value="details" className="mt-4 space-y-4">
-                       <EventsView events={events} homeTeamId={fixture.teams.home.id} getPlayerName={getPlayerName} />
+                       <EventsView events={events} fixture={fixture} getPlayerName={getPlayerName} />
                        <StatsView stats={stats} fixture={fixture} />
                     </TabsContent>
                 </Tabs>
@@ -598,3 +574,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
 }
 
     
+
