@@ -286,25 +286,21 @@ const SubstitutionsView = ({ events, homeTeam, awayTeam, getPlayerName }: { even
     );
 };
 
-const LineupField = ({ lineup, getPlayerName }: { lineup: LineupData, getPlayerName: (id: number, defaultName: string) => string }) => {
+const LineupField = ({ lineup, awayTeam, events, getPlayerName }: { lineup: LineupData, awayTeam?: Team, events: MatchEvent[], getPlayerName: (id: number, defaultName: string) => string }) => {
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
     return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا</div>;
   }
 
-  const rowsMap: { [key: number]: PlayerWithStats[] } = {};
-  lineup.startXI.forEach(p => {
-    if (!p.player.grid) return;
-    const [row] = p.player.grid.split(':').map(Number);
+  const rowsMap: { [key: number]: Player[] } = {};
+  lineup.startXI.forEach(({player}) => {
+    if (!player.grid) return;
+    const [row, col] = player.grid.split(':').map(Number);
     if (!rowsMap[row]) rowsMap[row] = [];
-    rowsMap[row].push(p);
+    rowsMap[row].push({ ...player, colIndex: col });
   });
   
   const sortedRows = Object.keys(rowsMap)
-    .map(row => ({ row: parseInt(row), players: rowsMap[parseInt(row)].sort((a, b) => {
-        const [, colA] = a.player.grid.split(':').map(Number);
-        const [, colB] = b.player.grid.split(':').map(Number);
-        return colA - colB;
-    })}))
+    .map(row => ({ row: parseInt(row), players: rowsMap[parseInt(row)].sort((a, b) => a.colIndex - b.colIndex) }))
     .sort((a, b) => a.row - b.row);
 
   const finalRows = sortedRows.reverse();
@@ -315,7 +311,7 @@ const LineupField = ({ lineup, getPlayerName }: { lineup: LineupData, getPlayerN
         <div className="absolute inset-0 flex flex-col justify-around p-2">
           {finalRows.map(({row, players}, rowIndex) => (
             <div key={rowIndex} className="flex justify-around items-center w-full">
-              {players.map(({player}) => {
+              {players.map((player) => {
                 const displayName = getPlayerName(player.id, player.name);
                 const playerPhoto = player.photo || `https://media.api-sports.io/football/players/${player.id}.png`;
                 
@@ -341,8 +337,8 @@ const LineupField = ({ lineup, getPlayerName }: { lineup: LineupData, getPlayerN
         </div>
       </div>
       
-      {lineup.substitutes && lineup.substitutes.length > 0 && (
-        <SubstitutionsView events={useMatchData().events} homeTeam={lineup.team} awayTeam={lineups.find(l => l.team.id !== lineup.team.id)?.team!} getPlayerName={getPlayerName} />
+      {awayTeam && lineup.substitutes && lineup.substitutes.length > 0 && (
+        <SubstitutionsView events={events} homeTeam={lineup.team} awayTeam={awayTeam} getPlayerName={getPlayerName} />
       )}
     </Card>
   );
@@ -543,6 +539,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
     const homeLineup = lineups.find(l => l.team.id === fixture.teams.home.id);
     const awayLineup = lineups.find(l => l.team.id === fixture.teams.away.id);
     const lineupToShow = activeLineup === 'home' ? homeLineup : awayLineup;
+    const opponentTeam = activeLineup === 'home' ? awayLineup?.team : homeLineup?.team;
     
     return (
         <div className="flex h-full flex-col bg-background">
@@ -580,6 +577,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         {lineupToShow && 
                             <LineupField 
                                 lineup={lineupToShow}
+                                awayTeam={opponentTeam}
+                                events={events}
                                 getPlayerName={getPlayerName}
                             />
                         }
@@ -600,4 +599,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
 }
 
     
-
