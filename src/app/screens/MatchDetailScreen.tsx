@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -148,12 +147,12 @@ function useMatchData(fixture?: Fixture) {
 // --- SUB-COMPONENTS ---
 const MatchHeader = ({ fixture, onBack, headerActions, navigate, isAdmin, onCopy }: { fixture: Fixture; onBack: () => void, headerActions?: React.ReactNode, navigate: ScreenProps['navigate'], isAdmin: boolean, onCopy: (url: string) => void }) => (
   <header className="relative bg-card text-foreground pt-10 pb-6 px-4 shadow-lg border-b">
-    <div className="absolute top-4 left-4">
+    <div className="absolute top-4 right-4">
       <Button variant="ghost" size="icon" onClick={onBack} className="text-foreground/80 hover:bg-accent">
         <ArrowLeft />
       </Button>
     </div>
-    <div className="absolute top-2 right-2 flex gap-1">
+    <div className="absolute top-2 left-2 flex gap-1">
        {headerActions}
     </div>
     <div className="text-center text-sm text-muted-foreground mb-4 cursor-pointer" onClick={() => navigate('CompetitionDetails', { leagueId: fixture.league.id, title: fixture.league.name, logo: fixture.league.logo })}>
@@ -166,7 +165,7 @@ const MatchHeader = ({ fixture, onBack, headerActions, navigate, isAdmin, onCopy
                 <AvatarImage src={fixture.teams.home.logo} />
                 <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
             </Avatar>
-            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(fixture.teams.home.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(fixture.teams.home.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
         </div>
         <span className="font-bold">{fixture.teams.home.name}</span>
       </div>
@@ -184,7 +183,7 @@ const MatchHeader = ({ fixture, onBack, headerActions, navigate, isAdmin, onCopy
                 <AvatarImage src={fixture.teams.away.logo} />
                 <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
             </Avatar>
-             {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(fixture.teams.away.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+             {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(fixture.teams.away.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
         </div>
         <span className="font-bold">{fixture.teams.away.name}</span>
       </div>
@@ -229,7 +228,7 @@ const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isA
                   )}>
                     {player.player.number}
                 </span>
-                <div className='absolute -bottom-1 -left-1 flex opacity-80'>
+                <div className='absolute -bottom-1 left-1 flex opacity-80'>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {e.stopPropagation(); onFavorite(); }}>
                         <Star className={cn("h-4 w-4", isFavorited ? "text-yellow-400 fill-current" : "text-white")} />
                     </Button>
@@ -237,7 +236,7 @@ const PlayerIcon = ({ player, isHomeTeam, onRename, onFavorite, isFavorited, isA
                         <Pencil className="h-4 w-4 text-white" />
                     </Button>}
                 </div>
-                 {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(player.player.photo); }}><Copy className="h-3 w-3 text-white" /></Button>}
+                 {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(player.player.photo); }}><Copy className="h-3 w-3 text-white" /></Button>}
             </div>
             <p className="text-[10px] font-semibold bg-black/50 text-white rounded-sm px-1 py-0.5 mt-1 whitespace-nowrap shadow-lg truncate w-full">
                 {player.player.name}
@@ -277,7 +276,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
                     <AvatarImage src={playerInfo.photo} />
                     <AvatarFallback>{playerInfo.name.substring(0,1)}</AvatarFallback>
                 </Avatar>
-                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(playerInfo.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(playerInfo.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
             </div>
             <p className="font-medium truncate flex-1">
                 {playerInfo.name}
@@ -342,7 +341,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
                 onCopy={onCopy}
               />
           ))}
-          <div className="absolute bottom-2 right-2 bg-black/50 text-white text-sm font-bold px-2 py-1 rounded">
+          <div className="absolute bottom-2 left-2 bg-black/50 text-white text-sm font-bold px-2 py-1 rounded">
              {lineupToShow?.formation}
           </div>
         </div>
@@ -357,7 +356,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
                         <AvatarImage src={lineupToShow.coach.photo} alt={lineupToShow.coach.name} />
                         <AvatarFallback>{lineupToShow.coach.name.substring(0,1)}</AvatarFallback>
                     </Avatar>
-                    {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(lineupToShow.coach.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                    {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(lineupToShow.coach.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
                 </div>
                 <div className='flex-1'>
                     <p className="font-medium">{lineupToShow.coach.name}</p>
@@ -452,32 +451,32 @@ const StandingsTab = ({ standings, loading, fixture, navigate }: { standings: St
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="text-center">ن</TableHead>
-                                <TableHead className="text-center">خ</TableHead>
-                                <TableHead className="text-center">ت</TableHead>
-                                <TableHead className="text-center">ف</TableHead>
+                                <TableHead className="w-1/2">الفريق</TableHead>
                                 <TableHead className="text-center">ل</TableHead>
-                                <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                                <TableHead className="text-center">ف</TableHead>
+                                <TableHead className="text-center">ت</TableHead>
+                                <TableHead className="text-center">خ</TableHead>
+                                <TableHead className="text-center">ن</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {group.map((s) => (
                                 <TableRow key={s.team.id} className={cn('cursor-pointer', s.team.id === fixture.teams.home.id || s.team.id === fixture.teams.away.id ? 'bg-primary/10' : '')} onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                                    <TableCell className="text-center font-bold">{s.points}</TableCell>
-                                    <TableCell className="text-center">{s.all.lose}</TableCell>
-                                    <TableCell className="text-center">{s.all.draw}</TableCell>
-                                    <TableCell className="text-center">{s.all.win}</TableCell>
-                                    <TableCell className="text-center">{s.all.played}</TableCell>
                                     <TableCell className="font-medium">
-                                        <div className="flex items-center gap-2 justify-end">
-                                            <span className="truncate">{s.team.name}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span>{s.rank}</span>
                                             <Avatar className="h-6 w-6">
                                                 <AvatarImage src={s.team.logo} alt={s.team.name} />
                                                 <AvatarFallback>{s.team.name.substring(0, 1)}</AvatarFallback>
                                             </Avatar>
-                                            <span>{s.rank}</span>
+                                            <span className="truncate">{s.team.name}</span>
                                         </div>
                                     </TableCell>
+                                    <TableCell className="text-center">{s.all.played}</TableCell>
+                                    <TableCell className="text-center">{s.all.win}</TableCell>
+                                    <TableCell className="text-center">{s.all.draw}</TableCell>
+                                    <TableCell className="text-center">{s.all.lose}</TableCell>
+                                    <TableCell className="text-center font-bold">{s.points}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -549,7 +548,7 @@ const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | nul
 
             return (
               <div key={index} className="relative flex my-3 w-full">
-                 <div className={cn("w-[calc(50%-1.5rem)]", isHomeTeam ? 'ml-auto' : 'mr-auto' )}>
+                 <div className={cn("w-[calc(50%-1.5rem)]", isHomeTeam ? "ml-auto" : "mr-auto" )}>
                     {content}
                  </div>
               </div>
@@ -630,9 +629,9 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
       <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="lineups" className="w-full">
           <div className="sticky top-0 bg-background z-10 border-b">
-            <TabsList className="grid w-full grid-cols-4 rounded-none flex-row-reverse">
-              <TabsTrigger value="details">التفاصيل</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4 rounded-none">
               <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
+              <TabsTrigger value="details">التفاصيل</TabsTrigger>
               <TabsTrigger value="stats">الإحصائيات</TabsTrigger>
               <TabsTrigger value="standings">الترتيب</TabsTrigger>
             </TabsList>
@@ -640,9 +639,9 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
           <TabsContent value="details" className='p-0'>
             <Tabs defaultValue={eventFilter} onValueChange={(val) => setEventFilter(val as EventFilter)} className="w-full">
                  <div className="px-4 pt-2">
-                    <TabsList className="grid w-full grid-cols-2 flex-row-reverse">
-                        <TabsTrigger value="highlights">الأبرز</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="all">جميع التفاصيل</TabsTrigger>
+                        <TabsTrigger value="highlights">الأبرز</TabsTrigger>
                     </TabsList>
                 </div>
                 <TabsContent value="highlights" className='p-0'>
@@ -673,3 +672,4 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
     
 
     
+
