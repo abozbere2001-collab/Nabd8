@@ -31,23 +31,27 @@ interface Fixture {
   goals: { home: number | null; away: number | null; };
 }
 
-interface LineupPlayerInfo { 
-    id: number; 
-    name: string; 
-    number: number; 
-    pos: string; 
-    grid: string | null; 
-    photo: string; 
+interface Player {
+    id: number;
+    name: string;
+    number: number;
+    pos: string;
+    grid: string | null;
+    photo: string;
 }
-interface LineupPlayer {
-    player: LineupPlayerInfo;
+
+interface PlayerResponse {
+    player: Player;
+    statistics: any[];
 }
+
+
 interface Lineup {
   team: { id: number; name: string; logo: string; isNational: boolean; };
   coach: { id: number; name: string; photo: string; };
   formation: string;
-  startXI: LineupPlayer[];
-  substitutes: LineupPlayer[];
+  startXI: Player[];
+  substitutes: Player[];
 }
 
 interface Event {
@@ -96,52 +100,86 @@ const CURRENT_SEASON = 2025;
 
 // --- API FETCH HOOK ---
 function useMatchData(fixture?: Fixture) {
-  const [data, setData] = useState<{
-    lineups: Lineup[] | null;
-    events: Event[] | null;
-    stats: MatchStats[] | null;
-    standings: Standing[][] | null;
-  }>({ lineups: null, events: null, stats: null, standings: null });
-  const [loading, setLoading] = useState(true);
+    const [data, setData] = useState<{
+        lineups: Lineup[];
+        events: Event[];
+        stats: MatchStats[];
+        standings: Standing[][];
+    }>({ lineups: [], events: [], stats: [], standings: [] });
+    const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!fixture) return;
-    const { fixture: { id: fixtureId, date }, league, teams } = fixture;
+    useEffect(() => {
+        if (!fixture) {
+            setLoading(false);
+            return;
+        }
+        const { fixture: { id: fixtureId, date }, league, teams } = fixture;
 
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const isNational = teams.home.winner !== null && teams.away.winner !== null;
-        const seasonForStandings = isNational ? new Date(date).getFullYear() : CURRENT_SEASON;
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                // Fetch lineups from the more detailed players endpoint
+                const homePlayersRes = await fetch(`/api/football/players?fixture=${fixtureId}&team=${teams.home.id}`);
+                const awayPlayersRes = await fetch(`/api/football/players?fixture=${fixtureId}&team=${teams.away.id}`);
+                
+                const homePlayersData = await homePlayersRes.json();
+                const awayPlayersData = await awayPlayersRes.json();
 
-        const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.all([
-          fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
-          fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
-          fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
-          fetch(`/api/football/standings?league=${league.id}&season=${seasonForStandings}`),
-        ]);
+                const parseLineup = (lineupData: any, teamInfo: any): Lineup | null => {
+                    if (!lineupData || !lineupData.response || lineupData.response.length === 0) return null;
+                    
+                    const coach = lineupData.response[0].statistics[0].team.coach;
+                    const formation = lineupData.response[0].statistics[0].formation;
+                    
+                    const startXI = lineupData.response.filter((p: any) => p.statistics[0].games.substitute === false).map((p:any) => p.player);
+                    const substitutes = lineupData.response.filter((p: any) => p.statistics[0].games.substitute === true).map((p:any) => p.player);
+                    
+                    return {
+                        team: { ...teamInfo, isNational: false },
+                        coach: coach || {id: 0, name: 'N/A', photo: ''},
+                        formation: formation,
+                        startXI: startXI,
+                        substitutes: substitutes,
+                    };
+                };
 
-        const lineupsData = await lineupsRes.json();
-        const eventsData = await eventsRes.json();
-        const statsData = await statsRes.json();
-        const standingsData = await standingsRes.json();
-        
-        setData({
-          lineups: lineupsData.response || [],
-          events: eventsData.response || [],
-          stats: statsData.response || [],
-          standings: standingsData.response?.[0]?.league?.standings || [],
-        });
-      } catch (error) {
-        console.error("Failed to fetch match details:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [fixture]);
+                const homeLineup = parseLineup(homePlayersData, teams.home);
+                const awayLineup = parseLineup(awayPlayersData, teams.away);
+                
+                const finalLineups: Lineup[] = [];
+                if(homeLineup) finalLineups.push(homeLineup);
+                if(awayLineup) finalLineups.push(awayLineup);
 
-  return { ...data, loading };
+                const isNational = teams.home.winner !== null && teams.away.winner !== null;
+                const seasonForStandings = isNational ? new Date(date).getFullYear() : CURRENT_SEASON;
+
+                const [eventsRes, statsRes, standingsRes] = await Promise.all([
+                    fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
+                    fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
+                    fetch(`/api/football/standings?league=${league.id}&season=${seasonForStandings}`),
+                ]);
+
+                const eventsData = await eventsRes.json();
+                const statsData = await statsRes.json();
+                const standingsData = await standingsRes.json();
+
+                setData({
+                    lineups: finalLineups,
+                    events: eventsData.response || [],
+                    stats: statsData.response || [],
+                    standings: standingsData.response?.[0]?.league?.standings || [],
+                });
+
+            } catch (error) {
+                console.error("Failed to fetch match details:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [fixture]);
+
+    return { ...data, loading };
 }
 
 // --- SUB-COMPONENTS ---
@@ -191,7 +229,7 @@ const MatchHeader = ({ fixture, onBack, headerActions, navigate, isAdmin, onCopy
   </header>
 );
 
-const PlayerOnPitch = ({ player }: { player: LineupPlayerInfo }) => {
+const PlayerOnPitch = ({ player }: { player: Player }) => {
   return (
     <div className="relative flex flex-col items-center justify-center w-16">
       <div className="relative">
@@ -211,7 +249,7 @@ const PlayerOnPitch = ({ player }: { player: LineupPlayerInfo }) => {
 };
 
 
-const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite, isAdmin, onCopy }: { lineups: Lineup[] | null, loading: boolean, fixture: Fixture, favorites: Favorites, onRename: (type: RenameType, id: number, name: string) => void, onFavorite: (type: 'player' | 'coach', item: any) => void, isAdmin: boolean, onCopy: (url: string) => void }) => {
+const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite, isAdmin, onCopy }: { lineups: Lineup[], loading: boolean, fixture: Fixture, favorites: Favorites, onRename: (type: RenameType, id: number, name: string) => void, onFavorite: (type: 'player' | 'coach', item: any) => void, isAdmin: boolean, onCopy: (url: string) => void }) => {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(fixture.teams.home.id);
 
   if (loading) {
@@ -231,21 +269,23 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
       return <p className="text-center text-muted-foreground p-8">تشكيلة الفريق المحدد غير متاحة.</p>;
   }
 
-  const groupPlayersByLine = (players: LineupPlayer[]) => {
-      const lines: { [key: string]: LineupPlayerInfo[] } = { G: [], D: [], M: [], F: [] };
+  const groupPlayersByLine = (players: Player[]) => {
+      const lines: { [key: string]: Player[] } = { G: [], D: [], M: [], F: [] };
       players.forEach(p => {
-          const position = p.player.pos;
+          if (!p) return;
+          const position = p.pos;
           if (lines[position]) {
-              lines[position].push(p.player);
+              lines[position].push(p);
           }
       });
       // Return in reverse order for correct on-pitch display (F, M, D, G)
       return [lines.F, lines.M, lines.D, lines.G].filter(line => line && line.length > 0);
   };
   
-  const playerLines = groupPlayersByLine(lineupToShow.startXI);
+  const playerLines = groupPlayersByLine(lineupToShow.startXI).reverse();
 
-  const renderPlayerRow = (playerInfo: LineupPlayerInfo) => {
+  const renderPlayerRow = (playerInfo: Player) => {
+    if(!playerInfo) return null;
     return (
          <div key={playerInfo.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted">
             <span className="text-muted-foreground w-6 text-center font-mono">{playerInfo.number}</span>
@@ -306,7 +346,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
         >
           {playerLines.map((line, lineIndex) => (
             <div key={lineIndex} className="flex justify-around items-center">
-              {line.map(player => <PlayerOnPitch key={player.id} player={player} />)}
+              {line.map(player => player ? <PlayerOnPitch key={player.id} player={player} /> : null)}
             </div>
           ))}
           <div className="absolute bottom-2 left-2 bg-black/50 text-white text-sm font-bold px-2 py-1 rounded">
@@ -345,7 +385,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
       <div className="p-2 rounded-lg bg-card border mx-4 mb-4">
          <h4 className="font-bold mb-2 text-base px-2">البدلاء</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            {lineupToShow.substitutes.map(s => renderPlayerRow(s.player))}
+            {lineupToShow.substitutes.map(s => renderPlayerRow(s))}
         </div>
       </div>
     </div>
@@ -353,7 +393,7 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
 };
 
 
-const StatsTab = ({ stats, loading, fixture }: { stats: MatchStats[] | null, loading: boolean, fixture: Fixture }) => {
+const StatsTab = ({ stats, loading, fixture }: { stats: MatchStats[], loading: boolean, fixture: Fixture }) => {
     if (loading) return <Skeleton className="w-full h-96 m-4" />;
     
     const homeStatsData = stats?.find(s => s.team.id === fixture.teams.home.id);
@@ -406,7 +446,7 @@ const StatsTab = ({ stats, loading, fixture }: { stats: MatchStats[] | null, loa
     );
 };
 
-const StandingsTab = ({ standings, loading, fixture, navigate }: { standings: Standing[][] | null, loading: boolean, fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
+const StandingsTab = ({ standings, loading, fixture, navigate }: { standings: Standing[][], loading: boolean, fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
     if (loading) return <Skeleton className="w-full h-96 m-4" />;
     if (!standings || standings.length === 0) return <p className="text-center p-8">الترتيب غير متاح.</p>;
 
@@ -454,7 +494,7 @@ const StandingsTab = ({ standings, loading, fixture, navigate }: { standings: St
     );
 };
 
-const EventsTab = ({ events, fixture, loading, filter }: { events: Event[] | null, fixture: Fixture, loading: boolean, filter: EventFilter }) => {
+const EventsTab = ({ events, fixture, loading, filter }: { events: Event[], fixture: Fixture, loading: boolean, filter: EventFilter }) => {
     if (loading) return <Skeleton className="w-full h-96 m-4" />;
     if (!events || events.length === 0) return <p className="text-center p-8">لا توجد أحداث رئيسية.</p>;
 
