@@ -12,15 +12,15 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Fixture, Standing, Player as PlayerType, Team, Favorites } from '@/lib/types';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot, setDoc, getDocs, collection } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDocs, collection, updateDoc, deleteField, getDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
-import { Star, Pencil, Goal, ArrowLeftRight, RectangleVertical } from 'lucide-react';
-import Image from "next/image";
-import { Progress } from '@/components/ui/progress';
+import { Star, Pencil, Goal, ArrowLeftRight, RectangleVertical, Copy } from 'lucide-react';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { NoteDialog } from '@/components/NoteDialog';
+import { Progress } from '@/components/ui/progress';
 
 
 // --- TYPE DEFINITIONS ---
@@ -57,6 +57,7 @@ type RenameType = 'team' | 'player' | 'coach';
 
 // --- HOOKS ---
 function useMatchData(fixture?: Fixture): MatchData {
+    const { toast } = useToast();
     const [data, setData] = useState<MatchData>({
         lineups: [], events: [], stats: [], standings: [], loading: true, error: null,
     });
@@ -74,7 +75,7 @@ function useMatchData(fixture?: Fixture): MatchData {
             const season = new Date(fixture.fixture.date).getFullYear();
 
             try {
-                // Fetch lineups and other data in parallel
+                // Fetch lineups, events, and other data in parallel
                 const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.allSettled([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
@@ -129,6 +130,11 @@ function useMatchData(fixture?: Fixture): MatchData {
 
             } catch (error: any) {
                 console.error("❌ Match data fetch error:", error);
+                toast({
+                    variant: "destructive",
+                    title: "خطأ في الشبكة",
+                    description: "فشل في جلب بيانات المباراة. يرجى التحقق من اتصالك بالإنترنت.",
+                });
                 setData({
                     lineups: [], events: [], stats: [], standings: [], loading: false,
                     error: error.message || "Unknown error",
@@ -137,7 +143,7 @@ function useMatchData(fixture?: Fixture): MatchData {
         };
 
         fetchData();
-    }, [fixture]);
+    }, [fixture, toast]);
 
     return data;
 }
@@ -187,6 +193,7 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
     const midfielders = startXI.filter(p => p.player.pos === 'M');
     const attackers = startXI.filter(p => p.player.pos === 'F');
 
+    // Build the rows in the correct logical order for a football pitch
     const rows: PlayerWithStats[][] = [];
     if(goalkeeper) rows.push([goalkeeper]);
     if(defenders.length > 0) rows.push(defenders);
@@ -195,8 +202,8 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
 
     return (
         <Card className="p-3 bg-card/80">
-            <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
-                <div className="absolute inset-0 flex flex-col justify-around p-2">
+             <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
+                 <div className="absolute inset-0 flex flex-col-reverse justify-around p-2">
                     {rows.map((row, rowIndex) => (
                         <div key={rowIndex} className="flex justify-around items-center">
                             {row.map((player) => (
@@ -288,7 +295,7 @@ const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName }: { events:
                         <TabsTrigger value="highlights">الأبرز</TabsTrigger>
                     </TabsList>
                 </Tabs>
-                <div className="relative flex flex-col items-center">
+                <div className="relative flex flex-col-reverse items-center">
                     <div className="absolute top-0 bottom-0 w-px bg-border/50"></div>
                     {filteredEvents.map((event, index) => {
                         const isHomeEvent = event.team.id === homeTeamId;
@@ -479,3 +486,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
+
