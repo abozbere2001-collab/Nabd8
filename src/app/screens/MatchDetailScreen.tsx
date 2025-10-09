@@ -16,10 +16,11 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
-import { Star, Pencil, Goal, ArrowLeftRight, RectangleVertical, Copy } from 'lucide-react';
+import { Star, Pencil, Goal, ArrowLeftRight, RectangleVertical, Copy, Heart } from 'lucide-react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { NoteDialog } from '@/components/NoteDialog';
 import { Progress } from '@/components/ui/progress';
+import Image from "next/image";
 
 
 // --- TYPE DEFINITIONS ---
@@ -63,9 +64,14 @@ function useMatchData(fixture?: Fixture): MatchData {
     const CURRENT_SEASON = useMemo(() => {
         if (!fixture) return new Date().getFullYear();
         if (fixture.league && fixture.league.round) {
-          const seasonYearMatch = fixture.league.round.match(/(\d{4})/);
-          if (seasonYearMatch) return parseInt(seasonYearMatch[0], 10);
+            const seasonYearMatch = fixture.league.round.match(/(\d{4})/);
+            if (seasonYearMatch) {
+              const year = parseInt(seasonYearMatch[0], 10);
+              // Handle cases like "2023-2024", we want the starting year
+              return year;
+            }
         }
+        // Fallback to fixture year if round doesn't have a year
         return new Date(fixture.fixture.date).getFullYear();
     }, [fixture]);
 
@@ -103,10 +109,11 @@ function useMatchData(fixture?: Fixture): MatchData {
                 const fetchedEvents: MatchEvent[] = await parseResult(eventsRes);
                 const fetchedStats: any[] = await parseResult(statsRes);
                 const fetchedStandings: Standing[] = (await parseResult(standingsRes))[0]?.league?.standings[0] || [];
-
+                
                 if (fetchedLineups.length > 0) {
                      for (let i = 0; i < fetchedLineups.length; i++) {
                         const lineup = fetchedLineups[i];
+                        if (!lineup.team?.id) continue;
                         
                         const teamPlayersRes = await fetch(`/api/football/players?team=${lineup.team.id}&season=${CURRENT_SEASON}`);
                         if (teamPlayersRes.ok) {
@@ -116,8 +123,9 @@ function useMatchData(fixture?: Fixture): MatchData {
                             teamPlayersList.forEach(p => { if (p.player.photo) photoMap.set(p.player.id, p.player.photo); });
 
                             const updatePhotos = (playerList: PlayerWithStats[]) => {
+                                if (!playerList) return;
                                 playerList.forEach(p => {
-                                    if (!p.player.photo && photoMap.has(p.player.id)) {
+                                    if (p.player && !p.player.photo && photoMap.has(p.player.id)) {
                                         p.player.photo = photoMap.get(p.player.id)!;
                                     }
                                 });
@@ -160,174 +168,113 @@ function useMatchData(fixture?: Fixture): MatchData {
 
 // --- CHILD COMPONENTS ---
 
-// ⚽ Player Component (From user)
-const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: PlayerWithStats, onRename: (type: RenameType, id: number, name: string) => void, isAdmin: boolean, getPlayerName: (id: number, defaultName: string) => string }) => {
-  const info = player.player;
-  const stats = player.statistics?.[0];
-  const name = getPlayerName(info.id, info.name);
-  const rating = stats?.games?.rating
-    ? parseFloat(stats.games.rating).toFixed(1)
-    : null;
-
-  return (
-    <div className="relative flex flex-col items-center text-white text-xs w-16">
-      {isAdmin && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRename("player", info.id, name);
-          }}
-        >
-          <Pencil className="h-3 w-3" />
-        </Button>
-      )}
-      <div className="relative w-12 h-12">
-        <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
-          <AvatarImage
-            src={
-              info.photo ||
-              `https://media.api-sports.io/football/players/${info.id}.png`
-            }
-            alt={name}
-          />
-          <AvatarFallback>{name?.charAt(0) || "?"}</AvatarFallback>
-        </Avatar>
-
-        {info.number && (
-          <div className="absolute -top-1 -left-1 bg-gray-800 text-[10px] h-5 w-5 rounded-full flex items-center justify-center border border-white">
-            {info.number}
-          </div>
-        )}
-        {rating && (
-          <div className="absolute -top-1 -right-1 bg-blue-600 text-[10px] h-5 w-5 rounded-full flex items-center justify-center border border-white">
-            {rating}
-          </div>
-        )}
-      </div>
-      <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px] text-center">
-        {name}
-      </span>
-    </div>
-  );
-};
-
-
-// ⚽️ Field Layout Component (From user)
-const LineupField = ({ lineup, onRename, isAdmin, getPlayerName }: { lineup: LineupData | undefined, onRename: (type: RenameType, id: number, name: string) => void, isAdmin: boolean, getPlayerName: (id: number, defaultName: string) => string }) => {
-  if (!lineup || !lineup.startXI?.length)
+function LineupField({ lineup }) {
+  if (!lineup || !lineup.startXI) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground py-6 bg-card rounded-lg">
-        التشكيلة غير متاحة حاليًا
+      <div className="text-center text-gray-400 py-10">
+        لا توجد تشكيلة متاحة حاليًا.
       </div>
     );
+  }
 
-  const forwards = lineup.startXI.filter((p) => p.player.pos === "F");
-  const midfielders = lineup.startXI.filter((p) => p.player.pos === "M");
-  const defenders = lineup.startXI.filter((p) => p.player.pos === "D");
-  const goalkeeper = lineup.startXI.find((p) => p.player.pos === "G");
+  // عكس الترتيب العمودي: الهجوم -> الوسط -> الدفاع -> الحارس
+  const grouped = {
+    attackers: lineup.startXI.filter((p) => p.player.pos === "F"),
+    midfielders: lineup.startXI.filter((p) => p.player.pos === "M"),
+    defenders: lineup.startXI.filter((p) => p.player.pos === "D"),
+    goalkeepers: lineup.startXI.filter((p) => p.player.pos === "G"),
+  };
 
-  const rows = [forwards, midfielders, defenders, goalkeeper ? [goalkeeper] : []];
+  // دالة لجلب صورة اللاعب من API Football
+  const getPlayerImage = (player) =>
+    player.player.photo ||
+    `https://media.api-sports.io/football/players/${player.player.id}.png`;
+
+  // ترتيب الخطوط من الأعلى للأسفل
+  const lines = [
+    { label: "الهجوم", players: grouped.attackers },
+    { label: "الوسط", players: grouped.midfielders },
+    { label: "الدفاع", players: grouped.defenders },
+    { label: "الحارس", players: grouped.goalkeepers },
+  ];
 
   return (
-    <Card className="p-3 bg-card/80">
-      <div
-        className="relative w-full aspect-[2/3] bg-green-700 rounded-lg overflow-hidden border border-green-500/20"
-        style={{
-          backgroundImage: "url('/football-pitch-vertical.svg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          transform: "scaleY(-1)"
-        }}
-      >
-        <div className="absolute inset-0 flex flex-col justify-around p-2">
-          {rows.map((row, i) => (
+    <div className="w-full flex flex-col items-center">
+      <div className="relative w-full max-w-3xl aspect-[2/3] bg-green-700 rounded-2xl overflow-hidden shadow-xl border-4 border-green-900">
+        {/* خلفية الملعب */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.15)_1px,_transparent_1px)] bg-[length:30px_30px]" />
+
+        {/* رسم الخطوط من الأعلى إلى الأسفل */}
+        <div className="absolute inset-0 flex flex-col justify-between py-6">
+          {lines.map((line, index) => (
             <div
-              key={i}
-              className="flex justify-evenly items-center w-full space-x-1"
-              style={{
-                transform: "scaleY(-1)"
-              }}
+              key={index}
+              className="flex justify-center gap-4 flex-wrap px-4"
             >
-              {row.map((player) => (
-                <PlayerOnPitch
-                  key={player.player.id}
-                  player={player}
-                  onRename={onRename}
-                  isAdmin={isAdmin}
-                  getPlayerName={getPlayerName}
-                />
+              {line.players.map((p, i) => (
+                <div
+                  key={i}
+                  className="flex flex-col items-center text-center space-y-1 w-[65px]"
+                >
+                  <div className="relative w-14 h-14 rounded-full border-2 border-white overflow-hidden shadow-md bg-green-900">
+                    <Image
+                      src={getPlayerImage(p)}
+                      alt={p.player.name}
+                      fill
+                      sizes="56px"
+                      className="object-cover"
+                    />
+                  </div>
+                  <span className="text-xs text-white font-semibold leading-tight">
+                    {p.player.name.split(" ")[0]}
+                  </span>
+                  <span className="text-[10px] text-gray-300">
+                    {p.player.pos}
+                  </span>
+                </div>
               ))}
             </div>
           ))}
         </div>
       </div>
 
+      {/* المدرب */}
       {lineup.coach && (
-        <div className="mt-4 pt-4 border-t border-border text-center">
-          <h4 className="font-bold mb-2">المدرب</h4>
-          <Avatar className="h-16 w-16 mx-auto">
-            <AvatarImage
-              src={
-                lineup.coach.photo ||
-                `https://media.api-sports.io/football/coachs/${lineup.coach.id}.png`
-              }
-              alt={lineup.coach.name}
-            />
-            <AvatarFallback>
-              {lineup.coach.name?.charAt(0) || "C"}
-            </AvatarFallback>
-          </Avatar>
-          <p className="font-semibold mt-1">{lineup.coach.name}</p>
+        <div className="mt-4 text-center">
+          <div className="text-gray-200 text-sm">المدرب</div>
+          <div className="text-white font-bold">{lineup.coach.name}</div>
         </div>
       )}
 
+      {/* قائمة البدلاء */}
       {lineup.substitutes?.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-border">
-          <h4 className="font-bold text-center mb-3">الاحتياط</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {lineup.substitutes.map((player) => (
-              <div
-                key={player.player.id}
-                className="relative flex items-center gap-2 p-2 rounded-lg bg-background/50 border"
-              >
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-0 right-0 h-6 w-6 z-10"
-                    onClick={() =>
-                      onRename("player", player.player.id, player.player.name)
-                    }
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                )}
-                <Avatar className="h-8 w-8">
-                  <AvatarImage
-                    src={
-                      player.player.photo ||
-                      `https://media.api-sports.io/football/players/${player.player.id}.png`
-                    }
-                    alt={player.player.name}
+        <Card className="w-full max-w-3xl mt-6 bg-green-900/70 border-green-800 p-4">
+          <h3 className="text-white text-center mb-3 font-semibold">
+            البدلاء
+          </h3>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 justify-items-center">
+            {lineup.substitutes.map((sub, i) => (
+              <div key={i} className="flex flex-col items-center space-y-1">
+                <div className="relative w-12 h-12 rounded-full overflow-hidden border border-white">
+                  <Image
+                    src={getPlayerImage(sub)}
+                    alt={sub.player.name}
+                    fill
+                    sizes="48px"
+                    className="object-cover"
                   />
-                  <AvatarFallback>
-                    {player.player.name?.charAt(0) || "?"}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-xs font-medium truncate">
-                  {getPlayerName(player.player.id, player.player.name)}
+                </div>
+                <span className="text-[11px] text-white text-center leading-tight">
+                  {sub.player.name.split(" ")[0]}
                 </span>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
-    </Card>
+    </div>
   );
-};
+}
 
 
 const EventIcon = ({ event }: { event: MatchEvent }) => {
@@ -558,10 +505,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                              <Button onClick={() => setActiveLineup('away')} variant={activeLineup === 'away' ? 'default' : 'outline'}>{fixture.teams.away.name}</Button>
                         </div>
                         <LineupField 
-                            lineup={lineupToShow} 
-                            onRename={handleOpenRename} 
-                            isAdmin={isAdmin}
-                            getPlayerName={getPlayerName}
+                            lineup={lineupToShow}
                         />
                     </TabsContent>
                     <TabsContent value="details" className="mt-4 space-y-4">
@@ -573,5 +517,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
-
-    
