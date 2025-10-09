@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -137,7 +136,7 @@ function useMatchData(fixture?: Fixture): MatchData {
 // --- CHILD COMPONENTS ---
 
 const PlayerOnPitch = ({ player, statistics, onRename, isAdmin }: { player: PlayerType, statistics: any[], onRename: () => void, isAdmin: boolean }) => {
-    const rating = statistics && statistics[0]?.games?.rating ? parseFloat(statistics[0].games.rating).toFixed(1) : null;
+    const rating = (statistics && statistics[0]?.games?.rating) ? parseFloat(statistics[0].games.rating).toFixed(1) : null;
     return (
         <div className="relative flex flex-col items-center justify-center text-white text-xs w-20">
              {isAdmin && (
@@ -179,16 +178,16 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
     const attackers = startXI.filter(p => p.player.pos === 'F');
 
     const rows: PlayerWithStats[][] = [];
-    if(attackers.length > 0) rows.push(attackers);
-    if(midfielders.length > 0) rows.push(midfielders);
-    if(defenders.length > 0) rows.push(defenders);
     if(goalkeeper) rows.push([goalkeeper]);
+    if(defenders.length > 0) rows.push(defenders);
+    if(midfielders.length > 0) rows.push(midfielders);
+    if(attackers.length > 0) rows.push(attackers);
 
     return (
         <Card className="p-3 bg-card/80">
             <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
                 <div className="absolute inset-0 flex flex-col justify-around p-2">
-                    {rows.reverse().map((row, rowIndex) => (
+                    {rows.map((row, rowIndex) => (
                         <div key={rowIndex} className="flex justify-around items-center">
                             {row.map(({ player, statistics }) => (
                                 <PlayerOnPitch key={player.id} player={{...player, name: getPlayerName(player.id, player.name)}} statistics={statistics} onRename={() => onRename('player', player.id, getPlayerName(player.id, player.name))} isAdmin={isAdmin} />
@@ -235,7 +234,7 @@ const EventIcon = ({ event }: { event: MatchEvent }) => {
     if (event.type === 'Card' && event.detail === 'Yellow Card') {
         return <RectangleVertical className="h-5 w-5 text-yellow-400 fill-current" />;
     }
-    if (event.type === 'Card' && event.detail === 'Red Card') {
+    if (event.type === 'Card' && (event.detail === 'Red Card' || event.detail === 'Second Yellow card')) {
         return <RectangleVertical className="h-5 w-5 text-red-500 fill-current" />;
     }
     if (event.type === 'subst') {
@@ -252,7 +251,7 @@ const STATS_TRANSLATIONS: { [key: string]: string } = {
     "Total passes": "إجمالي التمريرات", "Passes accurate": "تمريرات صحيحة", "Passes %": "دقة التمرير",
 };
 
-const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName }: { events: MatchEvent[], homeTeamId: number, awayTeamId: number, getPlayerName: (id: number, defaultName: string) => string }) => {
+const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName, fixture }: { events: MatchEvent[], homeTeamId: number, awayTeamId: number, getPlayerName: (id: number, defaultName: string) => string, fixture: Fixture }) => {
     const [filter, setFilter] = useState<'highlights' | 'all'>('all');
     
     const filteredEvents = useMemo(() => {
@@ -261,6 +260,10 @@ const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName }: { events:
         }
         return events;
     }, [events, filter]);
+
+    if (!events || events.length === 0) {
+        return <div className="text-muted-foreground text-center py-4">لا توجد أحداث متاحة لعرضها.</div>
+    }
 
     return (
         <Card>
@@ -297,7 +300,7 @@ const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName }: { events:
                                             <EventIcon event={event} />
                                             <div className="flex-1">
                                                 <p className="font-bold">{getPlayerName(event.player.id, event.player.name)}</p>
-                                                {event.assist.name && <p className="text-xs text-muted-foreground">Assist: {getPlayerName(event.assist.id!, event.assist.name)}</p>}
+                                                {event.assist.name && <p className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</p>}
                                             </div>
                                         </div>
                                     )}
@@ -311,11 +314,11 @@ const EventsView = ({ events, homeTeamId, awayTeamId, getPlayerName }: { events:
     )
 }
 
-const StatsView = ({ stats }: { stats: any[] }) => {
+const StatsView = ({ stats, fixture }: { stats: any[], fixture: Fixture }) => {
     if (stats.length < 2) return <p className="text-muted-foreground text-center py-4">الإحصائيات غير متاحة</p>;
 
-    const homeStats = stats.find(s => s.team.name === fixture.teams.home.name)?.statistics || [];
-    const awayStats = stats.find(s => s.team.name === fixture.teams.away.name)?.statistics || [];
+    const homeStats = stats.find(s => s.team.id === fixture.teams.home.id)?.statistics || [];
+    const awayStats = stats.find(s => s.team.id === fixture.teams.away.id)?.statistics || [];
 
     const combinedStats = homeStats.map((stat: any) => {
         const awayStat = awayStats.find((s: any) => s.type === stat.type);
@@ -446,11 +449,13 @@ export function MatchDetailScreen({ goBack, canGoBack, fixture, headerActions }:
                         <LineupField lineup={lineupToShow} onRename={handleOpenRename} isAdmin={isAdmin} getPlayerName={getPlayerName} />
                     </TabsContent>
                     <TabsContent value="details" className="mt-4 space-y-4">
-                       <EventsView events={events} homeTeamId={fixture.teams.home.id} awayTeamId={fixture.teams.away.id} getPlayerName={getPlayerName} />
-                       <StatsView stats={stats} />
+                       <EventsView events={events} homeTeamId={fixture.teams.home.id} awayTeamId={fixture.teams.away.id} getPlayerName={getPlayerName} fixture={fixture} />
+                       <StatsView stats={stats} fixture={fixture} />
                     </TabsContent>
                 </Tabs>
             </div>
         </div>
     );
 }
+
+    
