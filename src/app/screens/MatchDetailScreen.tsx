@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -187,15 +188,15 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
     const attackers = startXI.filter(p => p.player.pos === 'F');
 
     const rows: PlayerWithStats[][] = [];
-    if(attackers.length > 0) rows.push(attackers);
-    if(midfielders.length > 0) rows.push(midfielders);
-    if(defenders.length > 0) rows.push(defenders);
     if(goalkeeper) rows.push([goalkeeper]);
+    if(defenders.length > 0) rows.push(defenders);
+    if(midfielders.length > 0) rows.push(midfielders);
+    if(attackers.length > 0) rows.push(attackers);
 
     return (
         <Card className="p-3 bg-card/80">
             <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
-                <div className="absolute inset-0 flex flex-col-reverse justify-around p-2">
+                <div className="absolute inset-0 flex flex-col justify-around p-2">
                     {rows.map((row, rowIndex) => (
                         <div key={rowIndex} className="flex justify-around items-center">
                             {row.map((player) => (
@@ -478,5 +479,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
-
-    
