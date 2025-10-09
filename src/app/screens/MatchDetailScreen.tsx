@@ -28,7 +28,7 @@ interface Player {
   name: string;
   number: number;
   pos: string;
-  photo: string; // اجعل الصورة مطلوبة
+  photo: string;
   grid: string; // "row:col"
 }
 
@@ -62,7 +62,6 @@ interface MatchData {
 }
 type RenameType = 'team' | 'player' | 'coach';
 
-
 // --- USER'S FINAL LINUP COMPONENT ---
 export function LineupField({ lineup }: { lineup: LineupData }) {
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
@@ -72,7 +71,7 @@ export function LineupField({ lineup }: { lineup: LineupData }) {
   // افصل اللاعبين حسب الصفوف والاعمدة حسب grid
   const rowsMap: { [key: string]: Player[] } = {};
   lineup.startXI.forEach(({ player }) => {
-    const [row] = player.grid?.split(':').map(Number) || [0, 0];
+    const [row, col] = player.grid?.split(':').map(Number) || [0, 0];
     const key = String(row);
     if (!rowsMap[key]) rowsMap[key] = [];
     rowsMap[key].push(player);
@@ -151,11 +150,9 @@ function useMatchData(fixture?: FixtureType): MatchData {
             const seasonYearMatch = fixture.league.round.match(/(\d{4})/);
             if (seasonYearMatch) {
               const year = parseInt(seasonYearMatch[0], 10);
-              // Handle cases like "2023/2024" by taking the first year
               if (!isNaN(year)) return year;
             }
         }
-        // Fallback to the year of the fixture date
         return new Date(fixture.fixture.date).getFullYear();
     }, [fixture]);
 
@@ -499,3 +496,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
+
