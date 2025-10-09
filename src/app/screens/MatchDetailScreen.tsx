@@ -41,7 +41,7 @@ interface PlayerWithStats {
 }
 interface LineupData {
     team: Team;
-    coach: any;
+    coach: { id: number; name: string; photo: string; };
     formation: string;
     startXI: PlayerWithStats[];
     substitutes: PlayerWithStats[];
@@ -242,6 +242,7 @@ const H2HView = ({ h2h, fixture, homeName, awayName }: { h2h: H2HData[], fixture
 }
 
 const SubstitutionsView = ({ events, homeTeamId, awayTeamId, getPlayerName, onRename }: { events: MatchEvent[], homeTeamId: number, awayTeamId: number, getPlayerName: (id: number, defaultName: string) => string, onRename: (type: RenameType, id: number, name: string) => void }) => {
+    const { isAdmin } = useAdmin();
     const substitutions = events.filter(e => e.type === 'subst');
     if (substitutions.length === 0) return null;
 
@@ -258,12 +259,12 @@ const SubstitutionsView = ({ events, homeTeamId, awayTeamId, getPlayerName, onRe
                             <p>{sub.time.elapsed}'</p>
                             <div>
                                <p className="text-green-500 flex items-center gap-1">
-                                 <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.player.id, getPlayerName(sub.player.id, sub.player.name))}><Pencil className="h-3 w-3" /></Button>
+                                 {isAdmin && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.player.id, getPlayerName(sub.player.id, sub.player.name))}><Pencil className="h-3 w-3" /></Button>}
                                  دخول: {getPlayerName(sub.player.id, sub.player.name)}
                                </p>
                                <p className="text-red-500 flex items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.assist.id!, getPlayerName(sub.assist.id!, sub.assist.name!))}><Pencil className="h-3 w-3" /></Button>
-                                 خروج: {getPlayerName(sub.assist.id!, sub.assist.name!)}
+                                {isAdmin && sub.assist.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.assist.id!, getPlayerName(sub.assist.id!, sub.assist.name!))}><Pencil className="h-3 w-3" /></Button>}
+                                 خروج: {sub.assist.id ? getPlayerName(sub.assist.id, sub.assist.name!) : ''}
                                </p>
                             </div>
                         </div>
@@ -275,11 +276,11 @@ const SubstitutionsView = ({ events, homeTeamId, awayTeamId, getPlayerName, onRe
                              <div>
                                 <p className="text-green-500 flex items-center gap-1">
                                   دخول: {getPlayerName(sub.player.id, sub.player.name)}
-                                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.player.id, getPlayerName(sub.player.id, sub.player.name))}><Pencil className="h-3 w-3" /></Button>
+                                  {isAdmin && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.player.id, getPlayerName(sub.player.id, sub.player.name))}><Pencil className="h-3 w-3" /></Button>}
                                 </p>
                                 <p className="text-red-500 flex items-center gap-1">
-                                    خروج: {getPlayerName(sub.assist.id!, sub.assist.name!)}
-                                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.assist.id!, getPlayerName(sub.assist.id!, sub.assist.name!))}><Pencil className="h-3 w-3" /></Button>
+                                    خروج: {sub.assist.id ? getPlayerName(sub.assist.id, sub.assist.name!) : ''}
+                                    {isAdmin && sub.assist.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.assist.id!, getPlayerName(sub.assist.id!, sub.assist.name!))}><Pencil className="h-3 w-3" /></Button>}
                                 </p>
                              </div>
                              <p>{sub.time.elapsed}'</p>
@@ -291,7 +292,8 @@ const SubstitutionsView = ({ events, homeTeamId, awayTeamId, getPlayerName, onRe
     );
 };
 
-const LineupField = ({ lineup, opponentTeam, events, getPlayerName, onRename }: { lineup: LineupData, opponentTeam?: Team, events: MatchEvent[], getPlayerName: (id: number, defaultName: string) => string, onRename: (type: RenameType, id: number, name: string) => void }) => {
+const LineupField = ({ lineup, opponentTeam, events, getPlayerName, onRename }: { lineup: LineupData, opponentTeam?: Team, events: MatchEvent[], getPlayerName: (id: number, defaultName: string) => string; getCoachName: (id: number, defaultName: string) => string; onRename: (type: RenameType, id: number, name: string) => void }) => {
+  const { isAdmin } = useAdmin();
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
     return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا</div>;
   }
@@ -329,7 +331,7 @@ const LineupField = ({ lineup, opponentTeam, events, getPlayerName, onRename }: 
                           {player.number}
                         </div>
                       )}
-                       <Button variant="ghost" size="icon" className="absolute -top-1 -right-1 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => onRename('player', player.id, displayName)}><Pencil className="h-3 w-3 text-white" /></Button>
+                      {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-1 -right-1 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => onRename('player', player.id, displayName)}><Pencil className="h-3 w-3 text-white" /></Button>}
                     </div>
                     <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">{displayName}</span>
                   </div>
@@ -340,7 +342,20 @@ const LineupField = ({ lineup, opponentTeam, events, getPlayerName, onRename }: 
         </div>
       </div>
       
-       {opponentTeam && lineup.substitutes && (
+      {lineup.coach && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <h4 className="font-bold text-center mb-2">المدرب</h4>
+          <div className="flex items-center justify-center gap-2 group">
+            <Avatar className="h-10 w-10"><AvatarImage src={lineup.coach.photo} /></Avatar>
+            <p className="font-semibold">{getCoachName(lineup.coach.id, lineup.coach.name)}</p>
+            {isAdmin && <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => onRename('coach', lineup.coach.id, getCoachName(lineup.coach.id, lineup.coach.name))}><Pencil className="h-4 w-4" /></Button>}
+          </div>
+        </div>
+      )}
+
+      {opponentTeam && <SubstitutionsView events={events} homeTeamId={lineup.team.id} awayTeamId={opponentTeam.id} getPlayerName={getPlayerName} onRename={onRename} />}
+      
+      {lineup.substitutes && lineup.substitutes.length > 0 && (
         <div className="mt-4 pt-4 border-t border-border">
           <h4 className="font-bold text-center mb-3">الاحتياط</h4>
            <div className="grid grid-cols-2 gap-2">
@@ -348,11 +363,10 @@ const LineupField = ({ lineup, opponentTeam, events, getPlayerName, onRename }: 
                 <div key={player.id} className="flex items-center gap-2 p-1 border rounded bg-card/50 group">
                     <Avatar className="h-8 w-8"><AvatarImage src={player.photo} /></Avatar>
                     <p className="text-xs font-semibold flex-1">{getPlayerName(player.id, player.name)}</p>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => onRename('player', player.id, getPlayerName(player.id, player.name))}><Pencil className="h-3 w-3" /></Button>
+                    {isAdmin && <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => onRename('player', player.id, getPlayerName(player.id, player.name))}><Pencil className="h-3 w-3" /></Button>}
                 </div>
             ))}
            </div>
-          {lineup.substitutes.length > 0 && <SubstitutionsView events={events} homeTeamId={lineup.team.id} awayTeamId={opponentTeam.id} getPlayerName={getPlayerName} onRename={onRename} />}
         </div>
        )}
     </Card>
@@ -360,6 +374,7 @@ const LineupField = ({ lineup, opponentTeam, events, getPlayerName, onRename }: 
 };
 
 const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: MatchEvent[]; fixture: FixtureType; getPlayerName: (id: number, defaultName: string) => string; onRename: (type: RenameType, id: number, name: string) => void }) => {
+    const { isAdmin } = useAdmin();
     const [activeTab, setActiveTab] = useState('all');
     
     const keyEvents = useMemo(() => events.filter(e => e.type === 'Goal' || e.type === 'Card'), [events]);
@@ -369,32 +384,47 @@ const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: Matc
         return <div className="text-muted-foreground text-center py-4">لا توجد أحداث متاحة لعرضها.</div>
     }
 
-    const renderEvent = (ev: MatchEvent, isHomeTeam: boolean) => {
-        const icon =
-          ev.type === "Goal" ? "⚽" :
-          ev.type === "Card" && ev.detail.includes("Yellow") ? "🟨" :
-          ev.type === "Card" && ev.detail.includes("Red") ? "🟥" :
-          ev.type === "subst" ? "🔁" : "•";
-
-        const playerName = getPlayerName(ev.player.id, ev.player.name);
+    const renderEvent = (ev: MatchEvent) => {
+        const isHomeEvent = ev.team.id === fixture.teams.home.id;
+        const playerName = ev.player?.id ? getPlayerName(ev.player.id, ev.player.name) : 'غير معروف';
         const assistName = ev.assist?.id ? getPlayerName(ev.assist.id, ev.assist.name!) : null;
 
-        return (
-            <div className="flex items-center gap-2 py-1">
-                <span className="w-8 text-center text-xs">{ev.time.elapsed}'</span>
-                <div className="flex items-center gap-1.5 flex-1">
-                    <Avatar className="w-5 h-5"><AvatarImage src={ev.team.logo} /></Avatar>
-                    <div className="text-xs">
-                        <div className="font-semibold flex items-center gap-1">
-                          {playerName}
-                           <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', ev.player.id, playerName)}><Pencil className="h-3 w-3" /></Button>
-                        </div>
-                        <div className="text-muted-foreground">
-                            {icon} {ev.detail}
-                            {assistName && ` (صناعة: ${assistName})`}
-                        </div>
+        const icon = ev.type === "Goal" ? "⚽" :
+                     ev.type === "Card" && ev.detail.includes("Yellow") ? "🟨" :
+                     ev.type === "Card" && ev.detail.includes("Red") ? "🟥" :
+                     ev.type === "subst" ? "🔁" : "•";
+
+        const eventContent = (
+            <div className="flex items-center gap-2">
+                <Avatar className="w-5 h-5"><AvatarImage src={ev.team.logo} /></Avatar>
+                <div className="text-xs">
+                    <div className="font-semibold flex items-center gap-1">
+                        {playerName}
+                        {isAdmin && ev.player?.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => {e.stopPropagation(); onRename('player', ev.player.id, playerName)}}><Pencil className="h-3 w-3" /></Button>}
+                    </div>
+                    <div className="text-muted-foreground">
+                        {icon} {ev.detail}
+                        {assistName && ` (صناعة: ${assistName})`}
                     </div>
                 </div>
+            </div>
+        );
+
+        return (
+             <div className="flex items-center my-2">
+                {isHomeEvent ? (
+                    <>
+                        <div className="flex-1 text-right">{eventContent}</div>
+                        <div className="w-12 text-center text-xs text-muted-foreground font-mono">{ev.time.elapsed}'</div>
+                        <div className="flex-1"></div>
+                    </>
+                ) : (
+                    <>
+                        <div className="flex-1"></div>
+                        <div className="w-12 text-center text-xs text-muted-foreground font-mono">{ev.time.elapsed}'</div>
+                        <div className="flex-1 text-left">{eventContent}</div>
+                    </>
+                )}
             </div>
         );
     };
@@ -406,21 +436,13 @@ const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: Matc
                     <TabsTrigger value="key">الأبرز</TabsTrigger>
                     <TabsTrigger value="all">كل الأحداث</TabsTrigger>
                 </TabsList>
-                <CardContent className="p-0">
-                    <div className="flex h-[70vh]">
-                        {/* Home Team Events */}
-                        <div className="w-1/2 border-r pr-2 overflow-y-auto flex flex-col-reverse">
-                            {eventsToShow.map((ev, i) => (
-                                ev.team.id === fixture.teams.home.id ? <div key={`home-${i}`}>{renderEvent(ev, true)}</div> : <div key={`home-empty-${i}`} className="h-10"></div>
-                            ))}
-                        </div>
-                        {/* Away Team Events */}
-                        <div className="w-1/2 pl-2 overflow-y-auto flex flex-col-reverse">
-                           {eventsToShow.map((ev, i) => (
-                                ev.team.id === fixture.teams.away.id ? <div key={`away-${i}`}>{renderEvent(ev, false)}</div> : <div key={`away-empty-${i}`} className="h-10"></div>
-                            ))}
-                        </div>
-                    </div>
+                <CardContent className="p-2 relative h-[70vh] overflow-y-auto flex flex-col-reverse">
+                    {/* The timeline bar */}
+                    <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
+                    
+                    {[...eventsToShow].reverse().map((ev, i) => (
+                         <div key={i} className="relative">{renderEvent(ev)}</div>
+                    ))}
                 </CardContent>
             </Tabs>
         </Card>
@@ -512,27 +534,29 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
     const { db } = useFirestore();
     const [renameItem, setRenameItem] = useState<{ id: number; name: string; type: RenameType } | null>(null);
     const [isRenameOpen, setRenameOpen] = useState(false);
-    const [customPlayerNames, setCustomPlayerNames] = useState<Map<number, string>>(new Map());
+    const [customNames, setCustomNames] = useState<Map<number, string>>(new Map());
 
     const fetchCustomNames = useCallback(async () => {
         if (!db) return;
-        const playersColRef = collection(db, 'playerCustomizations');
+        const collectionsToFetch = ['playerCustomizations', 'coachCustomizations'];
         try {
-            const playersSnapshot = await getDocs(playersColRef);
-            const playerNames = new Map<number, string>();
-            playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
-            setCustomPlayerNames(playerNames);
+            const snapshots = await Promise.all(collectionsToFetch.map(c => getDocs(collection(db, c))));
+            const names = new Map<number, string>();
+            snapshots.forEach(snapshot => {
+                 snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
+            });
+            setCustomNames(names);
         } catch (error) {
-             const permissionError = new FirestorePermissionError({ path: 'playerCustomizations', operation: 'list' });
+             const permissionError = new FirestorePermissionError({ path: 'customizations', operation: 'list' });
              errorEmitter.emit('permission-error', permissionError);
         }
     }, [db]);
 
     useEffect(() => { fetchCustomNames(); }, [fetchCustomNames]);
     
-    const getPlayerName = useCallback((id: number, defaultName: string) => {
-        return customPlayerNames.get(id) || defaultName;
-    }, [customPlayerNames]);
+    const getCustomName = useCallback((id: number, defaultName: string) => {
+        return customNames.get(id) || defaultName;
+    }, [customNames]);
 
     const handleOpenRename = (type: RenameType, id: number, name: string) => {
         setRenameItem({ id, name, type });
@@ -566,7 +590,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
     
     return (
         <div className="flex h-full flex-col bg-background">
-            {renameItem && <RenameDialog isOpen={isRenameOpen} onOpenChange={setRenameOpen} currentName={renameItem.name} onSave={handleSaveRename} itemType={renameItem.type === 'player' ? 'اللاعب' : 'الفريق'} />}
+            {renameItem && <RenameDialog isOpen={isRenameOpen} onOpenChange={setRenameOpen} currentName={renameItem.name} onSave={handleSaveRename} itemType={renameItem.type === 'player' ? 'اللاعب' : 'المدرب'} />}
             <ScreenHeader title={fixture.league.name} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
             <div className="p-4 flex-1 overflow-y-auto">
                  <div className="text-center mb-4">
@@ -604,7 +628,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                                 lineup={lineupToShow}
                                 opponentTeam={opponentTeam}
                                 events={events}
-                                getPlayerName={getPlayerName}
+                                getPlayerName={getCustomName}
+                                getCoachName={getCustomName}
                                 onRename={handleOpenRename}
                             />
                         }
@@ -615,7 +640,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         }
                     </TabsContent>
                     <TabsContent value="events" className="mt-4">
-                       <EventsView events={events} fixture={fixture} getPlayerName={getPlayerName} onRename={handleOpenRename} />
+                       <EventsView events={events} fixture={fixture} getPlayerName={getCustomName} onRename={handleOpenRename} />
                     </TabsContent>
                      <TabsContent value="stats" className="mt-4">
                        <StatsView stats={stats} fixture={fixture} />
@@ -630,4 +655,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
 }
 
     
+
 
