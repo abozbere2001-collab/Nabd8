@@ -28,8 +28,9 @@ interface Player {
   name: string;
   number: number;
   pos: string;
-  photo: string;
   grid: string; // "row:col"
+  photo?: string;
+  colIndex?: number;
 }
 
 interface PlayerWithStats {
@@ -40,8 +41,8 @@ interface LineupData {
     team: Team;
     coach: any;
     formation: string;
-    startXI: { player: Player }[];
-    substitutes: { player: Player }[];
+    startXI: PlayerWithStats[];
+    substitutes: PlayerWithStats[];
 }
 interface MatchEvent {
     time: { elapsed: number; extra: number | null };
@@ -63,54 +64,59 @@ interface MatchData {
 type RenameType = 'team' | 'player' | 'coach';
 
 // --- USER'S FINAL LINUP COMPONENT ---
-export function LineupField({ lineup }: { lineup: LineupData }) {
+function LineupField({ lineup, getPlayerName }: { lineup: LineupData, getPlayerName: (id: number, defaultName: string) => string }) {
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
-    return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا</div>;
+    return <div className="flex items-center justify-center h-64 text-muted-foreground">التشكيلة غير متاحة حالياً</div>;
   }
 
-  // افصل اللاعبين حسب الصفوف والاعمدة حسب grid
-  const rowsMap: { [key: string]: Player[] } = {};
+  // ترتيب اللاعبين حسب grid (row:col)
+  const rows: { player: Player, colIndex?: number }[][] = [];
   lineup.startXI.forEach(({ player }) => {
-    const [row, col] = player.grid?.split(':').map(Number) || [0, 0];
-    const key = String(row);
-    if (!rowsMap[key]) rowsMap[key] = [];
-    rowsMap[key].push(player);
+    const [rowStr, colStr] = player.grid.split(':');
+    const rowIndex = parseInt(rowStr, 10) - 1;
+    const colIndex = parseInt(colStr, 10) - 1;
+    if (!rows[rowIndex]) rows[rowIndex] = [];
+    rows[rowIndex].push({ player: { ...player, colIndex } });
   });
 
-  // رتب اللاعبين في كل صف حسب العمود
-  const sortedRows = Object.keys(rowsMap)
-    .map(row => ({ row: parseInt(row), players: rowsMap[row].sort((a, b) => {
-      const [, colA] = a.grid.split(':').map(Number);
-      const [, colB] = b.grid.split(':').map(Number);
-      return colA - colB; // ترتيب أفقي صحيح
-    })}))
-    .sort((a, b) => a.row - b.row); // ترتيب عمودي من الحارس أسفل إلى الهجوم أعلى
+  // ترتيب الصفوف من الأسفل إلى الأعلى (الحارس أسفل)
+  const displayedRows = rows.reverse();
 
-  // عكس الصفوف عموديًا: الحارس أسفل، الهجوم أعلى
-  const finalRows = sortedRows.reverse();
+  // عكس الترتيب الأفقي (يمين ويسار)
+  displayedRows.forEach(row => row.sort((a, b) => (b.player.colIndex ?? 0) - (a.player.colIndex ?? 0)));
 
   return (
     <Card className="p-3 bg-card/80">
-      <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
+      <div
+        className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center rounded-lg border border-green-500/20 overflow-hidden"
+        style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}
+      >
         <div className="absolute inset-0 flex flex-col justify-around p-2">
-          {finalRows.map((row, rowIndex) => (
-            <div key={rowIndex} className="flex justify-around items-center w-full">
-              {row.players.map(player => (
-                <div key={player.id} className="flex flex-col items-center text-xs text-white w-16 text-center">
-                  <div className="relative w-12 h-12">
-                    <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
-                      <AvatarImage src={player.photo} alt={player.name} />
-                      <AvatarFallback>{player.name ? player.name.charAt(0) : '?'}</AvatarFallback>
-                    </Avatar>
-                    {player.number && (
-                      <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
-                        {player.number}
-                      </div>
-                    )}
+          {displayedRows.map((row, rowIndex) => (
+            row && <div key={rowIndex} className="flex justify-around items-end w-full">
+              {row.map(({player}) => {
+                const displayName = getPlayerName(player.id, player.name);
+                const playerPhoto = player.photo || `https://media.api-sports.io/football/players/${player.id}.png`;
+
+                return (
+                  <div key={player.id} className="flex flex-col items-center text-white text-xs w-16 text-center">
+                    <div className="relative w-12 h-12">
+                      <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
+                        <AvatarImage src={playerPhoto} alt={displayName} />
+                        <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      {player.number && (
+                        <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800">
+                          {player.number}
+                        </div>
+                      )}
+                    </div>
+                    <span className="mt-1 text-[11px] font-semibold text-center truncate w-full bg-black/50 px-1.5 py-0.5">
+                      {displayName}
+                    </span>
                   </div>
-                  <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">{player.name}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ))}
         </div>
@@ -118,23 +124,44 @@ export function LineupField({ lineup }: { lineup: LineupData }) {
 
       {lineup.substitutes && lineup.substitutes.length > 0 && (
         <div className="mt-4 pt-4 border-t border-border">
-          <h4 className="font-bold text-center mb-3">الاحتياط</h4>
+          <h4 className="font-bold text-center mb-2">الاحتياط</h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {lineup.substitutes.map(({ player }) => (
-              <div key={player.id} className="relative flex items-center gap-2 p-2 rounded-lg bg-background/50 border">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={player.photo} alt={player.name} />
-                  <AvatarFallback>{player.name ? player.name.charAt(0) : '?'}</AvatarFallback>
-                </Avatar>
-                <span className="text-xs font-medium truncate">{player.name}</span>
-              </div>
-            ))}
+            {lineup.substitutes.map(({ player }) => {
+              const displayName = getPlayerName(player.id, player.name);
+              const playerPhoto = player.photo || `https://media.api-sports.io/football/players/${player.id}.png`;
+
+              return (
+                <div key={player.id} className="flex flex-col items-center gap-1">
+                  <Avatar className="h-10 w-10 border border-white/30 bg-black/30">
+                    <AvatarImage src={playerPhoto} alt={displayName} />
+                    <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs font-medium text-center truncate w-full text-white/90">
+                    {displayName}
+                  </span>
+                </div>
+              );
+            })}
           </div>
+        </div>
+      )}
+
+      {lineup.coach && (
+        <div className="mt-4 pt-4 border-t border-border flex flex-col items-center gap-2">
+          <Avatar className="h-16 w-16 border-2 border-white/40 bg-black/30">
+            <AvatarImage
+              src={lineup.coach.photo || `https://media.api-sports.io/football/coachs/${lineup.coach.id}.png`}
+              alt={lineup.coach.name}
+            />
+            <AvatarFallback>{lineup.coach.name.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <span className="font-semibold text-white">{lineup.coach.name}</span>
         </div>
       )}
     </Card>
   );
-}
+};
+
 
 
 // --- HOOKS ---
