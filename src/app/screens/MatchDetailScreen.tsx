@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,23 +12,16 @@ import { ArrowLeft, Share2, Star, Clock, User, ArrowLeftRight, RectangleVertical
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, deleteField, getDocs, collection, getDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 // --- TYPE DEFINITIONS ---
 interface Fixture {
-  fixture: {
-    id: number;
-    date: string;
-    status: { short: string; long: string; elapsed: number | null };
-  };
+  fixture: { id: number; date: string; status: { short: string; long: string; elapsed: number | null }; };
   league: { id: number; name: string; logo: string; round: string; };
-  teams: {
-    home: { id: number; name: string; logo: string; winner: boolean | null };
-    away: { id: number; name: string; logo: string; winner: boolean | null };
-  };
+  teams: { home: { id: number; name: string; logo: string; winner: boolean | null }; away: { id: number; name:string; logo: string; winner: boolean | null }; };
   goals: { home: number | null; away: number | null; };
 }
 
@@ -41,16 +34,22 @@ interface Player {
     photo: string;
 }
 
-interface PlayerResponse {
-    player: Player;
+interface PlayerStats {
+    games: { minutes: number | null; position: string; rating: string | null; substitute: boolean; };
+    // ... other stats
 }
 
-interface LineupResponse {
-  team: { id: number; name: string; logo: string; };
-  coach: { id: number; name: string; photo: string; };
-  formation: string;
-  startXI: PlayerResponse[];
-  substitutes: PlayerResponse[];
+interface PlayerInfoFromApi {
+    player: Player;
+    statistics: PlayerStats[];
+}
+
+interface TeamLineup {
+    team: { id: number; name: string; logo: string; };
+    coach: { id: number; name: string; photo: string; };
+    formation: string;
+    startXI: PlayerInfoFromApi[];
+    substitutes: PlayerInfoFromApi[];
 }
 
 interface Event {
@@ -100,7 +99,7 @@ const CURRENT_SEASON = 2025;
 // --- API FETCH HOOK ---
 function useMatchData(fixture?: Fixture) {
     const [data, setData] = useState<{
-        lineups: LineupResponse[];
+        lineups: TeamLineup[];
         events: Event[];
         stats: MatchStats[];
         standings: Standing[][];
@@ -112,7 +111,7 @@ function useMatchData(fixture?: Fixture) {
             setLoading(false);
             return;
         }
-        const { fixture: { id: fixtureId, date }, league } = fixture;
+        const { fixture: { id: fixtureId, date }, league, teams } = fixture;
 
         const fetchData = async () => {
             setLoading(true);
@@ -120,20 +119,41 @@ function useMatchData(fixture?: Fixture) {
                 const isNational = fixture.teams.home.winner !== null && fixture.teams.away.winner !== null;
                 const seasonForStandings = isNational ? new Date(date).getFullYear() : CURRENT_SEASON;
 
-                const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.all([
-                    fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
+                // Fetch lineups using the 'players' endpoint for rich data
+                const [homePlayersRes, awayPlayersRes, eventsRes, statsRes, standingsRes] = await Promise.all([
+                    fetch(`/api/football/players?fixture=${fixtureId}&team=${teams.home.id}`),
+                    fetch(`/api/football/players?fixture=${fixtureId}&team=${teams.away.id}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
                     fetch(`/api/football/standings?league=${league.id}&season=${seasonForStandings}`),
                 ]);
 
-                const lineupsData = await lineupsRes.json();
+                const homePlayersData = await homePlayersRes.json();
+                const awayPlayersData = await awayPlayersRes.json();
                 const eventsData = await eventsRes.json();
                 const statsData = await statsRes.json();
                 const standingsData = await standingsRes.json();
-                
+
+                const processLineupData = (lineupData: any): TeamLineup | null => {
+                    if (!lineupData?.response?.[0]) return null;
+                    const response = lineupData.response[0];
+                    const allPlayers: PlayerInfoFromApi[] = response.players || [];
+                    
+                    return {
+                        team: response.team,
+                        coach: response.coach || { id: 0, name: 'N/A', photo: '' },
+                        formation: response.formation || 'N/A',
+                        startXI: allPlayers.filter(p => !p.statistics[0].games.substitute),
+                        substitutes: allPlayers.filter(p => p.statistics[0].games.substitute),
+                    };
+                };
+
+                const homeLineup = processLineupData(homePlayersData);
+                const awayLineup = processLineupData(awayPlayersData);
+                const finalLineups = [homeLineup, awayLineup].filter(Boolean) as TeamLineup[];
+
                 setData({
-                    lineups: lineupsData.response || [],
+                    lineups: finalLineups,
                     events: eventsData.response || [],
                     stats: statsData.response || [],
                     standings: standingsData.response?.[0]?.league?.standings || [],
@@ -150,6 +170,7 @@ function useMatchData(fixture?: Fixture) {
 
     return { ...data, loading };
 }
+
 
 // --- SUB-COMPONENTS ---
 const MatchHeader = ({ fixture, onBack, headerActions, navigate, isAdmin, onCopy }: { fixture: Fixture; onBack: () => void, headerActions?: React.ReactNode, navigate: ScreenProps['navigate'], isAdmin: boolean, onCopy: (url: string) => void }) => (
@@ -198,15 +219,32 @@ const MatchHeader = ({ fixture, onBack, headerActions, navigate, isAdmin, onCopy
   </header>
 );
 
-const PlayerOnPitch = ({ player }: { player: Player }) => {
+const PlayerOnPitch = ({ player, rating }: { player: Player, rating: string | null }) => {
+  const getRatingColor = (ratingValue: number) => {
+    if (ratingValue >= 8.5) return 'bg-blue-500';
+    if (ratingValue >= 7.5) return 'bg-green-500';
+    if (ratingValue >= 6.5) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+  
+  const ratingValue = rating ? parseFloat(rating) : null;
+
   return (
     <div className="relative flex flex-col items-center justify-center w-16">
+       {ratingValue && (
+            <div className={cn(
+                "absolute -top-2 -left-1 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background z-20",
+                 getRatingColor(ratingValue)
+            )}>
+              {ratingValue.toFixed(1)}
+            </div>
+        )}
       <div className="relative">
         <Avatar className="w-10 h-10 border-2 bg-slate-800/80 border-white/50 shadow-md">
           <AvatarImage src={player.photo} alt={player.name} />
           <AvatarFallback className="bg-slate-700 text-white font-bold">{player.name?.[0]}</AvatarFallback>
         </Avatar>
-        <div className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background bg-slate-900">
+        <div className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-background bg-slate-900 z-10">
           {player.number}
         </div>
       </div>
@@ -218,7 +256,7 @@ const PlayerOnPitch = ({ player }: { player: Player }) => {
 };
 
 
-const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite, isAdmin, onCopy }: { lineups: LineupResponse[], loading: boolean, fixture: Fixture, favorites: Favorites, onRename: (type: RenameType, id: number, name: string) => void, onFavorite: (type: 'player' | 'coach', item: any) => void, isAdmin: boolean, onCopy: (url: string) => void }) => {
+const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite, isAdmin, onCopy }: { lineups: TeamLineup[], loading: boolean, fixture: Fixture, favorites: Favorites, onRename: (type: RenameType, id: number, name: string) => void, onFavorite: (type: 'player' | 'coach', item: any) => void, isAdmin: boolean, onCopy: (url: string) => void }) => {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(fixture.teams.home.id);
 
   if (loading) {
@@ -238,36 +276,29 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
       return <p className="text-center text-muted-foreground p-8">تشكيلة الفريق المحدد غير متاحة.</p>;
   }
 
-  const groupPlayersByLine = (players: PlayerResponse[], formation: string) => {
-    if (!formation) return [];
-    
-    const linesFormation = formation.split('-').map(Number);
-    const playerLines: Player[][] = Array(linesFormation.length + 1).fill(0).map(() => []);
-
-    const gk = players.find(p => p.player.pos === 'G');
-    if (gk) playerLines[0] = [gk.player];
-    
-    const outfieldPlayers = players.filter(p => p.player.pos !== 'G');
-
-    let playerIndex = 0;
-    for (let i = 0; i < linesFormation.length; i++) {
-        const lineSize = linesFormation[i];
-        for (let j = 0; j < lineSize; j++) {
-            if (outfieldPlayers[playerIndex]) {
-                playerLines[i+1].push(outfieldPlayers[playerIndex].player);
-                playerIndex++;
-            }
+  const groupPlayersByLine = (players: PlayerInfoFromApi[]) => {
+    const lines: { [key: string]: PlayerInfoFromApi[] } = {
+        Goalkeeper: [],
+        Defender: [],
+        Midfielder: [],
+        Attacker: [],
+    };
+    players.forEach(p => {
+        const position = p.statistics[0].games.position;
+        if(lines[position]) {
+            lines[position].push(p);
         }
-    }
-    
-    return playerLines.filter(line => line.length > 0).reverse();
+    });
+
+    // Return in logical pitch order (reversed for display)
+    return [lines.Attacker, lines.Midfielder, lines.Defender, lines.Goalkeeper].filter(line => line && line.length > 0);
   };
   
-  const playerLines = groupPlayersByLine(lineupToShow.startXI, lineupToShow.formation);
+  const playerLines = groupPlayersByLine(lineupToShow.startXI);
 
-  const renderPlayerRow = (playerInfo: PlayerResponse) => {
+  const renderPlayerRow = (playerInfo: PlayerInfoFromApi) => {
     if(!playerInfo) return null;
-    const { player } = playerInfo;
+    const { player, statistics } = playerInfo;
     return (
          <div key={player.id} className="flex items-center gap-2 text-xs p-1 rounded-md hover:bg-muted">
             <span className="text-muted-foreground w-6 text-center font-mono">{player.number}</span>
@@ -324,11 +355,11 @@ const LineupsTab = ({ lineups, loading, fixture, favorites, onRename, onFavorite
       <div className="space-y-4 px-4">
         <div 
             className="relative w-full max-w-md mx-auto aspect-[3/4] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-500/30 shadow-2xl flex flex-col justify-around py-4" 
-            style={{ backgroundImage: "url(/football-pitch-3d.svg)", backgroundSize: '100% 100%' }}
+            style={{ backgroundImage: "url('/football-pitch-3d.svg')", backgroundSize: '100% 100%' }}
         >
           {playerLines.map((line, lineIndex) => (
             <div key={lineIndex} className="flex justify-around items-center">
-              {line.map(player => player ? <PlayerOnPitch key={player.id} player={player} /> : null)}
+              {line.map(({player, statistics}) => player ? <PlayerOnPitch key={player.id} player={player} rating={statistics[0]?.games.rating || null} /> : null)}
             </div>
           ))}
           <div className="absolute bottom-2 left-2 bg-black/50 text-white text-sm font-bold px-2 py-1 rounded">
@@ -569,9 +600,15 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
 
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !db) return;
     const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
         setFavorites(doc.data() as Favorites || {});
+    }, error => {
+         const permissionError = new FirestorePermissionError({
+            path: `favorites/${user.uid}`,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
     });
     return () => unsub();
   }, [user, db]);
@@ -582,26 +619,47 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
   };
   
   const handleFavorite = async (type: 'player' | 'coach', item: any) => {
-    if (!user) return;
+    if (!user || !db) return;
     const favRef = doc(db, 'favorites', user.uid);
     
     let fieldPath = `players.${item.id}`; // Assuming coaches are also identified by an id in a 'players' or similar map
     let isFavorited = !!favorites?.players?.[item.id];
     let favoriteData = { players: { [item.id]: { playerId: item.id, name: item.name, photo: item.photo }}};
     
-    if (isFavorited) {
-        await updateDoc(favRef, { [fieldPath]: deleteField() });
-    } else {
-        await setDoc(favRef, favoriteData, { merge: true });
+    try {
+        if (isFavorited) {
+            await updateDoc(favRef, { [fieldPath]: deleteField() });
+        } else {
+            await setDoc(favRef, favoriteData, { merge: true });
+        }
+    } catch (error) {
+        const permissionError = new FirestorePermissionError({
+            path: favRef.path,
+            operation: 'update',
+            requestResourceData: favoriteData
+        });
+        errorEmitter.emit('permission-error', permissionError);
     }
   };
 
   const handleSaveRename = async (newName: string) => {
-    if (!renameItem) return;
+    if (!renameItem || !db) return;
     const { id, type } = renameItem;
     const collectionName = type === 'player' ? 'playerCustomizations' : 'coachCustomizations';
-    await setDoc(doc(db, collectionName, String(id)), { customName: newName });
-    // TODO: Need a way to refresh the view with the new name
+    const docRef = doc(db, collectionName, String(id));
+    const data = { customName: newName };
+
+    try {
+        await setDoc(docRef, data);
+        toast({ title: 'تم الحفظ', description: `تمت إعادة تسمية ${type === 'player' ? 'اللاعب' : 'المدرب'}`});
+    } catch(error) {
+       const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'create',
+            requestResourceData: data
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    }
   };
 
 
@@ -655,3 +713,4 @@ export function MatchDetailScreen({ navigate, goBack, fixtureId, fixture, header
     </div>
   );
 }
+
