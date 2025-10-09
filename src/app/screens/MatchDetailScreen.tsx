@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
 import { cn } from '@/lib/utils';
 import type { Fixture, Standing, Player as PlayerType, Team, Favorites } from '@/lib/types';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
@@ -53,8 +53,6 @@ interface MatchData {
     error: string | null;
 }
 type RenameType = 'team' | 'player' | 'coach';
-const CURRENT_SEASON = 2024;
-
 
 // --- HOOKS ---
 function useMatchData(fixture?: Fixture): MatchData {
@@ -62,6 +60,14 @@ function useMatchData(fixture?: Fixture): MatchData {
     const [data, setData] = useState<MatchData>({
         lineups: [], events: [], stats: [], standings: [], loading: true, error: null,
     });
+    
+    const CURRENT_SEASON = useMemo(() => {
+        if (!fixture) return new Date().getFullYear();
+        // Extract season year from the league name if available (e.g., "Premier League - 2023/2024")
+        const match = fixture.league.round.match(/(\d{4})/);
+        return match ? parseInt(match[0], 10) : new Date(fixture.fixture.date).getFullYear();
+    }, [fixture]);
+
 
     useEffect(() => {
         if (!fixture) {
@@ -75,7 +81,6 @@ function useMatchData(fixture?: Fixture): MatchData {
             const leagueId = fixture.league.id;
 
             try {
-                // Main data fetching in parallel
                 const [lineupsRes, eventsRes, statsRes, standingsRes] = await Promise.allSettled([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
@@ -110,7 +115,6 @@ function useMatchData(fixture?: Fixture): MatchData {
                             const photoMap = new Map<number, string>();
                             teamPlayersList.forEach(p => { if (p.player.photo) photoMap.set(p.player.id, p.player.photo); });
 
-                            // Update photos for both starting XI and substitutes
                             lineup.startXI.forEach(p => { 
                                 if (!p.player.photo && photoMap.has(p.player.id)) { 
                                     p.player.photo = photoMap.get(p.player.id)!; 
@@ -149,7 +153,7 @@ function useMatchData(fixture?: Fixture): MatchData {
         };
 
         fetchData();
-    }, [fixture, toast]);
+    }, [fixture, toast, CURRENT_SEASON]);
 
     return data;
 }
@@ -194,7 +198,7 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
     const defenders = startXI.filter(p => p.player.pos === 'D').reverse();
     const midfielders = startXI.filter(p => p.player.pos === 'M').reverse();
     const attackers = startXI.filter(p => p.player.pos === 'F').reverse();
-
+    
     const rows: PlayerWithStats[][] = [];
     if(attackers.length > 0) rows.push(attackers);
     if(midfielders.length > 0) rows.push(midfielders);
@@ -204,23 +208,21 @@ function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup: Lin
     return (
         <Card className="p-3 bg-card/80">
              <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
-                 <div className="absolute inset-0 flex flex-col justify-around p-2">
-                    <div className="w-full h-full flex flex-col justify-around">
-                        {rows.map((row, rowIndex) => (
-                            <div key={rowIndex} className="flex justify-around items-center w-full">
-                                {row.map((player) => (
-                                    <div key={player.player.id} className="relative">
-                                         {isAdmin && (
-                                            <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50" onClick={() => onRename('player', player.player.id, getPlayerName(player.player.id, player.player.name))}>
-                                                <Pencil className="h-3 w-3" />
-                                            </Button>
-                                        )}
-                                        <PlayerOnPitch player={{...player, player: {...player.player, name: getPlayerName(player.player.id, player.player.name)}}} />
-                                    </div>
-                                ))}
-                            </div>
-                        ))}
-                    </div>
+                 <div className="absolute inset-0 flex flex-col-reverse justify-around p-2">
+                    {rows.map((row, rowIndex) => (
+                        <div key={rowIndex} className="flex justify-around items-center w-full">
+                            {row.map((player) => (
+                                <div key={player.player.id} className="relative">
+                                     {isAdmin && (
+                                        <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50" onClick={() => onRename('player', player.player.id, getPlayerName(player.player.id, player.player.name))}>
+                                            <Pencil className="h-3 w-3" />
+                                        </Button>
+                                    )}
+                                    <PlayerOnPitch player={{...player, player: {...player.player, name: getPlayerName(player.player.id, player.player.name)}}} />
+                                </div>
+                            ))}
+                        </div>
+                    ))}
                 </div>
             </div>
             
@@ -499,3 +501,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
 
 
 
+
+
+    
