@@ -23,8 +23,8 @@ interface MatchData {
 // ====== بيانات وهمية متكاملة ======
 const mockData:MatchData = {
   homeTeam:"ريال مدريد", awayTeam:"برشلونة",
-  homeLogo:"https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg",
-  awayLogo:"https://upload.wikimedia.org/wikipedia/en/4/47/FC_Barcelona_%28crest%29.svg",
+  homeLogo:"https://media.api-sports.io/football/teams/541.png",
+  awayLogo:"https://media.api-sports.io/football/teams/529.png",
   date:"12/10/2025", stadium:"سانتياغو برنابيو", time:"21:00",
   status:"live",
   events:[
@@ -35,30 +35,30 @@ const mockData:MatchData = {
     {type:"goal",team:"away",player:"ميسي",minute:70}
   ],
   homeFormation:[
-    {name:"كورتوا",number:1,position:"GK",image:"https://via.placeholder.com/48"},
-    {name:"راموس",number:4,position:"DEF",image:"https://via.placeholder.com/48"},
-    {name:"كارفاخال",number:2,position:"DEF",image:"https://via.placeholder.com/48"},
-    {name:"مودريتش",number:10,position:"MID",image:"https://via.placeholder.com/48"},
-    {name:"كروس",number:8,position:"MID",image:"https://via.placeholder.com/48"},
-    {name:"بنزيما",number:9,position:"FWD",image:"https://via.placeholder.com/48"},
-    {name:"فينيسيوس",number:20,position:"FWD",image:"https://via.placeholder.com/48"}
+    {name:"كورتوا",number:1,position:"GK",image:"https://media.api-sports.io/football/players/184.png"},
+    {name:"راموس",number:4,position:"DEF",image:"https://media.api-sports.io/football/players/145.png"},
+    {name:"كارفاخال",number:2,position:"DEF",image:"https://media.api-sports.io/football/players/58.png"},
+    {name:"مودريتش",number:10,position:"MID",image:"https://media.api-sports.io/football/players/14.png"},
+    {name:"كروس",number:8,position:"MID",image:"https://media.api-sports.io/football/players/15.png"},
+    {name:"بنزيما",number:9,position:"FWD",image:"https://media.api-sports.io/football/players/37.png"},
+    {name:"فينيسيوس",number:20,position:"FWD",image:"https://media.api-sports.io/football/players/3530.png"}
   ],
   awayFormation:[
-    {name:"تير شتيجن",number:1,position:"GK",image:"https://via.placeholder.com/48"},
-    {name:"بيكيه",number:3,position:"DEF",image:"https://via.placeholder.com/48"},
-    {name:"ألبا",number:18,position:"DEF",image:"https://via.placeholder.com/48"},
-    {name:"بوسكيتس",number:5,position:"MID",image:"https://via.placeholder.com/48"},
-    {name:"دي يونغ",number:21,position:"MID",image:"https://via.placeholder.com/48"},
-    {name:"ميسي",number:10,position:"FWD",image:"https://via.placeholder.com/48"},
-    {name:"أوباميانغ",number:14,position:"FWD",image:"https://via.placeholder.com/48"}
+    {name:"تير شتيجن",number:1,position:"GK",image:"https://media.api-sports.io/football/players/153.png"},
+    {name:"بيكيه",number:3,position:"DEF",image:"https://media.api-sports.io/football/players/154.png"},
+    {name:"ألبا",number:18,position:"DEF",image:"https://media.api-sports.io/football/players/157.png"},
+    {name:"بوسكيتس",number:5,position:"MID",image:"https://media.api-sports.io/football/players/164.png"},
+    {name:"دي يونغ",number:21,position:"MID",image:"https://media.api-sports.io/football/players/1627.png"},
+    {name:"ميسي",number:10,position:"FWD",image:"https://media.api-sports.io/football/players/874.png"},
+    {name:"أوباميانغ",number:14,position:"FWD",image:"https://media.api-sports.io/football/players/94.png"}
   ],
   substitutesHome:[
-    {name:"أسينسيو",number:11,position:"MID",image:"https://via.placeholder.com/40"},
-    {name:"لوكاس فاسكيز",number:17,position:"FWD",image:"https://via.placeholder.com/40"}
+    {name:"أسينسيو",number:11,position:"MID",image:"https://media.api-sports.io/football/players/16.png"},
+    {name:"لوكاس فاسكيز",number:17,position:"FWD",image:"https://media.api-sports.io/football/players/68.png"}
   ],
   substitutesAway:[
-    {name:"أراوخو",number:4,position:"DEF",image:"https://via.placeholder.com/40"},
-    {name:"غريزمان",number:7,position:"FWD",image:"https://via.placeholder.com/40"}
+    {name:"أراوخو",number:4,position:"DEF",image:"https://media.api-sports.io/football/players/3446.png"},
+    {name:"غريزمان",number:7,position:"FWD",image:"https://media.api-sports.io/football/players/95.png"}
   ],
   coachHome:"أنشيلوتي",
   coachAway:"تشافي",
