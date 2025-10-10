@@ -22,6 +22,7 @@ import { NoteDialog } from '@/components/NoteDialog';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import MatchTimeline from '@/components/MatchTimeline';
+import MatchStatistics from '@/components/MatchStatistics';
 
 
 // --- TYPE DEFINITIONS ---
@@ -342,78 +343,6 @@ const LineupField = ({ lineup, events, getPlayerName, getCoachName, onRename, fi
   );
 };
 
-
-const STATS_TRANSLATIONS: { [key: string]: string } = {
-    "Shots on Goal": "تسديدات على المرمى",
-    "Shots off Goal": "تسديدات خارج المرمى",
-    "Total Shots": "إجمالي التسديدات",
-    "Blocked Shots": "تسديدات تم صدها",
-    "Shots insidebox": "تسديدات من الداخل",
-    "Shots outsidebox": "تسديدات من الخارج",
-    "Fouls": "أخطاء",
-    "Corner Kicks": "ركلات ركنية",
-    "Offsides": "تسلل",
-    "Ball Possession": "الاستحواذ",
-    "Yellow Cards": "بطاقات صفراء",
-    "Red Cards": "بطاقات حمراء",
-    "Goalkeeper Saves": "تصديات الحارس",
-    "Total passes": "إجمالي التمريرات",
-    "Passes accurate": "تمريرات صحيحة",
-    "Passes %": "دقة التمرير",
-};
-
-const StatsView = ({ stats, fixture }: { stats: MatchData['stats'], fixture: FixtureType }) => {
-    if (!stats || stats.length < 2) {
-        return <p className="text-muted-foreground text-center py-4">الإحصائيات غير متاحة لهذه المباراة.</p>;
-    }
-
-    const homeData = stats.find(s => s.team.id === fixture.teams.home.id);
-    const awayData = stats.find(s => s.team.id === fixture.teams.away.id);
-
-    if (!homeData || !awayData) return <p className="text-muted-foreground text-center py-4">بيانات أحد الفريقين غير متاحة</p>;
-    
-    // Combine stats from both teams for easier rendering
-    const combinedStats = homeData.statistics.map(homeStat => {
-        const awayStat = awayData.statistics.find(s => s.type === homeStat.type);
-        return {
-            type: homeStat.type,
-            homeValue: homeStat.value,
-            awayValue: awayStat ? awayStat.value : null
-        };
-    }).filter(s => STATS_TRANSLATIONS[s.type]); // Only show stats we have translations for
-
-    return (
-        <Card>
-            <CardContent className="p-4 space-y-3">
-                {combinedStats.map((stat, index) => {
-                    const homeValRaw = stat.homeValue ?? '0';
-                    const awayValRaw = stat.awayValue ?? '0';
-
-                    const homeValStr = String(homeValRaw).replace('%', '');
-                    const awayValStr = String(awayValRaw).replace('%', '');
-                    
-                    const homeValNum = parseFloat(homeValStr) || 0;
-                    const awayValNum = parseFloat(awayValStr) || 0;
-
-                    const total = homeValNum + awayValNum;
-                    const isPercentage = String(homeValRaw).includes('%') || String(awayValRaw).includes('%');
-
-                    return (
-                        <div key={index} className="space-y-1">
-                             <div className="flex justify-between items-center text-sm font-bold">
-                                <span>{homeValRaw ?? 0}</span>
-                                <span className="text-muted-foreground text-xs">{STATS_TRANSLATIONS[stat.type] || stat.type}</span>
-                                <span>{awayValRaw ?? 0}</span>
-                            </div>
-                            <Progress value={homeValNum} max={isPercentage ? 100 : (total > 0 ? total : 100)} className="h-2 [&>div]:bg-primary" />
-                        </div>
-                    )
-                })}
-            </CardContent>
-        </Card>
-    );
-};
-
 const StandingsView = ({ standings, teamId }: { standings: Standing[] | null, teamId: number }) => {
     if (!standings || standings.length === 0) {
         return <p className="text-center py-8 text-muted-foreground">الترتيب غير متاح حاليًا.</p>
@@ -559,7 +488,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                        <MatchTimeline events={events} fixture={fixture} />
                     </TabsContent>
                      <TabsContent value="stats" className="mt-4">
-                       <StatsView stats={stats} fixture={fixture} />
+                       <MatchStatistics stats={stats} fixture={fixture} />
                     </TabsContent>
                      <TabsContent value="standings" className="mt-4">
                        <StandingsView standings={standings} teamId={fixture.teams.home.id} />
@@ -569,3 +498,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
+
+    
