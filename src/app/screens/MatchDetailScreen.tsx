@@ -12,10 +12,37 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useFirestore } from '@/firebase/provider';
-import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats } from '@/lib/types';
+import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
-import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2 } from 'lucide-react';
+import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
+import { Progress } from '@/components/ui/progress';
+
+// --- PlayerCard Component (as provided) ---
+const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
+  const fallbackImage = "https://media.api-sports.io/football/players/0.png";
+  const gameStats = player?.statistics?.[0]?.games || {};
+  const playerNumber = gameStats.number || player?.player?.number || "";
+  const rating =
+    gameStats.rating && !isNaN(parseFloat(gameStats.rating))
+      ? parseFloat(gameStats.rating).toFixed(1)
+      : null;
+  const playerImage =
+    player?.player?.photo && player.player.photo.includes("http")
+      ? player.player.photo
+      : fallbackImage;
+
+  return (
+    <div className="relative flex flex-col items-center">
+      <div className="relative w-12 h-12">
+        <img src={playerImage} alt={player?.player?.name || "Player"} className="rounded-full border-2 border-white/50" />
+        {playerNumber && <div className="absolute -top-1 -left-1 bg-gray-800 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background">{playerNumber}</div>}
+        {rating && <div className={`absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background ${parseFloat(rating)>=7?"bg-green-600":parseFloat(rating)>=6?"bg-yellow-600":"bg-red-600"}`}>{rating}</div>}
+      </div>
+      <span className="mt-1 text-[11px] font-semibold text-center truncate w-16">{player?.player?.name || "غير معروف"}</span>
+    </div>
+  );
+};
 
 
 // --- Reusable Components ---
@@ -61,185 +88,246 @@ const MatchHeaderCard = ({ fixture }: { fixture: Fixture }) => {
     );
 };
 
-const PitchPlayer = ({ player, isHome, position, number }: { player: PlayerWithStats, isHome: boolean, position: {top: string, left?: string, right?: string}, number: number }) => (
-    <div 
-        className="absolute flex flex-col items-center group cursor-pointer"
-        style={{ top: position.top, left: position.left, right: position.right, transform: 'translate(-50%, -50%)' }}
-    >
-        <div className="relative">
-            <Avatar className="h-8 w-8 border-2" style={{ borderColor: isHome ? '#fff' : '#fef08a' }}>
-                <AvatarImage src={player.player.photo} />
-                <AvatarFallback>{player.player.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <span className="absolute -bottom-1 -right-1 text-white bg-black/70 rounded-full text-[10px] w-4 h-4 flex items-center justify-center font-bold">
-                {number}
-            </span>
-        </div>
-        <span className="text-white text-[10px] font-semibold bg-black/50 px-1.5 py-0.5 rounded-full mt-1 whitespace-nowrap truncate max-w-[60px]">{player.player.name}</span>
-         <div className="absolute bottom-full mb-2 w-max bg-black/80 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-            {player.player.name} - التقييم: {player.statistics[0].games.rating || 'N/A'}
-        </div>
-    </div>
-);
-
-
-const formationPositions: Record<string, { home: { top: string, left?: string, right?: string }[], away: { top: string, left?: string, right?: string }[] }> = {
-    "4-3-3": {
-        home: [
-            { top: '92%' }, // GK
-            { top: '75%', left: '20%' }, { top: '75%', left: '80%' }, { top: '70%', left: '40%' }, { top: '70%', left: '60%' }, // DEF
-            { top: '50%', left: '25%' }, { top: '50%', left: '75%' }, { top: '50%', left: '50%' }, // MID
-            { top: '25%', left: '20%' }, { top: '25%', left: '80%' }, { top: '20%', left: '50%' }  // FWD
-        ],
-        away: [
-            { top: '8%' }, // GK
-            { top: '25%', left: '20%' }, { top: '25%', left: '80%' }, { top: '30%', left: '40%' }, { top: '30%', left: '60%' }, // DEF
-            { top: '50%', left: '25%' }, { top: '50%', left: '75%' }, { top: '50%', left: '50%' }, // MID
-            { top: '75%', left: '20%' }, { top: '75%', left: '80%' }, { top: '80%', left: '50%' }  // FWD
-        ]
-    },
-    "4-4-2": {
-        home: [
-            { top: '92%' }, { top: '75%', left: '20%' }, { top: '75%', left: '80%' }, { top: '70%', left: '40%' }, { top: '70%', left: '60%' },
-            { top: '50%', left: '20%' }, { top: '50%', left: '80%' }, { top: '50%', left: '40%' }, { top: '50%', left: '60%' },
-            { top: '25%', left: '40%' }, { top: '25%', left: '60%' }
-        ],
-        away: [
-            { top: '8%' }, { top: '25%', left: '20%' }, { top: '25%', left: '80%' }, { top: '30%', left: '40%' }, { top: '30%', left: '60%' },
-            { top: '50%', left: '20%' }, { top: '50%', left: '80%' }, { top: '50%', left: '40%' }, { top: '50%', left: '60%' },
-            { top: '75%', left: '40%' }, { top: '75%', left: '60%' }
-        ]
-    },
-     "4-2-3-1": {
-        home: [
-            { top: '92%' }, { top: '75%', left: '20%' }, { top: '75%', left: '80%' }, { top: '70%', left: '40%' }, { top: '70%', left: '60%' },
-            { top: '60%', left: '40%' }, { top: '60%', left: '60%' },
-            { top: '40%', left: '25%' }, { top: '40%', left: '75%' }, { top: '40%', left: '50%' },
-            { top: '20%', left: '50%' }
-        ],
-        away: [
-            { top: '8%' }, { top: '25%', left: '20%' }, { top: '25%', left: '80%' }, { top: '30%', left: '40%' }, { top: '30%', left: '60%' },
-            { top: '40%', left: '40%' }, { top: '40%', left: '60%' },
-            { top: '60%', left: '25%' }, { top: '60%', left: '75%' }, { top: '60%', left: '50%' },
-            { top: '80%', left: '50%' }
-        ]
-    },
-};
-
 
 // --- Tabs ---
 
-const DetailsTab = ({ fixture }: { fixture: Fixture | null }) => {
-    if (!fixture) return <Skeleton className="h-20 w-full" />;
+const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statistics: MatchStatistics[] | null }) => {
+    if (!fixture) return <Skeleton className="h-40 w-full" />;
+
+    const homeStats = statistics?.find(s => s.team.id === fixture.teams.home.id)?.statistics || [];
+    const awayStats = statistics?.find(s => s.team.id === fixture.teams.away.id)?.statistics || [];
+
+    const findStat = (stats: any[], type: string) => stats.find(s => s.type === type)?.value ?? '0';
+
+    const statMapping: { label: string; type: string; isProgress?: boolean }[] = [
+      { label: "الاستحواذ", type: "Ball Possession", isProgress: true },
+      { label: "التسديدات", type: "Total Shots" },
+      { label: "تسديدات على المرمى", type: "Shots on Goal" },
+      { label: "الأخطاء", type: "Fouls" },
+      { label: "البطاقات الصفراء", type: "Yellow Cards" },
+      { label: "البطاقات الحمراء", type: "Red Cards" },
+      { label: "الركنيات", type: "Corner Kicks" },
+    ];
+
     return (
-        <Card>
-            <CardContent className="p-4 text-sm">
-                <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">الملعب</span>
-                    <span className="font-semibold">{fixture.fixture.venue.name || 'غير محدد'}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">الجولة</span>
-                    <span className="font-semibold">{fixture.league.round}</span>
-                </div>
-                 <div className="flex justify-between py-2">
-                    <span className="text-muted-foreground">الحالة</span>
-                    <span className="font-semibold">{fixture.fixture.status.long}</span>
-                </div>
-            </CardContent>
-        </Card>
+        <div className="space-y-4">
+            <Card>
+                <CardContent className="p-4 text-sm">
+                    <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">الملعب</span>
+                        <span className="font-semibold">{fixture.fixture.venue.name || 'غير محدد'}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">الجولة</span>
+                        <span className="font-semibold">{fixture.league.round}</span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                        <span className="text-muted-foreground">الحالة</span>
+                        <span className="font-semibold">{fixture.fixture.status.long}</span>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardContent className="p-4 space-y-4">
+                    <h3 className="font-bold text-center">إحصائيات المباراة</h3>
+                    {statistics === null ? (
+                        <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                    ) : statistics.length > 0 ? (
+                        statMapping.map(stat => {
+                            const homeValueRaw = findStat(homeStats, stat.type);
+                            const awayValueRaw = findStat(awayStats, stat.type);
+                            
+                            if (stat.isProgress) {
+                                const homeVal = parseInt(String(homeValueRaw).replace('%','')) || 0;
+                                const awayVal = parseInt(String(awayValueRaw).replace('%','')) || 0;
+                                return (
+                                    <div key={stat.type} className="space-y-2">
+                                        <div className="flex justify-between items-center text-xs font-bold">
+                                            <span>{homeValueRaw}</span>
+                                            <span className="text-muted-foreground">{stat.label}</span>
+                                            <span>{awayValueRaw}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1" dir="ltr">
+                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-l-full" className="rounded-l-full"/>
+                                            <Progress value={awayVal} indicatorClassName="bg-accent rounded-r-full" className="rounded-r-full"/>
+                                        </div>
+                                    </div>
+                                )
+                            }
+                            return (
+                                <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
+                                    <span>{homeValueRaw}</span>
+                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
+                                    <span>{awayValueRaw}</span>
+                                </div>
+                            )
+                        })
+                    ) : (
+                       <p className="text-center text-muted-foreground p-4">الإحصائيات غير متاحة لهذه المباراة.</p>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
     );
 };
 
-const TimelineTab = ({ events }: { events: MatchEvent[] | null }) => {
+
+const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, homeTeamId: number }) => {
     if (!events) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     if (events.length === 0) return <p className="text-center text-muted-foreground p-8">لا توجد أحداث رئيسية في المباراة بعد.</p>;
 
     const getEventIcon = (event: MatchEvent) => {
-        if(event.type === 'Goal') return <FootballIcon className="w-5 h-5 text-green-500" />;
-        if(event.type === 'Card' && event.detail.includes('Yellow')) return <Square className="w-5 h-5 text-yellow-400 fill-current" />;
-        if(event.type === 'Card' && event.detail.includes('Red')) return <Square className="w-5 h-5 text-red-500 fill-current" />;
-        if(event.type === 'subst') return <div className="flex"><ArrowRight className="w-4 h-4 text-red-500" /><ArrowLeft className="w-4 h-4 text-green-500" /></div>
+        if (event.type === 'Goal') return <FootballIcon className="w-5 h-5 text-green-500" />;
+        if (event.type === 'Card' && event.detail.includes('Yellow')) return <Square className="w-5 h-5 text-yellow-400 fill-current" />;
+        if (event.type === 'Card' && event.detail.includes('Red')) return <Square className="w-5 h-5 text-red-500 fill-current" />;
+        if (event.type === 'subst') return <ArrowRight className="w-4 h-4 text-green-500" />;
         return <Clock className="w-5 h-5 text-muted-foreground" />;
     }
 
+    // Sort events by time, descending
+    const sortedEvents = [...events].sort((a, b) => b.time.elapsed - a.time.elapsed);
+
     return (
-        <div className="space-y-4">
-            {events.map((event, index) => (
-                <div key={index} className="flex items-center gap-4">
-                    <div className="flex flex-col items-center">
-                        <span className="text-xs font-bold">{event.time.elapsed}'</span>
-                        <div className="w-px h-6 bg-border"></div>
-                    </div>
-                    <div className="flex-1 flex items-center gap-3 bg-card p-2 rounded-md border">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background">
-                            {getEventIcon(event)}
+        <div className="relative px-4 py-8">
+            <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
+            {sortedEvents.map((event, index) => {
+                const isHomeEvent = event.team.id === homeTeamId;
+                return (
+                    <div key={index} className="relative flex items-center my-6">
+                        {/* Time Bubble */}
+                        <div className="absolute left-1/2 -translate-x-1/2 z-10 bg-background border rounded-full h-8 w-8 flex items-center justify-center font-bold text-xs">
+                           {event.time.elapsed}'
                         </div>
-                        <div className="flex-1 text-sm">
-                            <p className="font-semibold">{event.player.name}</p>
-                            <p className="text-xs text-muted-foreground">{event.team.name} - {event.detail}</p>
-                            {event.type === 'subst' && <p className="text-xs text-muted-foreground">خروج: {event.assist.name}</p>}
-                        </div>
+                        {isHomeEvent && (
+                            <div className="flex-1 flex justify-start">
+                                <div className="flex items-center gap-3 bg-card p-2 rounded-md border max-w-xs">
+                                     <div className="flex-1 text-sm text-right">
+                                        <p className="font-semibold">{event.player.name}</p>
+                                        {event.type === 'subst' && event.assist.name ? (
+                                            <p className="text-xs text-muted-foreground">تبديل بـ {event.assist.name}</p>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">{event.detail}</p>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background">
+                                        {getEventIcon(event)}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                         {!isHomeEvent && (
+                            <div className="flex-1 flex justify-end">
+                                <div className="flex items-center gap-3 bg-card p-2 rounded-md border max-w-xs">
+                                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background">
+                                        {getEventIcon(event)}
+                                    </div>
+                                    <div className="flex-1 text-sm text-left">
+                                        <p className="font-semibold">{event.player.name}</p>
+                                        {event.type === 'subst' && event.assist.name ? (
+                                            <p className="text-xs text-muted-foreground">تبديل بـ {event.assist.name}</p>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">{event.detail}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 };
+
 
 const LineupsTab = ({ lineups }: { lineups: LineupData[] | null }) => {
     if (!lineups) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     if (lineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     
     const [home, away] = lineups;
+    const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
+    const activeLineup = activeTeamTab === 'home' ? home : away;
 
-    const homePositions = formationPositions[home.formation] ? formationPositions[home.formation].home : formationPositions["4-3-3"].home;
-    const awayPositions = formationPositions[away.formation] ? formationPositions[away.formation].away : formationPositions["4-3-3"].away;
+    const renderPitch = (lineup: LineupData) => {
+        const formationGrid = lineup.startXI.reduce((acc, p) => {
+          if (p.player.grid) {
+            const [row, col] = p.player.grid.split(':').map(Number);
+            if (!acc[row]) acc[row] = [];
+            acc[row][col] = p;
+          }
+          return acc;
+        }, {} as { [key: number]: PlayerWithStats[] });
+
+        // Reverse to show goalkeeper at the bottom
+        const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => b - a);
+
+        return (
+             <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col justify-around p-2">
+                {sortedRows.map(row => (
+                    <div key={row} className="flex justify-around items-center">
+                        {formationGrid[row]?.map(p => p && <PlayerCard key={p.player.id} player={p} />)}
+                    </div>
+                ))}
+            </div>
+        )
+    }
 
     return (
-        <div className="space-y-6">
-            <div className="relative w-full max-w-sm mx-auto aspect-[2/3] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50">
-                 {/* Home Team */}
-                {home.startXI.map((p, i) => (
-                     <PitchPlayer key={`home-${p.player.id}`} player={p} isHome={true} position={homePositions[i] || { top: '50%' }} number={p.player.number || 0} />
-                ))}
+        <div className="space-y-4">
+            <Tabs value={activeTeamTab} onValueChange={(val) => setActiveTeamTab(val as 'home' | 'away')} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="home">{home.team.name}</TabsTrigger>
+                    <TabsTrigger value="away">{away.team.name}</TabsTrigger>
+                </TabsList>
+            </Tabs>
+            
+            <div className="font-bold text-center text-muted-foreground text-sm">التشكيلة: {activeLineup.formation}</div>
+            
+            {renderPitch(activeLineup)}
+            
+            <Card>
+                <CardContent className="p-2 space-y-2">
+                    <h3 className="font-bold text-center p-2 text-sm">التبديلات والاحتياط</h3>
+                    <div className="grid grid-cols-1 divide-y">
+                        {activeLineup.substitutes.map(p => {
+                             const subbedOutFor = events?.find(e => e.type === 'subst' && e.assist.id === p.player.id);
+                             const subbedInFor = events?.find(e => e.type === 'subst' && e.player.id === p.player.id);
 
-                {/* Away Team */}
-                {away.startXI.map((p, i) => (
-                    <PitchPlayer key={`away-${p.player.id}`} player={p} isHome={false} position={awayPositions[i] || { top: '50%' }} number={p.player.number || 0} />
-                ))}
-            </div>
+                            return (
+                                <div key={p.player.id} className="flex items-center gap-2 p-1.5 text-xs">
+                                    <PlayerCard player={p} />
+                                    {subbedInFor && (
+                                        <div className="flex items-center gap-1 text-green-500">
+                                            <ArrowRight className="h-3 w-3"/>
+                                            <span>دخل بديلاً لـ {subbedInFor.assist.name}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                </CardContent>
+            </Card>
 
-            {/* Substitutes */}
-            <div className="grid grid-cols-2 gap-4">
-                <Card>
-                    <CardContent className="p-2">
-                        <h3 className="font-bold text-center p-2">{home.team.name} (البدلاء)</h3>
-                         {home.substitutes.map(p => (
-                             <div key={p.player.id} className="flex items-center gap-2 p-1.5 text-xs border-b last:border-b-0">
-                                 <Avatar className="h-6 w-6"><AvatarImage src={p.player.photo} /></Avatar>
-                                 <span className="font-semibold">{p.player.name}</span>
-                             </div>
-                         ))}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-2">
-                        <h3 className="font-bold text-center p-2">{away.team.name} (البدلاء)</h3>
-                         {away.substitutes.map(p => (
-                             <div key={p.player.id} className="flex items-center gap-2 p-1.5 text-xs border-b last:border-b-0">
-                                 <Avatar className="h-6 w-6"><AvatarImage src={p.player.photo} /></Avatar>
-                                 <span className="font-semibold">{p.player.name}</span>
-                             </div>
-                         ))}
-                    </CardContent>
-                </Card>
-            </div>
+            <Card>
+                <CardContent className="p-3 text-center">
+                    <h3 className="font-bold text-sm mb-2">المدرب</h3>
+                    <div className="flex flex-col items-center gap-1">
+                        <Avatar className="h-12 w-12">
+                            <AvatarImage src={activeLineup.coach.photo} />
+                            <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 };
 
-const StandingsTab = ({ standings }: { standings: Standing[] | null }) => {
+
+const StandingsTab = ({ standings, fixture }: { standings: Standing[] | null, fixture: Fixture }) => {
     if (!standings) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     if (standings.length === 0) return <p className="text-center text-muted-foreground p-8">جدول الترتيب غير متاح لهذه البطولة.</p>;
     
@@ -247,32 +335,31 @@ const StandingsTab = ({ standings }: { standings: Standing[] | null }) => {
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead className="w-[40px]">#</TableHead>
-                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
-                    <TableHead className="text-center">لعب</TableHead>
-                    <TableHead className="text-center">ف</TableHead>
-                    <TableHead className="text-center">ت</TableHead>
-                    <TableHead className="text-center">خ</TableHead>
                     <TableHead className="text-center">نقاط</TableHead>
+                    <TableHead className="text-center">ف/ت/خ</TableHead>
+                    <TableHead className="text-center">لعب</TableHead>
+                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                    <TableHead className="w-[40px]">#</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {standings.map((s) => (
-                    <TableRow key={s.team.id}>
-                        <TableCell>{s.rank}</TableCell>
-                        <TableCell className="font-medium">
-                            <div className="flex items-center gap-2 justify-end">
-                                <span className="truncate">{s.team.name}</span>
-                                <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
-                            </div>
-                        </TableCell>
-                        <TableCell className="text-center">{s.all.played}</TableCell>
-                        <TableCell className="text-center">{s.all.win}</TableCell>
-                        <TableCell className="text-center">{s.all.draw}</TableCell>
-                        <TableCell className="text-center">{s.all.lose}</TableCell>
-                        <TableCell className="text-center font-bold">{s.points}</TableCell>
-                    </TableRow>
-                ))}
+                {standings.map((s) => {
+                    const isRelevantTeam = s.team.id === fixture.teams.home.id || s.team.id === fixture.teams.away.id;
+                    return (
+                        <TableRow key={s.team.id} className={cn(isRelevantTeam && "bg-primary/10")}>
+                            <TableCell className="text-center font-bold">{s.points}</TableCell>
+                            <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
+                            <TableCell className="text-center">{s.all.played}</TableCell>
+                            <TableCell className="font-medium">
+                                <div className="flex items-center gap-2 justify-end">
+                                    <span className="truncate">{s.team.name}</span>
+                                    <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
+                                </div>
+                            </TableCell>
+                            <TableCell className="font-bold">{s.rank}</TableCell>
+                        </TableRow>
+                    );
+                })}
             </TableBody>
         </Table>
     );
@@ -290,27 +377,32 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [loading, setLoading] = useState(!initialFixture);
 
     const fetchData = useCallback(async () => {
+         if (!fixtureId) return;
+        setLoading(true);
+
         try {
+            const currentLeagueId = fixture?.league.id;
+            const currentSeason = fixture?.league.season;
+
             const endpoints = [
                 `fixtures?id=${fixtureId}`,
                 `fixtures/lineups?fixture=${fixtureId}`,
                 `fixtures/events?fixture=${fixtureId}`,
-                `standings?league=${fixture?.league.id}&season=${fixture?.league.season}`
-            ];
+                `fixtures/statistics?fixture=${fixtureId}`,
+                currentLeagueId && currentSeason ? `standings?league=${currentLeagueId}&season=${currentSeason}` : null
+            ].filter(Boolean) as string[];
 
-            const [fixtureRes, lineupsRes, eventsRes, standingsRes] = await Promise.all(
-                endpoints.map(endpoint => fetch(`/api/football/${endpoint}`))
+            const responses = await Promise.all(
+                endpoints.map(endpoint => fetch(`/api/football/${endpoint}`).then(res => res.json()))
             );
             
-            const fixtureData = await fixtureRes.json();
-            const lineupsData = await lineupsRes.json();
-            const eventsData = await eventsRes.json();
-            const standingsData = await standingsRes.json();
-            
+            const [fixtureData, lineupsData, eventsData, statisticsData, standingsData] = responses;
+
             if (fixtureData.response?.[0]) setFixture(fixtureData.response[0]);
             if (lineupsData.response) setLineups(lineupsData.response);
             if (eventsData.response) setEvents(eventsData.response);
-            if (standingsData.response[0]?.league?.standings[0]) setStandings(standingsData.response[0].league.standings[0]);
+            if (statisticsData.response) setStatistics(statisticsData.response);
+            if (standingsData?.response?.[0]?.league?.standings[0]) setStandings(standingsData.response[0].league.standings[0]);
 
         } catch (error) {
             console.error("Failed to fetch match details:", error);
@@ -320,13 +412,13 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     }, [fixtureId, fixture?.league.id, fixture?.league.season]);
 
     useEffect(() => {
-        fetchData(); // Initial fetch
-        const interval = setInterval(fetchData, 30000); // Refresh every 30 seconds
+        fetchData(); 
+        const interval = setInterval(fetchData, 30000); 
         return () => clearInterval(interval);
     }, [fetchData]);
 
 
-    if (loading) {
+    if (loading && !fixture) {
         return (
             <div className="flex h-full flex-col bg-background">
                 <ScreenHeader title="تفاصيل المباراة" onBack={goBack} canGoBack={canGoBack} />
@@ -351,15 +443,15 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 <MatchHeaderCard fixture={fixture} />
                 <Tabs defaultValue="details" className="w-full">
                     <TabsList className="grid w-full grid-cols-4 rounded-lg h-auto p-1 bg-card">
-                        <TabsTrigger value="details">تفاصيل</TabsTrigger>
-                        <TabsTrigger value="events">مُجريات</TabsTrigger>
-                        <TabsTrigger value="lineups">التشكيل</TabsTrigger>
-                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                        <TabsTrigger value="details"><ShieldCheck className="w-4 h-4 ml-1" />تفاصيل</TabsTrigger>
+                        <TabsTrigger value="events"><Clock className="w-4 h-4 ml-1" />مُجريات</TabsTrigger>
+                        <TabsTrigger value="lineups"><Users className="w-4 h-4 ml-1" />التشكيل</TabsTrigger>
+                        <TabsTrigger value="standings"><BarChart className="w-4 h-4 ml-1" />الترتيب</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} /></TabsContent>
-                    <TabsContent value="events" className="mt-4"><TimelineTab events={events} /></TabsContent>
+                    <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
+                    <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
                     <TabsContent value="lineups" className="mt-4"><LineupsTab lineups={lineups} /></TabsContent>
-                    <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} /></TabsContent>
+                    <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} /></TabsContent>
                 </Tabs>
             </div>
         </div>
