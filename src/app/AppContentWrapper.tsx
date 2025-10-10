@@ -9,7 +9,7 @@ import { IraqScreen } from './screens/IraqScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
-import AdvancedMatchDetailPage from './screens/AdvancedMatchDetailScreen';
+import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
 import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
 import { CommentsScreen } from './screens/CommentsScreen';
@@ -47,8 +47,8 @@ const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> =
   News: { component: NewsScreen },
   Settings: { component: SettingsScreen },
   CompetitionDetails: { component: CompetitionDetailScreen },
-  MatchDetails: { component: AdvancedMatchDetailPage }, // <-- Use the new advanced screen
-  AdvancedMatchDetails: { component: AdvancedMatchDetailPage },
+  MatchDetails: { component: MatchDetailScreen },
+  AdvancedMatchDetails: { component: MatchDetailScreen },
   TeamDetails: { component: TeamDetailScreen },
   AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen },
   Comments: { component: CommentsScreen },
@@ -147,9 +147,9 @@ export function AppContentWrapper() {
     const isMainTab = mainTabs.includes(screen);
     const newKey = `${screen}-${Date.now()}`;
     
-    // Remap MatchDetails to AdvancedMatchDetails
-    if (screen === 'MatchDetails') {
-      screen = 'AdvancedMatchDetails';
+    // Remap AdvancedMatchDetails to MatchDetails
+    if (screen === 'AdvancedMatchDetails') {
+      screen = 'MatchDetails';
     }
 
     const newItem = { key: newKey, screen, props };

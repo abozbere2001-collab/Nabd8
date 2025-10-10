@@ -19,6 +19,7 @@ export interface Fixture {
     name: string; 
     logo: string; 
     round: string; 
+    season: number;
   };
   teams: { 
     home: { id: number; name: string; logo: string; winner: boolean | null; }; 
@@ -54,9 +55,10 @@ export interface Player {
   name: string;
   age?: number;
   number: number | null;
-  position: string;
+  position: 'G' | 'D' | 'M' | 'F' | string;
   photo: string;
   grid?: string | null;
+  rating?: string | null;
 }
 
 export interface PlayerWithStats {
@@ -65,7 +67,7 @@ export interface PlayerWithStats {
     games: {
       minutes: number | null;
       number: number | null;
-      position: string;
+      position: 'G' | 'D' | 'M' | 'F' | string;
       rating: string | null;
       captain: boolean;
       substitute: boolean;
@@ -91,13 +93,14 @@ export interface MatchEvent {
   comments: string | null;
 }
 
-export interface Stats { 
-    possessionHome:number; 
-    possessionAway:number; 
-    shotsHome:number; 
-    shotsAway:number; 
-    foulsHome:number; 
-    foulsAway:number; 
+export interface StatisticItem {
+    type: string;
+    value: string | number | null;
+}
+
+export interface MatchStatistics {
+    team: { id: number, name: string, logo: string };
+    statistics: StatisticItem[];
 }
 
 

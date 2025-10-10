@@ -1,0 +1,123 @@
+
+.timeline-container {
+    position: relative;
+    padding: 1rem 0;
+    margin: 0 auto;
+    max-width: 800px;
+}
+
+.timeline-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    background-color: hsl(var(--border));
+}
+
+.timeline-item {
+    position: relative;
+    display: flex;
+    width: 50%;
+    padding: 1rem 0;
+}
+
+.timeline-item-left {
+    left: 0;
+    padding-right: 2rem;
+    justify-content: flex-end;
+    text-align: right;
+}
+
+.timeline-item-right {
+    left: 50%;
+    padding-left: 2rem;
+    justify-content: flex-start;
+}
+
+.timeline-icon-container {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+}
+.timeline-item-left .timeline-icon-container {
+    right: -1rem; /* Half the icon width to center it on the line */
+}
+.timeline-item-right .timeline-icon-container {
+    left: -1rem; /* Half the icon width to center it on the line */
+}
+
+.timeline-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background-color: hsl(var(--card));
+    border: 2px solid hsl(var(--border));
+    font-size: 1rem;
+}
+
+.timeline-content-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.timeline-item-left .timeline-content-container {
+    flex-direction: row-reverse;
+}
+
+.timeline-time {
+    background-color: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
+    padding: 0.1rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.timeline-content {
+    padding: 0.5rem 0.75rem;
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    flex-grow: 1;
+}
+
+/* Event Specific Styles */
+.goal-icon {
+    animation: goal-pulse 1s ease-in-out infinite;
+}
+@keyframes goal-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+.card-icon {
+    width: 1rem;
+    height: 1.25rem;
+    border-radius: 2px;
+}
+
+.substitution-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1;
+}
+.sub-in { color: #22c55e; } /* green-500 */
+.sub-out { color: #ef4444; } /* red-500 */
+
+.substitution-text {
+    font-size: 0.8rem;
+    line-height: 1.2;
+}
+
+.var-icon {
+    color: hsl(var(--primary));
+}
