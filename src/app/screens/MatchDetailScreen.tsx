@@ -65,6 +65,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
   }, [fetchCustomNames]);
   
   const getDisplayName = useCallback((type: 'player' | 'team' | 'coach', id: number, defaultName: string) => {
+    if (!id || !defaultName) return defaultName || '';
     const map = type === 'player' ? customNames.players : type === 'team' ? customNames.teams : customNames.coaches;
     return map.get(id) || defaultName;
   }, [customNames]);
