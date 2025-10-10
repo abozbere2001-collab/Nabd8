@@ -10,6 +10,7 @@ import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { MatchDetailScreen } from './screens/MatchDetailScreen';
+import AdvancedMatchDetailPage from './screens/AdvancedMatchDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
 import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
 import { CommentsScreen } from './screens/CommentsScreen';
@@ -48,6 +49,7 @@ const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> =
   Settings: { component: SettingsScreen },
   CompetitionDetails: { component: CompetitionDetailScreen },
   MatchDetails: { component: MatchDetailScreen },
+  AdvancedMatchDetails: { component: AdvancedMatchDetailPage },
   TeamDetails: { component: TeamDetailScreen },
   AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen },
   Comments: { component: CommentsScreen },
@@ -231,4 +233,3 @@ export function AppContentWrapper() {
     </main>
   );
 }
-

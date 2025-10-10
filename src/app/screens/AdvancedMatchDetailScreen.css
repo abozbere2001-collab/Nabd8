@@ -1,0 +1,37 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+
+.rtl { direction: rtl; font-family:'Cairo',sans-serif; }
+.bg-light { background:#f0f2f5; }
+.card { background:#fff; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); padding:16px; margin-bottom:16px; transition:all 0.3s;}
+.card:hover { transform: translateY(-4px); box-shadow:0 6px 20px rgba(0,0,0,0.15); }
+
+.teams-box { gap:16px; }
+.team-card { display:flex; flex-direction:column; align-items:center; padding:12px; border-radius:12px; background:#e3f2fd; transition:all 0.3s; flex: 1; }
+.team-card:hover { background:#bbdefb; }
+.team-logo { width:64px; height:64px; border-radius:50%; margin-bottom:8px; object-fit: contain; }
+.team-name { font-weight:bold; }
+
+.field { background: linear-gradient(#4caf50,#388e3c); border-radius:12px; padding:12px; position:relative; display:flex; flex-direction:column; align-items:center; }
+.line { display:flex; justify-content:center; margin:4px 0; gap:12px; width: 100%; }
+.player { text-align:center; animation: fadeIn 0.5s ease-in; color: white; font-size: 12px; }
+.player img { width:48px; height:48px; border-radius:50%; border:2px solid #fff; margin-bottom:4px; }
+.coach { text-align:center; font-weight:bold; margin-top:8px; color: white; background-color: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 6px; }
+.substitutes { margin-top:8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2); }
+.substitutes h4 { color: white; text-align: center; margin-bottom: 8px; font-weight: bold;}
+.substitute { text-align:center; color: white; font-size: 12px; }
+.substitute img { width:40px; height:40px; border-radius:50%; border:1px solid #fff; }
+
+.event { padding:4px; border-radius:8px; margin:2px 0; display:flex; justify-content:space-between; background:#f9f9f9; transition:all 0.3s; }
+.event:hover { background:#e0f7fa; }
+.yellow-card { color:#fbc02d; animation: blink 1s infinite; }
+.red-card { color:#d32f2f; animation: blink 1s infinite; }
+.goal-icon { animation: pulse 1s infinite; }
+
+.substitution.in { color:green; font-weight: bold; }
+.substitution.out { color:red; text-decoration: line-through;}
+
+@keyframes pulse { 0% { transform: scale(1);} 50% { transform: scale(1.3);} 100%{ transform: scale(1);}}
+@keyframes blink { 0%,50%,100% {opacity:1;} 25%,75%{opacity:0.3;} }
+@keyframes fadeIn { from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);} }
+
