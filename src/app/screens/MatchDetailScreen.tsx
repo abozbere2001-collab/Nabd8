@@ -14,7 +14,7 @@ import { ar } from 'date-fns/locale';
 import { useFirestore } from '@/firebase/provider';
 import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
-import { Shirt, ArrowRight, ArrowLeft, Square, Clock } from 'lucide-react';
+import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2 } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 
 
