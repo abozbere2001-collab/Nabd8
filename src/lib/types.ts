@@ -1,3 +1,4 @@
+
 // This file contains all the type definitions for the data used in the app.
 
 // --- API Football Types ---

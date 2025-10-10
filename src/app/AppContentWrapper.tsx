@@ -62,7 +62,6 @@ const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> =
   ManageTopScorers: { component: ManageTopScorersScreen },
   Login: { component: LoginScreen },
   SignUp: { component: LoginScreen },
-  // UltimateMatchDetail is removed, using MatchDetails now
 };
 
 

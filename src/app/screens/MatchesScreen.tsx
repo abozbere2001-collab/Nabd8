@@ -10,7 +10,7 @@ import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
-import { Loader2, Search, RadioTower, Trophy } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -88,7 +88,7 @@ const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixtur
       >
         <div 
           className="hover:bg-accent/50 cursor-pointer -m-3 p-3"
-          onClick={() => navigate('UltimateMatchDetail', { fixtureId: fixture.fixture.id })}
+          onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id })}
         >
          <div 
             className="flex items-center justify-center text-xs text-muted-foreground mb-2 cursor-pointer hover:underline"
@@ -458,7 +458,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     </div>
                 </TabsContent>
                 <TabsContent value="predictions" className="mt-0">
-                    {/* Date scroller for predictions can be different if needed */}
+                    {/* Date scroller for predictions is handled inside the component */}
                 </TabsContent>
              </Tabs>
 
@@ -483,5 +483,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-
-    
