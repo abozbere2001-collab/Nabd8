@@ -55,11 +55,12 @@ export interface Player {
   name: string;
   age?: number;
   number: number | null;
-  position: 'G' | 'D' | 'M' | 'F' | string;
+  position: string; // Keep as string for flexibility
   photo: string;
   grid?: string | null;
   rating?: string | null;
 }
+
 
 export interface PlayerWithStats {
   player: Player;
@@ -67,7 +68,7 @@ export interface PlayerWithStats {
     games: {
       minutes: number | null;
       number: number | null;
-      position: 'G' | 'D' | 'M' | 'F' | string;
+      position: string;
       rating: string | null;
       captain: boolean;
       substitute: boolean;

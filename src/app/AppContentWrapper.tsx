@@ -9,7 +9,7 @@ import { IraqScreen } from './screens/IraqScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
-import { MatchDetailScreen } from './screens/MatchDetailScreen';
+import { UltimateMatchDetailScreen } from './screens/UltimateMatchDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
 import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
 import { CommentsScreen } from './screens/CommentsScreen';
@@ -47,8 +47,7 @@ const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> =
   News: { component: NewsScreen },
   Settings: { component: SettingsScreen },
   CompetitionDetails: { component: CompetitionDetailScreen },
-  MatchDetails: { component: MatchDetailScreen },
-  AdvancedMatchDetails: { component: MatchDetailScreen },
+  MatchDetails: { component: UltimateMatchDetailScreen },
   TeamDetails: { component: TeamDetailScreen },
   AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen },
   Comments: { component: CommentsScreen },
@@ -147,11 +146,6 @@ export function AppContentWrapper() {
     const isMainTab = mainTabs.includes(screen);
     const newKey = `${screen}-${Date.now()}`;
     
-    // Remap AdvancedMatchDetails to MatchDetails
-    if (screen === 'AdvancedMatchDetails') {
-      screen = 'MatchDetails';
-    }
-
     const newItem = { key: newKey, screen, props };
 
     if (!isMainTab) {
@@ -205,7 +199,8 @@ export function AppContentWrapper() {
       <div className="relative flex-1 flex flex-col overflow-hidden">
         <div className="relative flex-1 overflow-hidden">
             {stack.map((item, index) => {
-                const ScreenComponent = screenConfig[item.screen].component;
+                const ScreenComponent = screenConfig[item.screen]?.component;
+                if (!ScreenComponent) return null; // Safety check
                 const isActive = index === stack.length - 1;
                 const isPrevious = index === stack.length - 2;
 
