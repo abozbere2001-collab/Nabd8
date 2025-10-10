@@ -84,11 +84,20 @@ export interface LineupData {
 export interface MatchEvent {
   time: { elapsed: number; extra: number | null; };
   team: { id: number; name: string; logo: string; };
-  player: { id: number; name: string; };
+  player: { id: number | null; name: string; };
   assist: { id: number | null; name: string | null; };
   type: 'Goal' | 'Card' | 'subst' | 'Var';
   detail: string;
   comments: string | null;
+}
+
+export interface Stats { 
+    possessionHome:number; 
+    possessionAway:number; 
+    shotsHome:number; 
+    shotsAway:number; 
+    foulsHome:number; 
+    foulsAway:number; 
 }
 
 

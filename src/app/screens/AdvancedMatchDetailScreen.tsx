@@ -1,14 +1,12 @@
-
 // AdvancedMatchDetailPage.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
 import "./AdvancedMatchDetailScreen.css";
+import type { Player, MatchEvent as Event, Stats, LineupData } from "@/lib/types";
+import { ScreenHeader } from "@/components/ScreenHeader";
 
-// ====== أنواع البيانات ======
-interface Player { name:string; number:number; position:string; image:string; }
-interface Event { type:"goal"|"yellowCard"|"redCard"|"substitution"; team:"home"|"away"; player:string; minute:number; subIn?:string; subOut?:string; }
-interface Stats { possessionHome:number; possessionAway:number; shotsHome:number; shotsAway:number; foulsHome:number; foulsAway:number; }
+
 interface MatchData {
   homeTeam:string; awayTeam:string; homeLogo:string; awayLogo:string;
   date:string; stadium:string; time:string;
@@ -28,37 +26,37 @@ const mockData:MatchData = {
   date:"12/10/2025", stadium:"سانتياغو برنابيو", time:"21:00",
   status:"live",
   events:[
-    {type:"goal",team:"home",player:"مودريتش",minute:15},
-    {type:"yellowCard",team:"away",player:"ميسي",minute:23},
-    {type:"redCard",team:"home",player:"راموس",minute:45},
-    {type:"substitution",team:"away",player:"بيكيه",minute:60,subOut:"بيكيه",subIn:"أراوخو"},
-    {type:"goal",team:"away",player:"ميسي",minute:70}
+    {type:"Goal",team:{id: 541, name: 'Real Madrid', logo: ''},player:{id: 14, name:"مودريتش"},assist: {id:null, name: null}, time:{elapsed: 15, extra: null}, detail: "Normal Goal", comments: null},
+    {type:"Card",team:{id: 529, name: 'Barcelona', logo: ''},player:{id: 874, name:"ميسي"},assist: {id:null, name: null}, time:{elapsed: 23, extra: null}, detail: "Yellow Card", comments: null},
+    {type:"Card",team:{id: 541, name: 'Real Madrid', logo: ''},player:{id: 145, name:"راموس"},assist: {id:null, name: null}, time:{elapsed: 45, extra: null}, detail: "Red Card", comments: null},
+    {type:"subst",team:{id: 529, name: 'Barcelona', logo: ''},player:{id: 3446, name:"أراوخو"},assist: {id:154, name: "بيكيه"}, time:{elapsed: 60, extra: null}, detail: "Substitution", comments: null},
+    {type:"Goal",team:{id: 529, name: 'Barcelona', logo: ''},player:{id: 874, name:"ميسي"},assist: {id:null, name: null}, time:{elapsed: 70, extra: null}, detail: "Normal Goal", comments: null}
   ],
   homeFormation:[
-    {name:"كورتوا",number:1,position:"GK",image:"https://media.api-sports.io/football/players/184.png"},
-    {name:"راموس",number:4,position:"DEF",image:"https://media.api-sports.io/football/players/145.png"},
-    {name:"كارفاخال",number:2,position:"DEF",image:"https://media.api-sports.io/football/players/58.png"},
-    {name:"مودريتش",number:10,position:"MID",image:"https://media.api-sports.io/football/players/14.png"},
-    {name:"كروس",number:8,position:"MID",image:"https://media.api-sports.io/football/players/15.png"},
-    {name:"بنزيما",number:9,position:"FWD",image:"https://media.api-sports.io/football/players/37.png"},
-    {name:"فينيسيوس",number:20,position:"FWD",image:"https://media.api-sports.io/football/players/3530.png"}
+    {id: 184, name:"كورتوا",number:1,position:"G",image:"https://media.api-sports.io/football/players/184.png"},
+    {id: 145, name:"راموس",number:4,position:"D",image:"https://media.api-sports.io/football/players/145.png"},
+    {id: 58, name:"كارفاخال",number:2,position:"D",image:"https://media.api-sports.io/football/players/58.png"},
+    {id: 14, name:"مودريتش",number:10,position:"M",image:"https://media.api-sports.io/football/players/14.png"},
+    {id: 15, name:"كروس",number:8,position:"M",image:"https://media.api-sports.io/football/players/15.png"},
+    {id: 37, name:"بنزيما",number:9,position:"F",image:"https://media.api-sports.io/football/players/37.png"},
+    {id: 3530, name:"فينيسيوس",number:20,position:"F",image:"https://media.api-sports.io/football/players/3530.png"}
   ],
   awayFormation:[
-    {name:"تير شتيجن",number:1,position:"GK",image:"https://media.api-sports.io/football/players/153.png"},
-    {name:"بيكيه",number:3,position:"DEF",image:"https://media.api-sports.io/football/players/154.png"},
-    {name:"ألبا",number:18,position:"DEF",image:"https://media.api-sports.io/football/players/157.png"},
-    {name:"بوسكيتس",number:5,position:"MID",image:"https://media.api-sports.io/football/players/164.png"},
-    {name:"دي يونغ",number:21,position:"MID",image:"https://media.api-sports.io/football/players/1627.png"},
-    {name:"ميسي",number:10,position:"FWD",image:"https://media.api-sports.io/football/players/874.png"},
-    {name:"أوباميانغ",number:14,position:"FWD",image:"https://media.api-sports.io/football/players/94.png"}
+    {id: 153, name:"تير شتيجن",number:1,position:"G",image:"https://media.api-sports.io/football/players/153.png"},
+    {id: 154, name:"بيكيه",number:3,position:"D",image:"https://media.api-sports.io/football/players/154.png"},
+    {id: 157, name:"ألبا",number:18,position:"D",image:"https://media.api-sports.io/football/players/157.png"},
+    {id: 164, name:"بوسكيتس",number:5,position:"M",image:"https://media.api-sports.io/football/players/164.png"},
+    {id: 1627, name:"دي يونغ",number:21,position:"M",image:"https://media.api-sports.io/football/players/1627.png"},
+    {id: 874, name:"ميسي",number:10,position:"F",image:"https://media.api-sports.io/football/players/874.png"},
+    {id: 94, name:"أوباميانغ",number:14,position:"F",image:"https://media.api-sports.io/football/players/94.png"}
   ],
   substitutesHome:[
-    {name:"أسينسيو",number:11,position:"MID",image:"https://media.api-sports.io/football/players/16.png"},
-    {name:"لوكاس فاسكيز",number:17,position:"FWD",image:"https://media.api-sports.io/football/players/68.png"}
+    {id: 16, name:"أسينسيو",number:11,position:"M",image:"https://media.api-sports.io/football/players/16.png"},
+    {id: 68, name:"لوكاس فاسكيز",number:17,position:"F",image:"https://media.api-sports.io/football/players/68.png"}
   ],
   substitutesAway:[
-    {name:"أراوخو",number:4,position:"DEF",image:"https://media.api-sports.io/football/players/3446.png"},
-    {name:"غريزمان",number:7,position:"FWD",image:"https://media.api-sports.io/football/players/95.png"}
+    {id: 3446, name:"أراوخو",number:4,position:"D",image:"https://media.api-sports.io/football/players/3446.png"},
+    {id: 95, name:"غريزمان",number:7,position:"F",image:"https://media.api-sports.io/football/players/95.png"}
   ],
   coachHome:"أنشيلوتي",
   coachAway:"تشافي",
@@ -67,13 +65,13 @@ const mockData:MatchData = {
 
 // ====== مكون التشكيلة الكامل ======
 const FormationCard:React.FC<{team:string; players?:Player[]; substitutes?:Player[]; coach?:string;}> = ({team,players,substitutes,coach})=>{
-  const positions:Record<string,Player[]> = {GK:[],DEF:[],MID:[],FWD:[]};
+  const positions:Record<string,Player[]> = {G:[],D:[],M:[],F:[]};
   if (players) {
       players.forEach(p=>{
-        if(p.position.includes("GK")) positions.GK.push(p);
-        else if(p.position.includes("DEF")) positions.DEF.push(p);
-        else if(p.position.includes("MID")) positions.MID.push(p);
-        else positions.FWD.push(p);
+        const pos = p.position;
+        if(positions[pos]) {
+           positions[pos].push(p);
+        }
       });
   }
 
@@ -82,10 +80,10 @@ const FormationCard:React.FC<{team:string; players?:Player[]; substitutes?:Playe
     <div className="formation-card card mb-4">
       <h3 className="text-xl font-semibold mb-2">{team}</h3>
       <div className="field">
-        {["FWD","MID","DEF","GK"].map((pos,idx)=>(
+        {["F","M","D","G"].map((pos,idx)=>(
           <div key={idx} className={`line ${pos}`}>
-            {positions[pos].map((p,i)=>(
-              <div key={i} className="player">
+            {positions[pos]?.map((p,i)=>(
+              <div key={`${p.id}-${i}`} className="player">
                 <img src={p.image} alt={p.name}/>
                 <span>{p.number} {p.name}</span>
               </div>
@@ -95,13 +93,13 @@ const FormationCard:React.FC<{team:string; players?:Player[]; substitutes?:Playe
         {coach && <p className="coach">المدرب: {coach}</p>}
       </div>
       {substitutes && substitutes.length>0 && (
-        <div className="substitutes mt-2">
-          <h4>الاحتياط</h4>
-          <div className="flex gap-2">
+        <div className="substitutes">
+          <h4 className="font-bold text-center my-2 text-white">الاحتياط</h4>
+          <div className="flex flex-wrap justify-center gap-2">
             {substitutes.map((s,i)=>(
-              <div key={i} className="substitute">
+              <div key={`${s.id}-${i}`} className="substitute">
                 <img src={s.image} alt={s.name}/>
-                <span>{s.name}</span>
+                <span className="text-xs">{s.name}</span>
               </div>
             ))}
           </div>
@@ -112,7 +110,7 @@ const FormationCard:React.FC<{team:string; players?:Player[]; substitutes?:Playe
 };
 
 // ====== الصفحة النهائية ======
-const AdvancedMatchDetailPage:React.FC<{fixtureId:number}> = ({fixtureId})=>{
+const AdvancedMatchDetailPage:React.FC<{fixtureId:number; goBack: () => void; canGoBack: boolean}> = ({fixtureId, goBack, canGoBack})=>{
   const [match,setMatch]=useState<MatchData>(mockData);
   const [showFormation,setShowFormation]=useState<{home:boolean,away:boolean}>({home:false,away:false});
 
@@ -130,7 +128,8 @@ const AdvancedMatchDetailPage:React.FC<{fixtureId:number}> = ({fixtureId})=>{
   if(!match) return <p>جارٍ تحميل البيانات...</p>;
 
   return (
-    <div className="match-page rtl font-arabic p-4 bg-light">
+    <div className="match-page rtl font-arabic p-4 bg-light flex-1 overflow-y-auto">
+        <ScreenHeader title={`${match.homeTeam} ضد ${match.awayTeam}`} onBack={goBack} canGoBack={canGoBack} />
 
       {/* مربع الفرق */}
       <div className="teams-box flex justify-between mb-4">
@@ -139,8 +138,8 @@ const AdvancedMatchDetailPage:React.FC<{fixtureId:number}> = ({fixtureId})=>{
           {team:"away",name:match.awayTeam,logo:match.awayLogo}
         ].map((t,idx)=>(
           <div key={idx} className="team-card"
-            onClick={()=>setShowFormation(prev=>({...prev,[t.team]:!prev[t.team]}))}>
-            <img src={t.logo} alt={t.name} className="team-logo"/>
+            onClick={()=>setShowFormation(prev=>({home:false, away: false, [t.team]:!prev[t.team as 'home' | 'away']}))}>
+            <img src={t.logo} alt={t.name} className="team-logo object-contain"/>
             <h3 className="team-name">{t.name}</h3>
           </div>
         ))}
@@ -155,16 +154,19 @@ const AdvancedMatchDetailPage:React.FC<{fixtureId:number}> = ({fixtureId})=>{
         <div className="live-card card mb-4">
           <h2 className="text-2xl font-bold text-center text-red-500 animate-pulse mb-2">مباشر الآن</h2>
           {match.events.map((e,idx)=>(
-            <div key={idx} className={`event flex justify-between mb-1 ${e.type}`}>
-              <span>{e.minute}' {e.player}</span>
-              <span>
-                {e.type==="goal" && <span className="goal-icon">⚽</span>}
-                {e.type==="yellowCard" && <span className="yellow-card">🟨</span>}
-                {e.type==="redCard" && <span className="red-card">🟥</span>}
-                {e.type==="substitution" && (
-                  <span className={`substitution ${e.subIn?"in":"out"}`}>{e.subOut} → {e.subIn}</span>
+            <div key={idx} className={`event flex justify-between mb-1 items-center ${e.type}`}>
+              <span>{e.time.elapsed}' {e.player.name}</span>
+               <div className="flex items-center gap-2">
+                {e.type==="Goal" && <span className="goal-icon">⚽</span>}
+                {e.type==="Card" && e.detail === "Yellow Card" && <span className="card-icon yellow-card"></span>}
+                {e.type==="Card" && e.detail === "Red Card" && <span className="card-icon red-card"></span>}
+                {e.type==="subst" && (
+                  <span className="substitution">
+                    <span className="sub-out">↓ {e.assist.name}</span>
+                    <span className="sub-in">↑ {e.player.name}</span>
+                  </span>
                 )}
-              </span>
+              </div>
             </div>
           ))}
         </div>
@@ -173,18 +175,19 @@ const AdvancedMatchDetailPage:React.FC<{fixtureId:number}> = ({fixtureId})=>{
       {/* إحصائيات */}
       {match.stats && (
         <div className="stats-card card p-4">
-          <h2 className="text-2xl font-bold mb-2">إحصائيات المباراة</h2>
-          <div className="stats-grid grid grid-cols-2 gap-4">
-            <div className="home-stats text-left">
-              <p>استحواذ: {match.stats.possessionHome}%</p>
-              <p>تسديدات: {match.stats.shotsHome}</p>
-              <p>أخطاء: {match.stats.foulsHome}</p>
-            </div>
-            <div className="away-stats text-right">
-              <p>استحواذ: {match.stats.possessionAway}%</p>
-              <p>تسديدات: {match.stats.shotsAway}</p>
-              <p>أخطاء: {match.stats.foulsAway}</p>
-            </div>
+          <h2 className="text-2xl font-bold mb-2 text-center">إحصائيات المباراة</h2>
+          <div className="stats-grid grid grid-cols-3 gap-2 items-center">
+            <div className="home-stats text-right font-bold">{match.stats.possessionHome}%</div>
+            <div className="text-center text-muted-foreground">الاستحواذ</div>
+            <div className="away-stats text-left font-bold">{match.stats.possessionAway}%</div>
+            
+            <div className="home-stats text-right font-bold">{match.stats.shotsHome}</div>
+            <div className="text-center text-muted-foreground">التسديدات</div>
+            <div className="away-stats text-left font-bold">{match.stats.shotsAway}</div>
+
+            <div className="home-stats text-right font-bold">{match.stats.foulsHome}</div>
+            <div className="text-center text-muted-foreground">الأخطاء</div>
+            <div className="away-stats text-left font-bold">{match.stats.foulsAway}</div>
           </div>
         </div>
       )}
