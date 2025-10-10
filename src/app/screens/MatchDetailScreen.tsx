@@ -46,7 +46,7 @@ interface H2HData {
 interface MatchData {
     lineups: LineupData[];
     events: MatchEvent[];
-    stats: any[];
+    stats: { team: Team, statistics: { type: string, value: string | number | null }[] }[];
     standings: Standing[];
     h2h: H2HData[];
     loading: boolean;
@@ -249,7 +249,7 @@ const SubstitutionsView = ({ events, teamId, getPlayerName, onRename }: { events
     );
 };
 
-const LineupField = ({ lineup, events, getPlayerName, getCoachName, onRename }: { lineup: LineupData, events: MatchEvent[], getPlayerName: (id: number, defaultName: string) => string; getCoachName: (id: number, defaultName: string) => string; onRename: (type: RenameType, id: number, name: string) => void }) => {
+const LineupField = ({ lineup, events, getPlayerName, getCoachName, onRename, fixture }: { lineup: LineupData, events: MatchEvent[], getPlayerName: (id: number, defaultName: string) => string; getCoachName: (id: number, defaultName: string) => string; onRename: (type: RenameType, id: number, name: string) => void, fixture: FixtureType }) => {
   const { isAdmin } = useAdmin();
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
     return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا</div>;
@@ -351,7 +351,7 @@ const STATS_TRANSLATIONS: { [key: string]: string } = {
     "Total passes": "إجمالي التمريرات", "Passes accurate": "تمريرات صحيحة", "Passes %": "دقة التمرير",
 };
 
-const StatsView = ({ stats, fixture }: { stats: any[], fixture: FixtureType }) => {
+const StatsView = ({ stats, fixture }: { stats: MatchData['stats'], fixture: FixtureType }) => {
     if (stats.length < 2) return <p className="text-muted-foreground text-center py-4">الإحصائيات غير متاحة</p>;
 
     const homeData = stats.find(s => s.team.id === fixture.teams.home.id);
@@ -524,6 +524,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                                 getPlayerName={getCustomName}
                                 getCoachName={getCustomName}
                                 onRename={handleOpenRename}
+                                fixture={fixture}
                             />
                         }
                         {!lineupToShow && !loading && 
