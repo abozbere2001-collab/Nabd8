@@ -9,7 +9,6 @@ import { IraqScreen } from './screens/IraqScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
-import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
 import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
 import { CommentsScreen } from './screens/CommentsScreen';
@@ -40,14 +39,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User as UserIcon } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
 
-const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> = {
+const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
   Competitions: { component: CompetitionsScreen },
   Iraq: { component: IraqScreen },
   News: { component: NewsScreen },
   Settings: { component: SettingsScreen },
   CompetitionDetails: { component: CompetitionDetailScreen },
-  MatchDetails: { component: MatchDetailScreen },
   TeamDetails: { component: TeamDetailScreen },
   AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen },
   Comments: { component: CommentsScreen },
