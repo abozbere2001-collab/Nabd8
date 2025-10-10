@@ -75,7 +75,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
   }, {} as Record<string, PlayerStats[]>);
 
   const sortedRows = Object.keys(playersByRow)
-    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10)) 
+    .sort((a, b) => parseInt(b, 10) - parseInt(a, 10))
     .map(rowKey => {
         const row = playersByRow[rowKey];
         row.sort((a, b) => parseInt(a.player.grid!.split(':')[1]) - parseInt(b.player.grid!.split(':')[1]));
@@ -130,13 +130,13 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
           <div className="space-y-3">
             {substitutions.map((event, idx) => (
               <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
-                 <div className='flex items-center gap-2 text-green-500'>
+                 <div className='flex items-center gap-2 text-green-500 w-[45%]'>
                     <ArrowUp className="h-4 w-4" />
-                    <span className="font-medium">{getPlayerName(event.player.id, event.player.name)}</span>
+                    <span className="font-medium truncate">{getPlayerName(event.player.id, event.player.name)}</span>
                  </div>
                  <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
-                 <div className='flex items-center gap-2 text-red-500'>
-                    {event.assist?.id && <span className="font-medium">{getPlayerName(event.assist.id, event.assist.name!)}</span>}
+                 <div className='flex items-center gap-2 text-red-500 w-[45%] justify-end'>
+                    {event.assist?.id && <span className="font-medium truncate">{getPlayerName(event.assist.id, event.assist.name!)}</span>}
                     <ArrowDown className="h-4 w-4" />
                  </div>
               </div>
