@@ -1,10 +1,9 @@
 "use client";
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from '@/hooks/use-toast';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { doc, getDocs, collection, setDoc } from 'firebase/firestore';
-import type { Fixture as FixtureType, Player as PlayerType, Team, MatchEvent, Standing, PlayerStats } from '@/lib/types';
+import type { Fixture as FixtureType, Team, MatchEvent, Standing, LineupData } from '@/lib/types';
 import { RenameDialog } from '@/components/RenameDialog';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -18,89 +17,11 @@ import { MatchStatistics } from '@/components/MatchStatistics';
 import { LineupField } from '@/components/LineupField';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { useMatchData } from '@/hooks/useMatchData';
 
-
-interface LineupData {
-  team: Team;
-  coach?: any;
-  formation?: string;
-  startXI: PlayerStats[];
-  substitutes: PlayerStats[];
-}
-
-interface H2HData {
-    fixture: { id: number };
-    teams: { home: Team, away: Team, winner?: boolean | null };
-    goals: { home: number | null, away: number | null };
-}
-
-interface MatchDataHook {
-  lineups: LineupData[];
-  events: MatchEvent[];
-  stats: any[];
-  standings: Standing[];
-  h2h: H2HData[];
-  loading: boolean;
-  error: string | null;
-}
 
 type RenameType = 'team' | 'player' | 'coach';
 
-function useMatchData(fixture?: FixtureType): MatchDataHook {
-  const { toast } = useToast();
-  const [data, setData] = useState<MatchDataHook>({
-    lineups: [], events: [], stats: [], standings: [], h2h: [], loading: true, error: null,
-  });
-
-  const CURRENT_SEASON = useMemo(() => new Date(fixture?.fixture.date || Date.now()).getFullYear(), [fixture]);
-
-  useEffect(() => {
-    if (!fixture) {
-      setData(prev => ({ ...prev, loading: false, error: "لا توجد بيانات مباراة" }));
-      return;
-    }
-    const fetchData = async () => {
-      setData(prev => ({ ...prev, loading: true, error: null }));
-      try {
-        const fixtureId = fixture.fixture.id;
-        const leagueId = fixture.league.id;
-        const teamIds = `${fixture.teams.home.id}-${fixture.teams.away.id}`;
-
-        const [lineupsRes, eventsRes, statsRes, h2hRes, standingsRes] = await Promise.all([
-          fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
-          fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
-          fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
-          fetch(`/api/football/fixtures/headtohead?h2h=${teamIds}`),
-          fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
-        ]);
-        
-        const lineupsDataRaw = lineupsRes.ok ? (await lineupsRes.json()).response || [] : [];
-        const eventsData = eventsRes.ok ? (await eventsRes.json()).response || [] : [];
-        const statsData = statsRes.ok ? (await statsRes.json()).response || [] : [];
-        const h2hData = h2hRes.ok ? (await h2hRes.json()).response || [] : [];
-        const standingsData = standingsRes.ok ? (await standingsRes.json()).response[0]?.league?.standings[0] || [] : [];
-        
-        setData({ 
-            lineups: lineupsDataRaw, 
-            events: eventsData, 
-            stats: statsData, 
-            h2h: h2hData,
-            standings: standingsData, 
-            loading: false, 
-            error: null 
-        });
-
-      } catch (err: any) {
-        console.error("❌ fetch error:", err);
-        toast({ variant: "destructive", title: "خطأ", description: "فشل تحميل بيانات المباراة" });
-        setData(prev => ({ ...prev, loading: false, error: err.message }));
-      }
-    };
-    fetchData();
-  }, [fixture, toast, CURRENT_SEASON]);
-
-  return data;
-}
 
 export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, navigate }: { fixture: FixtureType; goBack: () => void; canGoBack: boolean; navigate: (screen: any, props: any) => void; }) {
   const { lineups, events, stats, h2h, standings, loading, error } = useMatchData(initialFixture);
@@ -391,4 +312,3 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
     </div>
   );
 }
-
