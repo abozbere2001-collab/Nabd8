@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Goal, RectangleVertical, ArrowLeftRight, AlertTriangle } from 'lucide-react';
+import { Goal, RectangleVertical, ArrowLeftRight, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
 import type { MatchEvent as MatchEventType } from '@/lib/types';
 
 
@@ -32,6 +32,57 @@ export function MatchTimeline({ events, homeTeamId, awayTeamId, getPlayerName }:
     return <p className="text-center text-muted-foreground p-4">لا توجد مجريات متاحة لهذه المباراة.</p>;
   }
   
+  const renderEventDetails = (event: MatchEventType) => {
+    if (event.type === 'subst') {
+        return (
+            <div className="flex flex-col text-right">
+                <div className="flex items-center gap-1 text-green-500">
+                    <ArrowUp className="h-3 w-3" />
+                    <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
+                </div>
+                {event.assist?.id && (
+                     <div className="flex items-center gap-1 text-red-500">
+                        <ArrowDown className="h-3 w-3" />
+                        <span className="text-xs">{getPlayerName(event.assist.id, event.assist.name || '')}</span>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    return (
+         <div className="flex flex-col text-right">
+            <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
+            {event.assist?.name && event.type === 'Goal' && <span className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
+        </div>
+    );
+  };
+  
+  const renderAwayEventDetails = (event: MatchEventType) => {
+    if (event.type === 'subst') {
+        return (
+            <div className="flex flex-col text-left">
+                <div className="flex items-center gap-1 text-green-500">
+                    <ArrowUp className="h-3 w-3" />
+                    <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
+                </div>
+                {event.assist?.id && (
+                     <div className="flex items-center gap-1 text-red-500">
+                        <ArrowDown className="h-3 w-3" />
+                        <span className="text-xs">{getPlayerName(event.assist.id, event.assist.name || '')}</span>
+                    </div>
+                )}
+            </div>
+        );
+    }
+      return (
+         <div className="flex flex-col text-left">
+            <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
+            {event.assist?.name && event.type === 'Goal' && <span className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
+        </div>
+    );
+  }
+
   return (
     <Card className="p-2 overflow-hidden">
         <Tabs value={filter} onValueChange={(v) => setFilter(v as any)} className="mb-4 w-full">
@@ -49,22 +100,14 @@ export function MatchTimeline({ events, homeTeamId, awayTeamId, getPlayerName }:
                 const eventContent = (
                     <div className="flex items-center gap-2 w-44">
                         <EventIcon event={event} />
-                        <div className="flex flex-col text-right">
-                            <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
-                            {event.assist?.name && event.type === 'Goal' && <span className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
-                            {event.type === 'subst' && event.assist?.name && <span className="text-xs text-muted-foreground">خروج: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
-                        </div>
+                        {renderEventDetails(event)}
                     </div>
                 );
 
                 const awayEventContent = (
-                     <div className="flex items-center gap-2 w-44 flex-row-reverse">
+                     <div className="flex items-center gap-2 w-44 flex-row-reverse text-left">
                         <EventIcon event={event} />
-                        <div className="flex flex-col text-left">
-                            <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
-                            {event.assist?.name && event.type === 'Goal' && <span className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
-                            {event.type === 'subst' && event.assist?.name && <span className="text-xs text-muted-foreground">خروج: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
-                        </div>
+                        {renderAwayEventDetails(event)}
                     </div>
                 );
                 
