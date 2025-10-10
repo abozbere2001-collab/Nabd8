@@ -21,7 +21,7 @@ import { Progress } from '@/components/ui/progress';
 const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
   const fallbackImage = "https://media.api-sports.io/football/players/0.png";
   const gameStats = player?.statistics?.[0]?.games || {};
-  const playerNumber = player?.player?.number || gameStats.number || "";
+  const playerNumber = player?.player?.number ?? gameStats.number || "";
   
   const rating = player?.player?.rating ?? (gameStats.rating && !isNaN(parseFloat(gameStats.rating))
       ? parseFloat(gameStats.rating).toFixed(1)
@@ -35,8 +35,8 @@ const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
   const getRatingColor = () => {
     if (!rating) return 'bg-gray-500';
     const r = parseFloat(rating);
-    if (r >= 7) return 'bg-green-600';
-    if (r >= 6) return 'bg-yellow-600';
+    if (r >= 8) return 'bg-green-600';
+    if (r >= 7) return 'bg-yellow-600';
     return 'bg-red-600';
   }
 
@@ -196,38 +196,40 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
         return <Clock className="w-5 h-5 text-muted-foreground" />;
     }
 
-    // Sort events by time, descending (90 -> 1)
-    const sortedEvents = [...events].sort((a, b) => b.time.elapsed - a.time.elapsed);
+    // Sort events by time, ascending (1 -> 90) to display from bottom up
+    const sortedEvents = [...events].sort((a, b) => a.time.elapsed - b.time.elapsed);
 
     return (
         <div className="relative px-2 py-8">
             <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
-            {sortedEvents.map((event, index) => {
-                const isHomeEvent = event.team.id === homeTeamId;
-                return (
-                    <div key={index} className={cn("relative flex my-4", !isHomeEvent ? "flex-row-reverse" : "flex-row")}>
-                        <div className="flex-1 text-center px-4">
-                            <div className={cn("flex items-center gap-3 bg-card p-2 rounded-md border w-full", !isHomeEvent ? "flex-row-reverse" : "flex-row")}>
-                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background">
-                                    {getEventIcon(event)}
-                                </div>
-                                <div className={cn("flex-1 text-sm", !isHomeEvent ? "text-right" : "text-left")}>
-                                    <p className="font-semibold">{event.player.name}</p>
-                                    {event.type === 'subst' && event.assist.name ? (
-                                        <p className="text-xs text-muted-foreground">تبديل بـ {event.assist.name}</p>
-                                    ) : (
-                                        <p className="text-xs text-muted-foreground">{event.detail}</p>
-                                    )}
+             <div className="flex flex-col-reverse">
+                {sortedEvents.map((event, index) => {
+                    const isHomeEvent = event.team.id === homeTeamId;
+                    return (
+                        <div key={index} className={cn("relative flex my-4", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
+                             <div className="flex-1 px-4">
+                                <div className={cn("flex items-center gap-3 bg-card p-2 rounded-md border w-full", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
+                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background">
+                                        {getEventIcon(event)}
+                                    </div>
+                                    <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
+                                        <p className="font-semibold">{event.player.name}</p>
+                                        {event.type === 'subst' && event.assist.name ? (
+                                            <p className="text-xs text-muted-foreground">تبديل بـ {event.assist.name}</p>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">{event.detail}</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
+                            <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 z-10 bg-background border rounded-full h-8 w-8 flex items-center justify-center font-bold text-xs">
+                               {event.time.elapsed}'
+                            </div>
+                             <div className="flex-1" />
                         </div>
-                        <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 z-10 bg-background border rounded-full h-8 w-8 flex items-center justify-center font-bold text-xs">
-                           {event.time.elapsed}'
-                        </div>
-                         <div className="flex-1" />
-                    </div>
-                );
-            })}
+                    );
+                })}
+            </div>
         </div>
     );
 };
@@ -244,48 +246,55 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
         );
 
         const fetchPlayerStats = async () => {
-            const playerStatsPromises = allPlayerIds.map(id => 
-                fetch(`/api/football/players?id=${id}&season=${season}`).then(res => res.json())
-            );
-            
-            const playerStatsResponses = await Promise.all(playerStatsPromises);
+            try {
+                const uniquePlayerIds = [...new Set(allPlayerIds)];
+                 const playerStatsPromises = uniquePlayerIds.map(id => 
+                    fetch(`/api/football/players?id=${id}&season=${season}`).then(res => res.json())
+                );
+                
+                const playerStatsResponses = await Promise.all(playerStatsPromises);
 
-            const playerRatingsMap = new Map<number, { photo: string, rating: string, number: number | null }>();
-            playerStatsResponses.forEach(res => {
-                if (res.response && res.response.length > 0) {
-                    const playerInfo = res.response[0];
-                    playerRatingsMap.set(playerInfo.player.id, {
-                        photo: playerInfo.player.photo,
-                        rating: playerInfo.statistics?.[0]?.games?.rating,
-                        number: playerInfo.player.number,
-                    });
-                }
-            });
-
-            const updatedLineups = initialLineups.map(lineup => {
-                const updatePlayer = (p: PlayerWithStats) => {
-                    const stats = playerRatingsMap.get(p.player.id);
-                    if (stats) {
-                        return {
-                            ...p,
-                            player: {
-                                ...p.player,
-                                photo: stats.photo || p.player.photo,
-                                rating: stats.rating || p.player.rating,
-                                number: stats.number ?? p.player.number,
-                            }
-                        };
+                const playerRatingsMap = new Map<number, { photo: string, rating: string | null, number: number | null }>();
+                playerStatsResponses.forEach(res => {
+                    if (res.response && res.response.length > 0) {
+                        const playerInfo = res.response[0];
+                        playerRatingsMap.set(playerInfo.player.id, {
+                            photo: playerInfo.player.photo,
+                            rating: playerInfo.statistics?.[0]?.games?.rating,
+                            number: playerInfo.player.number,
+                        });
                     }
-                    return p;
-                };
+                });
 
-                return {
-                    ...lineup,
-                    startXI: lineup.startXI.map(updatePlayer),
-                    substitutes: lineup.substitutes.map(updatePlayer)
-                };
-            });
-            setLineups(updatedLineups);
+                const updatedLineups = initialLineups.map(lineup => {
+                    const updatePlayer = (p: PlayerWithStats): PlayerWithStats => {
+                        const stats = playerRatingsMap.get(p.player.id);
+                        if (stats) {
+                            return {
+                                ...p,
+                                player: {
+                                    ...p.player,
+                                    photo: stats.photo || p.player.photo,
+                                    rating: stats.rating || p.player.rating,
+                                    number: stats.number ?? p.player.number,
+                                }
+                            };
+                        }
+                        return p;
+                    };
+
+                    return {
+                        ...lineup,
+                        startXI: lineup.startXI.map(updatePlayer),
+                        substitutes: lineup.substitutes.map(updatePlayer)
+                    };
+                });
+                setLineups(updatedLineups);
+            } catch (error) {
+                console.error("Error fetching player stats for lineup:", error);
+                // Don't crash, just use the initial lineups without enhanced stats
+                setLineups(initialLineups);
+            }
         };
         
         fetchPlayerStats();
@@ -305,6 +314,10 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
             const [row, col] = p.player.grid.split(':').map(Number);
             if (!acc[row]) acc[row] = [];
             acc[row][col] = p;
+          } else {
+             // Fallback for players without grid data
+             if (!acc[0]) acc[0] = [];
+             acc[0].push(p);
           }
           return acc;
         }, {} as { [key: number]: PlayerWithStats[] });
@@ -347,15 +360,15 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
                             return (
                                 <div key={p.player.id} className="flex items-center justify-between p-1.5 text-xs">
                                     <div className="flex items-center gap-2">
-                                        <PlayerCard player={p} />
                                         {subbedInEvent && subbedOutPlayer && (
                                             <div className="flex items-center gap-1 text-muted-foreground">
-                                                 <ArrowUp className="h-3 w-3 text-green-500"/>
-                                                 <span className="text-[10px]">({subbedInEvent.time.elapsed}')</span>
-                                                 <PlayerCard player={subbedOutPlayer} />
                                                  <ArrowDown className="h-3 w-3 text-red-500"/>
+                                                 <PlayerCard player={subbedOutPlayer} />
+                                                 <span className="text-[10px]">({subbedInEvent.time.elapsed}')</span>
+                                                 <ArrowUp className="h-3 w-3 text-green-500"/>
                                             </div>
                                         )}
+                                        <PlayerCard player={p} />
                                     </div>
                                     <span className="text-muted-foreground">{p.player.name}</span>
                                 </div>
@@ -500,7 +513,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} />
             <div className="flex-1 overflow-y-auto p-4">
                 <MatchHeaderCard fixture={fixture} />
-                <Tabs defaultValue="details" className="w-full">
+                <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-4 rounded-lg h-auto p-1 bg-card">
                         <TabsTrigger value="details"><ShieldCheck className="w-4 h-4 ml-1" />تفاصيل</TabsTrigger>
                         <TabsTrigger value="events"><Clock className="w-4 h-4 ml-1" />مُجريات</TabsTrigger>
