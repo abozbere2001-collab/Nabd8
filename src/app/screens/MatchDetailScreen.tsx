@@ -54,7 +54,7 @@ interface MatchData {
     loading: boolean;
     error: string | null;
 }
-type RenameType = 'team' | 'player' | 'coach' | 'statistic';
+type RenameType = 'league' | 'team' | 'player' | 'coach' | 'statistic';
 
 
 // --- HOOKS ---
@@ -381,7 +381,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
     const { db } = useFirestore();
     const [renameItem, setRenameItem] = useState<{ id: string | number; name: string; type: RenameType } | null>(null);
     const [isRenameOpen, setRenameOpen] = useState(false);
-    const [customNames, setCustomNames] = useState<{[key: string]: Map<string | number, string>}>({
+    
+    const [customNames, setCustomNames] = useState<{ [key: string]: Map<string | number, string> }>({
+        league: new Map(),
+        team: new Map(),
         player: new Map(),
         coach: new Map(),
         statistic: new Map(),
@@ -389,18 +392,22 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
 
     const fetchCustomNames = useCallback(async () => {
         if (!db) return;
-        const collectionsToFetch = ['playerCustomizations', 'coachCustomizations', 'statisticCustomizations'];
+        const collectionsToFetch = ['leagueCustomizations', 'teamCustomizations', 'playerCustomizations', 'coachCustomizations', 'statisticCustomizations'];
         try {
             const snapshots = await Promise.all(collectionsToFetch.map(c => getDocs(collection(db, c))));
             const names = {
+                league: new Map<number, string>(),
+                team: new Map<number, string>(),
                 player: new Map<number, string>(),
                 coach: new Map<number, string>(),
                 statistic: new Map<string, string>(),
             };
-            snapshots[0].forEach(doc => names.player.set(Number(doc.id), doc.data().customName));
-            snapshots[1].forEach(doc => names.coach.set(Number(doc.id), doc.data().customName));
-            snapshots[2].forEach(doc => names.statistic.set(doc.id, doc.data().customName));
-
+            snapshots[0].forEach(doc => names.league.set(Number(doc.id), doc.data().customName));
+            snapshots[1].forEach(doc => names.team.set(Number(doc.id), doc.data().customName));
+            snapshots[2].forEach(doc => names.player.set(Number(doc.id), doc.data().customName));
+            snapshots[3].forEach(doc => names.coach.set(Number(doc.id), doc.data().customName));
+            snapshots[4].forEach(doc => names.statistic.set(doc.id, doc.data().customName));
+            
             setCustomNames(names as any);
         } catch (error) {
              const permissionError = new FirestorePermissionError({ path: 'customizations', operation: 'list' });
@@ -410,9 +417,14 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
 
     useEffect(() => { fetchCustomNames(); }, [fetchCustomNames]);
     
-    const getCustomName = useCallback((type: 'player' | 'coach' | 'statistic', id: string | number, defaultName: string) => {
+    const getCustomName = useCallback((type: 'league' | 'team' | 'player' | 'coach' | 'statistic', id: string | number, defaultName: string) => {
         return customNames[type]?.get(id) || defaultName;
     }, [customNames]);
+    
+    const displayName = getCustomName('league', fixture.league.id, fixture.league.name);
+    const homeTeamName = getCustomName('team', fixture.teams.home.id, fixture.teams.home.name);
+    const awayTeamName = getCustomName('team', fixture.teams.away.id, fixture.teams.away.name);
+
 
     const handleOpenRename = (type: RenameType, id: string | number, name: string) => {
         setRenameItem({ id, name, type });
@@ -446,20 +458,20 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
     return (
         <div className="flex h-full flex-col bg-background">
             {renameItem && <RenameDialog isOpen={isRenameOpen} onOpenChange={setRenameOpen} currentName={renameItem.name} onSave={handleSaveRename} itemType={renameItem.type} />}
-            <ScreenHeader title={fixture.league.name} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+            <ScreenHeader title={displayName} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
             <div className="p-4 flex-1 overflow-y-auto">
                  <div className="text-center mb-4">
                     <div className="flex justify-around items-center">
                         <div className="flex flex-col items-center gap-2 w-1/3">
                             <Avatar className="h-16 w-16"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                            <h2 className="text-lg font-bold">{fixture.teams.home.name}</h2>
+                            <h2 className="text-lg font-bold">{homeTeamName}</h2>
                         </div>
                         <div className="text-4xl font-bold">
                             {fixture.goals.home ?? '-'} - {fixture.goals.away ?? '-'}
                         </div>
                          <div className="flex flex-col items-center gap-2 w-1/3">
                             <Avatar className="h-16 w-16"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                            <h2 className="text-lg font-bold">{fixture.teams.away.name}</h2>
+                            <h2 className="text-lg font-bold">{awayTeamName}</h2>
                         </div>
                     </div>
                      <p className="text-muted-foreground text-sm mt-2">{fixture.fixture.status.long}</p>
@@ -473,10 +485,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         <TabsTrigger value="standings">الترتيب</TabsTrigger>
                     </TabsList>
                     <TabsContent value="lineups" className="mt-4 space-y-4">
-                        {h2h && h2h.length > 0 && <H2HView h2h={h2h} fixture={fixture} homeName={fixture.teams.home.name} awayName={fixture.teams.away.name} />}
+                        {h2h && h2h.length > 0 && <H2HView h2h={h2h} fixture={fixture} homeName={homeTeamName} awayName={awayTeamName} />}
                         <div className="flex justify-center gap-4">
-                             <Button onClick={() => setActiveLineup('home')} variant={activeLineup === 'home' ? 'default' : 'outline'}>{fixture.teams.home.name}</Button>
-                             <Button onClick={() => setActiveLineup('away')} variant={activeLineup === 'away' ? 'default' : 'outline'}>{fixture.teams.away.name}</Button>
+                             <Button onClick={() => setActiveLineup('home')} variant={activeLineup === 'home' ? 'default' : 'outline'}>{homeTeamName}</Button>
+                             <Button onClick={() => setActiveLineup('away')} variant={activeLineup === 'away' ? 'default' : 'outline'}>{awayTeamName}</Button>
                         </div>
                         {lineupToShow && 
                             <LineupField 

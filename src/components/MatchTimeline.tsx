@@ -1,151 +1,103 @@
-
 "use client";
 import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { FootballIcon } from "./icons/FootballIcon";
+import { motion } from "framer-motion";
+import { FaFutbol, FaExclamationTriangle, FaArrowsRotate } from "react-icons/fa6";
 
+export default function MatchTimeline({ events = [], fixture }) {
+  const [filter, setFilter] = useState("all");
 
-export default function MatchTimeline({ events, fixture }) {
-  const [showAll, setShowAll] = useState(false);
-
-  if (!events || events.length === 0)
+    if (!events || events.length === 0)
     return (
-      <div className="text-center text-gray-400 p-6">
-        ⚠️ لا توجد مجريات متاحة
-      </div>
+      <div className="text-center text-gray-400 p-6">⚠️ لا توجد مجريات متاحة</div>
     );
 
-    const filteredEvents = showAll
-    ? events
-    : events.filter((ev) => ev.type === "Goal");
+  const filteredEvents =
+    filter === "highlight" ? events.filter((e) => e.type === "Goal") : events;
 
-  // ترتيب الأحداث من الأسفل للأعلى (الزمن الحقيقي)
-  const orderedEvents = [...filteredEvents].sort(
-    (a, b) => a.time.elapsed - b.time.elapsed
-  );
+  const getIcon = (type) => {
+    switch (type) {
+      case "Goal":
+        return <FaFutbol className="text-green-500" />;
+      case "Card":
+        return <FaExclamationTriangle className="text-yellow-400" />;
+      case "subst":
+        return <FaArrowsRotate className="text-blue-400" />;
+      default:
+        return <FaFutbol className="text-gray-300" />;
+    }
+  };
+  
+    const isHomeTeam = (teamId) => teamId === fixture.teams.home.id;
+
 
   return (
-    <div className="relative w-full max-w-[650px] mx-auto bg-gradient-to-b from-green-950 via-green-900 to-green-950 rounded-3xl shadow-lg border border-green-800 p-4 my-6">
-      {/* العنوان و الأزرار */}
-      <div className="flex justify-between items-center mb-3">
-        <h2 className="text-green-300 text-lg font-bold">المجريات</h2>
-        <div className="flex gap-2">
-          <Button
-            variant={!showAll ? "default" : "outline"}
-            onClick={() => setShowAll(false)}
-            className="bg-green-700 text-white hover:bg-green-600 px-3 py-1 text-sm rounded-full"
-          >
-            الأبرز
-          </Button>
-          <Button
-            variant={showAll ? "default" : "outline"}
-            onClick={() => setShowAll(true)}
-            className="bg-blue-700 text-white hover:bg-blue-600 px-3 py-1 text-sm rounded-full"
-          >
-            عرض الكل
-          </Button>
-        </div>
+    <div className="relative flex flex-col items-center w-full mt-6">
+      {/* أزرار التبديل */}
+      <div className="flex gap-3 mb-4">
+        <button
+          onClick={() => setFilter("highlight")}
+          className={`px-4 py-1 rounded-full text-sm font-semibold ${
+            filter === "highlight" ? "bg-green-600 text-white" : "bg-gray-200"
+          }`}
+        >
+          الأبرز
+        </button>
+        <button
+          onClick={() => setFilter("all")}
+          className={`px-4 py-1 rounded-full text-sm font-semibold ${
+            filter === "all" ? "bg-green-600 text-white" : "bg-gray-200"
+          }`}
+        >
+          عرض الكل
+        </button>
       </div>
 
-      {/* 🕒 العمود الزمني */}
-      <div className="relative flex justify-center">
-        {/* العمود الأبيض */}
-        <div className="absolute top-0 bottom-0 w-[2px] bg-white rounded-full"></div>
+      {/* عمود الزمن */}
+      <div className="relative w-[90%] sm:w-[70%] md:w-[60%] lg:w-[50%]">
+        <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-white opacity-80 z-0"></div>
 
-        {/* الأحداث */}
-        <div className="flex flex-col w-full">
-          {orderedEvents.map((ev, i) => {
-            const isHomeTeam = ev.team.id === fixture.teams.home.id; // ✅ المضيف يسار، الضيف يمين
-            const alignClass = isHomeTeam ? "justify-start" : "justify-end";
-            const sideOffset = isHomeTeam ? "pr-10" : "pl-10";
-            const bgColor =
-              ev.type === "Goal"
-                ? "bg-green-700/70"
-                : ev.type === "Card"
-                ? "bg-yellow-600/70"
-                : ev.type === "subst"
-                ? "bg-blue-600/50"
-                : "bg-gray-700/30";
-
-            return (
-              <div
-                key={i}
-                className={`flex ${alignClass} items-center w-full py-2 relative`}
+        <div className="flex flex-col-reverse items-center gap-4 mt-4">
+          {filteredEvents
+            .sort((a, b) => a.time.elapsed - b.time.elapsed)
+            .map((event, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className={`relative flex items-center w-full ${
+                  isHomeTeam(event.team.id) ? "justify-end pr-[52%]" : "justify-start pl-[52%]"
+                }`}
               >
+                {/* الحاوية لكل حدث */}
                 <div
-                  className={`flex items-center gap-1 ${sideOffset} w-[40%] max-w-[230px]`}
+                  className={`relative flex items-center gap-2 px-3 py-1.5 rounded-2xl shadow-md text-sm text-white max-w-[140px] ${
+                    isHomeTeam(event.team.id) ? "bg-green-700" : "bg-gray-700"
+                  }`}
                 >
-                  {isHomeTeam && (
-                    <>
-                      <img
-                        src={ev.team.logo}
-                        alt={ev.team.name}
-                        className="w-5 h-5 rounded-full"
-                      />
-                      <div
-                        className={`text-xs md:text-sm text-white p-2 rounded-lg ${bgColor} shadow-md`}
-                      >
-                        <span className="font-semibold">{ev.player?.name}</span>
-                        {ev.type === "Goal" && (
-                           <FootballIcon className="w-4 h-4 inline-block ml-1" />
-                        )}
-                        {ev.assist?.name && (
-                          <span className="text-xs text-gray-300 ml-1">
-                            (مساعدة: {ev.assist.name})
-                          </span>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
+                  <span>{getIcon(event.type)}</span>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-xs">{event.player?.name}</span>
+                    <span className="text-[11px] opacity-80">{event.detail}</span>
+                  </div>
 
-                {/* ✅ النقطة الزمنية البيضاء */}
-                <div className="absolute left-1/2 transform -translate-x-1/2 flex flex-col items-center">
-                  <div className="w-3 h-3 bg-white rounded-full shadow-md"></div>
-                  <span className="text-[10px] text-white mt-1">
-                    {ev.time.elapsed}'
-                    <br />
-                    {ev.time?.timestamp
-                      ? new Date(ev.time.timestamp * 1000).toLocaleTimeString(
-                          "ar-IQ",
-                          { hour: "2-digit", minute: "2-digit" }
-                        )
-                      : ""}
-                  </span>
-                </div>
+                  {/* نقطة العمود */}
+                  <div className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full border border-gray-400 shadow-sm z-10
+                    ${isHomeTeam(event.team.id) ? "-right-4" : "-left-4"}`}></div>
 
-                <div
-                  className={`flex items-center gap-1 ${sideOffset} w-[40%] max-w-[230px]`}
-                >
-                  {!isHomeTeam && (
-                    <>
-                      <div
-                        className={`text-xs md:text-sm text-white p-2 rounded-lg ${bgColor} shadow-md`}
-                      >
-                        <span className="font-semibold">{ev.player?.name}</span>
-                         {ev.type === "Goal" && (
-                           <FootballIcon className="w-4 h-4 inline-block ml-1" />
-                        )}
-                        {ev.assist?.name && (
-                          <span className="text-xs text-gray-300 ml-1">
-                            (مساعدة: {ev.assist.name})
-                          </span>
-                        )}
-                      </div>
-                      <img
-                        src={ev.team.logo}
-                        alt={ev.team.name}
-                        className="w-5 h-5 rounded-full"
-                      />
-                    </>
-                  )}
+                  {/* الوقت الحقيقي */}
+                  <div
+                    className={`absolute top-1/2 -translate-y-1/2 text-[11px] text-white opacity-70 ${
+                      isHomeTeam(event.team.id) ? "-right-10" : "-left-10"
+                    }`}
+                  >
+                    {event.time.elapsed}' 
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              </motion.div>
+            ))}
         </div>
       </div>
     </div>
   );
 }
-    
