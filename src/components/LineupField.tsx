@@ -1,4 +1,3 @@
-
 "use client";
 import React from 'react';
 import { Card } from "@/components/ui/card";
@@ -19,8 +18,10 @@ interface LineupData {
 const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: PlayerStats; onRename: (type: 'player', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; }) => {
   const { player: p, statistics } = player;
   const displayName = getPlayerName(p.id, p.name);
-  const rating = statistics?.[0]?.games?.rating ? parseFloat(statistics[0].games.rating).toFixed(1) : null;
-  const playerNumber = statistics?.[0]?.games?.number || p.number;
+  
+  const gameStats = statistics && statistics.length > 0 ? statistics[0].games : null;
+  const rating = gameStats?.rating ? parseFloat(gameStats.rating).toFixed(1) : null;
+  const playerNumber = gameStats?.number || p.number;
 
   return (
     <div className="relative flex flex-col items-center text-white text-xs w-16 text-center">
@@ -75,7 +76,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
   }, {} as Record<string, PlayerStats[]>);
 
   const sortedRows = Object.keys(playersByRow)
-    .sort((a, b) => parseInt(b, 10) - parseInt(a, 10))
+    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10)) 
     .map(rowKey => {
         const row = playersByRow[rowKey];
         row.sort((a, b) => parseInt(a.player.grid!.split(':')[1]) - parseInt(b.player.grid!.split(':')[1]));
@@ -149,33 +150,35 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
         <div className="mt-4 border-t border-border pt-4">
           <h4 className="text-center font-bold mb-2">الاحتياط</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {lineup.substitutes.map((p) => (
-              <div key={p.player.id} className="relative flex items-center gap-3 p-2 rounded-lg border bg-background/40">
-                   {isAdmin && (
-                    <Button
-                        variant="ghost" size="icon"
-                        className="absolute top-1 right-1 h-7 w-7 z-10"
-                        onClick={(e) => { e.stopPropagation(); onRename('player', p.player.id, getPlayerName(p.player.id, p.player.name)); }}
-                    >
-                        <Pencil className="h-4 w-4" />
-                    </Button>
-                    )}
-                  <Avatar className="h-10 w-10">
-                      <AvatarImage src={p.player.photo} />
-                      <AvatarFallback><User /></AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <span className="text-sm font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
-                     {(p.statistics && p.statistics.length > 0 && p.statistics[0]?.games?.number || p.player.number) && <p className="text-xs text-muted-foreground">الرقم: {p.statistics[0]?.games?.number || p.player.number}</p>}
-                  </div>
+            {lineup.substitutes.map((p) => {
+              const gameStats = p.statistics && p.statistics.length > 0 ? p.statistics[0].games : null;
+              const playerNumber = gameStats?.number || p.player.number;
+              return (
+                <div key={p.player.id} className="relative flex items-center gap-3 p-2 rounded-lg border bg-background/40">
+                     {isAdmin && (
+                      <Button
+                          variant="ghost" size="icon"
+                          className="absolute top-1 right-1 h-7 w-7 z-10"
+                          onClick={(e) => { e.stopPropagation(); onRename('player', p.player.id, getPlayerName(p.player.id, p.player.name)); }}
+                      >
+                          <Pencil className="h-4 w-4" />
+                      </Button>
+                      )}
+                    <Avatar className="h-10 w-10">
+                        <AvatarImage src={p.player.photo} />
+                        <AvatarFallback><User /></AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <span className="text-sm font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
+                       {playerNumber && <p className="text-xs text-muted-foreground">الرقم: {playerNumber}</p>}
+                    </div>
 
-              </div>
-            ))}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
     </Card>
   );
 }
-
-    
