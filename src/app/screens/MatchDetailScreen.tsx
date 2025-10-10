@@ -159,16 +159,16 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
 
   const renderTabs = () => {
     const availableTabs = [
-      { key: 'details', label: 'تفاصيل' },
-      { key: 'lineups', label: 'التشكيلة', condition: lineups && lineups.length > 0 },
       { key: 'events', label: 'المجريات', condition: events && events.length > 0 },
+      { key: 'lineups', label: 'التشكيلة', condition: lineups && lineups.length > 0 },
       { key: 'stats', label: 'الإحصائيات', condition: stats && stats.length > 0 },
       { key: 'standings', label: 'الترتيب', condition: standings && standings.length > 0 },
+      { key: 'details', label: 'تفاصيل' },
     ];
     return availableTabs.filter(tab => tab.condition !== false);
   };
   
-  const TABS = renderTabs();
+  const TABS = useMemo(renderTabs, [events, lineups, stats, standings]);
   const [activeTab, setActiveTab] = useState(TABS[0]?.key || 'details');
 
   useEffect(() => {
@@ -178,7 +178,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
             setActiveTab(newTabs[0].key);
           }
       }
-  }, [loading, activeTab, TABS]);
+  }, [loading, activeTab]);
 
   if (loading) {
       return (
@@ -230,7 +230,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
             </div>
         </div>
 
-        <Tabs defaultValue="details" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs defaultValue={TABS[0]?.key || 'details'} value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-5 h-auto">
                 {TABS.map(tab => <TabsTrigger key={tab.key} value={tab.key}>{tab.label}</TabsTrigger>)}
             </TabsList>
@@ -341,5 +341,3 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
     </div>
   );
 }
-
-    

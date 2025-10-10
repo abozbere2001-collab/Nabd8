@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
@@ -55,6 +56,17 @@ export function MatchTimeline({ events, homeTeamId, awayTeamId, getPlayerName }:
                         </div>
                     </div>
                 );
+
+                const awayEventContent = (
+                     <div className="flex items-center gap-2 w-44 flex-row-reverse">
+                        <EventIcon event={event} />
+                        <div className="flex flex-col text-left">
+                            <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
+                            {event.assist?.name && event.type === 'Goal' && <span className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
+                            {event.type === 'subst' && event.assist?.name && <span className="text-xs text-muted-foreground">خروج: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
+                        </div>
+                    </div>
+                );
                 
                 const timeIndicator = (
                     <div className="absolute left-1/2 -translate-x-1/2 bg-card border-2 border-primary rounded-full h-8 w-8 flex items-center justify-center text-xs font-bold z-10">
@@ -63,21 +75,17 @@ export function MatchTimeline({ events, homeTeamId, awayTeamId, getPlayerName }:
                 );
 
                 return (
-                    <div key={idx} className="relative flex items-center justify-center my-4 h-12">
+                    <div key={idx} className="relative flex items-center justify-between my-4 h-12">
+                        {/* Away team event (left side) */}
+                        <div className="w-1/2 flex justify-start pl-4">
+                           {!isHomeEvent && awayEventContent}
+                        </div>
+
                        {timeIndicator}
-                        <div className={`w-1/2 flex ${isHomeEvent ? 'justify-end pr-12' : 'justify-start pl-12'}`}>
-                            {isHomeEvent ? (
-                                eventContent
-                            ) : (
-                                <div className="flex items-center gap-2 w-44 flex-row-reverse">
-                                    <EventIcon event={event} />
-                                    <div className="flex flex-col text-left">
-                                        <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
-                                        {event.assist?.name && event.type === 'Goal' && <span className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
-                                        {event.type === 'subst' && event.assist?.name && <span className="text-xs text-muted-foreground">خروج: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
-                                    </div>
-                                </div>
-                            )}
+                       
+                       {/* Home team event (right side) */}
+                        <div className="w-1/2 flex justify-end pr-4">
+                           {isHomeEvent && eventContent}
                         </div>
                     </div>
                 );
