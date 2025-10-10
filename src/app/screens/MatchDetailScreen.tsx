@@ -1,15 +1,17 @@
+
 "use client";
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from '@/hooks/use-toast';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { doc, getDocs, collection, setDoc } from 'firebase/firestore';
-import type { Fixture as FixtureType, Player as PlayerType, Team, MatchEvent } from '@/lib/types';
-import { MatchView } from '@/components/MatchView'; 
+import type { Fixture as FixtureType, Player as PlayerType, Team, MatchEvent, Standing } from '@/lib/types';
+import { MatchPage } from '@/components/MatchView'; 
 import { RenameDialog } from '@/components/RenameDialog';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 interface PlayerWithStats {
   player: PlayerType & { pos?: string };
@@ -23,34 +25,29 @@ interface LineupData {
   substitutes?: PlayerWithStats[];
 }
 
-interface MatchDataForView {
-  lineup?: LineupData;
-  events?: MatchEvent[];
-  statistics?: any;
-  date?: string;
-  time?: string;
-  venue?: string;
-  // Other fields as needed by MatchView
+interface H2HData {
+    fixture: { id: number };
+    teams: { home: Team, away: Team };
+    goals: { home: number, away: number };
 }
 
+interface MatchDataHook {
+  lineups: LineupData[];
+  events: MatchEvent[];
+  stats: any[];
+  standings: Standing[];
+  h2h: H2HData[];
+  players: PlayerType[];
+  loading: boolean;
+  error: string | null;
+}
 
 type RenameType = 'team' | 'player' | 'coach';
 
-// Data fetching hook remains mostly the same
-function useMatchData(fixture?: FixtureType) {
+function useMatchData(fixture?: FixtureType): MatchDataHook {
   const { toast } = useToast();
-  const [data, setData] = useState<{
-    lineups: LineupData[];
-    events: MatchEvent[];
-    stats: any[];
-    loading: boolean;
-    error: string | null;
-  }>({
-    lineups: [],
-    events: [],
-    stats: [],
-    loading: true,
-    error: null,
+  const [data, setData] = useState<MatchDataHook>({
+    lineups: [], events: [], stats: [], standings: [], h2h: [], players: [], loading: true, error: null,
   });
 
   const CURRENT_SEASON = useMemo(() => new Date(fixture?.fixture.date || Date.now()).getFullYear(), [fixture]);
@@ -64,37 +61,38 @@ function useMatchData(fixture?: FixtureType) {
       setData(prev => ({ ...prev, loading: true, error: null }));
       try {
         const fixtureId = fixture.fixture.id;
-        
-        const [lineupsRes, eventsRes, statsRes] = await Promise.all([
+        const leagueId = fixture.league.id;
+        const teamIds = `${fixture.teams.home.id}-${fixture.teams.away.id}`;
+
+        const [lineupsRes, eventsRes, statsRes, h2hRes, playersRes] = await Promise.all([
           fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
           fetch(`/api/football/statistics?fixture=${fixtureId}`),
+          fetch(`/api/football/fixtures/headtohead?h2h=${teamIds}`),
+          fetch(`/api/football/players?league=${leagueId}&season=${CURRENT_SEASON}`),
         ]);
 
         const lineupsData = lineupsRes.ok ? (await lineupsRes.json()).response || [] : [];
         const eventsData = eventsRes.ok ? (await eventsRes.json()).response || [] : [];
         const statsData = statsRes.ok ? (await statsRes.json()).response || [] : [];
-
-        // Fetch player photos if missing
-        for (let lineup of lineupsData) {
-          const res = await fetch(`/api/football/players?team=${lineup.team.id}&season=${CURRENT_SEASON}`);
-          if (res.ok) {
-            const json = await res.json();
-            const map = new Map(json.response.map((p: any) => [p.player.id, p.player.photo]));
-            lineup.startXI.forEach((p: any) => {
-              if (!p.player.photo && map.has(p.player.id)) p.player.photo = map.get(p.player.id);
-            });
-            lineup.substitutes.forEach((p: any) => {
-              if (!p.player.photo && map.has(p.player.id)) p.player.photo = map.get(p.player.id);
-            });
-          }
-        }
-        setData({ lineups: lineupsData, events: eventsData, stats: statsData, loading: false, error: null });
+        const h2hData = h2hRes.ok ? (await h2hRes.json()).response || [] : [];
+        const playersData = playersRes.ok ? (await playersRes.json()).response || [] : [];
+        
+        setData({ 
+            lineups: lineupsData, 
+            events: eventsData, 
+            stats: statsData, 
+            h2h: h2hData,
+            players: playersData,
+            standings: [], // This might need a separate fetch if required
+            loading: false, 
+            error: null 
+        });
 
       } catch (err: any) {
         console.error("❌ fetch error:", err);
         toast({ variant: "destructive", title: "خطأ", description: "فشل تحميل بيانات المباراة" });
-        setData({ lineups: [], events: [], stats: [], loading: false, error: err.message });
+        setData(prev => ({ ...prev, loading: false, error: err.message }));
       }
     };
     fetchData();
@@ -103,9 +101,8 @@ function useMatchData(fixture?: FixtureType) {
   return data;
 }
 
-// The main screen component now fetches data and passes it to MatchView
 export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, navigate }: { fixture: FixtureType; goBack: () => void; canGoBack: boolean; navigate: (screen: any, props: any) => void; }) {
-  const { lineups, events, stats, loading, error } = useMatchData(initialFixture);
+  const { lineups, events, stats, h2h, players, loading, error } = useMatchData(initialFixture);
   const { isAdmin } = useAdmin();
   const { db } = useFirestore();
 
@@ -113,7 +110,6 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
   const [isRenameOpen, setRenameOpen] = useState(false);
   const [customPlayerNames, setCustomPlayerNames] = useState<Map<number, string>>(new Map());
 
-  // Fetch custom names
   const fetchCustomNames = useCallback(async () => {
     if (!db) return;
     const playersColRef = collection(db, 'playerCustomizations');
@@ -123,7 +119,11 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
         playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
         setCustomPlayerNames(playerNames);
     } catch (e) {
-        console.error("Error fetching custom names:", e);
+      const permissionError = new FirestorePermissionError({
+          path: `playerCustomizations`,
+          operation: 'list',
+      });
+      errorEmitter.emit('permission-error', permissionError);
     }
   }, [db]);
 
@@ -144,8 +144,18 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
     if (!renameItem || !db) return;
     const { id, type } = renameItem;
     const collectionName = `${type}Customizations`;
-    await setDoc(doc(db, collectionName, String(id)), { customName: newName });
-    fetchCustomNames(); // Refresh names after saving
+    const docRef = doc(db, collectionName, String(id));
+    try {
+      await setDoc(docRef, { customName: newName });
+      fetchCustomNames(); 
+    } catch(e) {
+      const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'create',
+          requestResourceData: { customName: newName }
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    }
   };
 
 
@@ -171,15 +181,27 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
       )
   }
 
-  // Construct the single `match` prop for MatchView
-  const matchDataForView = (teamId: number): MatchDataForView => ({
-    lineup: lineups.find(l => l.team.id === teamId),
-    events: events,
-    statistics: stats.find(s => s.team.id === teamId),
-    date: new Date(initialFixture.fixture.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }),
-    time: new Date(initialFixture.fixture.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-    venue: initialFixture.fixture.venue.name || 'غير محدد',
-  });
+  const constructMatchDataForView = (teamId: number) => {
+    const wins = h2h.filter(m => m.teams.home.id === teamId ? m.teams.home.winner : m.teams.away.winner).length;
+    const draws = h2h.filter(m => m.teams.home.winner === false && m.teams.away.winner === false).length;
+    const total = h2h.length;
+    const winPercentage = total > 0 ? (wins / total * 100).toFixed(0) : 0;
+    const drawPercentage = total > 0 ? (draws / total * 100).toFixed(0) : 0;
+
+
+    return {
+      lineup: lineups.find(l => l.team.id === teamId),
+      events: events,
+      stats: stats.find(s => s.team.id === teamId),
+      details: {
+          date: new Date(initialFixture.fixture.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }),
+          time: new Date(initialFixture.fixture.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+          stadium: initialFixture.fixture.venue.name || 'غير محدد',
+          predictions: `نسبة الفوز: ${winPercentage}%`,
+          history: `من أصل ${total} مواجهات، فاز ${wins} وتعادل ${draws}`
+      },
+    };
+  };
 
   return (
     <div className="flex flex-col bg-background h-full">
@@ -193,18 +215,16 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
             <TabsTrigger value="away">{initialFixture.teams.away.name}</TabsTrigger>
           </TabsList>
           <TabsContent value="home">
-            <MatchView 
-              match={matchDataForView(initialFixture.teams.home.id)}
-              homeTeamId={initialFixture.teams.home.id}
+            <MatchPage 
+              match={constructMatchDataForView(initialFixture.teams.home.id)}
               onRenamePlayer={handleRenamePlayer}
               isAdmin={!!isAdmin}
               getPlayerName={getPlayerName}
             />
           </TabsContent>
            <TabsContent value="away">
-             <MatchView 
-              match={matchDataForView(initialFixture.teams.away.id)}
-              homeTeamId={initialFixture.teams.home.id}
+             <MatchPage
+              match={constructMatchDataForView(initialFixture.teams.away.id)}
               onRenamePlayer={handleRenamePlayer}
               isAdmin={!!isAdmin}
               getPlayerName={getPlayerName}
