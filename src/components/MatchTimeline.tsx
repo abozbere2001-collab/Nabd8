@@ -42,17 +42,18 @@ export function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: M
             <TabsTrigger value="highlights">الأبرز</TabsTrigger>
             </TabsList>
         </Tabs>
-        <div className="relative flex flex-col-reverse p-4">
+        <div className="relative p-4" style={{ minHeight: `${filteredEvents.length * 5}rem`}}>
             {/* The vertical line */}
             <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
             
             {filteredEvents.map((event, idx) => {
                 const isHomeEvent = event.team.id === homeTeamId;
+                const bottomPosition = `${(event.time.elapsed / maxTime) * 100}%`;
                 
                 const eventContent = (
-                    <div className={`flex items-center gap-2 w-44 ${isHomeEvent ? 'flex-row-reverse' : ''}`}>
+                    <div className={`flex items-center gap-2 w-44 ${isHomeEvent ? 'flex-row-reverse text-right' : 'text-left'}`}>
                         <EventIcon event={event} />
-                        <div className={`flex flex-col ${isHomeEvent ? 'text-right' : 'text-left'}`}>
+                        <div className="flex flex-col">
                             <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
                             {event.assist?.name && event.type === 'Goal' && <span className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
                             {event.type === 'subst' && event.assist?.name && <span className="text-xs text-muted-foreground">خروج: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
@@ -66,19 +67,26 @@ export function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: M
                     </div>
                 );
 
-                const bottomPosition = `${(event.time.elapsed / maxTime) * 100}%`;
-
                 return (
-                    <div key={idx} className="relative flex justify-center h-16" style={{ marginBottom: '-1rem' }}>
-                       <div className="absolute w-full" style={{ bottom: bottomPosition }}>
-                         <div className="relative flex items-center h-0">
+                    <div key={idx} className="absolute w-full" style={{ bottom: bottomPosition, transform: 'translateY(50%)'}}>
+                       <div className="relative flex items-center justify-center h-0">
                            {timeIndicator}
-                           {isHomeEvent ? (
-                               <div className="absolute right-[55%] flex justify-end">{eventContent}</div>
-                           ) : (
-                               <div className="absolute left-[55%] flex justify-start">{eventContent}</div>
-                           )}
-                         </div>
+                           <div className="absolute w-full flex justify-center">
+                               {isHomeEvent ? (
+                                   <div className="w-1/2 flex justify-start pl-10">{eventContent}</div>
+                               ) : (
+                                   <div className="w-1/2"></div>
+                               )}
+                               <div className="w-1/2"></div>
+                           </div>
+                           <div className="absolute w-full flex justify-center">
+                               <div className="w-1/2"></div>
+                               {!isHomeEvent ? (
+                                   <div className="w-1/2 flex justify-end pr-10">{eventContent}</div>
+                               ) : (
+                                   <div className="w-1/2"></div>
+                               )}
+                           </div>
                        </div>
                     </div>
                 );

@@ -41,13 +41,16 @@ export function MatchStatistics({ homeStats, awayStats }: { homeStats?: any[], a
                 const homePercentage = total > 0 ? (homeValue / total) * 100 : 50;
 
                 return (
-                    <div key={stat.type} className="space-y-1">
-                        <div className="flex justify-between items-center text-sm font-semibold">
+                    <div key={stat.type} className="space-y-1" dir="ltr">
+                        <div className="flex justify-between items-center text-sm font-semibold text-right" dir="rtl">
                             <span>{stat.value ?? 0}</span>
-                            <span className="text-muted-foreground">{getTranslatedStat(stat.type)}</span>
+                            <span className="text-muted-foreground text-center">{getTranslatedStat(stat.type)}</span>
                             <span>{awayStat?.value ?? 0}</span>
                         </div>
-                        <Progress value={homePercentage} className="h-2 [&>div]:bg-primary" />
+                        <div className="flex items-center gap-2">
+                           <Progress value={100 - homePercentage} className="h-2 flex-1" />
+                           <Progress value={homePercentage} className="h-2 flex-1" />
+                        </div>
                     </div>
                 );
             })}
