@@ -58,12 +58,11 @@ export interface Player {
   position: string; // Keep as string for flexibility
   photo: string;
   grid?: string | null;
-  rating?: string | null;
 }
 
 
 export interface PlayerWithStats {
-  player: Player;
+  player: Player & { rating?: string | null };
   statistics: {
     games: {
       minutes: number | null;

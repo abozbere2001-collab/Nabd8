@@ -1,8 +1,9 @@
+
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
-import type { Fixture, LineupData, MatchEvent, Standing, MatchStatistics, Player } from '@/lib/types';
+import type { Fixture, LineupData, MatchEvent, Standing, MatchStatistics, Player, PlayerWithStats } from '@/lib/types';
 import './UltimateMatchDetailScreen.css';
 
 // Re-integrated types for clarity within the component
@@ -63,13 +64,12 @@ const PlayerCircle = ({ player }: { player: Player }) => (
 );
 
 const TeamFormation = ({ teamData, teamType }: { teamData: LineupData, teamType: 'home' | 'away' }) => {
-    const formation = teamData.formation.split('-').map(Number);
     const players = teamData.startXI;
     
     const gk = players.filter(p => p.player.grid === '1:1');
-    const defenders = players.filter(p => p.player.grid?.startsWith('2:') || p.player.grid?.startsWith('3:') || p.player.grid?.startsWith('4:') || p.player.grid?.startsWith('5:'));
-    const midfielders = players.filter(p => p.player.grid?.startsWith('6:') || p.player.grid?.startsWith('7:') || p.player.grid?.startsWith('8:'));
-    const attackers = players.filter(p => p.player.grid?.startsWith('9:') || p.player.grid?.startsWith('10:') || p.player.grid?.startsWith('11:'));
+    const defenders = players.filter(p => p.player.grid?.match(/^[2-5]:/));
+    const midfielders = players.filter(p => p.player.grid?.match(/^[6-8]:/));
+    const attackers = players.filter(p => p.player.grid?.match(/^(9|10|11):/));
 
     const pitchRows = [attackers, midfielders, defenders, gk];
     if (teamType === 'away') pitchRows.reverse();
@@ -152,10 +152,30 @@ export function UltimateMatchDetailScreen({ fixtureId, goBack, canGoBack }: Scre
             const season = currentFixture.league.season;
             const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${season}`);
             const standingsData = await standingsRes.json();
+            
+            const fullLineups = lineupsData.response || [];
+            if (fullLineups.length > 0) {
+                 const playersWithRatingsRes = await fetch(`/api/football/players?fixture=${fixtureId}`);
+                 const playersWithRatingsData = await playersWithRatingsRes.json();
+                 const playersRatingsMap = new Map<number, PlayerWithStats>();
+                 playersWithRatingsData.response.forEach((item: {player: Player, statistics: any[]}) => {
+                     playersRatingsMap.set(item.player.id, item as PlayerWithStats);
+                 });
+                 
+                 fullLineups.forEach((lineup: LineupData) => {
+                     lineup.startXI.forEach(starter => {
+                         const ratedPlayer = playersRatingsMap.get(starter.player.id);
+                         if (ratedPlayer) {
+                             starter.player.rating = ratedPlayer.statistics?.[0]?.games?.rating;
+                         }
+                     });
+                 });
+            }
+
 
             setMatch({
                 fixture: currentFixture,
-                lineups: lineupsData.response || [],
+                lineups: fullLineups,
                 events: eventsData.response || [],
                 statistics: statsData.response || [],
                 standings: standingsData.response?.[0]?.league?.standings?.[0] || [],
@@ -196,11 +216,16 @@ export function UltimateMatchDetailScreen({ fixtureId, goBack, canGoBack }: Scre
     const awayStats = statistics.find(s => s.team.id === awayTeam.id)?.statistics;
     
     const getStat = (stats: MatchStatistics['statistics'] | undefined, type: string) => stats?.find(s => s.type === type)?.value ?? '-';
+    
+    const statusShort = fixture.fixture.status.short;
+    const isLive = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(statusShort);
+    const isFinished = ['FT', 'AET', 'PEN'].includes(statusShort);
+    const isUpcoming = !isLive && !isFinished;
 
-    const statusClass = fixture.fixture.status.short === 'FT' ? 'finished' : ['HT', '1H', '2H'].includes(fixture.fixture.status.short) ? 'live' : 'upcoming';
+    const statusClass = isFinished ? 'finished' : isLive ? 'live' : 'upcoming';
     const statusText = fixture.fixture.status.long;
 
-    const highlights = events.filter(e => e.type === 'Goal' || e.type === 'Card' && e.detail === 'Red Card');
+    const highlights = events.filter(e => e.type === 'Goal' || (e.type === 'Card' && e.detail === 'Red Card'));
     const sortedEvents = [...events].sort((a, b) => a.time.elapsed - b.time.elapsed);
 
     return (

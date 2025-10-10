@@ -48,6 +48,7 @@ const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> =
   Settings: { component: SettingsScreen },
   CompetitionDetails: { component: CompetitionDetailScreen },
   MatchDetails: { component: UltimateMatchDetailScreen },
+  UltimateMatchDetail: { component: UltimateMatchDetailScreen },
   TeamDetails: { component: TeamDetailScreen },
   AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen },
   Comments: { component: CommentsScreen },
