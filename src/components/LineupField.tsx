@@ -88,15 +88,16 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }
     return acc;
   }, {} as Record<string, PlayerWithStats[]>);
 
-  // Sort rows numerically (desc for GK at bottom) and then players within each row (asc for L->R)
+  // Sort rows numerically (asc) and then reverse for GK at bottom
   const sortedRows = Object.keys(playersByRow)
-    .sort((a, b) => parseInt(b) - parseInt(a)) // Sort rows descending
+    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10)) 
     .map(rowKey => {
         const row = playersByRow[rowKey];
-        // Sort players ascending to fix the horizontal flip
+        // Sort players ascending (left to right)
         row.sort((a, b) => parseInt(a.player.grid!.split(':')[1]) - parseInt(b.player.grid!.split(':')[1]));
         return row;
-    });
+    })
+    .reverse(); // Reverse rows to have Goalkeeper at the bottom
 
 
   const substitutions = events.filter(e => e.type === 'subst' && e.team.id === lineup.team.id);
@@ -109,7 +110,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }
       >
         <div className="absolute inset-0 flex flex-col justify-around p-3">
           {sortedRows.map((row, i) => (
-            <div key={i} className="flex justify-around items-center flex-row-reverse">
+            <div key={i} className="flex justify-around items-center">
               {row.map((p) => (
                 <PlayerOnPitch key={p.player.id} player={p} onRename={onRename} isAdmin={isAdmin} getPlayerName={getPlayerName} />
               ))}
