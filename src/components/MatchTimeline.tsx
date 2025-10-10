@@ -1,82 +1,110 @@
+"use client";
+import React, { useState, useMemo } from "react";
+import { motion } from "framer-motion";
+import { FaFutbol, FaArrowsRotate, FaExclamation } from "react-icons/fa6";
+import { IoSquare } from "react-icons/io5";
 
-// --- Event Timeline Component جاهز للشعارات ---
-import React, { useState, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RectangleVertical, Goal, ArrowLeftRight } from 'lucide-react';
+export default function MatchTimeline({ events = [], fixture }) {
+  const [filter, setFilter] = useState("all");
 
-interface MatchEvent {
-    time: { elapsed: number; extra: number | null };
-    team: { id: number; name: string; logo?: string }; // الشعار اختياري
-    player: { id: number; name: string };
-    assist: { id: number | null; name: string | null };
-    type: 'Goal' | 'Card' | 'subst' | 'Var';
-    detail: string;
-    comments: string | null;
-}
+  const filteredEvents =
+    filter === "highlight" ? events.filter((e) => e.type === "Goal") : events;
 
-export default function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: MatchEvent[], homeTeamId: number, getPlayerName: (id: number, defaultName: string) => string }) {
-    const [filter, setFilter] = useState<'highlights' | 'all'>('all');
-
-    const sortedEvents = useMemo(() => [...events].sort((a, b) => a.time.elapsed - b.time.elapsed), [events]);
-    const filteredEvents = useMemo(() => {
-        if (filter === 'highlights') return sortedEvents.filter(e => e.type === 'Goal');
-        return sortedEvents;
-    }, [sortedEvents, filter]);
-
-    if (!events || events.length === 0) {
-        return <div className="text-muted-foreground text-center py-4">لا توجد أحداث متاحة لعرضها.</div>
+  const getIcon = (type, detail) => {
+    if (type === "Goal") return <FaFutbol className="text-green-400 text-sm" />;
+    if (type === "subst")
+      return <FaArrowsRotate className="text-blue-400 text-sm" />;
+    if (type === "Card") {
+      if (detail === "Yellow Card")
+        return <IoSquare className="text-yellow-400 text-base" />;
+      if (detail === "Red Card")
+        return <IoSquare className="text-red-600 text-base" />;
     }
+    // Fallback for other card types or Var
+    if (type === "Card") return <IoSquare className="text-yellow-400 text-base" />;
+    if (type === "Var") return <FaExclamation className="text-gray-300 text-sm" />;
+    return <FaFutbol className="text-gray-300 text-sm" />;
+  };
 
-    const EventIcon = ({ event }: { event: MatchEvent }) => {
-        if (event.type === 'Goal') return <Goal className="h-5 w-5 text-green-500" />;
-        if (event.type === 'Card' && event.detail === 'Yellow Card') return <RectangleVertical className="h-5 w-5 text-yellow-400" />;
-        if (event.type === 'Card' && (event.detail === 'Red Card' || event.detail === 'Second Yellow card')) return <RectangleVertical className="h-5 w-5 text-red-500" />;
-        if (event.type === 'subst') return <ArrowLeftRight className="h-4 w-4 text-blue-400" />;
-        if (event.type === 'Var') return <span className="text-xs px-1 bg-gray-300 rounded">VAR</span>;
-        return null;
-    };
+  return (
+    <div className="relative flex flex-col items-center w-full mt-6">
+      {/* أزرار التبديل */}
+      <div className="flex gap-3 mb-4">
+        <button
+          onClick={() => setFilter("highlight")}
+          className={`px-4 py-1 rounded-full text-sm font-semibold border transition ${
+            filter === "highlight"
+              ? "bg-green-600 text-white border-green-600 shadow-md"
+              : "bg-white text-gray-800 border-gray-300"
+          }`}
+        >
+          الأبرز
+        </button>
+        <button
+          onClick={() => setFilter("all")}
+          className={`px-4 py-1 rounded-full text-sm font-semibold border transition ${
+            filter === "all"
+              ? "bg-green-600 text-white border-green-600 shadow-md"
+              : "bg-white text-gray-800 border-gray-300"
+          }`}
+        >
+          عرض الكل
+        </button>
+      </div>
 
-    return (
-        <Card className="p-2">
-            <CardContent className="p-2">
-                <Tabs value={filter} onValueChange={(v) => setFilter(v as any)} className="w-full mb-2">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="all">عرض الكل</TabsTrigger>
-                        <TabsTrigger value="highlights">الأبرز</TabsTrigger>
-                    </TabsList>
-                </Tabs>
-                <div className="relative flex justify-center">
-                    {/* العمود الزمني */}
-                    <div className="relative flex flex-col items-center bg-white w-1.5 rounded-full mx-4" style={{ minHeight: '400px' }}>
-                        {Array.from({ length: 91 }).map((_, i) => (
-                            <div key={i} className="w-full h-[2px] border-b border-gray-300 relative">
-                                <span className="absolute -left-10 text-xs text-white">{i + 1}'</span>
-                            </div>
-                        ))}
-                    </div>
+      {/* عمود الزمن */}
+      <div className="relative w-[90%] sm:w-[70%] md:w-[60%] lg:w-[50%]">
+        <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-white opacity-80 z-0"></div>
 
-                    {/* أحداث المباراة */}
-                    <div className="absolute inset-0 flex flex-col justify-between">
-                        {filteredEvents.map((event, idx) => {
-                            const isHome = event.team.id === homeTeamId;
-                            return (
-                                <div key={idx} className={`flex w-full justify-${isHome ? 'start' : 'end'} items-center mb-1`}>
-                                    <div className={`flex items-center gap-2 p-1 rounded ${isHome ? 'bg-blue-600 text-white' : 'bg-green-600 text-white'} max-w-xs`}>
-                                        {/* شعار الفريق عند توفره */}
-                                        {event.team.logo && <img src={event.team.logo} alt={event.team.name} className="h-4 w-4 rounded-full" />}
-                                        <span className="font-semibold text-xs">{getPlayerName(event.player.id, event.player.name)}</span>
-                                        {event.assist.name && <span className="text-xs text-gray-200">({getPlayerName(event.assist.id!, event.assist.name)})</span>}
-                                        <EventIcon event={event} />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+        <div className="flex flex-col-reverse items-center gap-4 mt-4">
+          {filteredEvents
+            .sort((a, b) => a.time.elapsed - b.time.elapsed)
+            .map((event, index) => {
+              const isHome = event.team.id === fixture.teams.home.id;
+              return (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className={`relative flex items-center w-full ${
+                  isHome
+                    ? "justify-start pl-[52%]" // المضيف يسار
+                    : "justify-end pr-[52%]"   // الضيف يمين
+                }`}
+              >
+                {/* الحاوية لكل حدث */}
+                <div
+                  className={`relative flex items-center gap-2 px-3 py-1.5 rounded-2xl shadow-md text-sm text-white max-w-[140px] ${
+                    isHome ? "bg-blue-700" : "bg-green-700"
+                  }`}
+                >
+                  <span>{getIcon(event.type, event.detail)}</span>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-xs">{event.player?.name}</span>
+                    <span className="text-[11px] opacity-80">{event.detail}</span>
+                  </div>
+
+                  {/* نقطة العمود */}
+                  <div
+                    className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full border border-gray-400 shadow-sm z-10 ${
+                      isHome ? "-left-4" : "-right-4"
+                    }`}
+                  ></div>
+
+                  {/* الوقت */}
+                  <div
+                    className={`absolute top-1/2 -translate-y-1/2 text-[11px] text-white opacity-70 ${
+                      isHome ? "-left-10" : "-right-10"
+                    }`}
+                  >
+                    {event.time.elapsed}'
+                  </div>
                 </div>
-            </CardContent>
-        </Card>
-    )
-};
-
-    
+              </motion.div>
+            )})}
+        </div>
+      </div>
+    </div>
+  );
+}
