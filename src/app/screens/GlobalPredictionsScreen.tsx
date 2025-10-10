@@ -784,17 +784,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
     return (
         <div className="flex h-full flex-col bg-background">
-             <ScreenHeader 
-                title="التوقعات" 
-                onBack={goBack} 
-                canGoBack={canGoBack} 
-                actions={
-                    <>
-                        <PredictionsInfoDialog />
-                        {headerActions}
-                    </>
-                }
-            />
             <div className="flex-1 overflow-y-auto">
                  <AlertDialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
                     <AlertDialogContent className="max-w-lg w-full">
@@ -941,3 +930,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    
