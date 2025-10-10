@@ -33,48 +33,60 @@ export function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: M
 
   return (
     <Card className="p-2 overflow-x-hidden">
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as any)} className="mb-2 w-full">
+        <Tabs value={filter} onValueChange={(v) => setFilter(v as any)} className="mb-4 w-full">
             <TabsList className="grid grid-cols-2">
             <TabsTrigger value="all">عرض الكل</TabsTrigger>
             <TabsTrigger value="highlights">الأبرز</TabsTrigger>
             </TabsList>
         </Tabs>
-        <div className="relative flex flex-col p-4">
+        <div className="relative flex flex-col-reverse p-4">
+            {/* The vertical line */}
             <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
             
             {filteredEvents.map((event, idx) => {
-            const isHomeEvent = event.team.id === homeTeamId;
-            const content = (
-                <div className="flex items-center gap-2">
-                    <EventIcon event={event} />
-                    <div className="flex flex-col">
-                        <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
-                        {event.assist?.name && event.type === 'Goal' && <span className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
-                        {event.type === 'subst' && event.assist?.name && <span className="text-xs text-muted-foreground">خروج: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
+                const isHomeEvent = event.team.id === homeTeamId;
+                
+                const eventContent = (
+                    <div className="flex items-center gap-2 w-44">
+                        <EventIcon event={event} />
+                        <div className="flex flex-col text-right">
+                            <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
+                            {event.assist?.name && event.type === 'Goal' && <span className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
+                            {event.type === 'subst' && event.assist?.name && <span className="text-xs text-muted-foreground">خروج: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
+                        </div>
                     </div>
-                </div>
-            );
-            const timeIndicator = (
-                <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 bg-card border rounded-full h-8 w-8 flex items-center justify-center text-xs font-bold z-10">
-                   {event.time.elapsed}'
-                </div>
-            );
+                );
+                
+                const timeIndicator = (
+                    <div className="absolute left-1/2 -translate-x-1/2 bg-card border-2 border-primary rounded-full h-8 w-8 flex items-center justify-center text-xs font-bold z-10">
+                       {event.time.elapsed}'
+                    </div>
+                );
 
-            return (
-                <div key={idx} className="relative flex items-center justify-center my-3 h-12">
-                   {timeIndicator}
-                   {isHomeEvent ? (
-                       <div className="w-1/2 flex justify-start pr-8">{content}</div>
-                   ) : (
-                       <div className="w-1/2"></div>
-                   )}
-                   {isHomeEvent ? (
-                       <div className="w-1/2"></div>
-                   ) : (
-                       <div className="w-1/2 flex justify-end pl-8">{content}</div>
-                   )}
-                </div>
-            );
+                return (
+                    <div key={idx} className="relative flex items-center justify-center my-4 h-12">
+                       {timeIndicator}
+                       {isHomeEvent ? (
+                           <div className="w-1/2 flex justify-end pr-10">{eventContent}</div>
+                       ) : (
+                           <div className="w-1/2"></div>
+                       )}
+                       {isHomeEvent ? (
+                           <div className="w-1/2"></div>
+                       ) : (
+                           <div className="w-1/2 flex justify-start pl-10">
+                                <div className="flex items-center gap-2 w-44 flex-row-reverse">
+                                    <EventIcon event={event} />
+                                    <div className="flex flex-col text-left">
+                                        <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
+                                        {event.assist?.name && event.type === 'Goal' && <span className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
+                                        {event.type === 'subst' && event.assist?.name && <span className="text-xs text-muted-foreground">خروج: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
+                                    </div>
+                                </div>
+                           </div>
+                       )}
+                    </div>
+                );
             })}
         </div>
     </Card>
