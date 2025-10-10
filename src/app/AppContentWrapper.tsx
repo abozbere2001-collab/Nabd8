@@ -9,7 +9,7 @@ import { IraqScreen } from './screens/IraqScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
-import { UltimateMatchDetailScreen } from './screens/UltimateMatchDetailScreen';
+import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
 import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
 import { CommentsScreen } from './screens/CommentsScreen';
@@ -47,7 +47,7 @@ const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> =
   News: { component: NewsScreen },
   Settings: { component: SettingsScreen },
   CompetitionDetails: { component: CompetitionDetailScreen },
-  UltimateMatchDetail: { component: UltimateMatchDetailScreen },
+  MatchDetails: { component: MatchDetailScreen },
   TeamDetails: { component: TeamDetailScreen },
   AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen },
   Comments: { component: CommentsScreen },
@@ -62,8 +62,7 @@ const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> =
   ManageTopScorers: { component: ManageTopScorersScreen },
   Login: { component: LoginScreen },
   SignUp: { component: LoginScreen },
-  // MatchDetails is intentionally omitted as UltimateMatchDetailScreen is used instead
-  MatchDetails: { component: UltimateMatchDetailScreen },
+  // UltimateMatchDetail is removed, using MatchDetails now
 };
 
 
