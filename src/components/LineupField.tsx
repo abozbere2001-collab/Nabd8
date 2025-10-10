@@ -3,33 +3,19 @@ import React from 'react';
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Pencil, ArrowDown, ArrowUp } from 'lucide-react';
-import type { Player as PlayerType, Team, MatchEvent } from '@/lib/types';
+import { Pencil, ArrowDown, ArrowUp, User } from 'lucide-react';
+import type { Player as PlayerType, Team, MatchEvent, PlayerStats } from '@/lib/types';
 
-interface PlayerWithStats {
-  player: PlayerType & { pos?: string; grid?: string; number?: number; };
-  statistics: {
-      games: {
-          minutes: number;
-          number: number;
-          position: string;
-          rating: string;
-          captain: boolean;
-          substitute: boolean;
-      };
-      // Add other stats as needed
-  }[];
-}
 
 interface LineupData {
   team: Team;
   coach: any;
   formation: string;
-  startXI: PlayerWithStats[];
-  substitutes: PlayerWithStats[];
+  startXI: PlayerStats[];
+  substitutes: PlayerStats[];
 }
 
-const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: PlayerWithStats; onRename: (type: 'player', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; }) => {
+const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: PlayerStats; onRename: (type: 'player', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; }) => {
   const { player: p, statistics } = player;
   const displayName = getPlayerName(p.id, p.name);
   const rating = statistics?.[0]?.games?.rating ? parseFloat(statistics[0].games.rating).toFixed(1) : null;
@@ -50,7 +36,7 @@ const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: P
       <div className="relative w-12 h-12">
         <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
           <AvatarImage src={p.photo} alt={displayName} />
-          <AvatarFallback>{displayName ? displayName.charAt(0) : "?"}</AvatarFallback>
+          <AvatarFallback><User /></AvatarFallback>
         </Avatar>
         {playerNumber && (
           <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
@@ -85,22 +71,22 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
       acc[row].push(p);
     }
     return acc;
-  }, {} as Record<string, PlayerWithStats[]>);
+  }, {} as Record<string, PlayerStats[]>);
 
   const sortedRows = Object.keys(playersByRow)
-    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10)) 
+    .sort((a, b) => parseInt(b, 10) - parseInt(a, 10)) 
     .map(rowKey => {
         const row = playersByRow[rowKey];
         row.sort((a, b) => parseInt(a.player.grid!.split(':')[1]) - parseInt(b.player.grid!.split(':')[1]));
         return row;
-    })
-    .reverse();
+    });
 
 
   const substitutions = events.filter(e => e.type === 'subst' && e.team.id === lineup.team.id);
 
   return (
     <Card className="p-3 bg-card/80">
+      <h2 className="text-center font-bold text-xl mb-4 text-card-foreground">{lineup.team.name}</h2>
       <div
         className="relative w-full aspect-[2/3] bg-cover bg-center rounded-lg overflow-hidden border border-green-500/30"
         style={{ backgroundImage: "url('/football-pitch-vertical.svg')" }}
@@ -176,11 +162,11 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
                     )}
                   <Avatar className="h-10 w-10">
                       <AvatarImage src={p.player.photo} />
-                      <AvatarFallback>{p.player.name?.charAt(0) || '?'}</AvatarFallback>
+                      <AvatarFallback><User /></AvatarFallback>
                   </Avatar>
                   <div>
                     <span className="text-sm font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
-                     {p.player.number && <p className="text-xs text-muted-foreground">الرقم: {p.player.number}</p>}
+                     {(p.statistics[0]?.games?.number || p.player.number) && <p className="text-xs text-muted-foreground">الرقم: {p.statistics[0]?.games?.number || p.player.number}</p>}
                   </div>
 
               </div>

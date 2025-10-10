@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from '@/hooks/use-toast';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { doc, getDocs, collection, setDoc } from 'firebase/firestore';
-import type { Fixture as FixtureType, Player as PlayerType, Team, MatchEvent, Standing, PlayerStats as EnrichedPlayer } from '@/lib/types';
+import type { Fixture as FixtureType, Player as PlayerType, Team, MatchEvent, Standing, PlayerStats } from '@/lib/types';
 import { RenameDialog } from '@/components/RenameDialog';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -20,14 +20,17 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from 'next/image';
 import { Card } from '@/components/ui/card';
+import { LineupField } from '@/components/LineupField';
+import { MatchTimeline } from '@/components/MatchTimeline';
+
 
 // --- TYPE DEFINITIONS ---
 interface LineupData {
   team: Team;
   coach?: any;
   formation?: string;
-  startXI: EnrichedPlayer[];
-  substitutes: EnrichedPlayer[];
+  startXI: PlayerStats[];
+  substitutes: PlayerStats[];
 }
 
 interface H2HData {
@@ -42,7 +45,6 @@ interface MatchDataHook {
   stats: any[];
   standings: Standing[];
   h2h: H2HData[];
-  players: { [key: number]: EnrichedPlayer };
   loading: boolean;
   error: string | null;
 }
@@ -50,178 +52,10 @@ interface MatchDataHook {
 type RenameType = 'team' | 'player' | 'coach';
 
 
-// ✅ جلب بيانات اللاعبين مع الصور والتقييما من API-Football
-async function fetchPlayerData(fixtureId: number): Promise<{ [key: number]: EnrichedPlayer }> {
-  const res = await fetch(`/api/football/fixtures/players?fixture=${fixtureId}`);
-  if (!res.ok) return {};
-  const json = await res.json();
-  if (!json?.response) return {};
-  const players: { [key: number]: EnrichedPlayer } = {};
-  json.response.forEach((teamData: { team: Team, players: EnrichedPlayer[] }) => {
-    teamData.players.forEach((p: EnrichedPlayer) => {
-      players[p.player.id] = p;
-    });
-  });
-  return players;
-}
-
-//
-// 🏟️ عرض التشكيلة مع صور اللاعبين والتبديلات المحسّنة
-//
-function MatchLineups({ lineups, players, events, getPlayerName, getCoachName, onRename, isAdmin }: any) {
-  if (!lineups?.length) return <p className="text-center text-muted-foreground py-4">لا توجد تشكيلات متاحة</p>;
-
-  return (
-    <div className="grid md:grid-cols-2 gap-6">
-      {lineups.map((team: any) => {
-        const teamSubs = events.filter((s: MatchEvent) => s.team.id === team.team.id && s.type === 'subst');
-        
-        const playersByRow = team.startXI.reduce((acc: any, p: any) => {
-            const row = p.player.grid ? p.player.grid.split(':')[0] : '0';
-            if (!acc[row]) acc[row] = [];
-            acc[row].push(p);
-            return acc;
-        }, {});
-
-        const sortedRows = Object.keys(playersByRow)
-            .sort((a, b) => parseInt(a) - parseInt(b)) 
-            .map(rowKey => {
-                const row = playersByRow[rowKey];
-                // Reverse the horizontal order for the away team (or whichever is on the right)
-                 row.sort((a: any, b: any) => parseInt(a.player.grid!.split(':')[1]) - parseInt(b.player.grid!.split(':')[1]));
-                return row;
-            }).reverse();
-
-
-        return (
-            <Card key={team.team.id} className="p-4 bg-card/80 rounded-2xl shadow-lg overflow-hidden">
-                <h2 className="text-center font-bold text-xl mb-4 text-card-foreground">{team.team.name}</h2>
-                <div className="relative w-full h-[500px] bg-[url('/football-pitch-vertical.svg')] bg-cover bg-center rounded-lg border-2 border-green-500/20">
-                   <div className="absolute inset-0 flex flex-col justify-around p-3">
-                    {sortedRows.map((row, i) => (
-                        <div key={i} className="flex justify-around items-center">
-                        {row.map((p: any) => {
-                            const info = players[p.player.id] || { player: p.player, statistics: [] };
-                            const rating = info.statistics[0]?.games?.rating;
-                             return (
-                                <motion.div
-                                    key={p.player.id}
-                                    className="flex flex-col items-center"
-                                    initial={{ scale: 0, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{ delay: i * 0.05, type: 'spring', stiffness: 300, damping: 15 }}
-                                >
-                                     <div className="relative w-12 h-12">
-                                        <Avatar className="h-12 w-12 shadow-lg border-2 border-white/70">
-                                            <AvatarImage src={info.player.photo} alt={info.player.name} />
-                                            <AvatarFallback><User/></AvatarFallback>
-                                        </Avatar>
-                                        {rating && rating !== "N/A" &&
-                                            <div className="absolute -top-1 -right-1 text-white bg-blue-600 text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-background">
-                                                {parseFloat(rating).toFixed(1)}
-                                            </div>
-                                        }
-                                        </div>
-                                        <span className="text-white text-xs font-semibold mt-1 bg-black/60 px-1.5 py-0.5 rounded-md shadow-md">
-                                            {getPlayerName(info.player.id, info.player.name)}
-                                        </span>
-                                </motion.div>
-                            );
-                        })}
-                        </div>
-                    ))}
-                    </div>
-                </div>
-
-                {team.coach?.name && (
-                    <div className="mt-4 pt-3 border-t border-border text-center">
-                        <span className="font-medium text-muted-foreground">👔 {getCoachName(team.coach.id, team.coach.name)}</span>
-                    </div>
-                )}
-                
-                 {teamSubs.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-border">
-                    <h3 className="text-center font-bold text-sm mb-2 text-muted-foreground">التبديلات</h3>
-                    <div className="flex flex-col gap-2 text-sm">
-                      {teamSubs.map((sub: MatchEvent, i: number) => (
-                        <div key={i} className="flex items-center justify-between text-xs p-1.5 bg-background/50 rounded-md">
-                          <div className="flex items-center gap-2 text-green-600 font-semibold">
-                            <ArrowUp size={16} />
-                            <span>{getPlayerName(sub.player.id, sub.player.name)}</span>
-                          </div>
-                          <span className="font-bold text-muted-foreground">{sub.time.elapsed}'</span>
-                          <div className="flex items-center gap-2 text-red-600 font-semibold">
-                            <span>{getPlayerName(sub.assist!.id!, sub.assist!.name!)}</span>
-                            <ArrowDown size={16} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-            </Card>
-        )
-      })}
-    </div>
-  );
-}
-
-
-//
-// 🕒 عرض المجريات بخط زمني عمودي متقابل
-//
-function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: MatchEvent[], homeTeamId: number, getPlayerName: (id: number, name: string) => string }) {
-  if (!events?.length) return <p className="text-center text-muted-foreground py-4">لا توجد مجريات متاحة</p>;
-
-  // ترتيب المجريات من الدقيقة 1 في الأسفل إلى 90 في الأعلى
-  const sorted = [...events].sort((a, b) => a.time.elapsed - b.time.elapsed);
-
-  return (
-    <div className="relative w-full flex justify-center p-4">
-      {/* العمود المركزي */}
-      <div className="absolute w-0.5 bg-border h-full top-0 left-1/2 transform -translate-x-1/2" />
-
-      <div className="w-full max-w-2xl flex flex-col gap-6">
-        {sorted.map((e, idx) => {
-          const isHome = e.team.id === homeTeamId;
-          const sideClass = isHome ? "items-end" : "items-start";
-          const textSideClass = isHome ? "text-right" : "text-left";
-          const eventPlayerName = getPlayerName(e.player.id, e.player.name);
-          const assistPlayerName = e.assist?.id ? getPlayerName(e.assist.id, e.assist.name || '') : null;
-
-          return (
-            <div key={idx} className={`relative flex ${isHome ? 'justify-end' : 'justify-start'}`}>
-              {/* Time Indicator on the line */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-card border-2 border-primary text-primary font-bold text-xs rounded-full z-10">
-                {e.time.elapsed}'
-              </div>
-
-              {/* Event Card */}
-              <motion.div
-                className={`w-[calc(50%-2rem)] flex ${sideClass}`}
-                initial={{ opacity: 0, x: isHome ? -20 : 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.1 }}
-              >
-                <div className={`p-2 rounded-lg shadow-md bg-card border w-auto min-w-[120px] ${textSideClass}`}>
-                  <p className="font-bold text-sm">{eventPlayerName}</p>
-                  <p className="text-xs text-muted-foreground">{e.type}{e.detail ? ` (${e.detail})` : ""}</p>
-                  {e.type === 'Goal' && assistPlayerName && <p className="text-xs text-blue-500">صناعة: {assistPlayerName}</p>}
-                </div>
-              </motion.div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-
 function useMatchData(fixture?: FixtureType): MatchDataHook {
   const { toast } = useToast();
   const [data, setData] = useState<MatchDataHook>({
-    lineups: [], events: [], stats: [], standings: [], h2h: [], players: {}, loading: true, error: null,
+    lineups: [], events: [], stats: [], standings: [], h2h: [], loading: true, error: null,
   });
 
   const CURRENT_SEASON = useMemo(() => new Date(fixture?.fixture.date || Date.now()).getFullYear(), [fixture]);
@@ -238,12 +72,12 @@ function useMatchData(fixture?: FixtureType): MatchDataHook {
         const leagueId = fixture.league.id;
         const teamIds = `${fixture.teams.home.id}-${fixture.teams.away.id}`;
 
-        const [lineupsRes, eventsRes, statsRes, h2hRes, playersData, standingsRes] = await Promise.all([
+        const [lineupsRes, eventsRes, statsRes, h2hRes, playersRes, standingsRes] = await Promise.all([
           fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/headtohead?h2h=${teamIds}`),
-          fetchPlayerData(fixtureId),
+          fetch(`/api/football/players?fixture=${fixtureId}`),
           fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
         ]);
         
@@ -251,15 +85,30 @@ function useMatchData(fixture?: FixtureType): MatchDataHook {
         const eventsData = eventsRes.ok ? (await eventsRes.json()).response || [] : [];
         const statsData = statsRes.ok ? (await statsRes.json()).response || [] : [];
         const h2hData = h2hRes.ok ? (await h2hRes.json()).response || [] : [];
+        const playersDataResponse: { team: Team, players: PlayerStats[] }[] = playersRes.ok ? (await playersRes.json()).response || [] : [];
         const standingsData = standingsRes.ok ? (await standingsRes.json()).response[0]?.league?.standings[0] || [] : [];
         
+        const allPlayers = playersDataResponse.flatMap(p => p.players);
+        const playersMap = new Map(allPlayers.map(p => [p.player.id, p]));
+
+        const enrichedLineups = lineupsDataRaw.map((lineup: any) => {
+            const enrich = (playerList: any[]) => playerList.map(p => {
+                const fullPlayerData = playersMap.get(p.player.id);
+                return fullPlayerData || p;
+            });
+            return {
+                ...lineup,
+                startXI: enrich(lineup.startXI),
+                substitutes: enrich(lineup.substitutes)
+            }
+        });
+
         setData({ 
-            lineups: lineupsDataRaw, 
+            lineups: enrichedLineups, 
             events: eventsData, 
             stats: statsData, 
             h2h: h2hData,
             standings: standingsData, 
-            players: playersData,
             loading: false, 
             error: null 
         });
@@ -277,7 +126,7 @@ function useMatchData(fixture?: FixtureType): MatchDataHook {
 }
 
 export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, navigate }: { fixture: FixtureType; goBack: () => void; canGoBack: boolean; navigate: (screen: any, props: any) => void; }) {
-  const { lineups, events, stats, h2h, standings, players, loading, error } = useMatchData(initialFixture);
+  const { lineups, events, stats, h2h, standings, loading, error } = useMatchData(initialFixture);
   const { isAdmin } = useAdmin();
   const { db } = useFirestore();
 
@@ -348,6 +197,9 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
   const homeTeamId = initialFixture.teams.home.id;
   const awayTeamId = initialFixture.teams.away.id;
     
+  const homeLineup = useMemo(() => lineups.find(l => l.team.id === homeTeamId), [lineups, homeTeamId]);
+  const awayLineup = useMemo(() => lineups.find(l => l.team.id === awayTeamId), [lineups, awayTeamId]);
+
   const homeStats = useMemo(() => stats.find(s => s.team.id === homeTeamId)?.statistics, [stats, homeTeamId]);
   const awayStats = useMemo(() => stats.find(s => s.team.id === awayTeamId)?.statistics, [stats, awayTeamId]);
   
@@ -452,7 +304,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
         </div>
 
         <Tabs defaultValue="details" value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 h-auto">
+            <TabsList className="grid w-full grid-cols-5 h-auto">
                 {TABS.map(tab => <TabsTrigger key={tab.key} value={tab.key}>{tab.label}</TabsTrigger>)}
             </TabsList>
             
@@ -486,24 +338,27 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
                 </div>}
             </TabsContent>
 
-            <TabsContent value="lineups" className="p-4">
-               <MatchLineups 
-                    lineups={lineups} 
-                    players={players} 
-                    events={events}
-                    getPlayerName={(id: number, name: string) => getDisplayName('player', id, name)}
-                    getCoachName={(id: number, name: string) => getDisplayName('coach', id, name)}
-                    onRename={handleRename}
-                    isAdmin={isAdmin}
-                  />
+            <TabsContent value="lineups" className="p-4 grid md:grid-cols-2 gap-6">
+                <LineupField 
+                    lineup={homeLineup}
+                    events={events.filter(e => e.team.id === homeTeamId)} 
+                    onRename={handleRename} 
+                    isAdmin={isAdmin} 
+                    getPlayerName={(id, name) => getDisplayName('player', id, name)} 
+                    getCoachName={(id, name) => getDisplayName('coach', id, name)}
+                />
+                <LineupField 
+                    lineup={awayLineup}
+                    events={events.filter(e => e.team.id === awayTeamId)} 
+                    onRename={handleRename} 
+                    isAdmin={isAdmin} 
+                    getPlayerName={(id, name) => getDisplayName('player', id, name)}
+                    getCoachName={(id, name) => getDisplayName('coach', id, name)}
+                />
             </TabsContent>
 
             <TabsContent value="events" className="p-4">
-                 <MatchTimeline 
-                    events={events} 
-                    homeTeamId={homeTeamId} 
-                    getPlayerName={(id: number, name: string) => getDisplayName('player', id, name)} 
-                 />
+                 <MatchTimeline events={events} homeTeamId={homeTeamId} getPlayerName={(id, name) => getDisplayName('player', id, name)} />
             </TabsContent>
             
             <TabsContent value="stats" className="p-4">
