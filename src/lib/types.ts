@@ -130,6 +130,7 @@ export interface SeasonPrediction {
     predictedTopScorerId?: number;
     championPoints?: number;
     topScorerPoints?: number;
+    timestamp: any;
 }
 
 export interface NewsArticle {
@@ -158,3 +159,27 @@ export interface MatchEvent {
     detail: string;
     comments: string | null;
 }
+
+export interface PlayerStats {
+  player: Player & { pos?: string; grid?: string; number?: number; photo?: string };
+  statistics: {
+    games: {
+      minutes: number;
+      number: number;
+      position: string;
+      rating: string;
+      captain: boolean;
+      substitute: boolean;
+    };
+  }[];
+}
+
+export interface LineupData {
+  team: Team;
+  coach: any;
+  formation: string;
+  startXI: PlayerStats[];
+  substitutes: PlayerStats[];
+}
+
+export type PlayerWithStats = PlayerStats;
