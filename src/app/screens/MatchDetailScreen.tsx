@@ -23,9 +23,11 @@ const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
   const gameStats = player?.statistics?.[0]?.games || {};
   const playerNumber = player?.player?.number ?? gameStats.number || "";
   
-  const rating = player?.player?.rating ?? (gameStats.rating && !isNaN(parseFloat(gameStats.rating))
-      ? parseFloat(gameStats.rating).toFixed(1)
-      : null);
+  const rating = player?.player?.rating && !isNaN(parseFloat(player.player.rating))
+      ? parseFloat(player.player.rating).toFixed(1)
+      : (gameStats.rating && !isNaN(parseFloat(gameStats.rating))
+          ? parseFloat(gameStats.rating).toFixed(1)
+          : null);
 
   const playerImage =
     player?.player?.photo && player.player.photo.includes("http")
@@ -43,10 +45,7 @@ const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
   return (
     <div className="relative flex flex-col items-center">
       <div className="relative w-12 h-12">
-        <Avatar className="h-12 w-12 border-2 border-white/50">
-          <AvatarImage src={playerImage} alt={player?.player?.name || "Player"} />
-          <AvatarFallback>{player?.player?.name?.charAt(0) || 'P'}</AvatarFallback>
-        </Avatar>
+         <img src={playerImage} alt={player?.player?.name || "Player"} className="rounded-full w-12 h-12 object-cover border-2 border-white/50" onError={(e) => (e.currentTarget.src = fallbackImage)} />
         {playerNumber && <div className="absolute -top-1 -left-1 bg-gray-800 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background">{playerNumber}</div>}
         {rating && <div className={cn(`absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background`, getRatingColor())}>{rating}</div>}
       </div>
@@ -261,7 +260,7 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
                         playerRatingsMap.set(playerInfo.player.id, {
                             photo: playerInfo.player.photo,
                             rating: playerInfo.statistics?.[0]?.games?.rating,
-                            number: playerInfo.player.number,
+                            number: playerInfo.player.number ?? playerInfo.statistics?.[0]?.games?.number,
                         });
                     }
                 });
@@ -292,7 +291,6 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
                 setLineups(updatedLineups);
             } catch (error) {
                 console.error("Error fetching player stats for lineup:", error);
-                // Don't crash, just use the initial lineups without enhanced stats
                 setLineups(initialLineups);
             }
         };
@@ -309,19 +307,29 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
     const activeLineup = activeTeamTab === 'home' ? home : away;
 
     const renderPitch = (lineup: LineupData) => {
-        const formationGrid = lineup.startXI.reduce((acc, p) => {
-          if (p.player.grid) {
-            const [row, col] = p.player.grid.split(':').map(Number);
-            if (!acc[row]) acc[row] = [];
-            acc[row][col] = p;
-          } else {
-             // Fallback for players without grid data
-             if (!acc[0]) acc[0] = [];
-             acc[0].push(p);
-          }
-          return acc;
-        }, {} as { [key: number]: PlayerWithStats[] });
+        const formationGrid: { [key: number]: PlayerWithStats[] } = {};
+        const ungriddedPlayers: PlayerWithStats[] = [];
 
+        lineup.startXI.forEach(p => {
+            if (p.player.grid) {
+                const [row] = p.player.grid.split(':').map(Number);
+                if (!formationGrid[row]) formationGrid[row] = [];
+                formationGrid[row].push(p);
+            } else {
+                ungriddedPlayers.push(p);
+            }
+        });
+
+        // Sort columns within each row
+        Object.keys(formationGrid).forEach(rowKey => {
+            const row = Number(rowKey);
+            formationGrid[row].sort((a, b) => {
+                const colA = Number(a.player.grid?.split(':')[1] || 0);
+                const colB = Number(b.player.grid?.split(':')[1] || 0);
+                return colA - colB;
+            });
+        });
+        
         // Goalkeeper is usually row 1, we want it at the bottom.
         const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
 
@@ -329,9 +337,14 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2">
                 {sortedRows.map(row => (
                     <div key={row} className="flex justify-around items-center">
-                        {formationGrid[row]?.filter(Boolean).map(p => <PlayerCard key={p.player.id} player={p} />)}
+                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id} player={p} />)}
                     </div>
                 ))}
+                 {ungriddedPlayers.length > 0 && (
+                    <div className="flex justify-around items-center">
+                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id} player={p} />)}
+                    </div>
+                )}
             </div>
         )
     }
@@ -359,18 +372,20 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
 
                             return (
                                 <div key={p.player.id} className="flex items-center justify-between p-1.5 text-xs">
-                                    <div className="flex items-center gap-2">
-                                        {subbedInEvent && subbedOutPlayer && (
+                                     <div className="flex-1 flex items-center gap-2">
+                                        {subbedInEvent && subbedOutPlayer ? (
                                             <div className="flex items-center gap-1 text-muted-foreground">
-                                                 <ArrowDown className="h-3 w-3 text-red-500"/>
-                                                 <PlayerCard player={subbedOutPlayer} />
-                                                 <span className="text-[10px]">({subbedInEvent.time.elapsed}')</span>
                                                  <ArrowUp className="h-3 w-3 text-green-500"/>
+                                                  <span className="text-[10px]">({subbedInEvent.time.elapsed}')</span>
+                                                 <ArrowDown className="h-3 w-3 text-red-500"/>
+                                                 <span className="line-through">{subbedOutPlayer.player.name}</span>
                                             </div>
-                                        )}
+                                        ) : null}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground">{p.player.name}</span>
                                         <PlayerCard player={p} />
                                     </div>
-                                    <span className="text-muted-foreground">{p.player.name}</span>
                                 </div>
                             )
                         })}
