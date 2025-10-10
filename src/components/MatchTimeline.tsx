@@ -36,10 +36,12 @@ export function MatchTimeline({ events, homeTeamId, awayTeamId, getPlayerName }:
     if (event.type === 'subst') {
         return (
             <div className="flex flex-col text-right">
+                {/* اللاعب الداخل - أخضر وسهم للأعلى */}
                 <div className="flex items-center gap-1 text-green-500">
                     <ArrowUp className="h-3 w-3" />
                     <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
                 </div>
+                {/* اللاعب الخارج - أحمر وسهم للأسفل */}
                 {event.assist?.id && (
                      <div className="flex items-center gap-1 text-red-500">
                         <ArrowDown className="h-3 w-3" />
@@ -62,10 +64,12 @@ export function MatchTimeline({ events, homeTeamId, awayTeamId, getPlayerName }:
     if (event.type === 'subst') {
         return (
             <div className="flex flex-col text-left">
+                 {/* اللاعب الداخل - أخضر وسهم للأعلى */}
                 <div className="flex items-center gap-1 text-green-500">
                      <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
                      <ArrowUp className="h-3 w-3" />
                 </div>
+                 {/* اللاعب الخارج - أحمر وسهم للأسفل */}
                 {event.assist?.id && (
                      <div className="flex items-center gap-1 text-red-500">
                         <span className="text-xs">{getPlayerName(event.assist.id, event.assist.name || '')}</span>
