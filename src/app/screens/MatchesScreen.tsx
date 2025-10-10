@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import type { Fixture as FixtureType, Favorites, MatchDetails } from '@/lib/types';
+import { GlobalPredictionsScreen } from './GlobalPredictionsScreen';
 
 
 interface GroupedFixtures {
@@ -482,3 +483,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    
