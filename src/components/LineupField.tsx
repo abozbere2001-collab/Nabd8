@@ -4,14 +4,49 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Pencil, ArrowUp, ArrowDown } from 'lucide-react';
-import type { Player as PlayerType, Team, MatchEvent, PlayerStats } from '@/lib/types';
+import type { Player as PlayerType, Team, MatchEvent } from '@/lib/types';
 
-const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: PlayerStats; onRename: (type: 'player', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; }) => {
+interface PlayerWithStats {
+  player: PlayerType & { pos?: string; grid?: string; number?: number; };
+  statistics: {
+      games: {
+          minutes: number;
+          number: number;
+          position: string;
+          rating: string;
+          captain: boolean;
+          substitute: boolean;
+      };
+      rating?: string;
+  }[];
+}
+
+interface LineupData {
+  team: Team;
+  coach: any;
+  formation: string;
+  startXI: PlayerWithStats[];
+  substitutes: PlayerWithStats[];
+}
+
+const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: PlayerWithStats; onRename: (type: 'player', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; }) => {
   const { player: p, statistics } = player;
   const displayName = getPlayerName(p.id, p.name);
-  const gameStats = statistics && statistics.length > 0 ? statistics[0].games : null;
-  const rating = gameStats?.rating ? parseFloat(gameStats.rating).toFixed(1) : null;
-  const playerNumber = gameStats?.number || p.number;
+
+  // ✅ التقييم الآن يبحث في كلا الاحتمالين (games.rating أو rating المباشر)
+  const rawRating = statistics?.[0]?.games?.rating || statistics?.[0]?.rating;
+  const rating = rawRating ? parseFloat(rawRating).toFixed(1) : null;
+
+  const playerNumber = statistics?.[0]?.games?.number || p.number;
+
+  // ✅ لون التقييم حسب الأداء (اختياري، احترافي)
+  let ratingColor = "bg-blue-600";
+  if (rating) {
+    const val = parseFloat(rating);
+    if (val < 6) ratingColor = "bg-red-600";
+    else if (val < 7) ratingColor = "bg-yellow-600";
+    else ratingColor = "bg-green-600";
+  }
 
   return (
     <div className="relative flex flex-col items-center text-white text-xs w-16 text-center">
@@ -35,8 +70,8 @@ const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: P
             {playerNumber}
           </div>
         )}
-        {rating && parseFloat(rating) > 0 && (
-          <div className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-blue-600 z-10">
+        {rating && (
+          <div className={`absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background ${ratingColor} z-10`}>
             {rating}
           </div>
         )}
@@ -48,20 +83,20 @@ const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: P
   );
 };
 
-export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, getCoachName }: { lineup?: any; events: MatchEvent[]; onRename: (type: 'player' | 'coach', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; getCoachName: (id: number, name: string) => string; }) {
+export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, getCoachName }: { lineup?: LineupData; events: MatchEvent[]; onRename: (type: 'player' | 'coach', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; getCoachName: (id: number, name: string) => string; }) {
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
     return <div className="text-center py-6 text-muted-foreground">لا توجد تشكيلة متاحة</div>;
   }
 
   // ترتيب اللاعبين من الأسفل للأعلى: الحارس -> الدفاع -> الوسط -> الهجوم
-  const playersByRow = lineup.startXI.reduce((acc: Record<string, PlayerStats[]>, p: PlayerStats) => {
+  const playersByRow = lineup.startXI.reduce((acc, p) => {
     if (p.player.grid) {
       const row = p.player.grid.split(':')[0];
       if (!acc[row]) acc[row] = [];
       acc[row].push(p);
     }
     return acc;
-  }, {});
+  }, {} as Record<string, PlayerWithStats[]>);
 
   const sortedRows = Object.keys(playersByRow)
     .sort((a, b) => parseInt(b, 10) - parseInt(a, 10)) // يبدأ من الحارس في الأسفل
@@ -71,7 +106,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
       return row;
     });
 
-  // 🔁 تصحيح منطق التبديلات (الداخل = أخضر لأعلى، الخارج = أحمر لأسفل)
+  // 🔁 تصحيح التبديلات (الداخل = أخضر لأعلى، الخارج = أحمر لأسفل)
   const substitutions = events.filter(e => e.type === 'subst' && e.team.id === lineup.team.id);
 
   return (
@@ -121,15 +156,21 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
           <div className="space-y-3">
             {substitutions.map((event, idx) => (
               <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
-                 <div className="flex items-center gap-2 text-red-500 w-[45%]">
-                     <ArrowDown className="h-4 w-4" />
-                     <span className="font-medium">{getPlayerName(event.player.id, event.player.name)}</span>
-                 </div>
+                 {/* 🔴 اللاعب الخارج */}
+                {event.assist && (
+                  <div className="flex items-center gap-2 text-red-500">
+                    <ArrowDown className="h-4 w-4" />
+                    <span className="font-medium">{getPlayerName(event.assist.id, event.assist.name)}</span>
+                  </div>
+                )}
                  <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
-                 <div className="flex items-center gap-2 text-green-500 w-[45%] justify-end">
-                     {event.assist?.id && <span className="font-medium">{getPlayerName(event.assist.id, event.assist.name!)}</span>}
-                     <ArrowUp className="h-4 w-4" />
-                 </div>
+                 {/* 🟢 اللاعب الداخل */}
+                {event.player && (
+                  <div className="flex items-center gap-2 text-green-500">
+                    <ArrowUp className="h-4 w-4" />
+                    <span className="font-medium">{getPlayerName(event.player.id, event.player.name)}</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -141,7 +182,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
         <div className="mt-4 border-t border-border pt-4">
           <h4 className="text-center font-bold mb-2">الاحتياط</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {lineup.substitutes.map((p: PlayerStats) => (
+            {lineup.substitutes.map((p) => (
               <div key={p.player.id} className="relative flex items-center gap-3 p-2 rounded-lg border bg-background/40">
                 {isAdmin && (
                   <Button
