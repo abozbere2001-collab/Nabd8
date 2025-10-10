@@ -17,7 +17,7 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
-import { Star, Pencil, Goal, ArrowLeftRight, RectangleVertical, Copy, Heart, User, ShieldCheck, Repeat } from 'lucide-react';
+import { Star, Pencil, Goal, ArrowLeftRight, RectangleVertical, Copy, Heart, User, ShieldCheck, Repeat, AlertTriangle } from 'lucide-react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { NoteDialog } from '@/components/NoteDialog';
 import { Progress } from '@/components/ui/progress';
@@ -222,124 +222,155 @@ const H2HView = ({ h2h, fixture, homeName, awayName }: { h2h: H2HData[], fixture
     );
 }
 
-const SubstitutionsView = ({ events, teamId, getPlayerName, onRename }: { events: MatchEvent[], teamId: number, getPlayerName: (id: number, defaultName: string) => string, onRename: (type: RenameType, id: number, name: string) => void }) => {
-    const { isAdmin } = useAdmin();
-    const teamSubs = events.filter(e => e.type === 'subst' && e.team.id === teamId);
-    
-    if (teamSubs.length === 0) return null;
+const PlayerOnPitch = ({
+  player,
+  onRename,
+  isAdmin,
+  getPlayerName,
+}: {
+  player: PlayerWithStats;
+  onRename: (id: number, name: string) => void;
+  isAdmin: boolean;
+  getPlayerName: (id: number, defaultName: string) => string;
+}) => {
+  const { player: p, statistics } = player;
+  const rating = statistics?.[0]?.games?.rating
+    ? parseFloat(statistics[0].games.rating).toFixed(1)
+    : null;
+  const displayName = getPlayerName(p.id, p.name);
 
-    return (
-        <div className="mt-4 pt-4 border-t border-border">
-            <h4 className="font-bold text-center mb-3">التبديلات</h4>
-            <div className="space-y-2 text-center">
-                {teamSubs.map((sub, i) => (
-                    <div key={`sub-${i}`} className="text-xs flex items-center justify-center gap-2">
-                        <p className="w-6 text-muted-foreground">{sub.time.elapsed}'</p>
-                        <div className='flex-1 text-right flex items-center gap-1 justify-end'>
-                            {isAdmin && sub.assist.id && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.assist.id!, getPlayerName(sub.assist.id!, sub.assist.name!))}><Pencil className="h-3 w-3" /></Button>}
-                            <p className="text-red-500">{sub.assist.id ? getPlayerName(sub.assist.id, sub.assist.name!) : ''}</p>
-                        </div>
-                         <ArrowLeftRight className="w-3 h-3 text-muted-foreground" />
-                        <div className='flex-1 text-left flex items-center gap-1 justify-start'>
-                           <p className="text-green-500">{getPlayerName(sub.player.id, sub.player.name)}</p>
-                           {isAdmin && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRename('player', sub.player.id, getPlayerName(sub.player.id, sub.player.name))}><Pencil className="h-3 w-3" /></Button>}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
+  return (
+    <div className="relative flex flex-col items-center text-white text-xs w-16 text-center">
+      {isAdmin && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50"
+          onClick={() => onRename(p.id, displayName)}
+        >
+          <Pencil className="h-3 w-3" />
+        </Button>
+      )}
+      <div className="relative w-12 h-12">
+        <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
+          <AvatarImage src={p.photo} alt={displayName} />
+          <AvatarFallback>{displayName ? displayName.charAt(0) : "?"}</AvatarFallback>
+        </Avatar>
+        {p.number && (
+          <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
+            {p.number}
+          </div>
+        )}
+        {rating && parseFloat(rating) > 0 && (
+          <div className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-blue-600 z-10">
+            {rating}
+          </div>
+        )}
+      </div>
+      <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">
+        {displayName}
+      </span>
+    </div>
+  );
 };
 
-const LineupField = ({ lineup, events, getPlayerName, getCoachName, onRename, fixture }: { lineup: LineupData, events: MatchEvent[], getPlayerName: (id: number, defaultName: string) => string; getCoachName: (id: number, defaultName: string) => string; onRename: (type: RenameType, id: number, name: string) => void, fixture: FixtureType }) => {
-  const { isAdmin } = useAdmin();
-  if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
-     return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا. قد تكون هذه تشكيلة متوقعة.</div>;
+const LineupField = ({
+  lineup,
+  onRename,
+  isAdmin,
+  getPlayerName,
+}: {
+  lineup: LineupData;
+  onRename: (id: number, name: string) => void;
+  isAdmin: boolean;
+  getPlayerName: (id: number, defaultName: string) => string;
+}) => {
+  if (!lineup || lineup.startXI.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-center text-muted-foreground py-6 bg-card rounded-lg">
+        التشكيلة غير متاحة
+      </div>
+    );
   }
 
-  const rowsMap: { [key: number]: PlayerWithStats[] } = {};
-  lineup.startXI.forEach((playerWithStats) => {
-    const { player } = playerWithStats;
-    if (!player.grid) return;
-    const [row, col] = player.grid.split(':').map(Number);
-    if (!rowsMap[row]) rowsMap[row] = [];
-    rowsMap[row].push({ ...playerWithStats, player: { ...player, colIndex: col }});
-  });
-  
-  const sortedRows = Object.values(rowsMap).map(row => row.sort((a, b) => a.player.colIndex! - b.player.colIndex!)).sort((a,b) => (b[0].player.grid.split(':')[0] as any) - (a[0].player.grid.split(':')[0] as any));
+  const goalkeeper = lineup.startXI.find((p) => p.player.pos === "G");
+  const defenders = lineup.startXI.filter((p) => p.player.pos === "D").reverse();
+  const midfielders = lineup.startXI.filter((p) => p.player.pos === "M").reverse();
+  const attackers = lineup.startXI.filter((p) => p.player.pos === "F").reverse();
 
+  const rows: PlayerWithStats[][] = [];
+  if (attackers.length > 0) rows.push(attackers);
+  if (midfielders.length > 0) rows.push(midfielders);
+  if (defenders.length > 0) rows.push(defenders);
+  if (goalkeeper) rows.push([goalkeeper]);
 
   return (
     <Card className="p-3 bg-card/80">
-      <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20" style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
-        <div className="absolute inset-0 flex flex-col justify-around p-2">
-          {sortedRows.map((row, rowIndex) => (
+      <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20"
+           style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
+        <div className="absolute inset-0 flex flex-col-reverse justify-around p-2">
+          {rows.map((row, rowIndex) => (
             <div key={rowIndex} className="flex justify-around items-center w-full">
-              {row.map(({ player, statistics }) => {
-                const displayName = getPlayerName(player.id, player.name);
-                const playerPhoto = player.photo || `https://media.api-sports.io/football/players/${player.id}.png`;
-                const rating = statistics?.[0]?.games?.rating;
-                
-                return (
-                  <div key={player.id} className="flex flex-col items-center text-xs text-white w-16 text-center group">
-                    <div className="relative w-12 h-12">
-                      {rating && (
-                        <div className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
-                          {parseFloat(rating).toFixed(1)}
-                        </div>
-                      )}
-                      <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
-                        <AvatarImage src={playerPhoto} alt={displayName} />
-                        <AvatarFallback>{displayName ? displayName.charAt(0) : '?'}</AvatarFallback>
-                      </Avatar>
-                      {isAdmin && <Button variant="ghost" size="icon" className="absolute -bottom-1 -left-1 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => onRename('player', player.id, displayName)}><Pencil className="h-3 w-3 text-white" /></Button>}
-                    </div>
-                    <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">{displayName}</span>
-                  </div>
-                );
-              })}
+              {row.map((player) => (
+                <PlayerOnPitch
+                  key={player.player.id}
+                  player={player}
+                  onRename={onRename}
+                  isAdmin={isAdmin}
+                  getPlayerName={getPlayerName}
+                />
+              ))}
             </div>
           ))}
         </div>
       </div>
-      
+
       {lineup.coach && (
         <div className="mt-4 pt-4 border-t border-border">
           <h4 className="font-bold text-center mb-2">المدرب</h4>
-          <div className="flex items-center justify-center gap-2 group">
-            <Avatar className="h-10 w-10"><AvatarImage src={lineup.coach.photo} /></Avatar>
-            <p className="font-semibold">{getCoachName(lineup.coach.id, lineup.coach.name)}</p>
-            {isAdmin && <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => onRename('coach', lineup.coach.id, getCoachName(lineup.coach.id, lineup.coach.name))}><Pencil className="h-4 w-4" /></Button>}
+          <div className="flex flex-col items-center gap-2">
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={lineup.coach.photo} alt={lineup.coach.name} />
+              <AvatarFallback>{lineup.coach.name ? lineup.coach.name.charAt(0) : "C"}</AvatarFallback>
+            </Avatar>
+            <span className="font-semibold">{lineup.coach.name}</span>
           </div>
         </div>
       )}
 
-      {lineup.team && <SubstitutionsView events={events} teamId={lineup.team.id} getPlayerName={getPlayerName} onRename={onRename} />}
-      
       {lineup.substitutes && lineup.substitutes.length > 0 && (
         <div className="mt-4 pt-4 border-t border-border">
           <h4 className="font-bold text-center mb-3">الاحتياط</h4>
-           <div className="grid grid-cols-2 gap-2">
-            {lineup.substitutes.map(({ player, statistics }) => {
-              const rating = statistics?.[0]?.games?.rating;
-              return (
-                <div key={player.id} className="flex items-center gap-2 p-1 border rounded bg-card/50 group">
-                    <div className="relative">
-                      <Avatar className="h-8 w-8"><AvatarImage src={player.photo} /></Avatar>
-                      {rating && (
-                        <div className="absolute -top-1 -right-1 text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center border border-background bg-gray-600 z-10">
-                          {parseFloat(rating).toFixed(1)}
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs font-semibold flex-1">{getPlayerName(player.id, player.name)}</p>
-                    {isAdmin && <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => onRename('player', player.id, getPlayerName(player.id, player.name))}><Pencil className="h-3 w-3" /></Button>}
-                </div>
-              )
-            })}
-           </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {lineup.substitutes.map((player) => (
+              <div key={player.player.id} className="relative flex items-center gap-2 p-2 rounded-lg bg-background/50 border">
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-0 right-0 h-6 w-6 z-10"
+                    onClick={() => onRename(player.player.id, getPlayerName(player.player.id, player.player.name))}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                )}
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={player.player.photo} alt={player.player.name} />
+                  <AvatarFallback>{player.player.name ? player.player.name.charAt(0) : "?"}</AvatarFallback>
+                </Avatar>
+                <span className="text-xs font-medium truncate">
+                  {getPlayerName(player.player.id, player.player.name)}
+                </span>
+                {player.statistics?.[0]?.games?.rating && (
+                  <span className="ml-1 text-[10px] font-bold text-blue-600">
+                    {parseFloat(player.statistics[0].games.rating).toFixed(1)}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-       )}
+      )}
     </Card>
   );
 };
@@ -441,12 +472,24 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
     
     const availableTabs = useMemo(() => {
         const tabs = [];
-        if (lineups && lineups.length > 0) tabs.push({ value: 'lineups', label: 'التشكيلة' });
-        if (events && events.length > 0) tabs.push({ value: 'events', label: 'الأحداث' });
-        if (stats && stats.length > 0) tabs.push({ value: 'stats', label: 'الإحصائيات' });
-        if (standings && standings.length > 0) tabs.push({ value: 'standings', label: 'الترتيب' });
+        // A lineup is considered available if there's at least one team's lineup, and that lineup has players.
+        const lineupAvailable = lineups && lineups.length > 0 && lineups.some(l => l.startXI && l.startXI.length > 0);
+    
+        if (lineupAvailable) {
+            tabs.push({ value: 'lineups', label: 'التشكيلة' });
+        }
+        if (events && events.length > 0) {
+            tabs.push({ value: 'events', label: 'الأحداث' });
+        }
+        if (stats && stats.length > 0) {
+            tabs.push({ value: 'stats', label: 'الإحصائيات' });
+        }
+        if (standings && standings.length > 0) {
+            tabs.push({ value: 'standings', label: 'الترتيب' });
+        }
         return tabs;
     }, [lineups, events, stats, standings]);
+    
 
     if (loading && lineups.length === 0) {
         return (
@@ -504,11 +547,9 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                                 {lineupToShow && 
                                     <LineupField 
                                         lineup={lineupToShow}
-                                        events={events}
+                                        isAdmin={isAdmin}
                                         getPlayerName={(id, name) => getCustomName('player', id, name)}
-                                        getCoachName={(id, name) => getCustomName('coach', id, name)}
-                                        onRename={handleOpenRename}
-                                        fixture={fixture}
+                                        onRename={(id, name) => handleOpenRename('player', id, name)}
                                     />
                                 }
                                 {!lineupToShow && !loading && 
@@ -519,18 +560,20 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                             </TabsContent>
                         )}
                         
-                        <TabsContent value="events" className="mt-4">
-                          <MatchTimeline
-                            events={events}
-                            fixture={fixture}
-                            homeTeamId={fixture.teams.home.id}
-                            getPlayerName={(id, name) => getCustomName('player', id, name)}
-                          />
-                        </TabsContent>
+                        {availableTabs.some(t => t.value === 'events') && (
+                            <TabsContent value="events" className="mt-4">
+                              <MatchTimeline
+                                events={events}
+                                fixture={fixture}
+                                homeTeamId={fixture.teams.home.id}
+                                getPlayerName={(id, name) => getCustomName('player', id, name)}
+                              />
+                            </TabsContent>
+                        )}
 
                         {availableTabs.some(t => t.value === 'stats') && (
                              <TabsContent value="stats" className="mt-4">
-                               <MatchStatistics stats={stats} fixture={fixture} isAdmin={isAdmin} onRename={handleOpenRename} getStatName={(id, name) => getCustomName('statistic', id, name)} />
+                               <MatchStatistics stats={stats} fixture={fixture} isAdmin={isAdmin} onRename={(type, id, name) => handleOpenRename(type, id, name)} getStatName={(id, name) => getCustomName('statistic', id, name)} />
                              </TabsContent>
                         )}
 
