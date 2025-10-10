@@ -4,7 +4,7 @@ import type { Fixture as FixtureType } from '@/lib/types';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useMatchData } from '@/hooks/useMatchData';
 import { useAdmin, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { MatchTimeline } from '@/components/MatchTimeline';
 import { LineupField } from '@/components/LineupField';
@@ -13,15 +13,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Calendar, Shield, MapPin, Shirt } from 'lucide-react';
+import { Loader2, Calendar, Shield, MapPin, Shirt, Award } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 type RenameType = 'player' | 'coach' | 'team';
 
 export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack }: { fixture: FixtureType; goBack: () => void; canGoBack: boolean; }) {
-  const { data, loading } = useMatchData(initialFixture);
-  const { lineups, events, stats, standings, h2h } = data;
+  const { data, loading, error } = useMatchData(initialFixture);
   
   const { db, isAdmin } = useAdmin();
   const [customNames, setCustomNames] = React.useState<{ players: Map<number, string>, coaches: Map<number, string> }>({ players: new Map(), coaches: new Map() });
@@ -37,30 +38,36 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack }
   React.useEffect(() => {
     if (!db) return;
     const fetchCustomNames = async () => {
-      const [playersSnap, coachesSnap] = await Promise.all([
-        getDoc(doc(db, "playerCustomizations")),
-        getDoc(doc(db, "coachCustomizations")),
-      ]);
-      const playerNames = new Map(Object.entries(playersSnap.data() || {}).map(([id, data]) => [Number(id), (data as any).customName]));
-      const coachNames = new Map(Object.entries(coachesSnap.data() || {}).map(([id, data]) => [Number(id), (data as any).customName]));
-      setCustomNames({ players: playerNames, coaches: coachNames });
+        try {
+            const [playersSnap, coachesSnap] = await Promise.all([
+                getDocs(doc(db, "playerCustomizations")),
+                getDocs(doc(db, "coachCustomizations")),
+            ]);
+            const playerNames = new Map(Object.entries(playersSnap.data() || {}).map(([id, data]) => [Number(id), (data as any).customName]));
+            const coachNames = new Map(Object.entries(coachesSnap.data() || {}).map(([id, data]) => [Number(id), (data as any).customName]));
+            setCustomNames({ players: playerNames, coaches: coachNames });
+        } catch(e) {
+            // Non-admin users might not have access, so we fail silently.
+        }
     };
-    fetchCustomNames();
+    
+    if(isAdmin) {
+        fetchCustomNames();
+        const playersUnsub = onSnapshot(doc(db, "playerCustomizations"), (doc) => {
+            const data = doc.data();
+            if(data) setCustomNames(prev => ({...prev, players: new Map(Object.entries(data).map(([id, data]) => [Number(id), (data as any).customName]))}));
+        });
+        const coachesUnsub = onSnapshot(doc(db, "coachCustomizations"), (doc) => {
+            const data = doc.data();
+            if(data) setCustomNames(prev => ({...prev, coaches: new Map(Object.entries(data).map(([id, data]) => [Number(id), (data as any).customName]))}));
+        });
 
-    const playersUnsub = onSnapshot(doc(db, "playerCustomizations"), (doc) => {
-        const data = doc.data();
-        if(data) setCustomNames(prev => ({...prev, players: new Map(Object.entries(data).map(([id, data]) => [Number(id), (data as any).customName]))}));
-    });
-     const coachesUnsub = onSnapshot(doc(db, "coachCustomizations"), (doc) => {
-        const data = doc.data();
-        if(data) setCustomNames(prev => ({...prev, coaches: new Map(Object.entries(data).map(([id, data]) => [Number(id), (data as any).customName]))}));
-    });
-
-    return () => {
-      playersUnsub();
-      coachesUnsub();
-    };
-  }, [db]);
+        return () => {
+          playersUnsub();
+          coachesUnsub();
+        };
+    }
+  }, [db, isAdmin]);
 
   const getPlayerName = React.useCallback((id: number, defaultName: string) => customNames.players.get(id) || defaultName, [customNames.players]);
   const getCoachName = React. useCallback((id: number, defaultName: string) => customNames.coaches.get(id) || defaultName, [customNames.coaches]);
@@ -73,7 +80,16 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack }
   const handleSaveRename = async (newName: string) => {
     if (!renameItem || !db) return;
     const collectionName = `${renameItem.type}Customizations`;
-    await doc(db, collectionName, String(renameItem.id)).set({ customName: newName }, { merge: true });
+    const docRef = doc(db, collectionName, String(renameItem.id));
+    const dataToSave = { customName: newName };
+    setDoc(docRef, dataToSave, { merge: true }).catch(serverError => {
+        const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: dataToSave
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
   };
   
 
@@ -86,12 +102,18 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack }
       );
     }
     
+    if (error || !data) {
+        return <div className="text-center py-10 text-destructive">{error || "حدث خطأ أثناء تحميل بيانات المباراة."}</div>
+    }
+
+    const { lineups, events, stats, standings } = data;
     const homeLineup = lineups.find(l => l.team.id === homeTeam.id);
     const awayLineup = lineups.find(l => l.team.id === awayTeam.id);
 
     return (
        <Tabs defaultValue={defaultTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full grid-cols-4 rounded-none h-auto p-0 border-b flex-row-reverse sticky top-0 bg-background z-10">
+        <TabsList className="grid w-full grid-cols-5 rounded-none h-auto p-0 border-b flex-row-reverse sticky top-0 bg-background z-10">
+          <TabsTrigger value="info" className="rounded-none"><Award className="w-4 h-4 ml-1"/>قبل المباراة</TabsTrigger>
           <TabsTrigger value="timeline" className="rounded-none"><Calendar className="w-4 h-4 ml-1"/>المجريات</TabsTrigger>
           <TabsTrigger value="lineups" className="rounded-none"><Shirt className="w-4 h-4 ml-1"/>التشكيلة</TabsTrigger>
           <TabsTrigger value="stats" className="rounded-none"><Shield className="w-4 h-4 ml-1"/>الإحصائيات</TabsTrigger>
@@ -110,10 +132,10 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack }
                 </div>
             </TabsContent>
             <TabsContent value="timeline" className="p-4 m-0">
-                <MatchTimeline events={events} homeTeamId={homeTeam.id} awayTeamId={awayTeam.id} getPlayerName={getPlayerName} />
+                <MatchTimeline events={events} homeTeamId={homeTeam.id} getPlayerName={getPlayerName} />
             </TabsContent>
-            <TabsContent value="lineups" className="p-4 m-0">
-                <div className="grid grid-cols-2 gap-4">
+            <TabsContent value="lineups" className="p-0 m-0">
+                 <div className="grid grid-cols-2 gap-4 p-4">
                     <LineupField lineup={awayLineup} events={events} onRename={handleOpenRename} isAdmin={isAdmin} getPlayerName={getPlayerName} getCoachName={getCoachName} />
                     <LineupField lineup={homeLineup} events={events} onRename={handleOpenRename} isAdmin={isAdmin} getPlayerName={getPlayerName} getCoachName={getCoachName} />
                 </div>
@@ -150,7 +172,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack }
   
   const getStatusComponent = () => {
     const { elapsed } = initialFixture.fixture.status;
-    if (['1H', 'HT', '2H', 'ET', 'P'].includes(matchStatus)) {
+    if (['1H', 'HT', '2H', 'ET', 'P', 'LIVE'].includes(matchStatus)) {
         return <div className="text-red-500 font-bold animate-pulse">{elapsed}'</div>;
     }
     if (matchStatus === 'FT' || matchStatus === 'AET' || matchStatus === 'PEN') {

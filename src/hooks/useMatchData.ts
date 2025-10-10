@@ -15,33 +15,39 @@ interface PlayerStats {
   statistics: any[];
 }
 
+interface MatchData {
+    lineups: EnrichedLineupData[];
+    events: MatchEvent[];
+    stats: any[];
+    standings: Standing[];
+    h2h: any[];
+}
 interface MatchDataHook {
-  lineups: EnrichedLineupData[];
-  events: MatchEvent[];
-  stats: any[];
-  standings: Standing[];
-  h2h: any[];
+  data: MatchData | null;
   loading: boolean;
   error: string | null;
 }
 
 export function useMatchData(fixture?: FixtureType): MatchDataHook {
   const { toast } = useToast();
-  const [data, setData] = useState<MatchDataHook>({
-    lineups: [], events: [], stats: [], standings: [], h2h: [], loading: true, error: null,
-  });
+  const [data, setData] = useState<MatchData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
 
   const CURRENT_SEASON = useMemo(() => fixture ? new Date(fixture.fixture.date).getFullYear() : new Date().getFullYear(), [fixture]);
 
   useEffect(() => {
     if (!fixture) {
-      setData(prev => ({ ...prev, loading: false, error: "لا توجد بيانات مباراة" }));
+      setLoading(false);
+      setError("لا توجد بيانات مباراة");
       return;
     }
     let isCancelled = false;
 
     const fetchData = async () => {
-      setData(prev => ({ ...prev, loading: true, error: null }));
+      setLoading(true);
+      setError(null);
       try {
         const fixtureId = fixture.fixture.id;
         const leagueId = fixture.league.id;
@@ -100,8 +106,6 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
                 stats: statsData, 
                 h2h: h2hData,
                 standings: standingsData, 
-                loading: false, 
-                error: null 
             });
         }
 
@@ -109,7 +113,11 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
         if (!isCancelled) {
             console.error("❌ fetch error:", err);
             toast({ variant: "destructive", title: "خطأ", description: "فشل تحميل بيانات المباراة" });
-            setData(prev => ({ ...prev, loading: false, error: err.message }));
+            setError(err.message);
+        }
+      } finally {
+        if (!isCancelled) {
+            setLoading(false);
         }
       }
     };
@@ -120,5 +128,5 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
     };
   }, [fixture, toast, CURRENT_SEASON]);
 
-  return data;
+  return { data, loading, error };
 }
