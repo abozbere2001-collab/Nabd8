@@ -21,15 +21,25 @@ import { PlayerStats } from '@/components/PlayerStats';
 
 
 interface PlayerWithStats {
-  player: PlayerType & { pos?: string };
-  statistics?: any[];
+  player: PlayerType & { pos?: string; grid?: string; number?: number; };
+  statistics: {
+      games: {
+          minutes: number;
+          number: number;
+          position: string;
+          rating: string;
+          captain: boolean;
+          substitute: boolean;
+      };
+      // Add other stats as needed
+  }[];
 }
 interface LineupData {
   team: Team;
   coach?: any;
   formation?: string;
   startXI: PlayerWithStats[];
-  substitutes?: PlayerWithStats[];
+  substitutes: PlayerWithStats[];
 }
 
 interface H2HData {
@@ -74,12 +84,12 @@ function useMatchData(fixture?: FixtureType): MatchDataHook {
         const [lineupsRes, eventsRes, statsRes, h2hRes, playersRes, standingsRes] = await Promise.all([
           fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
-          fetch(`/api/football/statistics?fixture=${fixtureId}`),
+          fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/headtohead?h2h=${teamIds}`),
-          fetch(`/api/football/players?league=${leagueId}&season=${CURRENT_SEASON}`),
+          fetch(`/api/football/players?fixture=${fixtureId}`), // Fetch players by fixture
           fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
         ]);
-
+        
         const lineupsData = lineupsRes.ok ? (await lineupsRes.json()).response || [] : [];
         const eventsData = eventsRes.ok ? (await eventsRes.json()).response || [] : [];
         const statsData = statsRes.ok ? (await statsRes.json()).response || [] : [];
@@ -87,8 +97,27 @@ function useMatchData(fixture?: FixtureType): MatchDataHook {
         const playersData = playersRes.ok ? (await playersRes.json()).response || [] : [];
         const standingsData = standingsRes.ok ? (await standingsRes.json()).response[0]?.league?.standings[0] || [] : [];
         
+        // Merge player stats into lineups
+        const enrichedLineups = lineupsData.map((lineup: LineupData) => {
+            const teamPlayers = playersData.find((p: any) => p.team.id === lineup.team.id)?.players || [];
+            const mergeStats = (playerList: PlayerWithStats[]) => {
+                return playerList.map(p => {
+                    const playerStats = teamPlayers.find((tp: any) => tp.player.id === p.player.id);
+                    if (playerStats) {
+                        return { ...p, statistics: playerStats.statistics };
+                    }
+                    return p;
+                });
+            };
+            return {
+                ...lineup,
+                startXI: mergeStats(lineup.startXI),
+                substitutes: mergeStats(lineup.substitutes),
+            };
+        });
+
         setData({ 
-            lineups: lineupsData, 
+            lineups: enrichedLineups, 
             events: eventsData, 
             stats: statsData, 
             h2h: h2hData,
@@ -271,7 +300,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
                         <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" /><span>{new Date(initialFixture.fixture.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
                         <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /><span>{new Date(initialFixture.fixture.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span></div>
                         {initialFixture.fixture.venue.name && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /><span>{initialFixture.fixture.venue.name}, {initialFixture.fixture.venue.city}</span></div>}
-                        {initialFixture.fixture.referee && <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /><span>الحكم: {initialFixture.fixture.referee}</span></div>}
+                        {initialFixture.fixture.referee && <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /><span>الحكَم: {initialFixture.fixture.referee}</span></div>}
                     </div>
                 </div>
                 {h2h.length > 0 && <div className="bg-card p-4 rounded-lg border">
@@ -300,8 +329,24 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
                         <TabsTrigger value="home_lineup">{getDisplayName('team', homeTeamId, initialFixture.teams.home.name)}</TabsTrigger>
                         <TabsTrigger value="away_lineup">{getDisplayName('team', awayTeamId, initialFixture.teams.away.name)}</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="home_lineup" className="mt-4"><LineupField lineup={homeLineup} onRename={handleRename} isAdmin={isAdmin} getPlayerName={(id, name) => getDisplayName('player', id, name)} /></TabsContent>
-                    <TabsContent value="away_lineup" className="mt-4"><LineupField lineup={awayLineup} onRename={handleRename} isAdmin={isAdmin} getPlayerName={(id, name) => getDisplayName('player', id, name)} /></TabsContent>
+                    <TabsContent value="home_lineup" className="mt-4">
+                        <LineupField 
+                            lineup={homeLineup}
+                            events={events.filter(e => e.team.id === homeTeamId)} 
+                            onRename={handleRename} 
+                            isAdmin={isAdmin} 
+                            getPlayerName={(id, name) => getDisplayName('player', id, name)} 
+                        />
+                    </TabsContent>
+                    <TabsContent value="away_lineup" className="mt-4">
+                        <LineupField 
+                            lineup={awayLineup}
+                            events={events.filter(e => e.team.id === awayTeamId)} 
+                            onRename={handleRename} 
+                            isAdmin={isAdmin} 
+                            getPlayerName={(id, name) => getDisplayName('player', id, name)}
+                        />
+                    </TabsContent>
                 </Tabs>
             </TabsContent>
 

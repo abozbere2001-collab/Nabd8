@@ -8,10 +8,10 @@ import type { MatchEvent as MatchEventType } from '@/lib/types';
 
 const EventIcon = ({ event }: { event: MatchEventType }) => {
   if (event.type === 'Goal') return <Goal className="h-4 w-4 text-primary" />;
-  if (event.type === 'Card' && event.detail.includes('Yellow')) return <RectangleVertical className="h-4 w-4 text-yellow-400 fill-current" />;
-  if (event.type === 'Card' && event.detail.includes('Red')) return <RectangleVertical className="h-4 w-4 text-red-600 fill-current" />;
+  if (event.type === 'Card' && event.detail?.includes('Yellow')) return <RectangleVertical className="h-4 w-4 text-yellow-400 fill-current" />;
+  if (event.type === 'Card' && event.detail?.includes('Red')) return <RectangleVertical className="h-4 w-4 text-red-600 fill-current" />;
   if (event.type === 'subst') return <ArrowLeftRight className="h-4 w-4 text-blue-400" />;
-  if (event.type === 'Var' && event.detail.includes('Goal Cancelled')) return <AlertTriangle className="h-4 w-4 text-destructive" />;
+  if (event.type === 'Var' && event.detail?.includes('Goal Cancelled')) return <AlertTriangle className="h-4 w-4 text-destructive" />;
   return <div className="h-4 w-4" />;
 };
 
@@ -22,7 +22,7 @@ export function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: M
   
   const filteredEvents = useMemo(() => {
     if (filter === 'highlights') {
-      return sortedEvents.filter(e => e.type === 'Goal' || (e.type === 'Card' && e.detail.includes('Red')));
+      return sortedEvents.filter(e => e.type === 'Goal' || (e.type === 'Card' && e.detail?.includes('Red')));
     }
     return sortedEvents;
   }, [sortedEvents, filter]);

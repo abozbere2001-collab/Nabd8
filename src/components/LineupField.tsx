@@ -3,13 +3,23 @@ import React from 'react';
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Pencil } from 'lucide-react';
-import type { Player as PlayerType, Team } from '@/lib/types';
+import { Pencil, ArrowLeftRight, ArrowDown, ArrowUp } from 'lucide-react';
+import type { Player as PlayerType, Team, MatchEvent } from '@/lib/types';
 
 interface PlayerWithStats {
-  player: PlayerType & { pos?: string };
-  statistics?: any[];
+  player: PlayerType & { pos?: string; grid?: string; number?: number; };
+  statistics: {
+      games: {
+          minutes: number;
+          number: number;
+          position: string;
+          rating: string;
+          captain: boolean;
+          substitute: boolean;
+      };
+  }[];
 }
+
 interface LineupData {
   team: Team;
   coach: any;
@@ -19,39 +29,60 @@ interface LineupData {
 }
 
 const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: PlayerWithStats; onRename: (type: 'player', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; }) => {
-  const displayName = getPlayerName(player.player.id, player.player.name);
+  const { player: p, statistics } = player;
+  const displayName = getPlayerName(p.id, p.name);
+  const rating = statistics?.[0]?.games?.rating ? parseFloat(statistics[0].games.rating).toFixed(1) : null;
+  const playerNumber = statistics?.[0]?.games?.number || p.number;
+
   return (
     <div className="relative flex flex-col items-center text-white text-xs w-16 text-center">
-      {isAdmin && (
+       {isAdmin && (
         <Button
           variant="ghost"
           size="icon"
-          className="absolute -top-2 -right-2 h-6 w-6 z-10 text-white/80 hover:text-white"
-          onClick={(e) => { e.stopPropagation(); onRename('player', player.player.id, displayName); }}
+          className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50"
+          onClick={(e) => { e.stopPropagation(); onRename('player', p.id, displayName); }}
         >
           <Pencil className="h-3 w-3" />
         </Button>
       )}
-      <Avatar className="w-12 h-12 border-2 border-white/40 bg-black/30">
-        <AvatarImage src={player.player.photo || "/images/player-placeholder.png"} alt={displayName} />
-        <AvatarFallback>{displayName?.charAt(0) || '?'}</AvatarFallback>
-      </Avatar>
-      <span className="mt-1 bg-black/50 px-1 rounded text-[10px] truncate w-full">{displayName}</span>
+      <div className="relative w-12 h-12">
+        <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
+          <AvatarImage src={p.photo} alt={displayName} />
+          <AvatarFallback>{displayName ? displayName.charAt(0) : "?"}</AvatarFallback>
+        </Avatar>
+        {playerNumber && (
+          <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
+            {playerNumber}
+          </div>
+        )}
+        {rating && parseFloat(rating) > 0 && (
+          <div className="absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-blue-600 z-10">
+            {rating}
+          </div>
+        )}
+      </div>
+      <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">
+        {displayName}
+      </span>
     </div>
   );
 };
 
-export function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { lineup?: LineupData; onRename: (type: 'player' | 'coach', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; }) {
+
+export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }: { lineup?: LineupData; events: MatchEvent[]; onRename: (type: 'player' | 'coach', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; }) {
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
     return <div className="text-center py-6 text-muted-foreground">لا توجد تشكيلة متاحة</div>;
   }
 
-  const GK = lineup.startXI.filter((p: any) => p.player.pos === 'G');
-  const DEF = lineup.startXI.filter((p: any) => p.player.pos === 'D');
-  const MID = lineup.startXI.filter((p: any) => p.player.pos === 'M');
-  const FWD = lineup.startXI.filter((p: any) => p.player.pos === 'F');
+  const GK = lineup.startXI.filter((p) => p.player.pos === 'G');
+  const DEF = lineup.startXI.filter((p) => p.player.pos === 'D');
+  const MID = lineup.startXI.filter((p) => p.player.pos === 'M');
+  const FWD = lineup.startXI.filter((p) => p.player.pos === 'F');
 
   const rows = [FWD, MID, DEF, GK].filter(r => r.length > 0);
+
+  const substitutions = events.filter(e => e.type === 'subst' && e.team.id === lineup.team.id);
 
   return (
     <Card className="p-3 bg-card/80">
@@ -61,8 +92,8 @@ export function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { line
       >
         <div className="absolute inset-0 flex flex-col justify-around p-3">
           {rows.map((row, i) => (
-            <div key={i} className="flex justify-around items-center">
-              {row.map((p: any) => (
+            <div key={i} className="flex justify-around items-center flex-row-reverse">
+              {row.map((p) => (
                 <PlayerOnPitch key={p.player.id} player={p} onRename={onRename} isAdmin={isAdmin} getPlayerName={getPlayerName} />
               ))}
             </div>
@@ -92,17 +123,34 @@ export function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { line
         </div>
       )}
 
+      {substitutions.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <h4 className="text-center font-bold mb-3">التبديلات</h4>
+          <div className="space-y-3">
+            {substitutions.map((event, idx) => (
+              <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
+                 <div className='flex items-center gap-2 text-green-500'>
+                    <ArrowUp className="h-4 w-4" />
+                    <span className="font-medium">{getPlayerName(event.player.id, event.player.name)}</span>
+                 </div>
+                 <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
+                 <div className='flex items-center gap-2 text-red-500'>
+                    <span className="font-medium">{getPlayerName(event.assist.id!, event.assist.name!)}</span>
+                    <ArrowDown className="h-4 w-4" />
+                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {lineup.substitutes?.length > 0 && (
         <div className="mt-4 border-t border-border pt-4">
           <h4 className="text-center font-bold mb-2">الاحتياط</h4>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {lineup.substitutes.map((p: any) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {lineup.substitutes.map((p) => (
               <div key={p.player.id} className="flex items-center gap-2 p-2 bg-background/40 rounded border">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={p.player.photo || "/images/player-placeholder.png"} />
-                  <AvatarFallback>{p.player.name?.charAt(0) || '?'}</AvatarFallback>
-                </Avatar>
-                <span className="text-xs truncate">{getPlayerName(p.player.id, p.player.name)}</span>
+                <PlayerOnPitch player={p} onRename={onRename} isAdmin={isAdmin} getPlayerName={getPlayerName} />
               </div>
             ))}
           </div>
