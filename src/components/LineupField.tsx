@@ -71,12 +71,11 @@ const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: P
 };
 
 
-export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }: { lineup?: LineupData; events: MatchEvent[]; onRename: (type: 'player' | 'coach', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; }) {
+export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, getCoachName }: { lineup?: LineupData; events: MatchEvent[]; onRename: (type: 'player' | 'coach', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; getCoachName: (id: number, name: string) => string; }) {
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
     return <div className="text-center py-6 text-muted-foreground">لا توجد تشكيلة متاحة</div>;
   }
 
-  // Group players by grid row for accurate formation display
   const playersByRow = lineup.startXI.reduce((acc, p) => {
     if (p.player.grid) {
       const row = p.player.grid.split(':')[0];
@@ -88,16 +87,14 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }
     return acc;
   }, {} as Record<string, PlayerWithStats[]>);
 
-  // Sort rows numerically (asc) and then reverse for GK at bottom
   const sortedRows = Object.keys(playersByRow)
     .sort((a, b) => parseInt(a, 10) - parseInt(b, 10)) 
     .map(rowKey => {
         const row = playersByRow[rowKey];
-        // Sort players ascending (left to right)
         row.sort((a, b) => parseInt(a.player.grid!.split(':')[1]) - parseInt(b.player.grid!.split(':')[1]));
         return row;
     })
-    .reverse(); // Reverse rows to have Goalkeeper at the bottom
+    .reverse();
 
 
   const substitutions = events.filter(e => e.type === 'subst' && e.team.id === lineup.team.id);
@@ -131,13 +128,13 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }
                     <Button
                     variant="ghost" size="icon"
                     className="absolute -top-2 -right-2 h-6 w-6 z-10 text-white/80 hover:text-white bg-black/50 rounded-full"
-                    onClick={(e) => { e.stopPropagation(); onRename('coach', lineup.coach.id, lineup.coach.name); }}
+                    onClick={(e) => { e.stopPropagation(); onRename('coach', lineup.coach.id, getCoachName(lineup.coach.id, lineup.coach.name)); }}
                     >
                     <Pencil className="h-3 w-3" />
                     </Button>
                 )}
             </div>
-            <span className="font-semibold">{lineup.coach.name}</span>
+            <span className="font-semibold">{getCoachName(lineup.coach.id, lineup.coach.name)}</span>
         </div>
       )}
 
@@ -167,11 +164,11 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }
           <h4 className="text-center font-bold mb-2">الاحتياط</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {lineup.substitutes.map((p) => (
-              <div key={p.player.id} className="relative flex flex-col items-center gap-1 text-center p-2 rounded-lg border bg-background/40">
+              <div key={p.player.id} className="relative flex items-center gap-3 p-2 rounded-lg border bg-background/40">
                    {isAdmin && (
                     <Button
                         variant="ghost" size="icon"
-                        className="absolute top-0 right-0 h-7 w-7 z-10"
+                        className="absolute top-1 right-1 h-7 w-7 z-10"
                         onClick={(e) => { e.stopPropagation(); onRename('player', p.player.id, getPlayerName(p.player.id, p.player.name)); }}
                     >
                         <Pencil className="h-4 w-4" />
@@ -181,7 +178,11 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }
                       <AvatarImage src={p.player.photo} />
                       <AvatarFallback>{p.player.name?.charAt(0) || '?'}</AvatarFallback>
                   </Avatar>
-                  <span className="text-xs font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
+                  <div>
+                    <span className="text-sm font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
+                     {p.player.number && <p className="text-xs text-muted-foreground">الرقم: {p.player.number}</p>}
+                  </div>
+
               </div>
             ))}
           </div>

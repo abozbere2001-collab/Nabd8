@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/button';
 import { MatchTimeline } from '@/components/MatchTimeline';
 import { MatchStatistics } from '@/components/MatchStatistics';
 import { LineupField } from '@/components/LineupField';
-import { PlayerStats as PlayerStatsComponent } from '@/components/PlayerStats';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -125,14 +124,15 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
 
   const [renameItem, setRenameItem] = useState<{ id: number, name: string, type: RenameType } | null>(null);
   const [isRenameOpen, setRenameOpen] = useState(false);
-  const [customNames, setCustomNames] = useState<{ players: Map<number, string>, teams: Map<number,string> }>({ players: new Map(), teams: new Map() });
+  const [customNames, setCustomNames] = useState<{ players: Map<number, string>, teams: Map<number,string>, coaches: Map<number, string> }>({ players: new Map(), teams: new Map(), coaches: new Map() });
 
   const fetchCustomNames = useCallback(async () => {
     if (!db) return;
     try {
-        const [playersSnapshot, teamsSnapshot] = await Promise.all([
+        const [playersSnapshot, teamsSnapshot, coachesSnapshot] = await Promise.all([
             getDocs(collection(db, 'playerCustomizations')),
             getDocs(collection(db, 'teamCustomizations')),
+            getDocs(collection(db, 'coachCustomizations')),
         ]);
         
         const playerNames = new Map<number, string>();
@@ -140,11 +140,14 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
 
         const teamNames = new Map<number, string>();
         teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+        
+        const coachNames = new Map<number, string>();
+        coachesSnapshot.forEach(doc => coachNames.set(Number(doc.id), doc.data().customName));
 
-        setCustomNames({ players: playerNames, teams: teamNames });
+        setCustomNames({ players: playerNames, teams: teamNames, coaches: coachNames });
     } catch (e) {
       const permissionError = new FirestorePermissionError({
-          path: `playerCustomizations or teamCustomizations`,
+          path: `playerCustomizations, teamCustomizations, or coachCustomizations`,
           operation: 'list',
       });
       errorEmitter.emit('permission-error', permissionError);
@@ -155,8 +158,8 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
     fetchCustomNames();
   }, [fetchCustomNames]);
   
-  const getDisplayName = useCallback((type: 'player' | 'team', id: number, defaultName: string) => {
-    const map = type === 'player' ? customNames.players : customNames.teams;
+  const getDisplayName = useCallback((type: 'player' | 'team' | 'coach', id: number, defaultName: string) => {
+    const map = type === 'player' ? customNames.players : type === 'team' ? customNames.teams : customNames.coaches;
     return map.get(id) || defaultName;
   }, [customNames]);
 
@@ -204,11 +207,15 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
     let draws = 0;
 
     h2h.forEach(match => {
-        if(match.teams.home.id === homeTeamId && match.teams.home.winner) homeWins++;
-        else if (match.teams.away.id === homeTeamId && match.teams.away.winner) homeWins++;
-        else if(match.teams.home.id === awayTeamId && match.teams.home.winner) awayWins++;
-        else if (match.teams.away.id === awayTeamId && match.teams.away.winner) awayWins++;
-        else draws++;
+        if(match.teams.winner === null) {
+            draws++;
+        } else if (match.teams.winner && match.teams.home.id === homeTeamId) {
+            homeWins++;
+        } else if (match.teams.winner && match.teams.away.id === homeTeamId) {
+            homeWins++;
+        } else {
+            awayWins++;
+        }
     });
 
     return { homeWins, awayWins, draws, total };
@@ -314,6 +321,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
                             onRename={handleRename} 
                             isAdmin={isAdmin} 
                             getPlayerName={(id, name) => getDisplayName('player', id, name)} 
+                            getCoachName={(id, name) => getDisplayName('coach', id, name)}
                         />
                     </TabsContent>
                     <TabsContent value="away_lineup" className="mt-4">
@@ -323,6 +331,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
                             onRename={handleRename} 
                             isAdmin={isAdmin} 
                             getPlayerName={(id, name) => getDisplayName('player', id, name)}
+                            getCoachName={(id, name) => getDisplayName('coach', id, name)}
                         />
                     </TabsContent>
                 </Tabs>
