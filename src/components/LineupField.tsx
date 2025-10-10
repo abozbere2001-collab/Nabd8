@@ -9,7 +9,8 @@ import './LineupField.css';
 const groupPlayers = (players: LineupData['startXI']) => {
     const groups: { [key: string]: typeof players } = { 'G': [], 'D': [], 'M': [], 'F': [] };
     players.forEach(p => {
-        const position = p.statistics[0]?.games?.position || 'M';
+        // Safely access position, defaulting to player's main position if stats are missing.
+        const position = p.statistics?.[0]?.games?.position || p.player.position || 'M';
         if (groups[position[0]]) {
             groups[position[0]].push(p);
         } else {
@@ -30,7 +31,7 @@ export function LineupField({ home, away }: { home: LineupData, away: LineupData
                 <div className="team-section away-team">
                     {['F', 'M', 'D', 'G'].map(pos => (
                         <div key={`away-${pos}`} className="lineup-row">
-                            {awayGrouped[pos]?.map(({ player }) => <PlayerCard key={player.id} player={player} teamColors={away.team.colors} />)}
+                            {awayGrouped[pos]?.map(({ player, statistics }) => <PlayerCard key={player.id} player={{...player, rating: statistics?.[0]?.games?.rating}} teamColors={away.team.colors} />)}
                         </div>
                     ))}
                 </div>
@@ -46,7 +47,7 @@ export function LineupField({ home, away }: { home: LineupData, away: LineupData
                 <div className="team-section home-team">
                     {['G', 'D', 'M', 'F'].map(pos => (
                         <div key={`home-${pos}`} className="lineup-row">
-                            {homeGrouped[pos]?.map(({ player }) => <PlayerCard key={player.id} player={player} teamColors={home.team.colors} />)}
+                            {homeGrouped[pos]?.map(({ player, statistics }) => <PlayerCard key={player.id} player={{...player, rating: statistics?.[0]?.games?.rating}} teamColors={home.team.colors} />)}
                         </div>
                     ))}
                 </div>
@@ -82,4 +83,3 @@ export function LineupField({ home, away }: { home: LineupData, away: LineupData
         </div>
     );
 }
-
