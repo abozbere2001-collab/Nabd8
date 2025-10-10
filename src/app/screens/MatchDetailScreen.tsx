@@ -86,7 +86,7 @@ function useMatchData(fixture?: FixtureType): MatchDataHook {
         const playersMap = new Map(allPlayers.map(p => [p.player.id, p]));
 
         const enrichedLineups = lineupsDataRaw.map((lineup: any) => {
-            const enrich = (playerList: any[]) => playerList.map(p => {
+            const enrich = (playerList: any[] | undefined) => (playerList || []).map(p => {
                 const fullPlayerData = playersMap.get(p.player.id);
                 return fullPlayerData || p;
             });
@@ -352,7 +352,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
             </TabsContent>
 
             <TabsContent value="events" className="p-4">
-                 <MatchTimeline events={events} homeTeamId={homeTeamId} getPlayerName={(id, name) => getDisplayName('player', id, name)} />
+                 <MatchTimeline events={events} homeTeamId={homeTeamId} awayTeamId={awayTeamId} getPlayerName={(id, name) => getDisplayName('player', id, name)} />
             </TabsContent>
             
             <TabsContent value="stats" className="p-4">
