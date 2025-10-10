@@ -195,6 +195,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
           <TabsContent value="home">
             <MatchView 
               match={matchDataForView(initialFixture.teams.home.id)}
+              homeTeamId={initialFixture.teams.home.id}
               onRenamePlayer={handleRenamePlayer}
               isAdmin={!!isAdmin}
               getPlayerName={getPlayerName}
@@ -203,6 +204,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
            <TabsContent value="away">
              <MatchView 
               match={matchDataForView(initialFixture.teams.away.id)}
+              homeTeamId={initialFixture.teams.home.id}
               onRenamePlayer={handleRenamePlayer}
               isAdmin={!!isAdmin}
               getPlayerName={getPlayerName}
