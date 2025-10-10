@@ -173,9 +173,10 @@ const FormationCard:React.FC<{team:"home"|"away"; players?:Player[]; substitutes
   const positions: Record<string, Player[]> ={"GK":[], "DEF":[], "MID":[], "FWD":[]};
   if (players) {
     players.forEach(p=>{
-        if(p.position.includes("G")) positions.GK.push(p);
-        else if(p.position.includes("D")) positions.DEF.push(p);
-        else if(p.position.includes("M")) positions.MID.push(p);
+        const pos = p.position.toUpperCase();
+        if(pos.includes("G")) positions.GK.push(p);
+        else if(pos.includes("D")) positions.DEF.push(p);
+        else if(pos.includes("M")) positions.MID.push(p);
         else positions.FWD.push(p);
     });
   }

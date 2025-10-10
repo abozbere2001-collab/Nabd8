@@ -1,5 +1,6 @@
 
 
+// This file is being updated to be compatible with the new AdvancedMatchDetailScreen component.
 // --- TYPE DEFINITIONS ---
 export interface Fixture {
   fixture: { id: number; date: string; timestamp: number; status: { short: string; long: string; elapsed: number | null; }; };
@@ -30,11 +31,11 @@ export interface Team {
 export interface Player {
     id: number;
     name: string;
-    age: number;
+    age?: number;
     number: number | null;
     position: string;
     photo: string;
-    grid: string | null;
+    grid?: string | null;
 }
 
 export interface Favorites {
@@ -183,3 +184,5 @@ export interface LineupData {
 }
 
 export type PlayerWithStats = PlayerStats;
+
+    
