@@ -10,75 +10,28 @@ import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
-import { Loader2, Search, RadioTower } from 'lucide-react';
+import { Loader2, Search, RadioTower, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
+import type { Fixture as FixtureType, Favorites, MatchDetails } from '@/lib/types';
 
-// Interfaces
-interface Fixture {
-  fixture: {
-    id: number;
-    date: string;
-    timestamp: number;
-    status: {
-      long: string;
-      short: string;
-      elapsed: number | null;
-    };
-  };
-  league: {
-    id: number;
-    name: string;
-    logo: string;
-    round: string;
-  };
-  teams: {
-    home: { id: number; name: string; logo: string; winner: boolean | null };
-    away: { id: number; name: string; logo: string; winner: boolean | null };
-  };
-  goals: {
-    home: number | null;
-    away: number | null;
-  };
-}
-
-interface Favorites {
-    userId: string;
-    leagues?: { [key: string]: any };
-    teams?: { [key:string]: any };
-}
 
 interface GroupedFixtures {
     [leagueName: string]: {
-        league: Fixture['league'];
-        fixtures: Fixture[];
+        league: FixtureType['league'];
+        fixtures: FixtureType[];
     }
 }
 
-interface MatchDetails {
-    commentsEnabled: boolean;
-}
-
-
-// Helper functions
-const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
-
-const getDayLabel = (date: Date) => {
-    if (isToday(date)) return "اليوم";
-    if (isYesterday(date)) return "الأمس";
-    if (isTomorrow(date)) return "غداً";
-    return format(date, "EEE", { locale: ar });
-};
-
 // Live Timer Component
-const LiveMatchStatus = ({ fixture }: { fixture: Fixture }) => {
+const LiveMatchStatus = ({ fixture }: { fixture: FixtureType }) => {
     const { status, date } = fixture.fixture;
     const [elapsedTime, setElapsedTime] = useState(status.elapsed);
 
@@ -125,7 +78,7 @@ const LiveMatchStatus = ({ fixture }: { fixture: Fixture }) => {
 };
 
 // Fixture Item Component
-const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: Fixture, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
+const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
     
     return (
       <div 
@@ -134,7 +87,7 @@ const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixtur
       >
         <div 
           className="hover:bg-accent/50 cursor-pointer -m-3 p-3"
-          onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
+          onClick={() => navigate('UltimateMatchDetail', { fixtureId: fixture.fixture.id })}
         >
          <div 
             className="flex items-center justify-center text-xs text-muted-foreground mb-2 cursor-pointer hover:underline"
@@ -190,7 +143,7 @@ const FixturesList = ({
     matchDetails,
     navigate,
 }: { 
-    fixtures: Fixture[], 
+    fixtures: FixtureType[], 
     loading: boolean,
     activeTab: string, 
     showLiveOnly: boolean,
@@ -300,6 +253,15 @@ const FixturesList = ({
 };
 
 // Date Scroller
+const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
+
+const getDayLabel = (date: Date) => {
+    if (isToday(date)) return "اليوم";
+    if (isYesterday(date)) return "الأمس";
+    if (isTomorrow(date)) return "غداً";
+    return format(date, "EEE", { locale: ar });
+};
+
 const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: string, onDateSelect: (dateKey: string) => void}) => {
     const dates = useMemo(() => {
         const today = new Date();
@@ -357,7 +319,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     );
 }
 
-type TabName = 'all-matches' | 'my-results';
+type TabName = 'all-matches' | 'my-results' | 'predictions';
 type Cache<T> = { [date: string]: T };
 
 // Main Screen Component
@@ -369,7 +331,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
 
-  const [fixturesCache, setFixturesCache] = useState<Cache<Fixture[]>>({});
+  const [fixturesCache, setFixturesCache] = useState<Cache<FixtureType[]>>({});
   const [loadingFixtures, setLoadingFixtures] = useState(true);
   
   const [showLiveOnly, setShowLiveOnly] = useState(false);
@@ -444,7 +406,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   };
   
   const handleTabChange = (value: string) => {
-    const tabValue = value as 'all-matches' | 'my-results';
+    const tabValue = value as TabName;
     setActiveTab(tabValue);
   };
 
@@ -473,37 +435,50 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     checked={showLiveOnly}
                     onCheckedChange={setShowLiveOnly}
                   />
-                  <ProfileButton onProfileClick={() => navigate('Profile')} />
+                  <ProfileButton />
               </div>
             }
         />
         <div className="flex flex-col border-b bg-background">
              <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-               <TabsList className="grid w-full grid-cols-2 h-auto p-0 rounded-none bg-transparent">
+               <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
+                   <TabsTrigger value="predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
                    <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>كل المباريات</TabsTrigger>
                    <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
                </TabsList>
+                <TabsContent value="my-results" className="mt-0">
+                     <div className="py-2">
+                        <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
+                    </div>
+                </TabsContent>
+                <TabsContent value="all-matches" className="mt-0">
+                     <div className="py-2">
+                        <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
+                    </div>
+                </TabsContent>
+                <TabsContent value="predictions" className="mt-0">
+                    {/* Date scroller for predictions can be different if needed */}
+                </TabsContent>
              </Tabs>
 
-            <div className="py-2">
-                <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
-            </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <FixturesList 
-                fixtures={currentFixtures}
-                loading={loadingFixtures}
-                activeTab={activeTab}
-                showLiveOnly={showLiveOnly} 
-                favoritedLeagueIds={favoritedLeagueIds}
-                favoritedTeamIds={favoritedTeamIds}
-                hasAnyFavorites={hasAnyFavorites}
-                matchDetails={matchDetails}
-                navigate={navigate}
-            />
+            {activeTab === 'predictions' ? (
+                <GlobalPredictionsScreen navigate={navigate} goBack={goBack} canGoBack={canGoBack} />
+            ) : (
+                <FixturesList 
+                    fixtures={currentFixtures}
+                    loading={loadingFixtures}
+                    activeTab={activeTab}
+                    showLiveOnly={showLiveOnly} 
+                    favoritedLeagueIds={favoritedLeagueIds}
+                    favoritedTeamIds={favoritedTeamIds}
+                    hasAnyFavorites={hasAnyFavorites}
+                    matchDetails={matchDetails}
+                    navigate={navigate}
+                />
+            )}
         </div>
     </div>
   );
 }
-
-    

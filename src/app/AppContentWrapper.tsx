@@ -47,7 +47,6 @@ const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> =
   News: { component: NewsScreen },
   Settings: { component: SettingsScreen },
   CompetitionDetails: { component: CompetitionDetailScreen },
-  MatchDetails: { component: UltimateMatchDetailScreen },
   UltimateMatchDetail: { component: UltimateMatchDetailScreen },
   TeamDetails: { component: TeamDetailScreen },
   AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen },
@@ -63,6 +62,8 @@ const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> =
   ManageTopScorers: { component: ManageTopScorersScreen },
   Login: { component: LoginScreen },
   SignUp: { component: LoginScreen },
+  // MatchDetails is intentionally omitted as UltimateMatchDetailScreen is used instead
+  MatchDetails: { component: UltimateMatchDetailScreen },
 };
 
 
