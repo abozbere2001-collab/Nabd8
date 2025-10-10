@@ -60,9 +60,9 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
         const awayPlayersData = awayPlayersRes.ok ? (await awayPlayersRes.json()).response || [] : [];
 
         const allPlayersData = [...homePlayersData, ...awayPlayersData];
-        const playerDetailsMap = new Map<number, PlayerType>();
+        const playerDetailsMap = new Map<number, PlayerStats>();
         allPlayersData.forEach(p => {
-          playerDetailsMap.set(p.player.id, p.player);
+          playerDetailsMap.set(p.player.id, p);
         });
 
         const enrichedLineups = lineupsDataRaw.map((lineup: LineupData) => {
@@ -72,8 +72,9 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
               ...p,
               player: {
                 ...p.player,
-                photo: details?.photo || p.player.photo || "https://media.api-sports.io/football/players/0.png"
-              }
+                photo: details?.player.photo || p.player.photo || "https://media.api-sports.io/football/players/0.png"
+              },
+              statistics: details?.statistics || p.statistics,
             };
           });
 
