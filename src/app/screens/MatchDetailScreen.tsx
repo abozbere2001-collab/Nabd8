@@ -94,7 +94,7 @@ function useMatchData(fixture?: FixtureType): MatchData {
                 const [lineupsRes, eventsRes, statsRes, standingsRes, h2hRes] = await Promise.allSettled([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
-                    fetch(`/api/football/statistics?fixture=${fixtureId}`),
+                    fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
                     fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
                     fetch(`/api/football/fixtures/headtohead?h2h=${homeTeamId}-${awayTeamId}`),
                 ]);
@@ -499,7 +499,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
-
-    
 
     
