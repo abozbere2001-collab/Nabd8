@@ -11,14 +11,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { useFirestore } from '@/firebase/provider';
-import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player } from '@/lib/types';
+import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
-import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck } from 'lucide-react';
+import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 
-// --- PlayerCard Component (as provided) ---
+// --- PlayerCard Component ---
 const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
   const fallbackImage = "https://media.api-sports.io/football/players/0.png";
   const gameStats = player?.statistics?.[0]?.games || {};
@@ -32,12 +31,20 @@ const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
       ? player.player.photo
       : fallbackImage;
 
+  const getRatingColor = () => {
+    if (!rating) return 'bg-gray-500';
+    const r = parseFloat(rating);
+    if (r >= 7) return 'bg-green-600';
+    if (r >= 6) return 'bg-yellow-600';
+    return 'bg-red-600';
+  }
+
   return (
     <div className="relative flex flex-col items-center">
       <div className="relative w-12 h-12">
         <img src={playerImage} alt={player?.player?.name || "Player"} className="rounded-full border-2 border-white/50" />
         {playerNumber && <div className="absolute -top-1 -left-1 bg-gray-800 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background">{playerNumber}</div>}
-        {rating && <div className={`absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background ${parseFloat(rating)>=7?"bg-green-600":parseFloat(rating)>=6?"bg-yellow-600":"bg-red-600"}`}>{rating}</div>}
+        {rating && <div className={cn(`absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background`, getRatingColor())}>{rating}</div>}
       </div>
       <span className="mt-1 text-[11px] font-semibold text-center truncate w-16">{player?.player?.name || "غير معروف"}</span>
     </div>
@@ -74,7 +81,7 @@ const MatchHeaderCard = ({ fixture }: { fixture: Fixture }) => {
                                 </div>
                             </>
                         ) : (
-                             <div className="font-bold text-2xl tracking-wider">{format(new Date(fixture.fixture.date), "HH:mm")}</div>
+                             <div className="font-bold text-3xl tracking-wider">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
                         )}
                        
                     </div>
@@ -181,58 +188,39 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
         if (event.type === 'Goal') return <FootballIcon className="w-5 h-5 text-green-500" />;
         if (event.type === 'Card' && event.detail.includes('Yellow')) return <Square className="w-5 h-5 text-yellow-400 fill-current" />;
         if (event.type === 'Card' && event.detail.includes('Red')) return <Square className="w-5 h-5 text-red-500 fill-current" />;
-        if (event.type === 'subst') return <ArrowRight className="w-4 h-4 text-green-500" />;
+        if (event.type === 'subst') return <Users className="w-4 h-4 text-blue-500" />;
         return <Clock className="w-5 h-5 text-muted-foreground" />;
     }
 
-    // Sort events by time, descending
-    const sortedEvents = [...events].sort((a, b) => b.time.elapsed - a.time.elapsed);
+    // Sort events by time, ascending
+    const sortedEvents = [...events].sort((a, b) => a.time.elapsed - b.time.elapsed);
 
     return (
-        <div className="relative px-4 py-8">
-            <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
+        <div className="relative px-2 py-8">
+            <div className="absolute top-0 bottom-0 right-1/2 w-0.5 bg-border -translate-x-1/2"></div>
             {sortedEvents.map((event, index) => {
                 const isHomeEvent = event.team.id === homeTeamId;
                 return (
-                    <div key={index} className="relative flex items-center my-6">
-                        {/* Time Bubble */}
-                        <div className="absolute left-1/2 -translate-x-1/2 z-10 bg-background border rounded-full h-8 w-8 flex items-center justify-center font-bold text-xs">
+                    <div key={index} className={cn("relative flex my-4", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
+                        <div className="flex-1 text-center px-4">
+                            <div className={cn("flex items-center gap-3 bg-card p-2 rounded-md border w-full", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
+                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background">
+                                    {getEventIcon(event)}
+                                </div>
+                                <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
+                                    <p className="font-semibold">{event.player.name}</p>
+                                    {event.type === 'subst' && event.assist.name ? (
+                                        <p className="text-xs text-muted-foreground">تبديل بـ {event.assist.name}</p>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">{event.detail}</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="absolute top-1/2 right-1/2 -translate-y-1/2 translate-x-1/2 z-10 bg-background border rounded-full h-8 w-8 flex items-center justify-center font-bold text-xs">
                            {event.time.elapsed}'
                         </div>
-                        {isHomeEvent && (
-                            <div className="flex-1 flex justify-start">
-                                <div className="flex items-center gap-3 bg-card p-2 rounded-md border max-w-xs">
-                                     <div className="flex-1 text-sm text-right">
-                                        <p className="font-semibold">{event.player.name}</p>
-                                        {event.type === 'subst' && event.assist.name ? (
-                                            <p className="text-xs text-muted-foreground">تبديل بـ {event.assist.name}</p>
-                                        ) : (
-                                            <p className="text-xs text-muted-foreground">{event.detail}</p>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background">
-                                        {getEventIcon(event)}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                         {!isHomeEvent && (
-                            <div className="flex-1 flex justify-end">
-                                <div className="flex items-center gap-3 bg-card p-2 rounded-md border max-w-xs">
-                                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background">
-                                        {getEventIcon(event)}
-                                    </div>
-                                    <div className="flex-1 text-sm text-left">
-                                        <p className="font-semibold">{event.player.name}</p>
-                                        {event.type === 'subst' && event.assist.name ? (
-                                            <p className="text-xs text-muted-foreground">تبديل بـ {event.assist.name}</p>
-                                        ) : (
-                                            <p className="text-xs text-muted-foreground">{event.detail}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                         <div className="flex-1" />
                     </div>
                 );
             })}
@@ -241,7 +229,7 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
 };
 
 
-const LineupsTab = ({ lineups }: { lineups: LineupData[] | null }) => {
+const LineupsTab = ({ lineups, events }: { lineups: LineupData[] | null; events: MatchEvent[] | null; }) => {
     if (!lineups) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     if (lineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     
@@ -259,14 +247,14 @@ const LineupsTab = ({ lineups }: { lineups: LineupData[] | null }) => {
           return acc;
         }, {} as { [key: number]: PlayerWithStats[] });
 
-        // Reverse to show goalkeeper at the bottom
+        // Goalkeeper is usually row 1, we want it at the bottom.
         const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => b - a);
 
         return (
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col justify-around p-2">
                 {sortedRows.map(row => (
                     <div key={row} className="flex justify-around items-center">
-                        {formationGrid[row]?.map(p => p && <PlayerCard key={p.player.id} player={p} />)}
+                        {formationGrid[row]?.filter(Boolean).map(p => <PlayerCard key={p.player.id} player={p} />)}
                     </div>
                 ))}
             </div>
@@ -287,20 +275,20 @@ const LineupsTab = ({ lineups }: { lineups: LineupData[] | null }) => {
             {renderPitch(activeLineup)}
             
             <Card>
-                <CardContent className="p-2 space-y-2">
-                    <h3 className="font-bold text-center p-2 text-sm">التبديلات والاحتياط</h3>
+                <CardContent className="p-2">
+                    <h3 className="font-bold text-center p-2 text-sm">البدلاء والتبديلات</h3>
                     <div className="grid grid-cols-1 divide-y">
                         {activeLineup.substitutes.map(p => {
-                             const subbedOutFor = events?.find(e => e.type === 'subst' && e.assist.id === p.player.id);
-                             const subbedInFor = events?.find(e => e.type === 'subst' && e.player.id === p.player.id);
+                             const subbedInEvent = events?.find(e => e.type === 'subst' && e.player.id === p.player.id);
+                             const subbedOutPlayerName = subbedInEvent?.assist.name;
 
                             return (
                                 <div key={p.player.id} className="flex items-center gap-2 p-1.5 text-xs">
                                     <PlayerCard player={p} />
-                                    {subbedInFor && (
+                                    {subbedInEvent && (
                                         <div className="flex items-center gap-1 text-green-500">
-                                            <ArrowRight className="h-3 w-3"/>
-                                            <span>دخل بديلاً لـ {subbedInFor.assist.name}</span>
+                                            <ArrowUp className="h-3 w-3"/>
+                                            <span>دخل بديلاً لـ {subbedOutPlayerName}</span>
                                         </div>
                                     )}
                                 </div>
@@ -376,9 +364,11 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [standings, setStandings] = useState<Standing[] | null>(null);
     const [loading, setLoading] = useState(!initialFixture);
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (isInitialLoad: boolean) => {
          if (!fixtureId) return;
-        setLoading(true);
+        if (isInitialLoad) {
+            setLoading(true);
+        }
 
         try {
             const currentLeagueId = fixture?.league.id;
@@ -407,13 +397,15 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         } catch (error) {
             console.error("Failed to fetch match details:", error);
         } finally {
-            setLoading(false);
+            if (isInitialLoad) {
+                setLoading(false);
+            }
         }
     }, [fixtureId, fixture?.league.id, fixture?.league.season]);
 
     useEffect(() => {
-        fetchData(); 
-        const interval = setInterval(fetchData, 30000); 
+        fetchData(true); 
+        const interval = setInterval(() => fetchData(false), 30000); 
         return () => clearInterval(interval);
     }, [fetchData]);
 
@@ -450,10 +442,12 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
-                    <TabsContent value="lineups" className="mt-4"><LineupsTab lineups={lineups} /></TabsContent>
+                    <TabsContent value="lineups" className="mt-4"><LineupsTab lineups={lineups} events={events} /></TabsContent>
                     <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} /></TabsContent>
                 </Tabs>
             </div>
         </div>
     );
 }
+
+    
