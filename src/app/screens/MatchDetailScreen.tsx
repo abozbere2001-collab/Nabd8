@@ -21,11 +21,12 @@ import { Progress } from '@/components/ui/progress';
 const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
   const fallbackImage = "https://media.api-sports.io/football/players/0.png";
   const gameStats = player?.statistics?.[0]?.games || {};
-  const playerNumber = gameStats.number || player?.player?.number || "";
-  const rating =
-    gameStats.rating && !isNaN(parseFloat(gameStats.rating))
+  const playerNumber = player?.player?.number || gameStats.number || "";
+  
+  const rating = player?.player?.rating ?? (gameStats.rating && !isNaN(parseFloat(gameStats.rating))
       ? parseFloat(gameStats.rating).toFixed(1)
-      : null;
+      : null);
+
   const playerImage =
     player?.player?.photo && player.player.photo.includes("http")
       ? player.player.photo
@@ -232,7 +233,65 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
 };
 
 
-const LineupsTab = ({ lineups, events }: { lineups: LineupData[] | null; events: MatchEvent[] | null; }) => {
+const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: LineupData[] | null; events: MatchEvent[] | null; season: number; }) => {
+    const [lineups, setLineups] = useState(initialLineups);
+
+    useEffect(() => {
+        if (!initialLineups || initialLineups.length < 2) return;
+
+        const allPlayerIds = initialLineups.flatMap(l => 
+            [...l.startXI, ...l.substitutes].map(p => p.player.id)
+        );
+
+        const fetchPlayerStats = async () => {
+            const playerStatsPromises = allPlayerIds.map(id => 
+                fetch(`/api/football/players?id=${id}&season=${season}`).then(res => res.json())
+            );
+            
+            const playerStatsResponses = await Promise.all(playerStatsPromises);
+
+            const playerRatingsMap = new Map<number, { photo: string, rating: string, number: number | null }>();
+            playerStatsResponses.forEach(res => {
+                if (res.response && res.response.length > 0) {
+                    const playerInfo = res.response[0];
+                    playerRatingsMap.set(playerInfo.player.id, {
+                        photo: playerInfo.player.photo,
+                        rating: playerInfo.statistics?.[0]?.games?.rating,
+                        number: playerInfo.player.number,
+                    });
+                }
+            });
+
+            const updatedLineups = initialLineups.map(lineup => {
+                const updatePlayer = (p: PlayerWithStats) => {
+                    const stats = playerRatingsMap.get(p.player.id);
+                    if (stats) {
+                        return {
+                            ...p,
+                            player: {
+                                ...p.player,
+                                photo: stats.photo || p.player.photo,
+                                rating: stats.rating || p.player.rating,
+                                number: stats.number ?? p.player.number,
+                            }
+                        };
+                    }
+                    return p;
+                };
+
+                return {
+                    ...lineup,
+                    startXI: lineup.startXI.map(updatePlayer),
+                    substitutes: lineup.substitutes.map(updatePlayer)
+                };
+            });
+            setLineups(updatedLineups);
+        };
+        
+        fetchPlayerStats();
+        
+    }, [initialLineups, season]);
+    
     if (!lineups) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     if (lineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     
@@ -279,7 +338,7 @@ const LineupsTab = ({ lineups, events }: { lineups: LineupData[] | null; events:
             
             <Card>
                 <CardContent className="p-2">
-                    <h3 className="font-bold text-center p-2 text-sm">البدلاء والتبديلات</h3>
+                    <h3 className="font-bold text-center p-2 text-sm">الاحتياط والتبديلات</h3>
                      <div className="grid grid-cols-1 divide-y">
                         {activeLineup.substitutes.map(p => {
                              const subbedInEvent = events?.find(e => e.type === 'subst' && e.player.id === p.player.id);
@@ -290,10 +349,11 @@ const LineupsTab = ({ lineups, events }: { lineups: LineupData[] | null; events:
                                     <div className="flex items-center gap-2">
                                         <PlayerCard player={p} />
                                         {subbedInEvent && subbedOutPlayer && (
-                                            <div className="flex items-center gap-2">
-                                                 <ArrowUp className="h-4 w-4 text-green-500"/>
+                                            <div className="flex items-center gap-1 text-muted-foreground">
+                                                 <ArrowUp className="h-3 w-3 text-green-500"/>
+                                                 <span className="text-[10px]">({subbedInEvent.time.elapsed}')</span>
                                                  <PlayerCard player={subbedOutPlayer} />
-                                                 <ArrowDown className="h-4 w-4 text-red-500"/>
+                                                 <ArrowDown className="h-3 w-3 text-red-500"/>
                                             </div>
                                         )}
                                     </div>
@@ -378,9 +438,9 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         }
 
         try {
-            const currentLeagueId = initialFixture?.league.id;
-            const currentSeason = initialFixture?.league.season;
-
+            const currentLeagueId = fixture?.league.id || initialFixture?.league.id;
+            const currentSeason = fixture?.league.season || initialFixture?.league.season;
+            
             const endpoints = [
                 `fixtures?id=${fixtureId}`,
                 `fixtures/lineups?fixture=${fixtureId}`,
@@ -408,7 +468,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 setLoading(false);
             }
         }
-    }, [fixtureId, initialFixture?.league.id, initialFixture?.league.season]);
+    }, [fixtureId, initialFixture?.league.id, initialFixture?.league.season, fixture?.league.id, fixture?.league.season]);
 
     useEffect(() => {
         fetchData(true); 
@@ -449,7 +509,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
-                    <TabsContent value="lineups" className="mt-4"><LineupsTab lineups={lineups} events={events} /></TabsContent>
+                    <TabsContent value="lineups" className="mt-4"><LineupsTab lineups={lineups} events={events} season={fixture.league.season} /></TabsContent>
                     <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} /></TabsContent>
                 </Tabs>
             </div>
