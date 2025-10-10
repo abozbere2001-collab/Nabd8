@@ -10,7 +10,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { Star, Pencil, Copy, Heart, User, ShieldCheck, Repeat, AlertTriangle, Calendar, Clock, MapPin } from 'lucide-react';
+import { Star, Pencil, Copy, Heart, ShieldCheck, Calendar, Clock, MapPin } from 'lucide-react';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -196,13 +196,15 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
     let draws = 0;
 
     h2h.forEach(match => {
-        if(match.teams.home.winner) homeWins++;
-        else if (match.teams.away.winner) awayWins++;
+        if(match.teams.home.id === homeTeamId && match.teams.home.winner) homeWins++;
+        else if (match.teams.away.id === homeTeamId && match.teams.away.winner) homeWins++;
+        else if(match.teams.home.id === awayTeamId && match.teams.home.winner) awayWins++;
+        else if (match.teams.away.id === awayTeamId && match.teams.away.winner) awayWins++;
         else draws++;
     });
 
     return { homeWins, awayWins, draws, total };
-  }, [h2h]);
+  }, [h2h, homeTeamId, awayTeamId]);
 
 
   const renderTabs = () => {
@@ -223,11 +225,11 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
   useEffect(() => {
       if(!loading) {
           const newTabs = renderTabs();
-          if(newTabs.length > 0) {
+          if(newTabs.length > 0 && !newTabs.find(t => t.key === activeTab)) {
             setActiveTab(newTabs[0].key);
           }
       }
-  }, [loading]);
+  }, [loading, activeTab]);
 
   if (loading) {
       return (
@@ -257,7 +259,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
       <ScreenHeader title={`${getDisplayName('team', homeTeamId, initialFixture.teams.home.name)} ضد ${getDisplayName('team', awayTeamId, initialFixture.teams.away.name)}`} onBack={goBack} canGoBack={canGoBack} />
       
       <div className="flex-1 overflow-y-auto">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs defaultValue="details" value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto">
                 {TABS.map(tab => <TabsTrigger key={tab.key} value={tab.key}>{tab.label}</TabsTrigger>)}
             </TabsList>

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Goal, RectangleVertical, ArrowLeftRight, AlertTriangle } from 'lucide-react';
 import type { MatchEvent as MatchEventType } from '@/lib/types';

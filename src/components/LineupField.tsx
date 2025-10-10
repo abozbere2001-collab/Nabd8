@@ -51,7 +51,6 @@ export function LineupField({ lineup, onRename, isAdmin, getPlayerName }: { line
   const MID = lineup.startXI.filter((p: any) => p.player.pos === 'M');
   const FWD = lineup.startXI.filter((p: any) => p.player.pos === 'F');
 
-  // الترتيب الصحيح: الهجوم، الوسط، الدفاع، الحارس (ليظهر الحارس بالأسفل)
   const rows = [FWD, MID, DEF, GK].filter(r => r.length > 0);
 
   return (
