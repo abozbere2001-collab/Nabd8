@@ -51,7 +51,8 @@ export function LineupField({
   const substitutions = events.filter(e => e.type === 'subst' && e.team.id === lineup.team.id);
 
   const getPlayerFromLineup = (playerId: number): PlayerWithStats | undefined => {
-      return [...lineup.startXI, ...lineup.substitutes].find(p => p.player.id === playerId);
+      const allPlayers = [...(lineup.startXI || []), ...(lineup.substitutes || [])];
+      return allPlayers.find(p => p.player.id === playerId);
   }
 
   return (
@@ -111,14 +112,17 @@ export function LineupField({
           <div className="space-y-3">
             {substitutions.map((event, idx) => {
               const playerIn = getPlayerFromLineup(event.player.id);
+              const playerOut = event.assist?.id ? getPlayerFromLineup(event.assist.id) : undefined;
               const playerInName = playerIn ? getPlayerName(playerIn.player.id, playerIn.player.name) : event.player.name;
-              const playerOutName = event.assist?.id ? getPlayerName(event.assist.id, event.assist.name || '') : '';
+              const playerOutName = playerOut ? getPlayerName(playerOut.player.id, playerOut.player.name) : event.assist.name || '';
               
+              const playerInRating = playerIn?.statistics?.[0]?.games?.rating;
+
               return (
                 <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
                   
                   {/* اللاعب الخارج */}
-                  <div className="flex items-center gap-2 text-red-500 w-2/5">
+                   <div className="flex items-center gap-2 text-red-500 w-2/5">
                     <ArrowDown className="h-4 w-4" />
                     <span className="font-medium truncate">{playerOutName}</span>
                   </div>
@@ -126,22 +130,20 @@ export function LineupField({
                   <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
 
                   {/* اللاعب الداخل */}
-                  {playerIn && (
                     <div className="flex items-center gap-2 text-green-500 justify-end w-2/5">
                         <div className="text-right">
                            <span className="font-medium block truncate">{playerInName}</span>
-                           {playerIn.statistics?.[0]?.games?.rating && (
+                           {playerInRating && (
                                <span className="text-xs text-primary font-bold">
-                                   {parseFloat(playerIn.statistics[0].games.rating).toFixed(1)}
+                                   {parseFloat(playerInRating).toFixed(1)}
                                </span>
                            )}
                         </div>
                         <Avatar className="h-8 w-8">
-                            <AvatarImage src={playerIn.player.photo} />
+                            <AvatarImage src={playerIn?.player.photo} />
                         </Avatar>
                         <ArrowUp className="h-4 w-4" />
                     </div>
-                  )}
                 </div>
               );
             })}
