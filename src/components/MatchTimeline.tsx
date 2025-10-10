@@ -1,18 +1,9 @@
-
 "use client";
 import { useState } from "react";
-import type { MatchEvent, Fixture } from '@/lib/types';
 
-interface MatchTimelineProps {
-    events: MatchEvent[];
-    fixture: Fixture;
-}
-
-
-export default function MatchTimeline({ events, fixture }: MatchTimelineProps) {
+export default function MatchTimeline({ events, fixture }) {
   const [showGoalsOnly, setShowGoalsOnly] = useState(false);
 
-  // ترتيب الأحداث من الدقيقة 1 (أسفل) إلى 90 (أعلى)
   const sorted = [...events].sort((a, b) => a.time.elapsed - b.time.elapsed);
   const filtered = showGoalsOnly
     ? sorted.filter((e) => e.type === "Goal")
@@ -45,15 +36,15 @@ export default function MatchTimeline({ events, fixture }: MatchTimelineProps) {
       </div>
 
       {/* ⚡ الحاوية العامة */}
-      <div className="relative w-full max-w-3xl h-[75vh] overflow-y-auto bg-gradient-to-b from-green-950 via-green-900 to-green-950 rounded-3xl shadow-lg p-6 border border-green-800 flex justify-center items-start">
+      <div className="relative w-full max-w-[750px] h-[120vh] overflow-y-auto bg-gradient-to-b from-green-950 via-green-900 to-green-950 rounded-3xl shadow-lg p-6 border border-green-800 flex justify-center items-start my-4">
         {/* العمود الرئيسي */}
-        <div className="absolute left-1/2 -translate-x-1/2 w-[3px] bg-green-600 h-full rounded-full"></div>
+        <div className="absolute left-1/2 -translate-x-1/2 w-[2px] bg-green-500 h-[130vh] rounded-full"></div>
 
         {/* الأحداث */}
         <div className="flex flex-col-reverse justify-end w-full space-y-4">
           {filtered.map((ev, i) => {
             const isHome = ev.team.id === fixture.teams.home.id;
-            const sideClass = isHome ? "justify-end pr-10" : "justify-start pl-10";
+            const sideClass = isHome ? "justify-end pr-3" : "justify-start pl-3";
             const align = isHome ? "right-1/2 -mr-[2px]" : "left-1/2 -ml-[2px]";
             const icon =
               ev.type === "Goal"
@@ -66,6 +57,9 @@ export default function MatchTimeline({ events, fixture }: MatchTimelineProps) {
                 ? "🔁"
                 : "•";
 
+            const timeLabel =
+              ev.time?.real || ev.time?.updated || `${ev.time.elapsed}'`;
+
             return (
               <div
                 key={i}
@@ -73,14 +67,24 @@ export default function MatchTimeline({ events, fixture }: MatchTimelineProps) {
               >
                 {/* النقطة على العمود */}
                 <div
-                  className={`absolute ${align} w-4 h-4 bg-green-400 rounded-full border-[3px] border-green-950 shadow-md`}
+                  className={`absolute ${align} top-3 w-3 h-3 bg-green-400 rounded-full border-[3px] border-green-950 shadow-md`}
+                  title={timeLabel}
                 ></div>
 
-                {/* الحاوية الجانبية للحدث */}
+                {/* الوقت الحقيقي بجانب النقطة */}
+                <div
+                  className={`absolute text-[10px] text-gray-300 ${
+                    isHome ? "right-[51%]" : "left-[51%]"
+                  } top-6`}
+                >
+                  {timeLabel}
+                </div>
+
+                {/* الحاوية الجانبية للحدث (أقرب من العمود) */}
                 <div
                   className={`flex flex-col ${
                     isHome ? "items-end" : "items-start"
-                  } bg-green-800/70 rounded-2xl px-3 py-2 shadow-lg max-w-[45%] border border-green-700`}
+                  } bg-green-800/70 rounded-xl px-2 py-1 shadow-md max-w-[35%] border border-green-700`}
                 >
                   {/* رأس الحدث */}
                   <div
@@ -91,14 +95,16 @@ export default function MatchTimeline({ events, fixture }: MatchTimelineProps) {
                     <img
                       src={ev.team.logo}
                       alt="logo"
-                      className="w-5 h-5 rounded-full shadow-md"
+                      className="w-4 h-4 rounded-full shadow-md"
                     />
-                    <span className="text-xs text-gray-300">{ev.time.elapsed}'</span>
+                    <span className="text-[11px] text-gray-300">
+                      {ev.time.elapsed}'
+                    </span>
                   </div>
 
                   {/* نوع الحدث */}
                   <div
-                    className={`text-sm font-bold ${
+                    className={`text-xs font-bold ${
                       ev.type === "Goal"
                         ? "text-yellow-300"
                         : ev.type === "Card" && ev.detail.includes("Red")
@@ -111,8 +117,8 @@ export default function MatchTimeline({ events, fixture }: MatchTimelineProps) {
                     {icon} {ev.type === "Goal" ? "هدف" : ev.detail}
                   </div>
 
-                  {/* اللاعب وصاحب المساعدة */}
-                  <div className="text-xs text-gray-200">
+                  {/* اللاعب والمساعدة */}
+                  <div className="text-[11px] text-gray-200">
                     {ev.player?.name}
                     {ev.assist?.name && (
                       <span className="text-gray-400"> 🎯 {ev.assist.name}</span>
@@ -125,8 +131,8 @@ export default function MatchTimeline({ events, fixture }: MatchTimelineProps) {
         </div>
       </div>
 
-      {/* 🧭 دليل بسيط في الأسفل */}
-      <div className="flex justify-between w-full max-w-3xl mt-2 text-gray-400 text-sm">
+      {/* 🧭 دليل الفرق في الأسفل */}
+      <div className="flex justify-between w-full max-w-[750px] mt-2 text-gray-400 text-sm px-4">
         <div className="flex items-center gap-2">
           <img
             src={fixture.teams.home.logo}
@@ -144,6 +150,9 @@ export default function MatchTimeline({ events, fixture }: MatchTimelineProps) {
           />
         </div>
       </div>
+
+      {/* فراغ خارجي إضافي للتمرير المريح */}
+      <div className="h-20 w-full"></div>
     </div>
   );
 }
