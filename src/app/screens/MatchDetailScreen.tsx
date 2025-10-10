@@ -7,7 +7,7 @@ import type { ScreenProps } from '@/app/page';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from '@/lib/utils';
 import type { Fixture as FixtureType, Standing, Team, Favorites, Player as PlayerType, MatchEvent } from '@/lib/types';
@@ -28,8 +28,8 @@ import MatchStatistics from '@/components/MatchStatistics';
 
 // --- TYPE DEFINITIONS ---
 interface PlayerWithStats {
-    player: PlayerType;
-    statistics?: any[];
+    player: PlayerType & { pos?: string };
+    statistics?: { games?: { rating?: string } }[];
 }
 interface LineupData {
     team: Team;
@@ -92,6 +92,7 @@ function useMatchData(fixture?: FixtureType): MatchData {
 
             try {
                 const [lineupsRes, eventsRes, statsRes, standingsRes, h2hRes] = await Promise.allSettled([
+                    fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}&type=expected`),
                     fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
@@ -109,11 +110,17 @@ function useMatchData(fixture?: FixtureType): MatchData {
                     return [];
                 };
 
-                let fetchedLineups: LineupData[] = await parseResult(lineupsRes);
-                const fetchedEvents: MatchEvent[] = await parseResult(eventsRes);
-                const fetchedStats: any[] = await parseResult(statsRes);
-                const fetchedStandings: Standing[] = (await parseResult(standingsRes))[0]?.league?.standings[0] || [];
+                const expectedLineups: LineupData[] = await parseResult(lineupsRes);
+                let fetchedLineups: LineupData[] = await parseResult(eventsRes);
+                const fetchedEvents: MatchEvent[] = await parseResult(statsRes);
+                const fetchedStats: any[] = await parseResult(standingsRes);
+                const fetchedStandings: Standing[] = (await parseResult(h2hRes))[0]?.league?.standings[0] || [];
                 const fetchedH2H: H2HData[] = await parseResult(h2hRes);
+
+                // If official lineup is not available, use expected
+                if (fetchedLineups.length === 0 && expectedLineups.length > 0) {
+                    fetchedLineups = expectedLineups;
+                }
                 
                  if (fetchedLineups.length > 0) {
                      for (let i = 0; i < fetchedLineups.length; i++) {
@@ -307,8 +314,10 @@ const LineupField = ({
 
   return (
     <Card className="p-3 bg-card/80">
-      <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20"
-           style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
+      <div
+        className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20"
+        style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}
+      >
         <div className="absolute inset-0 flex flex-col justify-around p-2">
           {rows.map((row, rowIndex) => (
             <div key={rowIndex} className="flex justify-around items-center w-full">
@@ -344,18 +353,23 @@ const LineupField = ({
           <h4 className="font-bold text-center mb-3">الاحتياط</h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {lineup.substitutes.map((player) => (
-              <div key={player.player.id} className="relative flex items-center gap-2 p-2 rounded-lg bg-background/50 border">
+              <div
+                key={player.player.id}
+                className="relative flex flex-col items-center gap-1 p-2 rounded-lg bg-background/50 border"
+              >
                 {isAdmin && (
                   <Button
                     variant="ghost"
                     size="icon"
                     className="absolute top-0 right-0 h-6 w-6 z-10"
-                    onClick={() => onRename(player.player.id, getPlayerName(player.player.id, player.player.name))}
+                    onClick={() =>
+                      onRename(player.player.id, getPlayerName(player.player.id, player.player.name))
+                    }
                   >
                     <Pencil className="h-3 w-3" />
                   </Button>
                 )}
-                <Avatar className="h-8 w-8">
+                <Avatar className="h-10 w-10">
                   <AvatarImage src={player.player.photo} alt={player.player.name} />
                   <AvatarFallback>{player.player.name ? player.player.name.charAt(0) : "?"}</AvatarFallback>
                 </Avatar>
@@ -363,12 +377,12 @@ const LineupField = ({
                   {getPlayerName(player.player.id, player.player.name)}
                 </span>
                 {player.statistics?.[0]?.games?.rating && (
-                  <span className="ml-1 text-[10px] font-bold text-blue-600">
+                  <span className="mt-0.5 text-[10px] font-bold text-blue-600">
                     {parseFloat(player.statistics[0].games.rating).toFixed(1)}
                   </span>
                 )}
                 {player.player.number && (
-                  <span className="ml-1 text-[10px] font-bold text-white bg-gray-700 px-1 rounded">
+                  <span className="mt-0.5 text-[10px] font-bold text-white bg-gray-700 px-1 rounded">
                     {player.player.number}
                   </span>
                 )}
@@ -475,14 +489,12 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         const docRef = doc(db, collectionName, String(renameItem.id));
         await setDoc(docRef, { customName: newName });
         fetchCustomNames();
+        setRenameOpen(false);
     };
     
     const availableTabs = useMemo(() => {
         const tabs = [];
-        // A lineup is considered available if there's at least one team's lineup, and that lineup has players.
-        const lineupAvailable = lineups && lineups.length > 0 && lineups.some(l => l.startXI && l.startXI.length > 0);
-    
-        if (lineupAvailable) {
+        if (lineups && lineups.length > 0 && lineups.some(l => l.startXI && l.startXI.length > 0)) {
             tabs.push({ value: 'lineups', label: 'التشكيلة' });
         }
         if (events && events.length > 0) {
@@ -494,11 +506,12 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         if (standings && standings.length > 0) {
             tabs.push({ value: 'standings', label: 'الترتيب' });
         }
+        
         return tabs;
     }, [lineups, events, stats, standings]);
     
 
-    if (loading && lineups.length === 0) {
+    if (loading && lineups.length === 0 && availableTabs.length === 0) {
         return (
             <div className="flex h-full flex-col bg-background">
                 <ScreenHeader title="تفاصيل المباراة" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
@@ -538,7 +551,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                  
                  {availableTabs.length > 0 ? (
                      <Tabs defaultValue={availableTabs[0].value}>
-                        <TabsList className={`grid w-full grid-cols-${availableTabs.length}`}>
+                        <TabsList className={`grid w-full grid-cols-${availableTabs.length > 0 ? availableTabs.length : 1}`}>
                             {availableTabs.map(tab => (
                                 <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
                             ))}
@@ -571,7 +584,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                             <TabsContent value="events" className="mt-4">
                               <MatchTimeline
                                 events={events}
-                                fixture={fixture}
                                 homeTeamId={fixture.teams.home.id}
                                 getPlayerName={(id, name) => getCustomName('player', id, name)}
                               />
