@@ -49,9 +49,9 @@ export function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: M
                 const bottomPosition = `${(event.time.elapsed / maxTime) * 100}%`;
                 
                 const eventContent = (
-                    <div className={`flex items-center gap-2 w-44 ${isHomeEvent ? 'flex-row-reverse text-right' : 'text-left'}`}>
+                    <div className={`flex items-center gap-2 w-44 ${isHomeEvent ? 'flex-row-reverse' : ''}`}>
                         <EventIcon event={event} />
-                        <div className="flex flex-col">
+                        <div className={`flex flex-col ${isHomeEvent ? 'text-right' : 'text-left'}`}>
                             <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
                             {event.assist?.name && event.type === 'Goal' && <span className="text-xs text-muted-foreground">صناعة: {getPlayerName(event.assist.id!, event.assist.name)}</span>}
                             {event.type === 'subst' && event.assist?.name && <span className="text-xs text-muted-foreground">خروج: {getPlayerName(event.assist.id!, event.assist.name)}</span>}

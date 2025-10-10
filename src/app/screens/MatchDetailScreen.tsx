@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from '@/hooks/use-toast';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { doc, getDocs, collection, setDoc } from 'firebase/firestore';
-import type { Fixture as FixtureType, PlayerStats, Team, MatchEvent, Standing } from '@/lib/types';
+import type { Fixture as FixtureType, Player as PlayerType, Team, MatchEvent, Standing, PlayerStats } from '@/lib/types';
 import { RenameDialog } from '@/components/RenameDialog';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -13,14 +13,13 @@ import { Star, Pencil, Copy, Heart, ShieldCheck, Calendar, Clock, MapPin } from 
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { MatchStatistics } from '@/components/MatchStatistics';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LineupField } from '@/components/LineupField';
 import { MatchTimeline } from '@/components/MatchTimeline';
+import { MatchStatistics } from '@/components/MatchStatistics';
+import { LineupField } from '@/components/LineupField';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 
-// --- TYPE DEFINITIONS ---
 interface LineupData {
   team: Team;
   coach?: any;
@@ -46,7 +45,6 @@ interface MatchDataHook {
 }
 
 type RenameType = 'team' | 'player' | 'coach';
-
 
 function useMatchData(fixture?: FixtureType): MatchDataHook {
   const { toast } = useToast();
@@ -337,7 +335,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
             <TabsContent value="lineups" className="p-4 grid md:grid-cols-2 gap-6">
                 <LineupField 
                     lineup={homeLineup}
-                    events={events.filter(e => e.team.id === homeTeamId)} 
+                    events={events}
                     onRename={handleRename} 
                     isAdmin={isAdmin} 
                     getPlayerName={(id, name) => getDisplayName('player', id, name)} 
@@ -345,7 +343,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
                 />
                 <LineupField 
                     lineup={awayLineup}
-                    events={events.filter(e => e.team.id === awayTeamId)} 
+                    events={events}
                     onRename={handleRename} 
                     isAdmin={isAdmin} 
                     getPlayerName={(id, name) => getDisplayName('player', id, name)}
