@@ -1,161 +1,101 @@
-
 "use client";
-import { useState } from "react";
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { FootballIcon } from "./icons/FootballIcon";
 
 export default function MatchTimeline({ events, fixture }) {
-  const [showGoalsOnly, setShowGoalsOnly] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
-  const sorted = [...events].sort((a, b) => a.time.elapsed - b.time.elapsed);
-  const filtered = showGoalsOnly
-    ? sorted.filter((e) => e.type === "Goal")
-    : sorted;
+  if (!events || events.length === 0)
+    return (
+      <div className="text-center text-muted-foreground p-6">⚠️ لا توجد مجريات متاحة</div>
+    );
+
+  const filteredEvents = showAll
+    ? events
+    : events.filter((ev) => ev.type === "Goal" || ev.detail === 'Red Card');
 
   return (
-    <div className="w-full flex flex-col items-center">
-      {/* 🔘 أزرار التبديل */}
-      <div className="flex gap-3 my-4">
-        <button
-          onClick={() => setShowGoalsOnly(false)}
-          className={`px-4 py-1 rounded-full font-semibold text-sm transition ${
-            !showGoalsOnly
-              ? "bg-green-600 text-white shadow-lg"
-              : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-          }`}
-        >
-          🕒 جميع الأحداث
-        </button>
-        <button
-          onClick={() => setShowGoalsOnly(true)}
-          className={`px-4 py-1 rounded-full font-semibold text-sm transition ${
-            showGoalsOnly
-              ? "bg-blue-600 text-white shadow-lg"
-              : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-          }`}
-        >
-          ⚽ الأبرز (الأهداف فقط)
-        </button>
+    <div className="relative w-full max-w-[800px] mx-auto bg-gradient-to-b from-card to-background rounded-3xl shadow-lg border p-4 my-6">
+      {/* 🔘 العنوان و الأزرار */}
+      <div className="flex justify-between items-center mb-3">
+        <h2 className="text-primary text-lg font-bold">المجريات</h2>
+        <div className="flex gap-2">
+          <Button
+            variant={!showAll ? "default" : "outline"}
+            onClick={() => setShowAll(false)}
+            className="px-3 py-1 text-sm rounded-full"
+          >
+            الأبرز
+          </Button>
+          <Button
+            variant={showAll ? "default" : "outline"}
+            onClick={() => setShowAll(true)}
+            className="px-3 py-1 text-sm rounded-full"
+          >
+            عرض الكل
+          </Button>
+        </div>
       </div>
 
-      {/* ⚡ الحاوية العامة */}
-      <div className="relative w-full max-w-[750px] h-[120vh] overflow-y-auto bg-gradient-to-b from-green-950 via-green-900 to-green-950 rounded-3xl shadow-lg p-6 border border-green-800 flex justify-center items-start my-4">
-        {/* العمود الرئيسي */}
-        <div className="absolute left-1/2 -translate-x-1/2 w-[2px] bg-green-500 h-[130vh] rounded-full"></div>
+      {/* 🕒 العمود الزمني */}
+      <div className="relative flex justify-center">
+        <div className="absolute top-0 bottom-0 w-[2px] bg-border rounded-full"></div>
 
-        {/* الأحداث */}
-        <div className="flex flex-col-reverse justify-end w-full space-y-4">
-          {filtered.map((ev, i) => {
-            const isHome = ev.team.id === fixture.teams.home.id;
-            const sideClass = isHome ? "justify-end pr-3" : "justify-start pl-3";
-            const align = isHome ? "right-1/2 -mr-[2px]" : "left-1/2 -ml-[2px]";
-            const icon =
-              ev.type === "Goal"
-                ? "⚽"
-                : ev.type === "Card" && ev.detail.includes("Yellow")
-                ? "🟨"
-                : ev.type === "Card" && ev.detail.includes("Red")
-                ? "🟥"
-                : ev.type === "subst"
-                ? "🔁"
-                : "•";
-
-            const timeLabel =
-              ev.time?.real || ev.time?.updated || `${ev.time.elapsed}'`;
+        <div className="flex flex-col-reverse w-full">
+          {[...filteredEvents].sort((a, b) => b.time.elapsed - a.time.elapsed).map((ev, i) => {
+            const isHomeTeam = ev.team.id === fixture.teams.home.id;
+            const alignClass = isHomeTeam ? "justify-start" : "justify-end";
+            const sideOffset = isHomeTeam ? "pr-8" : "pl-8";
+            
+            const iconMap: {[key:string]: React.ReactNode} = {
+                "Goal": <FootballIcon className="w-4 h-4 text-green-400" />,
+                "Yellow Card": <div className="w-3 h-4 bg-yellow-400 rounded-sm" />,
+                "Red Card": <div className="w-3 h-4 bg-red-500 rounded-sm" />,
+                "subst": <span className="text-blue-400 text-lg">🔁</span>,
+            };
 
             return (
               <div
                 key={i}
-                className={`relative flex ${sideClass} items-center gap-2 text-white my-2`}
+                className={`flex ${alignClass} items-center w-full py-2 relative`}
               >
-                {/* النقطة على العمود */}
                 <div
-                  className={`absolute ${align} top-3 w-3 h-3 bg-green-400 rounded-full border-[3px] border-green-950 shadow-md`}
-                  title={timeLabel}
-                ></div>
-
-                {/* الوقت الحقيقي بجانب النقطة */}
-                <div
-                  className={`absolute text-[10px] text-gray-300 ${
-                    isHome ? "right-[51%]" : "left-[51%]"
-                  } top-6`}
+                  className={`flex items-center gap-1 ${sideOffset} w-[45%] max-w-[260px] ${isHomeTeam ? 'flex-row-reverse' : ''}`}
                 >
-                  {timeLabel}
-                </div>
-
-                {/* الحاوية الجانبية للحدث (أقرب من العمود) */}
-                <div
-                  className={`flex flex-col ${
-                    isHome ? "items-end" : "items-start"
-                  } bg-green-800/70 rounded-xl px-2 py-1 shadow-md max-w-[35%] border border-green-700`}
-                >
-                  {/* رأس الحدث */}
-                  <div
-                    className={`flex items-center justify-between w-full mb-1 ${
-                      isHome ? "flex-row-reverse" : ""
-                    }`}
-                  >
-                    <img
-                      src={ev.team.logo}
-                      alt="logo"
-                      className="w-4 h-4 rounded-full shadow-md"
-                    />
-                    <span className="text-[11px] text-gray-300">
-                      {ev.time.elapsed}'
-                    </span>
-                  </div>
-
-                  {/* نوع الحدث */}
-                  <div
-                    className={`text-xs font-bold ${
-                      ev.type === "Goal"
-                        ? "text-yellow-300"
-                        : ev.type === "Card" && ev.detail.includes("Red")
-                        ? "text-red-400"
-                        : ev.type === "Card" && ev.detail.includes("Yellow")
-                        ? "text-yellow-400"
-                        : "text-white"
-                    }`}
-                  >
-                    {icon} {ev.type === "Goal" ? "هدف" : ev.detail}
-                  </div>
-
-                  {/* اللاعب والمساعدة */}
-                  <div className="text-[11px] text-gray-200">
-                    {ev.player?.name}
+                  {/* شعار الفريق */}
+                  <img
+                    src={ev.team.logo}
+                    alt={ev.team.name}
+                    className="w-5 h-5 rounded-full"
+                  />
+                  {/* الحدث */}
+                  <div className={`text-xs md:text-sm text-foreground p-2 rounded-lg bg-card shadow-md flex-1 ${isHomeTeam ? 'text-right' : 'text-left'}`}>
+                    <div className="font-semibold flex items-center gap-2">
+                        {iconMap[ev.detail] || iconMap[ev.type]}
+                        <span>{ev.player?.name}</span>
+                    </div>
                     {ev.assist?.name && (
-                      <span className="text-gray-400"> 🎯 {ev.assist.name}</span>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        (مساعدة: {ev.assist.name})
+                      </div>
                     )}
                   </div>
                 </div>
+
+                {/* النقطة الزمنية */}
+                <div className="absolute left-1/2 transform -translate-x-1/2 flex flex-col items-center">
+                  <div className="w-3 h-3 bg-primary rounded-full shadow-md"></div>
+                  <span className="text-[10px] text-muted-foreground mt-1">
+                    {ev.time.elapsed}'
+                  </span>
+                </div>
+
               </div>
             );
           })}
         </div>
       </div>
-
-      {/* 🧭 دليل الفرق في الأسفل */}
-      <div className="flex justify-between w-full max-w-[750px] mt-2 text-gray-400 text-sm px-4">
-        <div className="flex items-center gap-2">
-          <img
-            src={fixture.teams.home.logo}
-            alt="home"
-            className="w-5 h-5 rounded-full"
-          />
-          <span>{fixture.teams.home.name}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span>{fixture.teams.away.name}</span>
-          <img
-            src={fixture.teams.away.logo}
-            alt="away"
-            className="w-5 h-5 rounded-full"
-          />
-        </div>
-      </div>
-
-      {/* فراغ خارجي إضافي للتمرير المريح */}
-      <div className="h-20 w-full"></div>
     </div>
   );
 }
-
-    
