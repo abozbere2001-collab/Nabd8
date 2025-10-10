@@ -74,7 +74,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
   }, {} as Record<string, PlayerStats[]>);
 
   const sortedRows = Object.keys(playersByRow)
-    .sort((a, b) => parseInt(b, 10) - parseInt(a, 10)) 
+    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10)) 
     .map(rowKey => {
         const row = playersByRow[rowKey];
         row.sort((a, b) => parseInt(a.player.grid!.split(':')[1]) - parseInt(b.player.grid!.split(':')[1]));
@@ -86,7 +86,6 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
 
   return (
     <Card className="p-3 bg-card/80">
-      <h2 className="text-center font-bold text-xl mb-4 text-card-foreground">{lineup.team.name}</h2>
       <div
         className="relative w-full aspect-[2/3] bg-cover bg-center rounded-lg overflow-hidden border border-green-500/30"
         style={{ backgroundImage: "url('/football-pitch-vertical.svg')" }}
@@ -166,7 +165,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
                   </Avatar>
                   <div>
                     <span className="text-sm font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
-                     {(p.statistics[0]?.games?.number || p.player.number) && <p className="text-xs text-muted-foreground">الرقم: {p.statistics[0]?.games?.number || p.player.number}</p>}
+                     {(p.statistics && p.statistics[0]?.games?.number || p.player.number) && <p className="text-xs text-muted-foreground">الرقم: {p.statistics[0]?.games?.number || p.player.number}</p>}
                   </div>
 
               </div>
