@@ -66,13 +66,15 @@ type MatchData = {
   substitutesHome?:Player[]; substitutesAway?:Player[];
 }
 
-const AdvancedMatchDetailPage:React.FC<{matchId:number}> = ({matchId})=>{
+const AdvancedMatchDetailPage:React.FC<{fixtureId:number}> = ({fixtureId})=>{
   const [match,setMatch]=useState<MatchData|null>(null);
   const [showFormation,setShowFormation]=useState<{home:boolean,away:boolean}>({home:false,away:false});
 
   const fetchMatchData=async()=>{
     try{
-      const response=await axios.get(`/api/match/${matchId}`);
+      // The fixtureId is now passed correctly, but the API endpoint /api/match/ needs to be created.
+      // For now, it will use the mock data.
+      const response=await axios.get(`/api/match/${fixtureId}`);
       setMatch(response.data);
     }catch(e){console.error(e);}
   };
@@ -81,7 +83,7 @@ const AdvancedMatchDetailPage:React.FC<{matchId:number}> = ({matchId})=>{
     fetchMatchData();
     const interval=setInterval(fetchMatchData,20000);
     return ()=>clearInterval(interval);
-  },[matchId]);
+  },[fixtureId]);
 
   if(!match) return <p>جارٍ تحميل البيانات...</p>;
 

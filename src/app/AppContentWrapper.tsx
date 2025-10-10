@@ -48,7 +48,7 @@ const screenConfig: Record<ScreenKey, { component: React.ComponentType<any>;}> =
   News: { component: NewsScreen },
   Settings: { component: SettingsScreen },
   CompetitionDetails: { component: CompetitionDetailScreen },
-  MatchDetails: { component: MatchDetailScreen },
+  MatchDetails: { component: AdvancedMatchDetailPage }, // <-- Use the new advanced screen
   AdvancedMatchDetails: { component: AdvancedMatchDetailPage },
   TeamDetails: { component: TeamDetailScreen },
   AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen },
@@ -148,6 +148,11 @@ export function AppContentWrapper() {
     const isMainTab = mainTabs.includes(screen);
     const newKey = `${screen}-${Date.now()}`;
     
+    // Remap MatchDetails to AdvancedMatchDetails
+    if (screen === 'MatchDetails') {
+      screen = 'AdvancedMatchDetails';
+    }
+
     const newItem = { key: newKey, screen, props };
 
     if (!isMainTab) {
