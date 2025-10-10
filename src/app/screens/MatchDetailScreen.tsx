@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from "@/components/ui/button";
 import { cn } from '@/lib/utils';
-import type { Fixture as FixtureType, Standing, Team, Favorites } from '@/lib/types';
+import type { Fixture as FixtureType, Standing, Team, Favorites, Player as PlayerType, MatchEvent } from '@/lib/types';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, setDoc, getDocs, collection, updateDoc, deleteField, getDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
@@ -21,21 +21,12 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { NoteDialog } from '@/components/NoteDialog';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import MatchTimeline from '@/components/MatchTimeline';
 
 
 // --- TYPE DEFINITIONS ---
-interface Player {
-  id: number;
-  name: string;
-  number: number;
-  pos: string; // G, D, M, F
-  grid: string; // "row:col"
-  photo?: string;
-  colIndex?: number;
-}
-
 interface PlayerWithStats {
-    player: Player;
+    player: PlayerType;
     statistics?: any[];
 }
 interface LineupData {
@@ -45,15 +36,7 @@ interface LineupData {
     startXI: PlayerWithStats[];
     substitutes: PlayerWithStats[];
 }
-interface MatchEvent {
-    time: { elapsed: number; extra: number | null };
-    team: { id: number; name: string; logo: string };
-    player: { id: number; name: string };
-    assist: { id: number | null; name: string | null };
-    type: 'Goal' | 'Card' | 'subst' | 'Var';
-    detail: string;
-    comments: string | null;
-}
+
 interface H2HData {
     fixture: { id: number, status: { long: string }, date: string };
     teams: { home: Team, away: Team };
@@ -138,7 +121,7 @@ function useMatchData(fixture?: FixtureType): MatchData {
                         const teamPlayersRes = await fetch(`/api/football/players?team=${lineup.team.id}&season=${CURRENT_SEASON}`);
                         if (teamPlayersRes.ok) {
                             const teamPlayersData = await teamPlayersRes.json();
-                            const teamPlayersList: { player: Player }[] = teamPlayersData.response || [];
+                            const teamPlayersList: { player: PlayerType }[] = teamPlayersData.response || [];
                             const photoMap = new Map<number, string>();
                             teamPlayersList.forEach(p => { if (p.player.photo) photoMap.set(p.player.id, p.player.photo); });
 
@@ -159,7 +142,7 @@ function useMatchData(fixture?: FixtureType): MatchData {
                 
                 setData({
                     lineups: fetchedLineups,
-                    events: fetchedEvents.sort((a, b) => a.time.elapsed - b.time.elapsed),
+                    events: fetchedEvents,
                     stats: fetchedStats,
                     standings: fetchedStandings,
                     h2h: fetchedH2H,
@@ -329,7 +312,7 @@ const LineupField = ({ lineup, events, getPlayerName, getCoachName, onRename }: 
         </div>
       )}
 
-      <SubstitutionsView events={events} teamId={lineup.team.id} getPlayerName={getPlayerName} onRename={onRename} />
+      {lineup.team && <SubstitutionsView events={events} teamId={lineup.team.id} getPlayerName={getPlayerName} onRename={onRename} />}
       
       {lineup.substitutes && lineup.substitutes.length > 0 && (
         <div className="mt-4 pt-4 border-t border-border">
@@ -359,82 +342,6 @@ const LineupField = ({ lineup, events, getPlayerName, getCoachName, onRename }: 
   );
 };
 
-const EventsView = ({ events, fixture, getPlayerName, onRename }: { events: MatchEvent[]; fixture: FixtureType; getPlayerName: (id: number, defaultName: string) => string; onRename: (type: RenameType, id: number, name: string) => void }) => {
-    const { isAdmin } = useAdmin();
-    const [activeTab, setActiveTab] = useState('key');
-    
-    const keyEvents = useMemo(() => events.filter(e => e.type === 'Goal' || e.detail === 'Red Card'), [events]);
-    const eventsToShow = activeTab === 'all' ? events : keyEvents;
-    
-    if (!events || events.length === 0) {
-        return <div className="text-muted-foreground text-center py-4">لا توجد أحداث متاحة لعرضها.</div>
-    }
-
-    const renderEvent = (ev: MatchEvent) => {
-        const isHomeEvent = ev.team.id === fixture.teams.home.id;
-        const playerName = ev.player?.id ? getPlayerName(ev.player.id, ev.player.name) : 'غير معروف';
-        const assistName = ev.assist?.id ? getPlayerName(ev.assist.id, ev.assist.name!) : null;
-
-        const icon = ev.type === "Goal" ? "⚽" :
-                     ev.detail === "Yellow Card" ? "🟨" :
-                     ev.detail === "Red Card" ? "🟥" :
-                     ev.type === "subst" ? "🔁" : "•";
-        
-        const eventPlayerInfo = (
-             <div className="flex items-center gap-1">
-                <div className="flex flex-col">
-                    <span className="font-semibold">{playerName}</span>
-                    {assistName && <span className="text-[10px] text-muted-foreground">(صناعة: {assistName})</span>}
-                </div>
-                {isAdmin && ev.player.id && (
-                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => {e.stopPropagation(); onRename('player', ev.player.id, playerName)}}><Pencil className="h-3 w-3" /></Button>
-                )}
-            </div>
-        );
-
-        const eventDetails = (
-             <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <span>{icon}</span>
-                <span>{ev.detail}</span>
-            </div>
-        );
-
-        return (
-             <div className={cn("w-full flex", isHomeEvent ? "justify-start" : "justify-end")}>
-                <div className={cn("flex items-center gap-2 w-[45%]", isHomeEvent ? "flex-row" : "flex-row-reverse")}>
-                    <Avatar className="w-4 h-4"><AvatarImage src={ev.team.logo} /></Avatar>
-                    <div className="flex flex-col">
-                        {eventPlayerInfo}
-                        {eventDetails}
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    return (
-        <Card>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="key">الأبرز</TabsTrigger>
-                    <TabsTrigger value="all">كل الأحداث</TabsTrigger>
-                </TabsList>
-                <CardContent className="p-2 relative h-[70vh] overflow-y-auto">
-                    <div className="absolute top-0 bottom-0 left-1/2 w-px bg-border -translate-x-1/2"></div>
-                    <div className="flex flex-col-reverse space-y-reverse space-y-1 pt-2">
-                        {[...eventsToShow].reverse().map((ev, i) => (
-                             <div key={i} className="flex items-center">
-                                <div className={cn("w-[45%] text-left", ev.team.id !== fixture.teams.home.id && "opacity-0")}>{ev.team.id === fixture.teams.home.id && renderEvent(ev)}</div>
-                                <div className="w-[10%] text-center text-xs text-muted-foreground font-mono">{ev.time.elapsed}'</div>
-                                <div className={cn("w-[45%] text-right", ev.team.id !== fixture.teams.away.id && "opacity-0")}>{ev.team.id === fixture.teams.away.id && renderEvent(ev)}</div>
-                            </div>
-                        ))}
-                    </div>
-                </CardContent>
-            </Tabs>
-        </Card>
-    );
-};
 
 const STATS_TRANSLATIONS: { [key: string]: string } = {
     "Shots on Goal": "تسديدات على المرمى", "Shots off Goal": "تسديدات خارج المرمى", "Total Shots": "إجمالي التسديدات",
@@ -626,7 +533,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         }
                     </TabsContent>
                     <TabsContent value="events" className="mt-4">
-                       <EventsView events={events} fixture={fixture} getPlayerName={getCustomName} onRename={handleOpenRename} />
+                       <MatchTimeline events={events} fixture={fixture} />
                     </TabsContent>
                      <TabsContent value="stats" className="mt-4">
                        <StatsView stats={stats} fixture={fixture} />
@@ -639,7 +546,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
-
-    
-
-    

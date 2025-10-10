@@ -34,6 +34,7 @@ export interface Player {
     number: number | null;
     position: string;
     photo: string;
+    grid: string | null;
 }
 
 export interface Favorites {
@@ -146,4 +147,14 @@ export interface ManualTopScorer {
     teamName: string;
     goals: number;
     playerPhoto?: string;
+}
+
+export interface MatchEvent {
+    time: { elapsed: number; extra: number | null };
+    team: { id: number; name: string; logo: string };
+    player: { id: number; name: string };
+    assist: { id: number | null; name: string | null };
+    type: 'Goal' | 'Card' | 'subst' | 'Var';
+    detail: string;
+    comments: string | null;
 }
