@@ -66,12 +66,11 @@ function useMatchData(fixture?: FixtureType): MatchDataHook {
         const leagueId = fixture.league.id;
         const teamIds = `${fixture.teams.home.id}-${fixture.teams.away.id}`;
 
-        const [lineupsRes, eventsRes, statsRes, h2hRes, playersRes, standingsRes] = await Promise.all([
+        const [lineupsRes, eventsRes, statsRes, h2hRes, standingsRes] = await Promise.all([
           fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/headtohead?h2h=${teamIds}`),
-          fetch(`/api/football/players?fixture=${fixtureId}`),
           fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
         ]);
         
@@ -79,26 +78,10 @@ function useMatchData(fixture?: FixtureType): MatchDataHook {
         const eventsData = eventsRes.ok ? (await eventsRes.json()).response || [] : [];
         const statsData = statsRes.ok ? (await statsRes.json()).response || [] : [];
         const h2hData = h2hRes.ok ? (await h2hRes.json()).response || [] : [];
-        const playersDataResponse: { team: Team, players: PlayerStats[] }[] = playersRes.ok ? (await playersRes.json()).response || [] : [];
         const standingsData = standingsRes.ok ? (await standingsRes.json()).response[0]?.league?.standings[0] || [] : [];
         
-        const allPlayers = playersDataResponse.flatMap(p => p.players);
-        const playersMap = new Map(allPlayers.map(p => [p.player.id, p]));
-
-        const enrichedLineups = lineupsDataRaw.map((lineup: any) => {
-            const enrich = (playerList: any[] = []) => playerList.map(p => {
-                const fullPlayerData = playersMap.get(p.player.id);
-                return fullPlayerData || p;
-            });
-            return {
-                ...lineup,
-                startXI: enrich(lineup.startXI),
-                substitutes: enrich(lineup.substitutes)
-            }
-        });
-
         setData({ 
-            lineups: enrichedLineups, 
+            lineups: lineupsDataRaw, 
             events: eventsData, 
             stats: statsData, 
             h2h: h2hData,
@@ -408,3 +391,4 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
     </div>
   );
 }
+
