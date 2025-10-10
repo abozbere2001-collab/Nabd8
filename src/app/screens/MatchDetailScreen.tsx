@@ -1,4 +1,3 @@
-
 "use client";
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,36 +9,57 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { Star, Pencil, Copy, Heart, ShieldCheck, Calendar, Clock, MapPin } from 'lucide-react';
+import { Star, Pencil, Copy, Heart, ShieldCheck, Calendar, Clock, MapPin, ArrowUp, ArrowDown, User } from 'lucide-react';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { MatchStatistics } from '@/components/MatchStatistics';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from 'next/image';
-import { ArrowUp, ArrowDown } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+
+// --- TYPE DEFINITIONS ---
+interface LineupData {
+  team: Team;
+  coach?: any;
+  formation?: string;
+  startXI: EnrichedPlayer[];
+  substitutes: EnrichedPlayer[];
+}
+
+interface H2HData {
+    fixture: { id: number };
+    teams: { home: Team, away: Team, winner?: boolean | null };
+    goals: { home: number | null, away: number | null };
+}
+
+interface MatchDataHook {
+  lineups: LineupData[];
+  events: MatchEvent[];
+  stats: any[];
+  standings: Standing[];
+  h2h: H2HData[];
+  players: { [key: number]: EnrichedPlayer };
+  loading: boolean;
+  error: string | null;
+}
+
+type RenameType = 'team' | 'player' | 'coach';
 
 
-// --- START: New components provided by user ---
-
-// ✅ جلب بيانات اللاعبين مع الصور والتقييمات من API-Football
-async function fetchPlayerData(fixtureId: number) {
-  const res = await fetch(`/api/football/players?fixture=${fixtureId}`);
+// ✅ جلب بيانات اللاعبين مع الصور والتقييما من API-Football
+async function fetchPlayerData(fixtureId: number): Promise<{ [key: number]: EnrichedPlayer }> {
+  const res = await fetch(`/api/football/fixtures/players?fixture=${fixtureId}`);
   if (!res.ok) return {};
   const json = await res.json();
   if (!json?.response) return {};
-  const players: { [key: number]: any } = {};
-  json.response.forEach((team: any) => {
-    team.players.forEach((p: any) => {
-      players[p.player.id] = {
-        id: p.player.id,
-        name: p.player.name,
-        photo: p.player.photo,
-        rating: p.statistics?.[0]?.games?.rating || "N/A",
-      };
+  const players: { [key: number]: EnrichedPlayer } = {};
+  json.response.forEach((teamData: { team: Team, players: EnrichedPlayer[] }) => {
+    teamData.players.forEach((p: EnrichedPlayer) => {
+      players[p.player.id] = p;
     });
   });
   return players;
@@ -67,7 +87,8 @@ function MatchLineups({ lineups, players, events, getPlayerName, getCoachName, o
             .sort((a, b) => parseInt(a) - parseInt(b)) 
             .map(rowKey => {
                 const row = playersByRow[rowKey];
-                row.sort((a: any, b: any) => parseInt(a.player.grid!.split(':')[1]) - parseInt(b.player.grid!.split(':')[1]));
+                // Reverse the horizontal order for the away team (or whichever is on the right)
+                 row.sort((a: any, b: any) => parseInt(a.player.grid!.split(':')[1]) - parseInt(b.player.grid!.split(':')[1]));
                 return row;
             }).reverse();
 
@@ -80,7 +101,8 @@ function MatchLineups({ lineups, players, events, getPlayerName, getCoachName, o
                     {sortedRows.map((row, i) => (
                         <div key={i} className="flex justify-around items-center">
                         {row.map((p: any) => {
-                            const info = players[p.player.id] || {};
+                            const info = players[p.player.id] || { player: p.player, statistics: [] };
+                            const rating = info.statistics[0]?.games?.rating;
                              return (
                                 <motion.div
                                     key={p.player.id}
@@ -90,21 +112,18 @@ function MatchLineups({ lineups, players, events, getPlayerName, getCoachName, o
                                     transition={{ delay: i * 0.05, type: 'spring', stiffness: 300, damping: 15 }}
                                 >
                                      <div className="relative w-12 h-12">
-                                        <Image
-                                            src={info.photo || '/player-placeholder.png'}
-                                            alt={info.name || p.player.name}
-                                            width={48}
-                                            height={48}
-                                            className="rounded-full shadow-lg border-2 border-white/70"
-                                        />
-                                        {info.rating && info.rating !== "N/A" &&
+                                        <Avatar className="h-12 w-12 shadow-lg border-2 border-white/70">
+                                            <AvatarImage src={info.player.photo} alt={info.player.name} />
+                                            <AvatarFallback><User/></AvatarFallback>
+                                        </Avatar>
+                                        {rating && rating !== "N/A" &&
                                             <div className="absolute -top-1 -right-1 text-white bg-blue-600 text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-background">
-                                                {info.rating}
+                                                {parseFloat(rating).toFixed(1)}
                                             </div>
                                         }
                                         </div>
                                         <span className="text-white text-xs font-semibold mt-1 bg-black/60 px-1.5 py-0.5 rounded-md shadow-md">
-                                            {getPlayerName(p.player.id, p.player.name)}
+                                            {getPlayerName(info.player.id, info.player.name)}
                                         </span>
                                 </motion.div>
                             );
@@ -120,7 +139,7 @@ function MatchLineups({ lineups, players, events, getPlayerName, getCoachName, o
                     </div>
                 )}
                 
-                {teamSubs.length > 0 && (
+                 {teamSubs.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-border">
                     <h3 className="text-center font-bold text-sm mb-2 text-muted-foreground">التبديلات</h3>
                     <div className="flex flex-col gap-2 text-sm">
@@ -154,6 +173,7 @@ function MatchLineups({ lineups, players, events, getPlayerName, getCoachName, o
 function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: MatchEvent[], homeTeamId: number, getPlayerName: (id: number, name: string) => string }) {
   if (!events?.length) return <p className="text-center text-muted-foreground py-4">لا توجد مجريات متاحة</p>;
 
+  // ترتيب المجريات من الدقيقة 1 في الأسفل إلى 90 في الأعلى
   const sorted = [...events].sort((a, b) => a.time.elapsed - b.time.elapsed);
 
   return (
@@ -197,35 +217,6 @@ function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: MatchEve
   );
 }
 
-// --- END: New components provided by user ---
-
-
-interface LineupData {
-  team: Team;
-  coach?: any;
-  formation?: string;
-  startXI: EnrichedPlayer[];
-  substitutes: EnrichedPlayer[];
-}
-
-interface H2HData {
-    fixture: { id: number };
-    teams: { home: Team, away: Team, winner?: boolean | null };
-    goals: { home: number | null, away: number | null };
-}
-
-interface MatchDataHook {
-  lineups: LineupData[];
-  events: MatchEvent[];
-  stats: any[];
-  standings: Standing[];
-  h2h: H2HData[];
-  players: { [key: number]: any };
-  loading: boolean;
-  error: string | null;
-}
-
-type RenameType = 'team' | 'player' | 'coach';
 
 function useMatchData(fixture?: FixtureType): MatchDataHook {
   const { toast } = useToast();
@@ -435,6 +426,31 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
       <ScreenHeader title={`${getDisplayName('team', homeTeamId, initialFixture.teams.home.name)} ضد ${getDisplayName('team', awayTeamId, initialFixture.teams.away.name)}`} onBack={goBack} canGoBack={canGoBack} />
       
       <div className="flex-1 overflow-y-auto">
+        <div className="bg-card p-4 rounded-lg m-4 border">
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1 justify-end truncate">
+                    <span className="font-bold text-lg truncate">{getDisplayName('team', homeTeamId, initialFixture.teams.home.name)}</span>
+                     <Avatar className="h-10 w-10">
+                         <AvatarImage src={initialFixture.teams.home.logo} />
+                         <AvatarFallback>{initialFixture.teams.home.name.substring(0, 2)}</AvatarFallback>
+                    </Avatar>
+                </div>
+                <div className="font-bold text-3xl px-2 bg-muted rounded-md">
+                   {initialFixture.goals.home ?? ''} - {initialFixture.goals.away ?? ''}
+                </div>
+                <div className="flex items-center gap-2 flex-1 truncate">
+                      <Avatar className="h-10 w-10">
+                         <AvatarImage src={initialFixture.teams.away.logo} />
+                         <AvatarFallback>{initialFixture.teams.away.name.substring(0, 2)}</AvatarFallback>
+                    </Avatar>
+                    <span className="font-bold text-lg truncate">{getDisplayName('team', awayTeamId, initialFixture.teams.away.name)}</span>
+                </div>
+            </div>
+             <div className="text-center text-sm text-primary mt-2">
+                {initialFixture.fixture.status.long}
+            </div>
+        </div>
+
         <Tabs defaultValue="details" value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 h-auto">
                 {TABS.map(tab => <TabsTrigger key={tab.key} value={tab.key}>{tab.label}</TabsTrigger>)}
@@ -471,7 +487,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
             </TabsContent>
 
             <TabsContent value="lineups" className="p-4">
-                <MatchLineups 
+               <MatchLineups 
                     lineups={lineups} 
                     players={players} 
                     events={events}
@@ -533,4 +549,3 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
     </div>
   );
 }
-
