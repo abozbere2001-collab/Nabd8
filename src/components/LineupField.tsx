@@ -120,7 +120,7 @@ export function LineupField({
               return (
                 <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
                   
-                  {/* اللاعب الخارج باللون الأحمر والسهم للأسفل */}
+                  {/* اللاعب الخارج (playerOut) باللون الأحمر والسهم للأسفل */}
                   <div className="flex items-center gap-2 text-red-500 w-2/5">
                     <ArrowDown className="h-4 w-4" />
                     <span className="font-medium truncate">{playerOutName}</span>
@@ -129,7 +129,7 @@ export function LineupField({
                   {/* توقيت التبديل */}
                   <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
 
-                  {/* اللاعب الداخل باللون الأخضر والسهم للأعلى */}
+                  {/* اللاعب الداخل (playerIn) باللون الأخضر والسهم للأعلى */}
                   <div className="flex items-center gap-2 text-green-500 justify-end w-2/5">
                       <div className="text-right">
                          <span className="font-medium block truncate">{playerInName}</span>
