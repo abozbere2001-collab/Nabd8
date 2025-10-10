@@ -21,6 +21,7 @@ import { SeasonTeamSelectionScreen } from './screens/SeasonTeamSelectionScreen';
 import { SeasonPlayerSelectionScreen } from './screens/SeasonPlayerSelectionScreen';
 import { AddEditNewsScreen } from './screens/AddEditNewsScreen';
 import { ManageTopScorersScreen } from './screens/ManageTopScorersScreen';
+import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import type { ScreenKey } from './page';
@@ -58,6 +59,7 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   SeasonPlayerSelection: { component: SeasonPlayerSelectionScreen },
   AddEditNews: { component: AddEditNewsScreen },
   ManageTopScorers: { component: ManageTopScorersScreen },
+  MatchDetails: { component: MatchDetailScreen },
   Login: { component: LoginScreen },
   SignUp: { component: LoginScreen },
 };
