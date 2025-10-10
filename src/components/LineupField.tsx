@@ -7,7 +7,6 @@ import { Pencil, ArrowUp, ArrowDown } from 'lucide-react';
 import type { Player as PlayerType, Team, MatchEvent, PlayerWithStats, LineupData } from '@/lib/types';
 import { PlayerCard } from '@/components/PlayerCard';
 
-
 export function LineupField({
   lineup,
   events,
@@ -121,29 +120,30 @@ export function LineupField({
               return (
                 <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
                   
-                  {/* اللاعب الخارج */}
-                   <div className="flex items-center gap-2 text-red-500 w-2/5">
+                  {/* اللاعب الخارج باللون الأحمر والسهم للأسفل */}
+                  <div className="flex items-center gap-2 text-red-500 w-2/5">
                     <ArrowDown className="h-4 w-4" />
                     <span className="font-medium truncate">{playerOutName}</span>
                   </div>
 
+                  {/* توقيت التبديل */}
                   <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
 
-                  {/* اللاعب الداخل */}
-                    <div className="flex items-center gap-2 text-green-500 justify-end w-2/5">
-                        <div className="text-right">
-                           <span className="font-medium block truncate">{playerInName}</span>
-                           {playerInRating && (
-                               <span className="text-xs text-primary font-bold">
-                                   {parseFloat(playerInRating).toFixed(1)}
-                               </span>
-                           )}
-                        </div>
-                        <Avatar className="h-8 w-8">
-                            <AvatarImage src={playerIn?.player.photo} />
-                        </Avatar>
-                        <ArrowUp className="h-4 w-4" />
-                    </div>
+                  {/* اللاعب الداخل باللون الأخضر والسهم للأعلى */}
+                  <div className="flex items-center gap-2 text-green-500 justify-end w-2/5">
+                      <div className="text-right">
+                         <span className="font-medium block truncate">{playerInName}</span>
+                         {playerInRating && (
+                             <span className="text-xs text-primary font-bold">
+                                 {parseFloat(playerInRating).toFixed(1)}
+                             </span>
+                         )}
+                      </div>
+                      <Avatar className="h-8 w-8">
+                          <AvatarImage src={playerIn?.player.photo} />
+                      </Avatar>
+                      <ArrowUp className="h-4 w-4" />
+                  </div>
                 </div>
               );
             })}
