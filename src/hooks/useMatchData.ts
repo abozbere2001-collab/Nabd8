@@ -33,6 +33,8 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
       setData(prev => ({ ...prev, loading: false, error: "لا توجد بيانات مباراة" }));
       return;
     }
+    let isCancelled = false;
+
     const fetchData = async () => {
       setData(prev => ({ ...prev, loading: true, error: null }));
       try {
@@ -40,59 +42,54 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
         const leagueId = fixture.league.id;
         const homeTeamId = fixture.teams.home.id;
         const awayTeamId = fixture.teams.away.id;
-        const teamIds = `${homeTeamId}-${awayTeamId}`;
-
-        // 1. Fetch primary data in parallel
+        
+        // 1. Fetch primary data (lineups, events, etc.)
         const [lineupsRes, eventsRes, statsRes, h2hRes, standingsRes] = await Promise.all([
           fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
-          fetch(`/api/football/fixtures/headtohead?h2h=${teamIds}`),
+          fetch(`/api/football/fixtures/headtohead?h2h=${homeTeamId}-${awayTeamId}`),
           fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
         ]);
         
         const lineupsDataRaw = lineupsRes.ok ? (await lineupsRes.json()).response || [] : [];
+        if (isCancelled) return;
+        
         const eventsData = eventsRes.ok ? (await eventsRes.json()).response || [] : [];
         const statsData = statsRes.ok ? (await statsRes.json()).response || [] : [];
         const h2hData = h2hRes.ok ? (await h2hRes.json()).response || [] : [];
         const standingsData = standingsRes.ok ? (await standingsRes.json()).response[0]?.league?.standings[0] || [] : [];
-        
-        // 2. Collect all player IDs from lineups
-        const allPlayerIds = new Set<number>();
-        lineupsDataRaw.forEach((lineup: LineupData) => {
-            lineup.startXI.forEach(p => p.player.id && allPlayerIds.add(p.player.id));
-            lineup.substitutes.forEach(p => p.player.id && allPlayerIds.add(p.player.id));
-        });
 
-        // 3. Fetch full player data for both teams
+        // 2. Fetch full player data for each team in the lineup
         let allPlayersData: PlayerStats[] = [];
-        if (allPlayerIds.size > 0) {
-            const [homePlayersRes, awayPlayersRes] = await Promise.all([
-                fetch(`/api/football/players?team=${homeTeamId}&season=${CURRENT_SEASON}`),
-                fetch(`/api/football/players?team=${awayTeamId}&season=${CURRENT_SEASON}`),
-            ]);
-            const homePlayers = homePlayersRes.ok ? (await homePlayersRes.json()).response || [] : [];
-            const awayPlayers = awayPlayersRes.ok ? (await awayPlayersRes.json()).response || [] : [];
-            allPlayersData = [...homePlayers, ...awayPlayers];
+        for (const lineup of lineupsDataRaw) {
+            const teamId = lineup.team?.id;
+            if (!teamId) continue;
+            
+            const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`);
+            if (playersRes.ok) {
+                const teamPlayers = (await playersRes.json()).response || [];
+                allPlayersData.push(...teamPlayers);
+            }
         }
+        if (isCancelled) return;
 
-        // 4. Create a map of full player details
+        // 3. Create a map of full player details
         const playerDetailsMap = new Map<number, PlayerStats>();
         allPlayersData.forEach(p => {
           playerDetailsMap.set(p.player.id, p);
         });
 
-        // 5. Enrich lineup data with full player details
+        // 4. Enrich lineup data with full player details
         const enrichedLineups = lineupsDataRaw.map((lineup: LineupData) => {
-          const enrich = (players: PlayerStats[]) => players.map(p => {
+          const enrich = (players: { player: PlayerType }[]) => players.map(p => {
             const details = playerDetailsMap.get(p.player.id);
-            // The lineup data from the API is minimal, we enrich it with data from the /players endpoint
             return {
               player: {
                 ...p.player,
                 photo: details?.player.photo || p.player.photo || "https://media.api-sports.io/football/players/0.png",
               },
-              statistics: details?.statistics || p.statistics,
+              statistics: details?.statistics || (p as any).statistics || [],
             };
           });
 
@@ -103,23 +100,31 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
           };
         });
         
-        setData({ 
-            lineups: enrichedLineups, 
-            events: eventsData, 
-            stats: statsData, 
-            h2h: h2hData,
-            standings: standingsData, 
-            loading: false, 
-            error: null 
-        });
+        if (!isCancelled) {
+            setData({ 
+                lineups: enrichedLineups, 
+                events: eventsData, 
+                stats: statsData, 
+                h2h: h2hData,
+                standings: standingsData, 
+                loading: false, 
+                error: null 
+            });
+        }
 
       } catch (err: any) {
-        console.error("❌ fetch error:", err);
-        toast({ variant: "destructive", title: "خطأ", description: "فشل تحميل بيانات المباراة" });
-        setData(prev => ({ ...prev, loading: false, error: err.message }));
+        if (!isCancelled) {
+            console.error("❌ fetch error:", err);
+            toast({ variant: "destructive", title: "خطأ", description: "فشل تحميل بيانات المباراة" });
+            setData(prev => ({ ...prev, loading: false, error: err.message }));
+        }
       }
     };
     fetchData();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [fixture, toast, CURRENT_SEASON]);
 
   return data;
