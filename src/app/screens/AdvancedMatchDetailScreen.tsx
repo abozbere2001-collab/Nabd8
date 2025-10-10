@@ -1,71 +1,82 @@
 // AdvancedMatchDetailPage.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import "./AdvancedMatchDetailScreen.css";
-import type { Player, MatchEvent as Event, Stats, LineupData } from "@/lib/types";
+import type { Player as PlayerType, MatchEvent, Stats as StatsType, LineupData, Fixture } from "@/lib/types";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { Loader2 } from "lucide-react";
 
+// ====== أنواع البيانات (مستوردة الآن من types.ts) ======
+// Interaces are now using the main types from lib/types.ts for consistency
 
-interface MatchData {
-  homeTeam:string; awayTeam:string; homeLogo:string; awayLogo:string;
-  date:string; stadium:string; time:string;
-  status:"upcoming"|"live"|"finished";
-  events?:Event[];
-  homeFormation?:Player[]; awayFormation?:Player[];
-  stats?:Stats;
-  coachHome?:string; coachAway?:string;
-  substitutesHome?:Player[]; substitutesAway?:Player[];
-}
+// Helper function to transform API data to the component's expected format
+const transformApiData = (
+    fixtureDetails: Fixture, 
+    lineups: LineupData[], 
+    events: MatchEvent[], 
+    stats: any[]
+): any => {
+    if (!fixtureDetails || lineups.length < 2) {
+        return null;
+    }
+    const homeTeamApi = lineups.find(l => l.team.id === fixtureDetails.teams.home.id);
+    const awayTeamApi = lineups.find(l => l.team.id === fixtureDetails.teams.away.id);
 
-// ====== بيانات وهمية متكاملة ======
-const mockData:MatchData = {
-  homeTeam:"ريال مدريد", awayTeam:"برشلونة",
-  homeLogo:"https://media.api-sports.io/football/teams/541.png",
-  awayLogo:"https://media.api-sports.io/football/teams/529.png",
-  date:"12/10/2025", stadium:"سانتياغو برنابيو", time:"21:00",
-  status:"live",
-  events:[
-    {type:"Goal",team:{id: 541, name: 'Real Madrid', logo: ''},player:{id: 14, name:"مودريتش"},assist: {id:null, name: null}, time:{elapsed: 15, extra: null}, detail: "Normal Goal", comments: null},
-    {type:"Card",team:{id: 529, name: 'Barcelona', logo: ''},player:{id: 874, name:"ميسي"},assist: {id:null, name: null}, time:{elapsed: 23, extra: null}, detail: "Yellow Card", comments: null},
-    {type:"Card",team:{id: 541, name: 'Real Madrid', logo: ''},player:{id: 145, name:"راموس"},assist: {id:null, name: null}, time:{elapsed: 45, extra: null}, detail: "Red Card", comments: null},
-    {type:"subst",team:{id: 529, name: 'Barcelona', logo: ''},player:{id: 3446, name:"أراوخو"},assist: {id:154, name: "بيكيه"}, time:{elapsed: 60, extra: null}, detail: "Substitution", comments: null},
-    {type:"Goal",team:{id: 529, name: 'Barcelona', logo: ''},player:{id: 874, name:"ميسي"},assist: {id:null, name: null}, time:{elapsed: 70, extra: null}, detail: "Normal Goal", comments: null}
-  ],
-  homeFormation:[
-    {id: 184, name:"كورتوا",number:1,position:"G",image:"https://media.api-sports.io/football/players/184.png"},
-    {id: 145, name:"راموس",number:4,position:"D",image:"https://media.api-sports.io/football/players/145.png"},
-    {id: 58, name:"كارفاخال",number:2,position:"D",image:"https://media.api-sports.io/football/players/58.png"},
-    {id: 14, name:"مودريتش",number:10,position:"M",image:"https://media.api-sports.io/football/players/14.png"},
-    {id: 15, name:"كروس",number:8,position:"M",image:"https://media.api-sports.io/football/players/15.png"},
-    {id: 37, name:"بنزيما",number:9,position:"F",image:"https://media.api-sports.io/football/players/37.png"},
-    {id: 3530, name:"فينيسيوس",number:20,position:"F",image:"https://media.api-sports.io/football/players/3530.png"}
-  ],
-  awayFormation:[
-    {id: 153, name:"تير شتيجن",number:1,position:"G",image:"https://media.api-sports.io/football/players/153.png"},
-    {id: 154, name:"بيكيه",number:3,position:"D",image:"https://media.api-sports.io/football/players/154.png"},
-    {id: 157, name:"ألبا",number:18,position:"D",image:"https://media.api-sports.io/football/players/157.png"},
-    {id: 164, name:"بوسكيتس",number:5,position:"M",image:"https://media.api-sports.io/football/players/164.png"},
-    {id: 1627, name:"دي يونغ",number:21,position:"M",image:"https://media.api-sports.io/football/players/1627.png"},
-    {id: 874, name:"ميسي",number:10,position:"F",image:"https://media.api-sports.io/football/players/874.png"},
-    {id: 94, name:"أوباميانغ",number:14,position:"F",image:"https://media.api-sports.io/football/players/94.png"}
-  ],
-  substitutesHome:[
-    {id: 16, name:"أسينسيو",number:11,position:"M",image:"https://media.api-sports.io/football/players/16.png"},
-    {id: 68, name:"لوكاس فاسكيز",number:17,position:"F",image:"https://media.api-sports.io/football/players/68.png"}
-  ],
-  substitutesAway:[
-    {id: 3446, name:"أراوخو",number:4,position:"D",image:"https://media.api-sports.io/football/players/3446.png"},
-    {id: 95, name:"غريزمان",number:7,position:"F",image:"https://media.api-sports.io/football/players/95.png"}
-  ],
-  coachHome:"أنشيلوتي",
-  coachAway:"تشافي",
-  stats:{possessionHome:55,possessionAway:45,shotsHome:10,shotsAway:8,foulsHome:12,foulsAway:14}
+    if (!homeTeamApi || !awayTeamApi) {
+         return null;
+    }
+
+    const transformPlayer = (p: any): PlayerType => ({
+        id: p.player.id,
+        name: p.player.name,
+        number: p.player.number,
+        position: p.player.pos,
+        photo: p.player.photo,
+        grid: p.player.grid
+    });
+
+    const homeStats = stats.find(s => s.team.id === fixtureDetails.teams.home.id)?.statistics;
+    const awayStats = stats.find(s => s.team.id === fixtureDetails.teams.away.id)?.statistics;
+
+    const getStatValue = (statsArray: any[], type: string) => {
+        if (!statsArray) return 0;
+        const stat = statsArray.find(s => s.type === type);
+        // Handle both string and number values, remove '%' if present
+        return stat ? parseInt(String(stat.value).replace('%', '')) : 0;
+    };
+    
+    return {
+        homeTeam: homeTeamApi.team.name,
+        awayTeam: awayTeamApi.team.name,
+        homeLogo: homeTeamApi.team.logo,
+        awayLogo: awayTeamApi.team.logo,
+        date: new Date(fixtureDetails.fixture.date).toLocaleDateString('ar-EG'),
+        stadium: fixtureDetails.fixture.venue.name,
+        time: new Date(fixtureDetails.fixture.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+        status: fixtureDetails.fixture.status.short,
+        events: events,
+        homeFormation: homeTeamApi.startXI.map(transformPlayer),
+        awayFormation: awayTeamApi.startXI.map(transformPlayer),
+        substitutesHome: homeTeamApi.substitutes.map(transformPlayer),
+        substitutesAway: awayTeamApi.substitutes.map(transformPlayer),
+        coachHome: homeTeamApi.coach.name,
+        coachAway: awayTeamApi.coach.name,
+        stats: homeStats && awayStats ? {
+            possessionHome: getStatValue(homeStats, "Ball Possession"),
+            possessionAway: getStatValue(awayStats, "Ball Possession"),
+            shotsHome: getStatValue(homeStats, "Total Shots"),
+            shotsAway: getStatValue(awayStats, "Total Shots"),
+            foulsHome: getStatValue(homeStats, "Fouls"),
+            foulsAway: getStatValue(awayStats, "Fouls")
+        } : undefined
+    };
 };
 
+
 // ====== مكون التشكيلة الكامل ======
-const FormationCard:React.FC<{team:string; players?:Player[]; substitutes?:Player[]; coach?:string;}> = ({team,players,substitutes,coach})=>{
-  const positions:Record<string,Player[]> = {G:[],D:[],M:[],F:[]};
+const FormationCard:React.FC<{team:string; players?:PlayerType[]; substitutes?:PlayerType[]; coach?:string;}> = ({team,players,substitutes,coach})=>{
+  const positions:Record<string,PlayerType[]> = {G:[],D:[],M:[],F:[]};
   if (players) {
       players.forEach(p=>{
         const pos = p.position;
@@ -75,7 +86,6 @@ const FormationCard:React.FC<{team:string; players?:Player[]; substitutes?:Playe
       });
   }
 
-
   return (
     <div className="formation-card card mb-4">
       <h3 className="text-xl font-semibold mb-2">{team}</h3>
@@ -84,7 +94,7 @@ const FormationCard:React.FC<{team:string; players?:Player[]; substitutes?:Playe
           <div key={idx} className={`line ${pos}`}>
             {positions[pos]?.map((p,i)=>(
               <div key={`${p.id}-${i}`} className="player">
-                <img src={p.image} alt={p.name}/>
+                <img src={p.photo} alt={p.name}/>
                 <span>{p.number} {p.name}</span>
               </div>
             ))}
@@ -98,7 +108,7 @@ const FormationCard:React.FC<{team:string; players?:Player[]; substitutes?:Playe
           <div className="flex flex-wrap justify-center gap-2">
             {substitutes.map((s,i)=>(
               <div key={`${s.id}-${i}`} className="substitute">
-                <img src={s.image} alt={s.name}/>
+                <img src={s.photo} alt={s.name}/>
                 <span className="text-xs">{s.name}</span>
               </div>
             ))}
@@ -110,32 +120,71 @@ const FormationCard:React.FC<{team:string; players?:Player[]; substitutes?:Playe
 };
 
 // ====== الصفحة النهائية ======
-const AdvancedMatchDetailPage:React.FC<{fixtureId:number; goBack: () => void; canGoBack: boolean}> = ({fixtureId, goBack, canGoBack})=>{
-  const [match,setMatch]=useState<MatchData>(mockData);
+const AdvancedMatchDetailPage:React.FC<{fixtureId:number; fixture: Fixture, goBack: () => void; canGoBack: boolean}> = ({fixtureId, fixture: initialFixture, goBack, canGoBack})=>{
+  const [matchData, setMatchData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [showFormation,setShowFormation]=useState<{home:boolean,away:boolean}>({home:false,away:false});
 
-    useEffect(()=>{
-        // We are using mock data, but this keeps the structure for potential future API calls.
-        // The fixtureId is available here if needed.
-        const interval=setInterval(()=>{
-             // In a real scenario, you would fetch data here using fixtureId
-            setMatch({...mockData}); 
-        },20000);
-        return ()=>clearInterval(interval);
-    },[fixtureId]);
+  const fetchMatchData = useCallback(async () => {
+    try {
+      const [lineupsRes, eventsRes, statsRes, fixtureRes] = await Promise.all([
+        fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
+        fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
+        fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
+        fetch(`/api/football/fixtures?id=${fixtureId}`) // Re-fetch fixture for live status
+      ]);
+
+      const lineupsData = await lineupsRes.json();
+      const eventsData = await eventsRes.json();
+      const statsData = await statsRes.json();
+      const fixtureData = await fixtureRes.json();
+
+      const transformedData = transformApiData(
+          fixtureData.response[0] || initialFixture,
+          lineupsData.response,
+          eventsData.response,
+          statsData.response
+      );
+
+      setMatchData(transformedData);
+    } catch(e) {
+      console.error("Failed to fetch match details", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [fixtureId, initialFixture]);
 
 
-  if(!match) return <p>جارٍ تحميل البيانات...</p>;
+  useEffect(()=>{
+    setLoading(true);
+    fetchMatchData(); // Initial fetch
+    const interval = setInterval(fetchMatchData, 30000); // Auto-refresh every 30 seconds
+    return () => clearInterval(interval);
+  },[fetchMatchData]);
+
+  if(loading) {
+    return (
+        <div className="match-page rtl font-arabic p-4 bg-light flex-1 overflow-y-auto flex items-center justify-center">
+             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    );
+  }
+
+  if(!matchData) return (
+     <div className="match-page rtl font-arabic p-4 bg-light flex-1 overflow-y-auto flex items-center justify-center">
+         <p>لا توجد بيانات تفصيلية لهذه المباراة.</p>
+     </div>
+  );
 
   return (
     <div className="match-page rtl font-arabic p-4 bg-light flex-1 overflow-y-auto">
-        <ScreenHeader title={`${match.homeTeam} ضد ${match.awayTeam}`} onBack={goBack} canGoBack={canGoBack} />
+        <ScreenHeader title={`${matchData.homeTeam} ضد ${matchData.awayTeam}`} onBack={goBack} canGoBack={canGoBack} />
 
       {/* مربع الفرق */}
       <div className="teams-box flex justify-between mb-4">
         {[
-          {team:"home",name:match.homeTeam,logo:match.homeLogo},
-          {team:"away",name:match.awayTeam,logo:match.awayLogo}
+          {team:"home",name:matchData.homeTeam,logo:matchData.homeLogo},
+          {team:"away",name:matchData.awayTeam,logo:matchData.awayLogo}
         ].map((t,idx)=>(
           <div key={idx} className="team-card"
             onClick={()=>setShowFormation(prev=>({home:false, away: false, [t.team]:!prev[t.team as 'home' | 'away']}))}>
@@ -146,14 +195,16 @@ const AdvancedMatchDetailPage:React.FC<{fixtureId:number; goBack: () => void; ca
       </div>
 
       {/* تشكيل كل فريق */}
-      {showFormation.home && match.homeFormation && <FormationCard team={match.homeTeam} players={match.homeFormation} substitutes={match.substitutesHome} coach={match.coachHome}/>}
-      {showFormation.away && match.awayFormation && <FormationCard team={match.awayTeam} players={match.awayFormation} substitutes={match.substitutesAway} coach={match.coachAway}/>}
+      {showFormation.home && matchData.homeFormation && <FormationCard team={matchData.homeTeam} players={matchData.homeFormation} substitutes={matchData.substitutesHome} coach={matchData.coachHome}/>}
+      {showFormation.away && matchData.awayFormation && <FormationCard team={matchData.awayTeam} players={matchData.awayFormation} substitutes={matchData.substitutesAway} coach={matchData.coachAway}/>}
 
       {/* أحداث حية */}
-      {match.status==="live" && match.events && (
+      {matchData.status !== "NS" && matchData.events && (
         <div className="live-card card mb-4">
-          <h2 className="text-2xl font-bold text-center text-red-500 animate-pulse mb-2">مباشر الآن</h2>
-          {match.events.map((e,idx)=>(
+          <h2 className="text-2xl font-bold text-center text-red-500 animate-pulse mb-2">
+            {matchData.status === "FT" ? "انتهت" : "المجريات"}
+          </h2>
+          {matchData.events.map((e: MatchEvent, idx: number)=>(
             <div key={idx} className={`event flex justify-between mb-1 items-center ${e.type}`}>
               <span>{e.time.elapsed}' {e.player.name}</span>
                <div className="flex items-center gap-2">
@@ -162,8 +213,8 @@ const AdvancedMatchDetailPage:React.FC<{fixtureId:number; goBack: () => void; ca
                 {e.type==="Card" && e.detail === "Red Card" && <span className="card-icon red-card"></span>}
                 {e.type==="subst" && (
                   <span className="substitution">
-                    <span className="sub-out">↓ {e.assist.name}</span>
-                    <span className="sub-in">↑ {e.player.name}</span>
+                    <span className="sub-out">↓ {e.player.name}</span>
+                    <span className="sub-in">↑ {e.assist.name}</span>
                   </span>
                 )}
               </div>
@@ -173,21 +224,21 @@ const AdvancedMatchDetailPage:React.FC<{fixtureId:number; goBack: () => void; ca
       )}
 
       {/* إحصائيات */}
-      {match.stats && (
+      {matchData.stats && (
         <div className="stats-card card p-4">
           <h2 className="text-2xl font-bold mb-2 text-center">إحصائيات المباراة</h2>
           <div className="stats-grid grid grid-cols-3 gap-2 items-center">
-            <div className="home-stats text-right font-bold">{match.stats.possessionHome}%</div>
+            <div className="home-stats text-right font-bold">{matchData.stats.possessionHome}%</div>
             <div className="text-center text-muted-foreground">الاستحواذ</div>
-            <div className="away-stats text-left font-bold">{match.stats.possessionAway}%</div>
+            <div className="away-stats text-left font-bold">{matchData.stats.possessionAway}%</div>
             
-            <div className="home-stats text-right font-bold">{match.stats.shotsHome}</div>
+            <div className="home-stats text-right font-bold">{matchData.stats.shotsHome}</div>
             <div className="text-center text-muted-foreground">التسديدات</div>
-            <div className="away-stats text-left font-bold">{match.stats.shotsAway}</div>
+            <div className="away-stats text-left font-bold">{matchData.stats.shotsAway}</div>
 
-            <div className="home-stats text-right font-bold">{match.stats.foulsHome}</div>
+            <div className="home-stats text-right font-bold">{matchData.stats.foulsHome}</div>
             <div className="text-center text-muted-foreground">الأخطاء</div>
-            <div className="away-stats text-left font-bold">{match.stats.foulsAway}</div>
+            <div className="away-stats text-left font-bold">{matchData.stats.foulsAway}</div>
           </div>
         </div>
       )}
