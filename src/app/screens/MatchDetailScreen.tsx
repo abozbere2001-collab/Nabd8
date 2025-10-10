@@ -157,7 +157,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
   }, [h2h, homeTeamId]);
 
 
-  const renderTabs = () => {
+  const renderTabs = useCallback(() => {
     const availableTabs = [
       { key: 'events', label: 'المجريات', condition: events && events.length > 0 },
       { key: 'lineups', label: 'التشكيلة', condition: lineups && lineups.length > 0 },
@@ -166,19 +166,28 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
       { key: 'details', label: 'تفاصيل' },
     ];
     return availableTabs.filter(tab => tab.condition !== false);
+  }, [events, lineups, stats, standings]);
+  
+  const TABS = useMemo(renderTabs, [renderTabs]);
+  
+  const getDefaultTab = () => {
+    const isLiveOrFinished = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'FT', 'AET', 'PEN'].includes(initialFixture.fixture.status.short);
+    if (isLiveOrFinished && events.length > 0) {
+      return 'events';
+    }
+    return 'details';
   };
   
-  const TABS = useMemo(renderTabs, [events, lineups, stats, standings]);
-  const [activeTab, setActiveTab] = useState(TABS[0]?.key || 'details');
+  const [activeTab, setActiveTab] = useState(getDefaultTab());
 
   useEffect(() => {
       if(!loading) {
           const newTabs = renderTabs();
           if(newTabs.length > 0 && !newTabs.find(t => t.key === activeTab)) {
-            setActiveTab(newTabs[0].key);
+            setActiveTab(getDefaultTab());
           }
       }
-  }, [loading, activeTab]);
+  }, [loading, activeTab, renderTabs]);
 
   if (loading) {
       return (
@@ -230,7 +239,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
             </div>
         </div>
 
-        <Tabs defaultValue={TABS[0]?.key || 'details'} value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs defaultValue={getDefaultTab()} value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-5 h-auto">
                 {TABS.map(tab => <TabsTrigger key={tab.key} value={tab.key}>{tab.label}</TabsTrigger>)}
             </TabsList>
@@ -268,8 +277,8 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
             <TabsContent value="lineups" className="p-0">
                  <Tabs defaultValue="home" className="w-full">
                     <TabsList className="grid w-full grid-cols-2 h-auto">
-                        <TabsTrigger value="away">{getDisplayName('team', awayTeamId, initialFixture.teams.away.name)}</TabsTrigger>
                         <TabsTrigger value="home">{getDisplayName('team', homeTeamId, initialFixture.teams.home.name)}</TabsTrigger>
+                        <TabsTrigger value="away">{getDisplayName('team', awayTeamId, initialFixture.teams.away.name)}</TabsTrigger>
                     </TabsList>
                     <TabsContent value="home" className="p-4">
                         <LineupField 
