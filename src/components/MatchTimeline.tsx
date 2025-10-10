@@ -63,13 +63,13 @@ export function MatchTimeline({ events, homeTeamId, awayTeamId, getPlayerName }:
         return (
             <div className="flex flex-col text-left">
                 <div className="flex items-center gap-1 text-green-500">
-                    <ArrowUp className="h-3 w-3" />
-                    <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
+                     <span className="text-sm font-semibold">{getPlayerName(event.player.id, event.player.name)}</span>
+                     <ArrowUp className="h-3 w-3" />
                 </div>
                 {event.assist?.id && (
                      <div className="flex items-center gap-1 text-red-500">
-                        <ArrowDown className="h-3 w-3" />
                         <span className="text-xs">{getPlayerName(event.assist.id, event.assist.name || '')}</span>
+                        <ArrowDown className="h-3 w-3" />
                     </div>
                 )}
             </div>
