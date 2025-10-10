@@ -52,9 +52,9 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
           fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
         ]);
         
-        const lineupsDataRaw = lineupsRes.ok ? (await lineupsRes.json()).response || [] : [];
         if (isCancelled) return;
         
+        const lineupsDataRaw = lineupsRes.ok ? (await lineupsRes.json()).response || [] : [];
         const eventsData = eventsRes.ok ? (await eventsRes.json()).response || [] : [];
         const statsData = statsRes.ok ? (await statsRes.json()).response || [] : [];
         const h2hData = h2hRes.ok ? (await h2hRes.json()).response || [] : [];
@@ -62,17 +62,21 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
 
         // 2. Fetch full player data for each team in the lineup
         let allPlayersData: PlayerStats[] = [];
-        for (const lineup of lineupsDataRaw) {
-            const teamId = lineup.team?.id;
-            if (!teamId) continue;
-            
-            const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`);
-            if (playersRes.ok) {
-                const teamPlayers = (await playersRes.json()).response || [];
-                allPlayersData.push(...teamPlayers);
+        if (lineupsDataRaw.length > 0) {
+            for (const lineup of lineupsDataRaw) {
+                const teamId = lineup.team?.id;
+                if (!teamId) continue;
+                
+                // Fetch all players for the team to ensure we have data for everyone
+                const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`);
+                if (isCancelled) return;
+                
+                if (playersRes.ok) {
+                    const teamPlayers = (await playersRes.json()).response || [];
+                    allPlayersData.push(...teamPlayers);
+                }
             }
         }
-        if (isCancelled) return;
 
         // 3. Create a map of full player details
         const playerDetailsMap = new Map<number, PlayerStats>();
