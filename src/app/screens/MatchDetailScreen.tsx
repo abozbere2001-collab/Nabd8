@@ -254,7 +254,7 @@ const SubstitutionsView = ({ events, teamId, getPlayerName, onRename }: { events
 const LineupField = ({ lineup, events, getPlayerName, getCoachName, onRename, fixture }: { lineup: LineupData, events: MatchEvent[], getPlayerName: (id: number, defaultName: string) => string; getCoachName: (id: number, defaultName: string) => string; onRename: (type: RenameType, id: number, name: string) => void, fixture: FixtureType }) => {
   const { isAdmin } = useAdmin();
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
-    return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا</div>;
+     return <div className="text-center py-6 text-muted-foreground">التشكيلة غير متاحة حاليًا. قد تكون هذه تشكيلة متوقعة.</div>;
   }
 
   const rowsMap: { [key: number]: PlayerWithStats[] } = {};
@@ -438,6 +438,15 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         await setDoc(docRef, { customName: newName });
         fetchCustomNames();
     };
+    
+    const availableTabs = useMemo(() => {
+        const tabs = [];
+        if (lineups && lineups.length > 0) tabs.push({ value: 'lineups', label: 'التشكيلة' });
+        if (events && events.length > 0) tabs.push({ value: 'events', label: 'الأحداث' });
+        if (stats && stats.length > 0) tabs.push({ value: 'stats', label: 'الإحصائيات' });
+        if (standings && standings.length > 0) tabs.push({ value: 'standings', label: 'الترتيب' });
+        return tabs;
+    }, [lineups, events, stats, standings]);
 
     if (loading && lineups.length === 0) {
         return (
@@ -477,51 +486,63 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                      <p className="text-muted-foreground text-sm mt-2">{fixture.fixture.status.long}</p>
                  </div>
                  
-                <Tabs defaultValue="lineups">
-                    <TabsList className="grid w-full grid-cols-4">
-                        <TabsTrigger value="lineups">التشكيلة</TabsTrigger>
-                        <TabsTrigger value="events">الأحداث</TabsTrigger>
-                        <TabsTrigger value="stats">الإحصائيات</TabsTrigger>
-                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="lineups" className="mt-4 space-y-4">
-                        {h2h && h2h.length > 0 && <H2HView h2h={h2h} fixture={fixture} homeName={homeTeamName} awayName={awayTeamName} />}
-                        <div className="flex justify-center gap-4">
-                             <Button onClick={() => setActiveLineup('home')} variant={activeLineup === 'home' ? 'default' : 'outline'}>{homeTeamName}</Button>
-                             <Button onClick={() => setActiveLineup('away')} variant={activeLineup === 'away' ? 'default' : 'outline'}>{awayTeamName}</Button>
-                        </div>
-                        {lineupToShow && 
-                            <LineupField 
-                                lineup={lineupToShow}
-                                events={events}
-                                getPlayerName={(id, name) => getCustomName('player', id, name)}
-                                getCoachName={(id, name) => getCustomName('coach', id, name)}
-                                onRename={handleOpenRename}
-                                fixture={fixture}
-                            />
-                        }
-                        {!lineupToShow && !loading && 
-                             <div className="flex items-center justify-center h-64 text-muted-foreground">
-                                التشكيلة غير متاحة حالياً
-                             </div>
-                        }
-                    </TabsContent>
-                    <TabsContent value="events" className="mt-4">
-                       <MatchTimeline events={events} homeTeamId={fixture.teams.home.id} getPlayerName={(id, name) => getCustomName('player', id, name)} />
-                    </TabsContent>
-                     <TabsContent value="stats" className="mt-4">
-                       <MatchStatistics stats={stats} fixture={fixture} isAdmin={isAdmin} onRename={handleOpenRename} getStatName={(id, name) => getCustomName('statistic', id, name)} />
-                     </TabsContent>
-                     <TabsContent value="standings" className="mt-4">
-                       <StandingsView standings={standings} teamId={fixture.teams.home.id} />
-                     </TabsContent>
-                </Tabs>
+                 {availableTabs.length > 0 ? (
+                     <Tabs defaultValue={availableTabs[0].value}>
+                        <TabsList className={`grid w-full grid-cols-${availableTabs.length}`}>
+                            {availableTabs.map(tab => (
+                                <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
+                            ))}
+                        </TabsList>
+                        
+                        {availableTabs.some(t => t.value === 'lineups') && (
+                            <TabsContent value="lineups" className="mt-4 space-y-4">
+                                {h2h && h2h.length > 0 && <H2HView h2h={h2h} fixture={fixture} homeName={homeTeamName} awayName={awayTeamName} />}
+                                <div className="flex justify-center gap-4">
+                                    <Button onClick={() => setActiveLineup('home')} variant={activeLineup === 'home' ? 'default' : 'outline'}>{homeTeamName}</Button>
+                                    <Button onClick={() => setActiveLineup('away')} variant={activeLineup === 'away' ? 'default' : 'outline'}>{awayTeamName}</Button>
+                                </div>
+                                {lineupToShow && 
+                                    <LineupField 
+                                        lineup={lineupToShow}
+                                        events={events}
+                                        getPlayerName={(id, name) => getCustomName('player', id, name)}
+                                        getCoachName={(id, name) => getCustomName('coach', id, name)}
+                                        onRename={handleOpenRename}
+                                        fixture={fixture}
+                                    />
+                                }
+                                {!lineupToShow && !loading && 
+                                    <div className="flex items-center justify-center h-64 text-muted-foreground">
+                                        التشكيلة غير متاحة حالياً
+                                    </div>
+                                }
+                            </TabsContent>
+                        )}
+                        
+                        {availableTabs.some(t => t.value === 'events') && (
+                             <TabsContent value="events" className="mt-4">
+                               <MatchTimeline events={events} homeTeamId={fixture.teams.home.id} getPlayerName={(id, name) => getCustomName('player', id, name)} fixture={fixture} />
+                             </TabsContent>
+                        )}
+
+                        {availableTabs.some(t => t.value === 'stats') && (
+                             <TabsContent value="stats" className="mt-4">
+                               <MatchStatistics stats={stats} fixture={fixture} isAdmin={isAdmin} onRename={handleOpenRename} getStatName={(id, name) => getCustomName('statistic', id, name)} />
+                             </TabsContent>
+                        )}
+
+                        {availableTabs.some(t => t.value === 'standings') && (
+                            <TabsContent value="standings" className="mt-4">
+                              <StandingsView standings={standings} teamId={fixture.teams.home.id} />
+                            </TabsContent>
+                        )}
+                    </Tabs>
+                ) : !loading && (
+                    <div className="text-center py-10 text-muted-foreground">
+                        لا توجد تفاصيل إضافية لهذه المباراة حاليًا.
+                    </div>
+                )}
             </div>
         </div>
     );
 }
-
-    
-
-
-    
