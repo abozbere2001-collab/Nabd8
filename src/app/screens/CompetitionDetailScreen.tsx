@@ -19,6 +19,7 @@ import type { Fixture, Standing, TopScorer, Team, Favorites } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { format } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +34,43 @@ import {
 type RenameType = 'league' | 'team' | 'player';
 
 const CURRENT_SEASON = 2024;
+
+
+const LiveMatchStatus = ({ fixture }: { fixture: Fixture }) => {
+    const { status, date } = fixture.fixture;
+
+    const isLive = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(status.short);
+    const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
+
+    if (isLive) {
+        return (
+            <>
+                <div className="text-red-500 font-bold text-xs animate-pulse mb-1">
+                    {status.elapsed ? `${status.elapsed}'` : status.long}
+                </div>
+                <div className="font-bold text-lg">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
+                <div className="text-xs text-muted-foreground mt-1">{status.short === 'HT' ? 'استراحة' : 'مباشر'}</div>
+            </>
+        );
+    }
+    
+    if (isFinished) {
+         return (
+            <>
+                <div className="font-bold text-lg">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
+                <div className="text-xs text-muted-foreground mt-1">انتهت</div>
+            </>
+        );
+    }
+
+    return (
+        <>
+            <div className="font-bold text-lg">{format(new Date(date), "HH:mm")}</div>
+            <div className="text-xs text-muted-foreground mt-1">{status.long}</div>
+        </>
+    );
+};
+
 
 export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo, headerActions }: ScreenProps & { title?: string, leagueId?: number, logo?: string, headerActions?: React.ReactNode }) {
   const { isAdmin } = useAdmin();
@@ -374,29 +412,29 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 </div>
             ) : fixtures.length > 0 ? (
                 <div className="space-y-3">
-                    {fixtures.map(({ fixture, teams, goals }) => (
-                        <div key={fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.id, fixture: { fixture, teams, goals, league: {id: leagueId!, name: displayTitle || '', logo, round: ''}} })}>
+                    {fixtures.map((fixture) => (
+                        <div key={fixture.fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}>
                            <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
-                                <span>{new Date(fixture.date).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                                <span>{fixture.status.short}</span>
+                                <span>{new Date(fixture.fixture.date).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                <span>{fixture.fixture.status.long}</span>
                            </div>
                            <div className="flex items-center justify-between gap-2">
-                               <div className="flex items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={(e) => {e.stopPropagation(); navigate('TeamDetails', { teamId: teams.home.id })}}>
-                                   <span className="font-semibold truncate">{getDisplayName('team', teams.home.id, teams.home.name)}</span>
+                               <div className="flex items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={(e) => {e.stopPropagation(); navigate('TeamDetails', { teamId: fixture.teams.home.id })}}>
+                                   <span className="font-semibold truncate">{getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name)}</span>
                                    <Avatar className="h-8 w-8">
-                                       <AvatarImage src={teams.home.logo} alt={teams.home.name} />
-                                       <AvatarFallback>{teams.home.name.substring(0, 2)}</AvatarFallback>
+                                       <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
+                                       <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
                                    </Avatar>
                                </div>
-                               <div className="font-bold text-lg px-2 bg-muted rounded-md">
-                                   {goals.home !== null ? `${goals.home} - ${goals.away}` : new Date(fixture.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
-                               </div>
-                               <div className="flex items-center gap-2 flex-1 truncate cursor-pointer" onClick={(e) => {e.stopPropagation(); navigate('TeamDetails', { teamId: teams.away.id })}}>
+                                <div className="flex flex-col items-center justify-center min-w-[80px] text-center">
+                                     <LiveMatchStatus fixture={fixture} />
+                                </div>
+                               <div className="flex items-center gap-2 flex-1 truncate cursor-pointer" onClick={(e) => {e.stopPropagation(); navigate('TeamDetails', { teamId: fixture.teams.away.id })}}>
                                     <Avatar className="h-8 w-8">
-                                       <AvatarImage src={teams.away.logo} alt={teams.away.name} />
-                                       <AvatarFallback>{teams.away.name.substring(0, 2)}</AvatarFallback>
+                                       <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
+                                       <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
                                    </Avatar>
-                                   <span className="font-semibold truncate">{getDisplayName('team', teams.away.id, teams.away.name)}</span>
+                                   <span className="font-semibold truncate">{getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name)}</span>
                                </div>
                            </div>
                         </div>
@@ -564,3 +602,5 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+
+    

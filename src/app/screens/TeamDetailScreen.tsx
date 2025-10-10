@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -43,6 +42,42 @@ interface PlayerInfoFromApi {
 type RenameType = 'team' | 'player';
 
 const CURRENT_SEASON = 2025;
+
+
+const LiveMatchStatus = ({ fixture }: { fixture: Fixture }) => {
+    const { status, date } = fixture.fixture;
+
+    const isLive = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(status.short);
+    const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
+
+    if (isLive) {
+        return (
+            <>
+                <div className="text-red-500 font-bold text-xs animate-pulse mb-1">
+                    {status.elapsed ? `${status.elapsed}'` : status.long}
+                </div>
+                <div className="font-bold text-base">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
+                <div className="text-xs text-muted-foreground mt-1">{status.short === 'HT' ? 'استراحة' : 'مباشر'}</div>
+            </>
+        );
+    }
+    
+    if (isFinished) {
+         return (
+            <>
+                <div className="font-bold text-base">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
+                <div className="text-xs text-muted-foreground mt-1">انتهت</div>
+            </>
+        );
+    }
+
+    return (
+        <>
+            <div className="font-bold text-base">{format(new Date(date), "HH:mm")}</div>
+            <div className="text-xs text-muted-foreground mt-1">{status.long}</div>
+        </>
+    );
+};
 
 // --- HOOKS ---
 function useTeamData(teamId?: number) {  
@@ -387,14 +422,16 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                                     <div key={fixture.fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}>
                                         <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
                                             <span>{format(new Date(fixture.fixture.date), 'EEE, d MMM yyyy')}</span>
-                                            <span>{fixture.fixture.status.short}</span>
+                                            <span>{fixture.league.name}</span>
                                         </div>
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2 flex-1 justify-end truncate">
                                                 <span className="font-semibold truncate">{fixture.teams.home.name}</span>
                                                 <Avatar className="h-6 w-6"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
                                             </div>
-                                            <div className="font-bold text-base px-2 bg-muted rounded-md">{fixture.goals.home ?? ''} - {fixture.goals.away ?? ''}</div>
+                                            <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
+                                                <LiveMatchStatus fixture={fixture} />
+                                            </div>
                                             <div className="flex items-center gap-2 flex-1 truncate">
                                                 <Avatar className="h-6 w-6"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
                                                 <span className="font-semibold truncate">{fixture.teams.away.name}</span>
@@ -462,7 +499,5 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
     </div>
   );
 }
-
-    
 
     

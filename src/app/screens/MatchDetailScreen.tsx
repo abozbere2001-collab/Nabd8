@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,6 +22,36 @@ import { useMatchData } from '@/hooks/useMatchData';
 
 
 type RenameType = 'team' | 'player' | 'coach';
+
+const LiveMatchStatus = ({ fixture }: { fixture: FixtureType }) => {
+    const { status, date } = fixture.fixture;
+
+    const isLive = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(status.short);
+    const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
+
+    if (isLive) {
+        return (
+            <>
+                <div className="text-red-500 font-bold text-xs animate-pulse mb-1">
+                    {status.elapsed ? `${status.elapsed}'` : status.long}
+                </div>
+                <div className="font-bold text-3xl">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
+                <div className="text-sm text-muted-foreground mt-1">{status.short === 'HT' ? 'استراحة' : 'مباشر'}</div>
+            </>
+        );
+    }
+    
+    if (isFinished) {
+         return (
+            <>
+                <div className="font-bold text-3xl">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
+                <div className="text-sm text-muted-foreground mt-1">انتهت</div>
+            </>
+        );
+    }
+
+    return <div className="font-bold text-3xl">{`${fixture.goals.home ?? ''} - ${fixture.goals.away ?? ''}`}</div>
+};
 
 
 export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, navigate }: { fixture: FixtureType; goBack: () => void; canGoBack: boolean; navigate: (screen: any, props: any) => void; }) {
@@ -186,8 +217,8 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
                          <AvatarFallback>{initialFixture.teams.home.name.substring(0, 2)}</AvatarFallback>
                     </Avatar>
                 </div>
-                <div className="font-bold text-3xl px-2 bg-muted rounded-md">
-                   {initialFixture.goals.home ?? ''} - {initialFixture.goals.away ?? ''}
+                <div className="flex flex-col items-center justify-center px-2 min-w-[80px]">
+                    <LiveMatchStatus fixture={initialFixture} />
                 </div>
                 <div className="flex items-center gap-2 flex-1 truncate">
                       <Avatar className="h-10 w-10">
@@ -196,9 +227,6 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
                     </Avatar>
                     <span className="font-bold text-lg truncate">{getDisplayName('team', awayTeamId, initialFixture.teams.away.name)}</span>
                 </div>
-            </div>
-             <div className="text-center text-sm text-primary mt-2">
-                {initialFixture.fixture.status.long}
             </div>
         </div>
 
@@ -313,3 +341,5 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
     </div>
   );
 }
+
+    

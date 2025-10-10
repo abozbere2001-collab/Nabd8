@@ -78,39 +78,49 @@ const getDayLabel = (date: Date) => {
 };
 
 // Live Timer Component
-const LiveTimer = ({ startTime, status, elapsed }: { startTime: number, status: string, elapsed: number | null }) => {
-    const [elapsedTime, setElapsedTime] = useState<string>('');
+const LiveMatchStatus = ({ fixture }: { fixture: Fixture }) => {
+    const { status, date } = fixture.fixture;
+    const [elapsedTime, setElapsedTime] = useState(status.elapsed);
 
     useEffect(() => {
-        if (!['1H', '2H', 'HT', 'ET', 'P', 'BT'].includes(status)) {
-            setElapsedTime(status);
-            return;
+        setElapsedTime(status.elapsed);
+        if (['1H', '2H', 'ET', 'P', 'BT'].includes(status.short) && status.elapsed !== null) {
+            const interval = setInterval(() => {
+                setElapsedTime(prev => (prev ? prev + 1 : 1));
+            }, 60000);
+            return () => clearInterval(interval);
         }
+    }, [status.short, status.elapsed]);
 
-        if (status === 'HT') {
-            setElapsedTime('نصف الوقت');
-            return;
-        }
-        
-        if (elapsed) {
-            setElapsedTime(`${elapsed}'`);
-        }
+    const isLive = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(status.short);
+    const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
 
-        const interval = setInterval(() => {
-            if (elapsed) {
-              setElapsedTime(`${elapsed}'`);
-            }
-        }, 1000 * 60); // Update every minute
-
-        return () => clearInterval(interval);
-    }, [startTime, status, elapsed]);
-
-    if (!elapsedTime) return null;
+    if (isLive) {
+        return (
+            <>
+                <div className="text-red-500 font-bold text-xs animate-pulse mb-1">
+                    {elapsedTime ? `${elapsedTime}'` : status.long}
+                </div>
+                <div className="font-bold text-lg">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
+                <div className="text-xs text-muted-foreground mt-1">{status.short === 'HT' ? 'استراحة' : 'مباشر'}</div>
+            </>
+        );
+    }
+    
+    if (isFinished) {
+         return (
+            <>
+                <div className="font-bold text-lg">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
+                <div className="text-xs text-muted-foreground mt-1">انتهت</div>
+            </>
+        );
+    }
 
     return (
-        <span className="text-red-600 font-bold text-xs animate-pulse">
-            {elapsedTime}
-        </span>
+        <>
+            <div className="font-bold text-lg">{format(new Date(date), "HH:mm")}</div>
+            <div className="text-xs text-muted-foreground mt-1">{status.long}</div>
+        </>
     );
 };
 
@@ -126,25 +136,18 @@ const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixtur
           className="hover:bg-accent/50 cursor-pointer -m-3 p-3"
           onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
-         <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
-              <div 
-                className="flex items-center gap-2 cursor-pointer hover:underline"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    navigate('CompetitionDetails', { leagueId: fixture.league.id, title: fixture.league.name, logo: fixture.league.logo });
-                }}
-              >
-                  <Avatar className="h-4 w-4">
-                      <AvatarImage src={fixture.league.logo} alt={fixture.league.name} />
-                      <AvatarFallback>{fixture.league.name.substring(0,1)}</AvatarFallback>
-                  </Avatar>
-                  <span className="truncate">{fixture.league.name}</span>
-              </div>
-              <LiveTimer 
-                startTime={fixture.fixture.timestamp} 
-                status={fixture.fixture.status.short}
-                elapsed={fixture.fixture.status.elapsed}
-              />
+         <div 
+            className="flex items-center justify-center text-xs text-muted-foreground mb-2 cursor-pointer hover:underline"
+            onClick={(e) => {
+                e.stopPropagation();
+                navigate('CompetitionDetails', { leagueId: fixture.league.id, title: fixture.league.name, logo: fixture.league.logo });
+            }}
+          >
+              <Avatar className="h-4 w-4 ml-2">
+                  <AvatarImage src={fixture.league.logo} alt={fixture.league.name} />
+                  <AvatarFallback>{fixture.league.name.substring(0,1)}</AvatarFallback>
+              </Avatar>
+              <span className="truncate">{fixture.league.name}</span>
          </div>
          <div className="flex items-center justify-between gap-2">
              <div className="flex items-center gap-2 flex-1 justify-end truncate">
@@ -154,13 +157,8 @@ const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixtur
                      <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
                  </Avatar>
              </div>
-             <div className={cn(
-                "font-bold text-lg px-2 rounded-md min-w-[80px] text-center",
-                 ['NS', 'TBD', 'PST', 'CANC'].includes(fixture.fixture.status.short) ? "bg-muted" : "bg-card"
-                )}>
-                 {['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short) || (fixture.goals.home !== null)
-                   ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
-                   : format(new Date(fixture.fixture.date), "HH:mm")}
+             <div className="flex flex-col items-center justify-center min-w-[80px] text-center">
+                 <LiveMatchStatus fixture={fixture} />
              </div>
              <div className="flex items-center gap-2 flex-1 truncate">
                   <Avatar className="h-8 w-8">
@@ -507,3 +505,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    
