@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -30,10 +31,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { CURRENT_SEASON } from '@/lib/constants';
 
 type RenameType = 'league' | 'team' | 'player';
 
-const CURRENT_SEASON = 2024;
+
 
 
 const LiveMatchStatus = ({ fixture }: { fixture: Fixture }) => {
@@ -169,26 +171,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       setLoading(true);
       try {
         await fetchAllCustomNames();
-
-        const leagueRes = await fetch(`/api/football/leagues?id=${leagueId}`);
-        const leagueData = await leagueRes.json();
-        const leagueInfo = leagueData.response?.[0];
-        
-        let seasonToFetch = CURRENT_SEASON;
-        if (leagueInfo?.league.type.toLowerCase() === 'cup' && leagueInfo.seasons.length > 0) {
-            const latestSeason = leagueInfo.seasons.sort((a: any, b: any) => b.year - a.year)[0];
-            if (latestSeason) {
-                seasonToFetch = latestSeason.year;
-            }
-        }
-        setSeason(seasonToFetch);
-
+        setSeason(CURRENT_SEASON);
 
         const [fixturesRes, standingsRes, scorersRes, teamsRes] = await Promise.all([
-          fetch(`/api/football/fixtures?league=${leagueId}&season=${seasonToFetch}`),
-          fetch(`/api/football/standings?league=${leagueId}&season=${seasonToFetch}`),
-          fetch(`/api/football/players/topscorers?league=${leagueId}&season=${seasonToFetch}`),
-          fetch(`/api/football/teams?league=${leagueId}&season=${seasonToFetch}`)
+          fetch(`/api/football/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`),
+          fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
+          fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON}`),
+          fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`)
         ]);
 
         const fixturesData = await fixturesRes.json();

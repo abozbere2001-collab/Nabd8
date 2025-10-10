@@ -1,10 +1,11 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import type { User } from 'firebase/auth';
 import { LoginScreen } from './screens/LoginScreen';
-import { FirebaseProvider } from '@/firebase/provider';
+import { FirebaseProvider, useAuth } from '@/firebase/provider';
 import { onAuthStateChange } from '@/lib/firebase-client';
 import { AppContentWrapper } from './AppContentWrapper';
 
@@ -50,4 +51,5 @@ export default function Home() {
     </FirebaseProvider>
   );
 }
+
 

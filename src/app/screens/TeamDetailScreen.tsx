@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -20,6 +21,7 @@ import type { Fixture, Standing, TopScorer, Favorites } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
+import { CURRENT_SEASON } from '@/lib/constants';
 
 
 // --- TYPE DEFINITIONS ---
@@ -41,7 +43,6 @@ interface PlayerInfoFromApi {
 }
 type RenameType = 'team' | 'player';
 
-const CURRENT_SEASON = 2025;
 
 
 const LiveMatchStatus = ({ fixture }: { fixture: Fixture }) => {
@@ -106,7 +107,7 @@ function useTeamData(teamId?: number) {
         const teamData = await teamRes.json();
         const teamInfo: TeamInfo | null = teamData.response?.[0] || null;
 
-        const seasonForData = teamInfo?.team.type === 'National' ? new Date().getFullYear() : CURRENT_SEASON;
+        const seasonForData = CURRENT_SEASON;
         
         // Fetch players for the correct season
         const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${seasonForData}`);
@@ -129,10 +130,7 @@ function useTeamData(teamId?: number) {
         let standingsData = { response: [] };
         let scorersData = { response: [] };
         if (leagueIdForStandings) {
-            // Use the year of the first fixture for national team standings, otherwise use the calculated season
-            const seasonForStandings = teamInfo?.team.type === 'National' && fixtures.length > 0 
-                ? new Date(fixtures[0].fixture.date).getFullYear() 
-                : seasonForData;
+            const seasonForStandings = CURRENT_SEASON;
             const [standingsRes, scorersRes] = await Promise.all([
                  fetch(`/api/football/standings?league=${leagueIdForStandings}&season=${seasonForStandings}`),
                  fetch(`/api/football/players/topscorers?league=${leagueIdForStandings}&season=${seasonForStandings}`)
