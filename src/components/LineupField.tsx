@@ -40,7 +40,7 @@ const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: P
           <AvatarImage src={p.photo} alt={displayName} />
           <AvatarFallback><User /></AvatarFallback>
         </Avatar>
-        {playerNumber && (
+        {playerNumber != null && (
           <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
             {playerNumber}
           </div>
@@ -170,7 +170,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
                     </Avatar>
                     <div>
                       <span className="text-sm font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
-                       {playerNumber && <p className="text-xs text-muted-foreground">الرقم: {playerNumber}</p>}
+                       {playerNumber != null && <p className="text-xs text-muted-foreground">الرقم: {playerNumber}</p>}
                     </div>
 
                 </div>

@@ -18,7 +18,6 @@ const EventIcon = ({ event }: { event: MatchEventType }) => {
 export function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: MatchEventType[]; homeTeamId: number; getPlayerName: (id: number, defaultName: string) => string; }) {
   const [filter, setFilter] = useState<'all' | 'highlights'>('all');
 
-  // Sort from 1' to 90'
   const sortedEvents = useMemo(() => [...events].sort((a, b) => a.time.elapsed - b.time.elapsed), [events]);
   
   const filteredEvents = useMemo(() => {
@@ -42,8 +41,7 @@ export function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: M
             <TabsTrigger value="highlights">الأبرز</TabsTrigger>
             </TabsList>
         </Tabs>
-        <div className="relative p-4" style={{ minHeight: `${filteredEvents.length * 5}rem`}}>
-            {/* The vertical line */}
+        <div className="relative p-4" style={{ minHeight: `${filteredEvents.length * 4}rem`}}>
             <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
             
             {filteredEvents.map((event, idx) => {
@@ -62,27 +60,26 @@ export function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: M
                 );
                 
                 const timeIndicator = (
-                    <div className="absolute left-1/2 -translate-x-1/2 bg-card border-2 border-primary rounded-full h-8 w-8 flex items-center justify-center text-xs font-bold z-10">
+                    <div className="absolute left-1/2 -translate-x-1/2 bg-card border-2 border-primary rounded-full h-8 w-8 flex items-center justify-center text-xs font-bold z-10" style={{ transform: 'translateY(-50%)' }}>
                        {event.time.elapsed}'
                     </div>
                 );
 
                 return (
-                    <div key={idx} className="absolute w-full" style={{ bottom: bottomPosition, transform: 'translateY(50%)'}}>
+                    <div key={idx} className="absolute w-full" style={{ bottom: bottomPosition }}>
                        <div className="relative flex items-center justify-center h-0">
                            {timeIndicator}
                            <div className="absolute w-full flex justify-center">
                                {isHomeEvent ? (
-                                   <div className="w-1/2 flex justify-start pl-10">{eventContent}</div>
+                                   <div className="w-1/2 flex justify-start pl-12">{eventContent}</div>
                                ) : (
                                    <div className="w-1/2"></div>
                                )}
-                               <div className="w-1/2"></div>
                            </div>
                            <div className="absolute w-full flex justify-center">
                                <div className="w-1/2"></div>
                                {!isHomeEvent ? (
-                                   <div className="w-1/2 flex justify-end pr-10">{eventContent}</div>
+                                   <div className="w-1/2 flex justify-end pr-12">{eventContent}</div>
                                ) : (
                                    <div className="w-1/2"></div>
                                )}
