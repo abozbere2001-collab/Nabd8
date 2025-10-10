@@ -507,18 +507,21 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                         }
                     </TabsContent>
                     <TabsContent value="events" className="mt-4">
-                       <MatchTimeline events={events} fixture={fixture} />
+                       <MatchTimeline events={events} homeTeamId={fixture.teams.home.id} getPlayerName={(id, name) => getCustomName('player', id, name)} />
                     </TabsContent>
                      <TabsContent value="stats" className="mt-4">
                        <MatchStatistics stats={stats} fixture={fixture} isAdmin={isAdmin} onRename={handleOpenRename} getStatName={(id, name) => getCustomName('statistic', id, name)} />
-                    </TabsContent>
+                     </TabsContent>
                      <TabsContent value="standings" className="mt-4">
                        <StandingsView standings={standings} teamId={fixture.teams.home.id} />
-                    </TabsContent>
+                     </TabsContent>
                 </Tabs>
             </div>
         </div>
     );
 }
+
+    
+
 
     
