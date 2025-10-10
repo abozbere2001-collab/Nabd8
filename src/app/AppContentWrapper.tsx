@@ -73,12 +73,22 @@ type StackItem = {
   props?: Record<string, any>;
 };
 
-export const ProfileButton = ({ onProfileClick }: { onProfileClick: () => void }) => {
+export const ProfileButton = () => {
     const { user } = useAuth();
 
     const handleSignOut = async () => {
         await signOut();
     };
+    
+    const navigateToProfile = () => {
+        // This is a placeholder. The actual navigation is handled by the parent component.
+        // We'll call a prop passed down for navigation.
+        // For now, we find the AppContentWrapper's navigate function on the window.
+        if ((window as any).appNavigate) {
+            (window as any).appNavigate('Profile');
+        }
+    };
+
 
     if (!user) return null;
 
@@ -102,7 +112,7 @@ export const ProfileButton = ({ onProfileClick }: { onProfileClick: () => void }
                     </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onProfileClick}>
+                <DropdownMenuItem onClick={navigateToProfile}>
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>الملف الشخصي</span>
                 </DropdownMenuItem>
@@ -157,6 +167,13 @@ export function AppContentWrapper() {
       }
     });
   }, []);
+  
+  // A bit of a hack to make the profile button work from a different component tree
+  useMemo(() => {
+      if (typeof window !== 'undefined') {
+          (window as any).appNavigate = navigate;
+      }
+  }, [navigate]);
 
   if (!stack || stack.length === 0) {
     return (
@@ -214,3 +231,4 @@ export function AppContentWrapper() {
     </main>
   );
 }
+

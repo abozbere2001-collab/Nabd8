@@ -15,6 +15,13 @@ export type ScreenProps = {
   canGoBack: boolean;
 };
 
+function App() {
+  const { user } = useAuth();
+  if (!user) {
+    return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
+  }
+  return <AppContentWrapper />;
+}
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
@@ -39,7 +46,8 @@ export default function Home() {
 
   return (
     <FirebaseProvider user={user}>
-      {user ? <AppContentWrapper /> : <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />}
+      <App />
     </FirebaseProvider>
   );
 }
+
