@@ -54,7 +54,7 @@ interface MatchData {
     loading: boolean;
     error: string | null;
 }
-type RenameType = 'team' | 'player' | 'coach';
+type RenameType = 'team' | 'player' | 'coach' | 'statistic';
 
 
 // --- HOOKS ---
@@ -379,20 +379,29 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
     const [activeLineup, setActiveLineup] = useState<'home' | 'away'>('home');
     const { isAdmin } = useAdmin();
     const { db } = useFirestore();
-    const [renameItem, setRenameItem] = useState<{ id: number; name: string; type: RenameType } | null>(null);
+    const [renameItem, setRenameItem] = useState<{ id: string | number; name: string; type: RenameType } | null>(null);
     const [isRenameOpen, setRenameOpen] = useState(false);
-    const [customNames, setCustomNames] = useState<Map<number, string>>(new Map());
+    const [customNames, setCustomNames] = useState<{[key: string]: Map<string | number, string>}>({
+        player: new Map(),
+        coach: new Map(),
+        statistic: new Map(),
+    });
 
     const fetchCustomNames = useCallback(async () => {
         if (!db) return;
-        const collectionsToFetch = ['playerCustomizations', 'coachCustomizations'];
+        const collectionsToFetch = ['playerCustomizations', 'coachCustomizations', 'statisticCustomizations'];
         try {
             const snapshots = await Promise.all(collectionsToFetch.map(c => getDocs(collection(db, c))));
-            const names = new Map<number, string>();
-            snapshots.forEach(snapshot => {
-                 snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
-            });
-            setCustomNames(names);
+            const names = {
+                player: new Map<number, string>(),
+                coach: new Map<number, string>(),
+                statistic: new Map<string, string>(),
+            };
+            snapshots[0].forEach(doc => names.player.set(Number(doc.id), doc.data().customName));
+            snapshots[1].forEach(doc => names.coach.set(Number(doc.id), doc.data().customName));
+            snapshots[2].forEach(doc => names.statistic.set(doc.id, doc.data().customName));
+
+            setCustomNames(names as any);
         } catch (error) {
              const permissionError = new FirestorePermissionError({ path: 'customizations', operation: 'list' });
              errorEmitter.emit('permission-error', permissionError);
@@ -401,11 +410,11 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
 
     useEffect(() => { fetchCustomNames(); }, [fetchCustomNames]);
     
-    const getCustomName = useCallback((id: number, defaultName: string) => {
-        return customNames.get(id) || defaultName;
+    const getCustomName = useCallback((type: 'player' | 'coach' | 'statistic', id: string | number, defaultName: string) => {
+        return customNames[type]?.get(id) || defaultName;
     }, [customNames]);
 
-    const handleOpenRename = (type: RenameType, id: number, name: string) => {
+    const handleOpenRename = (type: RenameType, id: string | number, name: string) => {
         setRenameItem({ id, name, type });
         setRenameOpen(true);
     };
@@ -436,7 +445,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
     
     return (
         <div className="flex h-full flex-col bg-background">
-            {renameItem && <RenameDialog isOpen={isRenameOpen} onOpenChange={setRenameOpen} currentName={renameItem.name} onSave={handleSaveRename} itemType={renameItem.type === 'player' ? 'اللاعب' : 'المدرب'} />}
+            {renameItem && <RenameDialog isOpen={isRenameOpen} onOpenChange={setRenameOpen} currentName={renameItem.name} onSave={handleSaveRename} itemType={renameItem.type} />}
             <ScreenHeader title={fixture.league.name} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
             <div className="p-4 flex-1 overflow-y-auto">
                  <div className="text-center mb-4">
@@ -473,8 +482,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                             <LineupField 
                                 lineup={lineupToShow}
                                 events={events}
-                                getPlayerName={getCustomName}
-                                getCoachName={getCustomName}
+                                getPlayerName={(id, name) => getCustomName('player', id, name)}
+                                getCoachName={(id, name) => getCustomName('coach', id, name)}
                                 onRename={handleOpenRename}
                                 fixture={fixture}
                             />
@@ -489,7 +498,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                        <MatchTimeline events={events} fixture={fixture} />
                     </TabsContent>
                      <TabsContent value="stats" className="mt-4">
-                       <MatchStatistics stats={stats} fixture={fixture} />
+                       <MatchStatistics stats={stats} fixture={fixture} isAdmin={isAdmin} onRename={handleOpenRename} getStatName={(id, name) => getCustomName('statistic', id, name)} />
                     </TabsContent>
                      <TabsContent value="standings" className="mt-4">
                        <StandingsView standings={standings} teamId={fixture.teams.home.id} />

@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenKey, ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
@@ -141,10 +141,22 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
             leaguesData.response.forEach((r: LeagueResult) => resultsMap.set(`league-${r.league.id}`, { ...r, type: 'league' }));
         }
 
-        // 2. Search Firestore for custom names
+        // 2. Search Firestore for custom names (starts with logic)
         if (db) {
-            const teamCustomQuery = query(collection(db, "teamCustomizations"), where("customName", ">=", queryTerm), where("customName", "<=", queryTerm + '\uf8ff'), limit(10));
-            const leagueCustomQuery = query(collection(db, "leagueCustomizations"), where("customName", ">=", queryTerm), where("customName", "<=", queryTerm + '\uf8ff'), limit(10));
+            const teamCustomQuery = query(
+                collection(db, "teamCustomizations"), 
+                orderBy("customName"),
+                where("customName", ">=", queryTerm), 
+                where("customName", "<=", queryTerm + '\uf8ff'), 
+                limit(10)
+            );
+            const leagueCustomQuery = query(
+                collection(db, "leagueCustomizations"), 
+                orderBy("customName"),
+                where("customName", ">=", queryTerm), 
+                where("customName", "<=", queryTerm + '\uf8ff'), 
+                limit(10)
+            );
 
             const [teamCustomSnap, leagueCustomSnap] = await Promise.all([
                 getDocs(teamCustomQuery),

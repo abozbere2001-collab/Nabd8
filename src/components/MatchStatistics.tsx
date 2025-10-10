@@ -1,11 +1,9 @@
-
 "use client";
 import React from "react";
+import { Button } from "@/components/ui/button";
+import { Pencil } from "lucide-react";
 
-export default function MatchStatistics({ stats, fixture }) {
-  // stats يجب أن تكون مصفوفة تحتوي على إحصاءات الفريقين بنفس ترتيب الـ API
-  // مثال: [{team: {...}, statistics: [...]}, {team: {...}, statistics: [...]}]
-
+export default function MatchStatistics({ stats, fixture, isAdmin, onRename, getStatName }) {
   const homeStats = stats.find((s) => s.team.id === fixture.teams.home.id);
   const awayStats = stats.find((s) => s.team.id === fixture.teams.away.id);
 
@@ -47,20 +45,17 @@ export default function MatchStatistics({ stats, fixture }) {
         {homeStats.statistics.map((stat, i) => {
           const awayValue = awayStats.statistics[i]?.value || 0;
           const homeValue = stat.value || 0;
-          const name = stat.type;
+          const originalName = stat.type;
+          const displayName = getStatName(originalName, originalName);
 
-          // نسبة عرض بياني على الشريط
-          const homePercent = parseFloat(
-            (parseFloat(homeValue) /
-              (parseFloat(homeValue) + parseFloat(awayValue) || 1)) *
-              100
-          ).toFixed(1);
-          const awayPercent = (100 - homePercent).toFixed(1);
+          const totalValue = (typeof homeValue === 'string' ? 0 : homeValue) + (typeof awayValue === 'string' ? 0 : awayValue);
+          const homePercent = totalValue > 0 ? ((typeof homeValue === 'string' ? 0 : homeValue) / totalValue) * 100 : 50;
+          const awayPercent = 100 - homePercent;
 
           return (
             <div
               key={i}
-              className="flex items-center justify-between py-3 text-white relative"
+              className="flex items-center justify-between py-3 text-white relative group"
             >
               {/* 🔢 القيم */}
               <div className="w-[25%] text-right text-sm text-green-200 font-semibold">
@@ -70,7 +65,14 @@ export default function MatchStatistics({ stats, fixture }) {
               {/* 📊 الإحصاء نفسه */}
               <div className="w-[50%] flex flex-col items-center text-center relative">
                 {/* اسم الإحصاء */}
-                <div className="text-gray-300 text-xs mb-1">{name}</div>
+                <div className="text-gray-300 text-xs mb-1 flex items-center gap-2">
+                    {displayName}
+                    {isAdmin && (
+                        <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => onRename('statistic', originalName, displayName)}>
+                            <Pencil className="h-3 w-3" />
+                        </Button>
+                    )}
+                </div>
 
                 {/* شريط بياني وسط جميل */}
                 <div className="relative w-full h-2 bg-green-950 rounded-full overflow-hidden">
@@ -96,5 +98,3 @@ export default function MatchStatistics({ stats, fixture }) {
     </div>
   );
 }
-
-    
