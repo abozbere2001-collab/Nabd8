@@ -86,7 +86,7 @@ function useMatchData(fixture?: FixtureType): MatchDataHook {
         const playersMap = new Map(allPlayers.map(p => [p.player.id, p]));
 
         const enrichedLineups = lineupsDataRaw.map((lineup: any) => {
-            const enrich = (playerList: any[] | undefined) => (playerList || []).map(p => {
+            const enrich = (playerList: any[] = []) => playerList.map(p => {
                 const fullPlayerData = playersMap.get(p.player.id);
                 return fullPlayerData || p;
             });
@@ -332,23 +332,33 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
                 </div>}
             </TabsContent>
 
-            <TabsContent value="lineups" className="p-4 grid md:grid-cols-2 gap-6">
-                <LineupField 
-                    lineup={homeLineup}
-                    events={events}
-                    onRename={handleRename} 
-                    isAdmin={isAdmin} 
-                    getPlayerName={(id, name) => getDisplayName('player', id, name)} 
-                    getCoachName={(id, name) => getDisplayName('coach', id, name)}
-                />
-                <LineupField 
-                    lineup={awayLineup}
-                    events={events}
-                    onRename={handleRename} 
-                    isAdmin={isAdmin} 
-                    getPlayerName={(id, name) => getDisplayName('player', id, name)}
-                    getCoachName={(id, name) => getDisplayName('coach', id, name)}
-                />
+            <TabsContent value="lineups" className="p-0">
+                 <Tabs defaultValue="home" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 h-auto">
+                        <TabsTrigger value="away">{getDisplayName('team', awayTeamId, initialFixture.teams.away.name)}</TabsTrigger>
+                        <TabsTrigger value="home">{getDisplayName('team', homeTeamId, initialFixture.teams.home.name)}</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="home" className="p-4">
+                        <LineupField 
+                            lineup={homeLineup}
+                            events={events}
+                            onRename={handleRename} 
+                            isAdmin={isAdmin} 
+                            getPlayerName={(id, name) => getDisplayName('player', id, name)} 
+                            getCoachName={(id, name) => getDisplayName('coach', id, name)}
+                        />
+                    </TabsContent>
+                    <TabsContent value="away" className="p-4">
+                        <LineupField 
+                            lineup={awayLineup}
+                            events={events}
+                            onRename={handleRename} 
+                            isAdmin={isAdmin} 
+                            getPlayerName={(id, name) => getDisplayName('player', id, name)}
+                            getCoachName={(id, name) => getDisplayName('coach', id, name)}
+                        />
+                    </TabsContent>
+                </Tabs>
             </TabsContent>
 
             <TabsContent value="events" className="p-4">

@@ -28,6 +28,15 @@ interface LineupData {
   substitutes: PlayerWithStats[];
 }
 
+interface LineupFieldProps {
+  lineup?: LineupData;
+  events: MatchEvent[];
+  onRename: (type: 'player' | 'coach', id: number, name: string) => void;
+  isAdmin: boolean;
+  getPlayerName: (id: number, name: string) => string;
+  getCoachName: (id: number, name: string) => string;
+}
+
 const PlayerOnPitch = ({
   player,
   onRename,
@@ -91,21 +100,7 @@ const PlayerOnPitch = ({
   );
 };
 
-export function LineupField({
-  lineup,
-  events,
-  onRename,
-  isAdmin,
-  getPlayerName,
-  getCoachName
-}: {
-  lineup?: LineupData;
-  events: MatchEvent[];
-  onRename: (type: 'player' | 'coach', id: number, name: string) => void;
-  isAdmin: boolean;
-  getPlayerName: (id: number, name: string) => string;
-  getCoachName: (id: number, name: string) => string;
-}) {
+export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, getCoachName }: LineupFieldProps) {
   if (!lineup || !lineup.startXI?.length) {
     return <div className="text-center py-6 text-muted-foreground">لا توجد تشكيلة متاحة</div>;
   }
@@ -131,21 +126,12 @@ export function LineupField({
 
   return (
     <Card className="p-3 bg-card/80">
-      <div
-        className="relative w-full aspect-[2/3] bg-cover bg-center rounded-lg overflow-hidden border border-green-500/30"
-        style={{ backgroundImage: "url('/football-pitch-vertical.svg')" }}
-      >
+      <div className="relative w-full aspect-[2/3] bg-cover bg-center rounded-lg overflow-hidden border border-green-500/30" style={{ backgroundImage: "url('/football-pitch-vertical.svg')" }}>
         <div className="absolute inset-0 flex flex-col justify-around p-3">
           {sortedRows.map((row, i) => (
             <div key={i} className="flex justify-around items-center">
               {row.map((p) => (
-                <PlayerOnPitch
-                  key={p.player.id}
-                  player={p}
-                  onRename={onRename}
-                  isAdmin={isAdmin}
-                  getPlayerName={getPlayerName}
-                />
+                <PlayerOnPitch key={p.player.id} player={p} onRename={onRename} isAdmin={isAdmin} getPlayerName={getPlayerName} />
               ))}
             </div>
           ))}
@@ -158,19 +144,12 @@ export function LineupField({
           <h4 className="text-center font-bold mb-2">المدرب</h4>
           <div className="relative">
             <Avatar className="h-16 w-16">
-              <AvatarImage src={lineup.coach.photo || (lineup.coach.id ? `https://media.api-sports.io/football/coachs/${lineup.coach.id}.png` : '')} />
+              <AvatarImage src={lineup.coach.photo} />
               <AvatarFallback>{lineup.coach.name?.charAt(0) || 'C'}</AvatarFallback>
             </Avatar>
             {isAdmin && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute -top-2 -right-2 h-6 w-6 z-10 text-white/80 hover:text-white bg-black/50 rounded-full"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRename('coach', lineup.coach.id, getCoachName(lineup.coach.id, lineup.coach.name));
-                }}
-              >
+              <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 z-10 text-white/80 hover:text-white bg-black/50 rounded-full"
+                onClick={(e) => { e.stopPropagation(); onRename('coach', lineup.coach.id, getCoachName(lineup.coach.id, lineup.coach.name)); }}>
                 <Pencil className="h-3 w-3" />
               </Button>
             )}
@@ -185,19 +164,25 @@ export function LineupField({
           <h4 className="text-center font-bold mb-3">التبديلات</h4>
           <div className="space-y-3">
             {substitutions.map((event, idx) => (
-               <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
-                 <div className="flex items-center gap-2 text-red-500">
-                   <ArrowDown className="h-4 w-4" />
-                   <span className="font-medium">{getPlayerName(event.player.id, event.player.name)}</span>
+              <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
+                 <div className="flex items-center gap-4">
+                    {/* اللاعب الخارج */}
+                    {event.player && (
+                    <div className="flex items-center gap-2 text-red-500">
+                        <ArrowDown className="h-4 w-4" />
+                        <span className="font-medium">{getPlayerName(event.player.id, event.player.name)}</span>
+                    </div>
+                    )}
+                    {/* اللاعب الداخل */}
+                    {event.assist && (
+                    <div className="flex items-center gap-2 text-green-500">
+                        <ArrowUp className="h-4 w-4" />
+                        <span className="font-medium">{getPlayerName(event.assist.id, event.assist.name)}</span>
+                    </div>
+                    )}
                  </div>
-                 <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
-                 {event.assist && event.assist.id && (
-                   <div className="flex items-center gap-2 text-green-500">
-                     <ArrowUp className="h-4 w-4" />
-                     <span className="font-medium">{getPlayerName(event.assist.id, event.assist.name)}</span>
-                   </div>
-                 )}
-               </div>
+                <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
+              </div>
             ))}
           </div>
         </div>
@@ -209,10 +194,11 @@ export function LineupField({
           <h4 className="text-center font-bold mb-2">الاحتياط</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {lineup.substitutes.map((p) => {
-              const playerNumber = p.statistics?.[0]?.games?.number || p.player.number;
-              const ratingValue = p.statistics?.[0]?.games?.rating;
-              const rating = ratingValue ? parseFloat(ratingValue).toFixed(1) : null;
-              return (
+                 const playerNumber = p.statistics?.[0]?.games?.number || p.player.number;
+                 const ratingValue = p.statistics?.[0]?.games?.rating;
+                 const rating = ratingValue ? parseFloat(ratingValue).toFixed(1) : null;
+              
+                return (
               <div key={p.player.id} className="relative flex items-center gap-3 p-2 rounded-lg border bg-background/40">
                 {isAdmin && (
                   <Button
@@ -233,14 +219,13 @@ export function LineupField({
                 </Avatar>
                 <div>
                   <span className="text-sm font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
-                  {playerNumber && <p className="text-xs text-muted-foreground">الرقم: {playerNumber}</p>}
+                   {playerNumber && <p className="text-xs text-muted-foreground">الرقم: {playerNumber}</p>}
+                  {/* تقييم البديل */}
                   {rating && (
-                    <div className="flex items-center gap-1 mt-1">
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full text-white ${
-                            parseFloat(rating) >= 7 ? 'bg-green-600' : parseFloat(rating) >= 6 ? 'bg-yellow-600' : 'bg-red-600'
-                        }`}>
-                           {rating}
-                        </span>
+                    <div className={`mt-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background ${
+                        parseFloat(rating) >= 7 ? 'bg-green-600' : parseFloat(rating) >= 6 ? 'bg-yellow-600' : 'bg-red-600'
+                      } z-10`}>
+                        {rating}
                     </div>
                   )}
                 </div>
