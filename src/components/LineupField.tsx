@@ -3,7 +3,7 @@ import React from 'react';
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Pencil, ArrowLeftRight, ArrowDown, ArrowUp } from 'lucide-react';
+import { Pencil, ArrowDown, ArrowUp } from 'lucide-react';
 import type { Player as PlayerType, Team, MatchEvent } from '@/lib/types';
 
 interface PlayerWithStats {
@@ -17,6 +17,7 @@ interface PlayerWithStats {
           captain: boolean;
           substitute: boolean;
       };
+      // Add other stats as needed
   }[];
 }
 
@@ -75,12 +76,27 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }
     return <div className="text-center py-6 text-muted-foreground">لا توجد تشكيلة متاحة</div>;
   }
 
-  const GK = lineup.startXI.filter((p) => p.player.pos === 'G');
-  const DEF = lineup.startXI.filter((p) => p.player.pos === 'D');
-  const MID = lineup.startXI.filter((p) => p.player.pos === 'M');
-  const FWD = lineup.startXI.filter((p) => p.player.pos === 'F');
+  // Group players by grid row for accurate formation display
+  const playersByRow = lineup.startXI.reduce((acc, p) => {
+    if (p.player.grid) {
+      const row = p.player.grid.split(':')[0];
+      if (!acc[row]) {
+        acc[row] = [];
+      }
+      acc[row].push(p);
+    }
+    return acc;
+  }, {} as Record<string, PlayerWithStats[]>);
 
-  const rows = [FWD, MID, DEF, GK].filter(r => r.length > 0);
+  // Sort rows numerically and then sort players within each row
+  const sortedRows = Object.keys(playersByRow)
+    .sort((a, b) => parseInt(a) - parseInt(b))
+    .map(rowKey => {
+        const row = playersByRow[rowKey];
+        row.sort((a, b) => parseInt(a.player.grid!.split(':')[1]) - parseInt(b.player.grid!.split(':')[1]));
+        return row;
+    });
+
 
   const substitutions = events.filter(e => e.type === 'subst' && e.team.id === lineup.team.id);
 
@@ -91,7 +107,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }
         style={{ backgroundImage: "url('/football-pitch-vertical.svg')" }}
       >
         <div className="absolute inset-0 flex flex-col justify-around p-3">
-          {rows.map((row, i) => (
+          {sortedRows.map((row, i) => (
             <div key={i} className="flex justify-around items-center flex-row-reverse">
               {row.map((p) => (
                 <PlayerOnPitch key={p.player.id} player={p} onRename={onRename} isAdmin={isAdmin} getPlayerName={getPlayerName} />
@@ -149,9 +165,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }
           <h4 className="text-center font-bold mb-2">الاحتياط</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {lineup.substitutes.map((p) => (
-              <div key={p.player.id} className="flex items-center gap-2 p-2 bg-background/40 rounded border">
-                <PlayerOnPitch player={p} onRename={onRename} isAdmin={isAdmin} getPlayerName={getPlayerName} />
-              </div>
+              <PlayerOnPitch key={p.player.id} player={p} onRename={onRename} isAdmin={isAdmin} getPlayerName={getPlayerName} />
             ))}
           </div>
         </div>
