@@ -294,21 +294,22 @@ const LineupField = ({
   }
 
   const goalkeeper = lineup.startXI.find((p) => p.player.pos === "G");
-  const defenders = lineup.startXI.filter((p) => p.player.pos === "D").reverse();
-  const midfielders = lineup.startXI.filter((p) => p.player.pos === "M").reverse();
-  const attackers = lineup.startXI.filter((p) => p.player.pos === "F").reverse();
+  const defenders = lineup.startXI.filter((p) => p.player.pos === "D");
+  const midfielders = lineup.startXI.filter((p) => p.player.pos === "M");
+  const attackers = lineup.startXI.filter((p) => p.player.pos === "F");
 
+  // ترتيب طبيعي من الأسفل للأعلى: حارس -> دفاع -> وسط -> هجوم
   const rows: PlayerWithStats[][] = [];
-  if (attackers.length > 0) rows.push(attackers);
-  if (midfielders.length > 0) rows.push(midfielders);
-  if (defenders.length > 0) rows.push(defenders);
   if (goalkeeper) rows.push([goalkeeper]);
+  if (defenders.length > 0) rows.push(defenders);
+  if (midfielders.length > 0) rows.push(midfielders);
+  if (attackers.length > 0) rows.push(attackers);
 
   return (
     <Card className="p-3 bg-card/80">
       <div className="relative w-full aspect-[2/3] max-h-[700px] bg-cover bg-center bg-no-repeat rounded-lg overflow-hidden border border-green-500/20"
            style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}>
-        <div className="absolute inset-0 flex flex-col-reverse justify-around p-2">
+        <div className="absolute inset-0 flex flex-col justify-around p-2">
           {rows.map((row, rowIndex) => (
             <div key={rowIndex} className="flex justify-around items-center w-full">
               {row.map((player) => (
@@ -366,6 +367,11 @@ const LineupField = ({
                     {parseFloat(player.statistics[0].games.rating).toFixed(1)}
                   </span>
                 )}
+                {player.player.number && (
+                  <span className="ml-1 text-[10px] font-bold text-white bg-gray-700 px-1 rounded">
+                    {player.player.number}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -374,6 +380,7 @@ const LineupField = ({
     </Card>
   );
 };
+
 
 const StandingsView = ({ standings, teamId }: { standings: Standing[] | null, teamId: number }) => {
     if (!standings || standings.length === 0) {
@@ -592,4 +599,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
-
