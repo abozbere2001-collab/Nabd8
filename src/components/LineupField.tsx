@@ -81,7 +81,14 @@ export function LineupField({
   isAdmin,
   getPlayerName,
   getCoachName
-}: LineupFieldProps) {
+}: {
+  lineup?: LineupData;
+  events: MatchEvent[];
+  onRename: (type: 'player' | 'coach', id: number, name: string) => void;
+  isAdmin: boolean;
+  getPlayerName: (id: number, name: string) => string;
+  getCoachName: (id: number, name: string) => string;
+}) {
   if (!lineup || !lineup.startXI?.length) {
     return <div className="text-center py-6 text-muted-foreground">لا توجد تشكيلة متاحة</div>;
   }
