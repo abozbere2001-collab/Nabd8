@@ -9,7 +9,6 @@ import { IraqScreen } from './screens/IraqScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
-import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import AdvancedMatchDetailPage from './screens/AdvancedMatchDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
 import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
