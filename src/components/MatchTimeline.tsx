@@ -15,7 +15,7 @@ const EventIcon = ({ event }: { event: MatchEventType }) => {
   return <div className="h-4 w-4" />;
 };
 
-export function MatchTimeline({ events, homeTeamId, awayTeamId, getPlayerName }: { events: MatchEventType[]; homeTeamId: number; awayTeamId: number; getPlayerName: (id: number, defaultName: string) => string; }) {
+export function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: MatchEventType[]; homeTeamId: number; getPlayerName: (id: number, defaultName: string) => string; }) {
   const [filter, setFilter] = useState<'all' | 'highlights'>('all');
 
   const sortedEvents = useMemo(() => [...events].sort((a, b) => b.time.elapsed - a.time.elapsed), [events]);

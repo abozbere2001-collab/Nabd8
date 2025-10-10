@@ -36,37 +36,24 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack }
   const defaultTab = ['NS', 'PST', 'CANC'].includes(matchStatus) ? 'info' : 'timeline';
 
   React.useEffect(() => {
-    if (!db) return;
-    const fetchCustomNames = async () => {
-        try {
-            const [playersSnap, coachesSnap] = await Promise.all([
-                getDocs(doc(db, "playerCustomizations")),
-                getDocs(doc(db, "coachCustomizations")),
-            ]);
-            const playerNames = new Map(Object.entries(playersSnap.data() || {}).map(([id, data]) => [Number(id), (data as any).customName]));
-            const coachNames = new Map(Object.entries(coachesSnap.data() || {}).map(([id, data]) => [Number(id), (data as any).customName]));
-            setCustomNames({ players: playerNames, coaches: coachNames });
-        } catch(e) {
-            // Non-admin users might not have access, so we fail silently.
-        }
-    };
+    if (!db || !isAdmin) return;
     
-    if(isAdmin) {
-        fetchCustomNames();
-        const playersUnsub = onSnapshot(doc(db, "playerCustomizations"), (doc) => {
-            const data = doc.data();
-            if(data) setCustomNames(prev => ({...prev, players: new Map(Object.entries(data).map(([id, data]) => [Number(id), (data as any).customName]))}));
-        });
-        const coachesUnsub = onSnapshot(doc(db, "coachCustomizations"), (doc) => {
-            const data = doc.data();
-            if(data) setCustomNames(prev => ({...prev, coaches: new Map(Object.entries(data).map(([id, data]) => [Number(id), (data as any).customName]))}));
-        });
+    const playersUnsub = onSnapshot(collection(db, "playerCustomizations"), (snapshot) => {
+        const playerNames = new Map<number, string>();
+        snapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
+        setCustomNames(prev => ({ ...prev, players: playerNames }));
+    });
 
-        return () => {
-          playersUnsub();
-          coachesUnsub();
-        };
-    }
+    const coachesUnsub = onSnapshot(collection(db, "coachCustomizations"), (snapshot) => {
+        const coachNames = new Map<number, string>();
+        snapshot.forEach(doc => coachNames.set(Number(doc.id), doc.data().customName));
+        setCustomNames(prev => ({ ...prev, coaches: coachNames }));
+    });
+
+    return () => {
+      playersUnsub();
+      coachesUnsub();
+    };
   }, [db, isAdmin]);
 
   const getPlayerName = React.useCallback((id: number, defaultName: string) => customNames.players.get(id) || defaultName, [customNames.players]);
