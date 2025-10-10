@@ -519,11 +519,14 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
                             </TabsContent>
                         )}
                         
-                        {availableTabs.some(t => t.value === 'events') && (
-                             <TabsContent value="events" className="mt-4">
-                               <MatchTimeline events={events} homeTeamId={fixture.teams.home.id} getPlayerName={(id, name) => getCustomName('player', id, name)} fixture={fixture} />
-                             </TabsContent>
-                        )}
+                        <TabsContent value="events" className="mt-4">
+                          <MatchTimeline
+                            events={events}
+                            fixture={fixture}
+                            homeTeamId={fixture.teams.home.id}
+                            getPlayerName={(id, name) => getCustomName('player', id, name)}
+                          />
+                        </TabsContent>
 
                         {availableTabs.some(t => t.value === 'stats') && (
                              <TabsContent value="stats" className="mt-4">
@@ -546,3 +549,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
+
