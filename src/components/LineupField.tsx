@@ -36,7 +36,7 @@ export function LineupField({
   }, {} as Record<number, PlayerWithStats[]>);
 
   const sortedRows = Object.keys(playersByRow)
-    .sort((a, b) => parseInt(b) - parseInt(a))
+    .sort((a, b) => parseInt(a) - parseInt(b))
     .map(rowKey => {
       const row = playersByRow[Number(rowKey)];
       row.sort((a, b) => {
@@ -56,6 +56,10 @@ export function LineupField({
 
   return (
     <Card className="p-3 bg-card/80">
+      <div className="flex items-center justify-center gap-2 mb-2">
+          <Avatar className="w-8 h-8"><AvatarImage src={lineup.team.logo} /></Avatar>
+          <h3 className="font-bold">{lineup.team.name}</h3>
+      </div>
       <div
         className="relative w-full aspect-[2/3] bg-cover bg-center rounded-lg overflow-hidden border border-green-500/30"
         style={{ backgroundImage: "url('/football-pitch-vertical.svg')" }}
@@ -77,7 +81,6 @@ export function LineupField({
         </div>
       </div>
 
-      {/* المدرب */}
       {lineup.coach && (
         <div className="mt-4 pt-4 border-t border-border flex flex-col items-center gap-2">
           <h4 className="text-center font-bold mb-2">المدرب</h4>
@@ -104,7 +107,6 @@ export function LineupField({
         </div>
       )}
 
-      {/* التبديلات */}
       {substitutions.length > 0 && (
         <div className="mt-4 pt-4 border-t border-border">
           <h4 className="text-center font-bold mb-3">التبديلات</h4>
@@ -120,30 +122,27 @@ export function LineupField({
               return (
                 <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
                   
-                  {/* اللاعب الخارج (playerOut) باللون الأحمر والسهم للأسفل */}
-                  <div className="flex items-center gap-2 text-red-500 w-2/5">
+                   <div className="flex items-center gap-2 text-red-500 w-2/5">
                     <ArrowDown className="h-4 w-4" />
                     <span className="font-medium truncate">{playerOutName}</span>
                   </div>
 
-                  {/* توقيت التبديل */}
                   <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
 
-                  {/* اللاعب الداخل (playerIn) باللون الأخضر والسهم للأعلى */}
-                  <div className="flex items-center gap-2 text-green-500 justify-end w-2/5">
-                      <div className="text-right">
-                         <span className="font-medium block truncate">{playerInName}</span>
-                         {playerInRating && (
-                             <span className="text-xs text-primary font-bold">
-                                 {parseFloat(playerInRating).toFixed(1)}
-                             </span>
-                         )}
-                      </div>
-                      <Avatar className="h-8 w-8">
-                          <AvatarImage src={playerIn?.player.photo} />
-                      </Avatar>
-                      <ArrowUp className="h-4 w-4" />
-                  </div>
+                    <div className="flex items-center gap-2 text-green-500 justify-end w-2/5">
+                        <div className="text-right">
+                           <span className="font-medium block truncate">{playerInName}</span>
+                           {playerInRating && (
+                               <span className="text-xs text-primary font-bold">
+                                   {parseFloat(playerInRating).toFixed(1)}
+                               </span>
+                           )}
+                        </div>
+                        <Avatar className="h-8 w-8">
+                            <AvatarImage src={playerIn?.player.photo} />
+                        </Avatar>
+                        <ArrowUp className="h-4 w-4" />
+                    </div>
                 </div>
               );
             })}
@@ -151,12 +150,10 @@ export function LineupField({
         </div>
       )}
       
-
-      {/* الاحتياط */}
       {lineup.substitutes?.length > 0 && (
         <div className="mt-4 border-t border-border pt-4">
           <h4 className="text-center font-bold mb-2">الاحتياط</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             {lineup.substitutes.map((p) => {
               if (!p) return null;
               return (

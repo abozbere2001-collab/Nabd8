@@ -19,6 +19,7 @@ const STATS_TRANSLATIONS: Record<string, string> = {
   "Total passes": "إجمالي التمريرات",
   "Passes accurate": "تمريرات صحيحة",
   "Passes %": "دقة التمرير",
+  "expected_goals": "الأهداف المتوقعة"
 };
 
 const getTranslatedStat = (type: string) => STATS_TRANSLATIONS[type] || type;
@@ -34,11 +35,19 @@ export function MatchStatistics({ homeStats, awayStats }: { homeStats?: any[], a
         <div className="space-y-4 bg-card p-4 rounded-lg border">
             {combinedStats.map(stat => {
                 const awayStat = awayStats.find(s => s.type === stat.type);
-                const homeValue = stat.value === null ? 0 : typeof stat.value === 'string' ? parseInt(stat.value.replace('%', '')) : stat.value;
-                const awayValue = awayStat?.value === null ? 0 : typeof awayStat?.value === 'string' ? parseInt(awayStat.value.replace('%', '')) : awayStat?.value;
                 
-                const total = homeValue + awayValue;
-                const homePercentage = total > 0 ? (homeValue / total) * 100 : 50;
+                let homeValueNum, awayValueNum;
+
+                if(typeof stat.value === 'string' && stat.value.includes('%')) {
+                    homeValueNum = parseInt(stat.value.replace('%', ''));
+                    awayValueNum = awayStat ? parseInt(String(awayStat.value).replace('%', '')) : 0;
+                } else {
+                    homeValueNum = Number(stat.value) || 0;
+                    awayValueNum = awayStat ? (Number(awayStat.value) || 0) : 0;
+                }
+                
+                const total = homeValueNum + awayValueNum;
+                const homePercentage = total > 0 ? (homeValueNum / total) * 100 : 50;
 
                 return (
                     <div key={stat.type} className="space-y-1">
@@ -48,8 +57,8 @@ export function MatchStatistics({ homeStats, awayStats }: { homeStats?: any[], a
                             <span>{awayStat?.value ?? 0}</span>
                         </div>
                         <div className="flex items-center gap-2" dir="ltr">
-                           <Progress value={homePercentage} className="h-2 flex-1 rotate-180" />
-                           <Progress value={100 - homePercentage} className="h-2 flex-1 rotate-180" />
+                           <Progress value={homePercentage} className="h-2 flex-1" indicatorClassName="bg-primary" />
+                           <Progress value={100 - homePercentage} className="h-2 flex-1 rotate-180" indicatorClassName="bg-destructive" />
                         </div>
                     </div>
                 );
