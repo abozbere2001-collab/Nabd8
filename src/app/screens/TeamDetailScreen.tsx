@@ -446,7 +446,12 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId, headerAc
                             {standings && standings.length > 0 ? (
                                 <Table>
                                     <TableHeader><TableRow>
-                                        <TableHead className="text-center">ن</TableHead><TableHead className="text-center">خ</TableHead><TableHead className="text-center">ت</TableHead><TableHead className="text-center">ف</TableHead><TableHead className="text-center">ل</TableHead><TableHead className="w-1/2 text-right">الفريق</TableHead>
+                                        <TableHead className="text-center">ن</TableHead>
+                                        <TableHead className="text-center">خ</TableHead>
+                                        <TableHead className="text-center">ت</TableHead>
+                                        <TableHead className="text-center">ف</TableHead>
+                                        <TableHead className="text-center">ل</TableHead>
+                                        <TableHead className="w-1/2 text-right">الفريق</TableHead>
                                     </TableRow></TableHeader>
                                     <TableBody>
                                     {standings.map((s) => (

@@ -316,29 +316,29 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-card">
-                                <th className="p-2 text-right">الفريق</th>
-                                <th className="p-2 text-center">ل</th>
-                                <th className="p-2 text-center">ف</th>
-                                <th className="p-2 text-center">ت</th>
-                                <th className="p-2 text-center">خ</th>
                                 <th className="p-2 text-center">ن</th>
+                                <th className="p-2 text-center">خ</th>
+                                <th className="p-2 text-center">ت</th>
+                                <th className="p-2 text-center">ف</th>
+                                <th className="p-2 text-center">ل</th>
+                                <th className="p-2 text-right">الفريق</th>
                             </tr>
                         </thead>
                         <tbody>
                         {standings.map((s) => (
                             <tr key={s.team.id} className={cn("border-b border-border", s.team.id === homeTeamId || s.team.id === awayTeamId ? 'bg-primary/10' : '')}>
+                                <td className="p-2 text-center font-bold">{s.points}</td>
+                                <td className="p-2 text-center">{s.all.lose}</td>
+                                <td className="p-2 text-center">{s.all.draw}</td>
+                                <td className="p-2 text-center">{s.all.win}</td>
+                                <td className="p-2 text-center">{s.all.played}</td>
                                 <td className="p-2">
-                                    <div className="flex items-center gap-2">
-                                        <span>{s.rank}</span>
-                                        <img src={s.team.logo} className="h-5 w-5" alt={s.team.name} />
+                                    <div className="flex items-center gap-2 justify-end">
                                         <span>{getDisplayName('team', s.team.id, s.team.name)}</span>
+                                        <img src={s.team.logo} className="h-5 w-5" alt={s.team.name} />
+                                        <span>{s.rank}</span>
                                     </div>
                                 </td>
-                                <td className="p-2 text-center">{s.all.played}</td>
-                                <td className="p-2 text-center">{s.all.win}</td>
-                                <td className="p-2 text-center">{s.all.draw}</td>
-                                <td className="p-2 text-center">{s.all.lose}</td>
-                                <td className="p-2 text-center font-bold">{s.points}</td>
                             </tr>
                         ))}
                         </tbody>

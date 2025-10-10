@@ -188,32 +188,32 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-1/2 text-right">الفريق</TableHead>
-                            <TableHead className="text-center">لعب</TableHead>
-                            <TableHead className="text-center">ف</TableHead>
-                            <TableHead className="text-center">ت</TableHead>
-                            <TableHead className="text-center">خ</TableHead>
                             <TableHead className="text-center">نقاط</TableHead>
+                            <TableHead className="text-center">خ</TableHead>
+                            <TableHead className="text-center">ت</TableHead>
+                            <TableHead className="text-center">ف</TableHead>
+                            <TableHead className="text-center">لعب</TableHead>
+                            <TableHead className="w-1/2 text-right">الفريق</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {standings.map((s) => (
                             <TableRow key={`${s.rank}-${s.team.id}`} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
+                                <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                <TableCell className="text-center">{s.all.lose}</TableCell>
+                                <TableCell className="text-center">{s.all.draw}</TableCell>
+                                <TableCell className="text-center">{s.all.win}</TableCell>
+                                <TableCell className="text-center">{s.all.played}</TableCell>
                                 <TableCell className="font-medium">
-                                    <div className="flex items-center gap-2">
-                                        <span>{s.rank}</span>
+                                    <div className="flex items-center gap-2 justify-end">
+                                        <span className="truncate">{s.team.name}</span>
                                         <Avatar className="h-6 w-6">
                                             <AvatarImage src={s.team.logo} alt={s.team.name} />
                                             <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
                                         </Avatar>
-                                        <span className="truncate">{s.team.name}</span>
+                                        <span>{s.rank}</span>
                                     </div>
                                 </TableCell>
-                                <TableCell className="text-center">{s.all.played}</TableCell>
-                                <TableCell className="text-center">{s.all.win}</TableCell>
-                                <TableCell className="text-center">{s.all.draw}</TableCell>
-                                <TableCell className="text-center">{s.all.lose}</TableCell>
-                                <TableCell className="text-center font-bold">{s.points}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -237,27 +237,27 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                             <TableHead className="text-right">اللاعب</TableHead>
+                             <TableHead className="text-center">الأهداف</TableHead>
                              <TableHead className="text-right">الفريق</TableHead>
-                            <TableHead className="text-center">الأهداف</TableHead>
+                             <TableHead className="text-right">اللاعب</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {topScorers.map((scorer) => (
                             <TableRow key={scorer.rank}>
+                                <TableCell className="text-center font-bold text-lg">{scorer.goals}</TableCell>
                                 <TableCell>
-                                    <div className="flex items-center gap-3">
+                                     <p className="text-xs text-muted-foreground text-right">{scorer.teamName}</p>
+                                </TableCell>
+                                <TableCell>
+                                    <div className="flex items-center gap-3 justify-end">
+                                        <p className="font-semibold">{scorer.playerName}</p>
                                         <Avatar className="h-8 w-8">
                                             <AvatarImage src={scorer.playerPhoto} />
                                             <AvatarFallback>{scorer.playerName.charAt(0)}</AvatarFallback>
                                         </Avatar>
-                                        <p className="font-semibold">{scorer.playerName}</p>
                                     </div>
                                 </TableCell>
-                                <TableCell>
-                                     <p className="text-xs text-muted-foreground text-right">{scorer.teamName}</p>
-                                </TableCell>
-                                <TableCell className="text-center font-bold text-lg">{scorer.goals}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

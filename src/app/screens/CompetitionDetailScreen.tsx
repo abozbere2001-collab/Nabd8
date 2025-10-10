@@ -451,39 +451,18 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="text-right w-1/2">الفريق</TableHead>
-                            <TableHead className="text-center">لعب</TableHead>
-                            <TableHead className="text-center">ف</TableHead>
-                            <TableHead className="text-center">ت</TableHead>
-                            <TableHead className="text-center">خ</TableHead>
+                            <TableHead className="w-[120px] text-right"></TableHead>
                             <TableHead className="text-center">نقاط</TableHead>
-                            <TableHead className="text-left w-[120px]"></TableHead>
+                            <TableHead className="text-center">خ</TableHead>
+                            <TableHead className="text-center">ت</TableHead>
+                            <TableHead className="text-center">ف</TableHead>
+                            <TableHead className="text-center">لعب</TableHead>
+                            <TableHead className="text-right w-1/2">الفريق</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {standings.map((s) => (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                                <TableCell className="font-medium">
-                                    <div className="flex items-center gap-2 justify-end">
-                                        <span>{s.rank}</span>
-                                         <div className="relative">
-                                            <Avatar className="h-6 w-6">
-                                                <AvatarImage src={s.team.logo} alt={s.team.name} />
-                                                <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
-                                            </Avatar>
-                                            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(s.team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
-                                        </div>
-                                        <p className="truncate">
-                                            {getDisplayName('team', s.team.id, s.team.name)}
-                                            {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {s.team.id})</span>}
-                                        </p>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-center">{s.all.played}</TableCell>
-                                <TableCell className="text-center">{s.all.win}</TableCell>
-                                <TableCell className="text-center">{s.all.draw}</TableCell>
-                                <TableCell className="text-center">{s.all.lose}</TableCell>
-                                <TableCell className="text-center font-bold">{s.points}</TableCell>
                                 <TableCell onClick={e => e.stopPropagation()}>
                                      <div className='flex items-center justify-start opacity-80'>
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('team', s.team.id, getDisplayName('team', s.team.id, s.team.name))}>
@@ -496,6 +475,28 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             <Heart className="h-4 w-4 text-muted-foreground" />
                                         </Button>}
                                      </div>
+                                </TableCell>
+                                <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                <TableCell className="text-center">{s.all.lose}</TableCell>
+                                <TableCell className="text-center">{s.all.draw}</TableCell>
+                                <TableCell className="text-center">{s.all.win}</TableCell>
+                                <TableCell className="text-center">{s.all.played}</TableCell>
+                                <TableCell className="font-medium">
+                                    <div className="flex items-center gap-2 justify-end">
+                                        
+                                        <p className="truncate">
+                                            {getDisplayName('team', s.team.id, s.team.name)}
+                                            {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {s.team.id})</span>}
+                                        </p>
+                                        <div className="relative">
+                                            <Avatar className="h-6 w-6">
+                                                <AvatarImage src={s.team.logo} alt={s.team.name} />
+                                                <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
+                                            </Avatar>
+                                            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(s.team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                                        </div>
+                                        <span>{s.rank}</span>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
