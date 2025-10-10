@@ -6,19 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Pencil, ArrowUp, ArrowDown } from 'lucide-react';
 import type { Player as PlayerType, Team, MatchEvent, PlayerStats } from '@/lib/types';
 
-
-interface LineupData {
-  team: Team;
-  coach: any;
-  formation: string;
-  startXI: PlayerStats[];
-  substitutes: PlayerStats[];
-}
-
 const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: PlayerStats; onRename: (type: 'player', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; }) => {
-  const { player: p } = player;
+  const { player: p, statistics } = player;
   const displayName = getPlayerName(p.id, p.name);
-  const gameStats = player.statistics && player.statistics.length > 0 ? player.statistics[0].games : null;
+  const gameStats = statistics && statistics.length > 0 ? statistics[0].games : null;
   const rating = gameStats?.rating ? parseFloat(gameStats.rating).toFixed(1) : null;
   const playerNumber = gameStats?.number || p.number;
 
@@ -57,20 +48,20 @@ const PlayerOnPitch = ({ player, onRename, isAdmin, getPlayerName }: { player: P
   );
 };
 
-export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, getCoachName }: { lineup?: LineupData; events: MatchEvent[]; onRename: (type: 'player' | 'coach', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; getCoachName: (id: number, name: string) => string; }) {
+export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, getCoachName }: { lineup?: any; events: MatchEvent[]; onRename: (type: 'player' | 'coach', id: number, name: string) => void; isAdmin: boolean; getPlayerName: (id: number, name: string) => string; getCoachName: (id: number, name: string) => string; }) {
   if (!lineup || !lineup.startXI || lineup.startXI.length === 0) {
     return <div className="text-center py-6 text-muted-foreground">لا توجد تشكيلة متاحة</div>;
   }
 
   // ترتيب اللاعبين من الأسفل للأعلى: الحارس -> الدفاع -> الوسط -> الهجوم
-  const playersByRow = lineup.startXI.reduce((acc, p) => {
+  const playersByRow = lineup.startXI.reduce((acc: Record<string, PlayerStats[]>, p: PlayerStats) => {
     if (p.player.grid) {
       const row = p.player.grid.split(':')[0];
       if (!acc[row]) acc[row] = [];
       acc[row].push(p);
     }
     return acc;
-  }, {} as Record<string, PlayerStats[]>);
+  }, {});
 
   const sortedRows = Object.keys(playersByRow)
     .sort((a, b) => parseInt(b, 10) - parseInt(a, 10)) // يبدأ من الحارس في الأسفل
@@ -130,19 +121,15 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
           <div className="space-y-3">
             {substitutions.map((event, idx) => (
               <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
-                {/* ✅ اللاعب الخارج */}
-                <div className="flex items-center gap-2 text-red-500 w-[45%]">
-                    <ArrowDown className="h-4 w-4" />
-                    <span className="font-medium">{getPlayerName(event.player.id, event.player.name)}</span>
-                  </div>
-
-                <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
-                
-                {/* ✅ اللاعب الداخل */}
+                 <div className="flex items-center gap-2 text-red-500 w-[45%]">
+                     <ArrowDown className="h-4 w-4" />
+                     <span className="font-medium">{getPlayerName(event.player.id, event.player.name)}</span>
+                 </div>
+                 <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
                  <div className="flex items-center gap-2 text-green-500 w-[45%] justify-end">
-                    <span className="font-medium">{getPlayerName(event.assist.id!, event.assist.name!)}</span>
-                    <ArrowUp className="h-4 w-4" />
-                  </div>
+                     {event.assist?.id && <span className="font-medium">{getPlayerName(event.assist.id, event.assist.name!)}</span>}
+                     <ArrowUp className="h-4 w-4" />
+                 </div>
               </div>
             ))}
           </div>
@@ -154,7 +141,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
         <div className="mt-4 border-t border-border pt-4">
           <h4 className="text-center font-bold mb-2">الاحتياط</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {lineup.substitutes.map((p) => (
+            {lineup.substitutes.map((p: PlayerStats) => (
               <div key={p.player.id} className="relative flex items-center gap-3 p-2 rounded-lg border bg-background/40">
                 {isAdmin && (
                   <Button
@@ -171,7 +158,7 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName, 
                 </Avatar>
                 <div>
                   <span className="text-sm font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
-                  {(p.statistics?.[0]?.games?.number || p.player.number) && <p className="text-xs text-muted-foreground">الرقم: {p.statistics[0].games.number || p.player.number}</p>}
+                  {(p.statistics?.[0]?.games?.number || p.player.number) && <p className="text-xs text-muted-foreground">الرقم: {p.statistics?.[0]?.games?.number || p.player.number}</p>}
                 </div>
               </div>
             ))}
