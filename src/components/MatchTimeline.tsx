@@ -32,7 +32,7 @@ export function MatchTimeline({ events, homeTeamId, awayTeamId, getPlayerName }:
     return <p className="text-center text-muted-foreground p-4">لا توجد مجريات متاحة لهذه المباراة.</p>;
   }
   
-  const renderEventDetails = (event: MatchEventType) => {
+  const renderHomeEventDetails = (event: MatchEventType) => {
     if (event.type === 'subst') {
         return (
             <div className="flex flex-col text-right">
@@ -97,10 +97,10 @@ export function MatchTimeline({ events, homeTeamId, awayTeamId, getPlayerName }:
             {filteredEvents.map((event, idx) => {
                 const isHomeEvent = event.team.id === homeTeamId;
                 
-                const eventContent = (
+                const homeEventContent = (
                     <div className="flex items-center gap-2 w-44">
                         <EventIcon event={event} />
-                        {renderEventDetails(event)}
+                        {renderHomeEventDetails(event)}
                     </div>
                 );
 
@@ -128,7 +128,7 @@ export function MatchTimeline({ events, homeTeamId, awayTeamId, getPlayerName }:
                        
                        {/* Home team event (right side) */}
                         <div className="w-1/2 flex justify-end pr-4">
-                           {isHomeEvent && eventContent}
+                           {isHomeEvent && homeEventContent}
                         </div>
                     </div>
                 );
