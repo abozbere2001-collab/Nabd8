@@ -18,7 +18,7 @@ const EventIcon = ({ event }: { event: MatchEventType }) => {
 export function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: MatchEventType[]; homeTeamId: number; getPlayerName: (id: number, defaultName: string) => string; }) {
   const [filter, setFilter] = useState<'all' | 'highlights'>('all');
 
-  const sortedEvents = useMemo(() => [...events].sort((a, b) => a.time.elapsed - b.time.elapsed), [events]);
+  const sortedEvents = useMemo(() => [...events].sort((a, b) => b.time.elapsed - a.time.elapsed), [events]);
   
   const filteredEvents = useMemo(() => {
     if (filter === 'highlights') {
@@ -39,7 +39,7 @@ export function MatchTimeline({ events, homeTeamId, getPlayerName }: { events: M
             <TabsTrigger value="highlights">الأبرز</TabsTrigger>
             </TabsList>
         </Tabs>
-        <div className="relative flex flex-col-reverse p-4">
+        <div className="relative flex flex-col p-4">
             {/* The vertical line */}
             <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
             

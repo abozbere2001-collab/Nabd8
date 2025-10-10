@@ -88,11 +88,12 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }
     return acc;
   }, {} as Record<string, PlayerWithStats[]>);
 
-  // Sort rows numerically and then sort players within each row
+  // Sort rows numerically (desc for GK at bottom) and then players within each row (asc for L->R)
   const sortedRows = Object.keys(playersByRow)
-    .sort((a, b) => parseInt(a) - parseInt(b))
+    .sort((a, b) => parseInt(b) - parseInt(a)) // Sort rows descending
     .map(rowKey => {
         const row = playersByRow[rowKey];
+        // Sort players ascending to fix the horizontal flip
         row.sort((a, b) => parseInt(a.player.grid!.split(':')[1]) - parseInt(b.player.grid!.split(':')[1]));
         return row;
     });
@@ -165,7 +166,22 @@ export function LineupField({ lineup, events, onRename, isAdmin, getPlayerName }
           <h4 className="text-center font-bold mb-2">الاحتياط</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {lineup.substitutes.map((p) => (
-              <PlayerOnPitch key={p.player.id} player={p} onRename={onRename} isAdmin={isAdmin} getPlayerName={getPlayerName} />
+              <div key={p.player.id} className="relative flex flex-col items-center gap-1 text-center p-2 rounded-lg border bg-background/40">
+                   {isAdmin && (
+                    <Button
+                        variant="ghost" size="icon"
+                        className="absolute top-0 right-0 h-7 w-7 z-10"
+                        onClick={(e) => { e.stopPropagation(); onRename('player', p.player.id, getPlayerName(p.player.id, p.player.name)); }}
+                    >
+                        <Pencil className="h-4 w-4" />
+                    </Button>
+                    )}
+                  <Avatar className="h-10 w-10">
+                      <AvatarImage src={p.player.photo} />
+                      <AvatarFallback>{p.player.name?.charAt(0) || '?'}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
+              </div>
             ))}
           </div>
         </div>

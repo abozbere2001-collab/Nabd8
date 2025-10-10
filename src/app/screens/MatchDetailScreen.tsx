@@ -54,7 +54,7 @@ interface MatchDataHook {
   stats: any[];
   standings: Standing[];
   h2h: H2HData[];
-  players: PlayerType[];
+  players: PlayerWithStats[];
   loading: boolean;
   error: string | null;
 }
@@ -86,7 +86,7 @@ function useMatchData(fixture?: FixtureType): MatchDataHook {
           fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/headtohead?h2h=${teamIds}`),
-          fetch(`/api/football/players?fixture=${fixtureId}`), // Fetch players by fixture
+          fetch(`/api/football/players?fixture=${fixtureId}`),
           fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
         ]);
         
@@ -97,31 +97,12 @@ function useMatchData(fixture?: FixtureType): MatchDataHook {
         const playersData = playersRes.ok ? (await playersRes.json()).response || [] : [];
         const standingsData = standingsRes.ok ? (await standingsRes.json()).response[0]?.league?.standings[0] || [] : [];
         
-        // Merge player stats into lineups
-        const enrichedLineups = lineupsData.map((lineup: LineupData) => {
-            const teamPlayers = playersData.find((p: any) => p.team.id === lineup.team.id)?.players || [];
-            const mergeStats = (playerList: PlayerWithStats[]) => {
-                return playerList.map(p => {
-                    const playerStats = teamPlayers.find((tp: any) => tp.player.id === p.player.id);
-                    if (playerStats) {
-                        return { ...p, statistics: playerStats.statistics };
-                    }
-                    return p;
-                });
-            };
-            return {
-                ...lineup,
-                startXI: mergeStats(lineup.startXI),
-                substitutes: mergeStats(lineup.substitutes),
-            };
-        });
-
         setData({ 
-            lineups: enrichedLineups, 
+            lineups: lineupsData, 
             events: eventsData, 
             stats: statsData, 
             h2h: h2hData,
-            players: playersData.map((p: any) => p.player),
+            players: playersData,
             standings: standingsData, 
             loading: false, 
             error: null 
@@ -213,8 +194,8 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
   const homeStats = useMemo(() => stats.find(s => s.team.id === homeTeamId)?.statistics, [stats, homeTeamId]);
   const awayStats = useMemo(() => stats.find(s => s.team.id === awayTeamId)?.statistics, [stats, awayTeamId]);
   
-  const homePlayers = useMemo(() => players.filter(p => homeLineup?.startXI.some(s => s.player.id === p.id) || homeLineup?.substitutes.some(s => s.player.id === p.id)), [players, homeLineup]);
-  const awayPlayers = useMemo(() => players.filter(p => awayLineup?.startXI.some(s => s.player.id === p.id) || awayLineup?.substitutes.some(s => s.player.id === p.id)), [players, awayLineup]);
+  const homePlayers = useMemo(() => players.filter(p => p.team.id === homeTeamId), [players, homeTeamId]);
+  const awayPlayers = useMemo(() => players.filter(p => p.team.id === awayTeamId), [players, awayTeamId]);
 
   const h2hStats = useMemo(() => {
     const total = h2h.length;
@@ -358,9 +339,8 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
                 <MatchStatistics homeStats={homeStats} awayStats={awayStats} />
             </TabsContent>
             
-            <TabsContent value="players" className="p-4">
+            <TabsContent value="players" className="p-4 space-y-4">
                  <PlayerStats players={homePlayers} title={`أرقام لاعبي ${getDisplayName('team', homeTeamId, initialFixture.teams.home.name)}`} />
-                 <div className="my-4" />
                  <PlayerStats players={awayPlayers} title={`أرقام لاعبي ${getDisplayName('team', awayTeamId, initialFixture.teams.away.name)}`} />
             </TabsContent>
 
