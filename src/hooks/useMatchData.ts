@@ -38,16 +38,17 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
       try {
         const fixtureId = fixture.fixture.id;
         const leagueId = fixture.league.id;
-        const teamIds = `${fixture.teams.home.id}-${fixture.teams.away.id}`;
+        const homeTeamId = fixture.teams.home.id;
+        const awayTeamId = fixture.teams.away.id;
+        const teamIds = `${homeTeamId}-${awayTeamId}`;
 
-        const [lineupsRes, eventsRes, statsRes, h2hRes, standingsRes, homePlayersRes, awayPlayersRes] = await Promise.all([
+        // 1. Fetch primary data in parallel
+        const [lineupsRes, eventsRes, statsRes, h2hRes, standingsRes] = await Promise.all([
           fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/headtohead?h2h=${teamIds}`),
           fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
-          fetch(`/api/football/players?team=${fixture.teams.home.id}&season=${CURRENT_SEASON}`),
-          fetch(`/api/football/players?team=${fixture.teams.away.id}&season=${CURRENT_SEASON}`),
         ]);
         
         const lineupsDataRaw = lineupsRes.ok ? (await lineupsRes.json()).response || [] : [];
@@ -56,23 +57,40 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
         const h2hData = h2hRes.ok ? (await h2hRes.json()).response || [] : [];
         const standingsData = standingsRes.ok ? (await standingsRes.json()).response[0]?.league?.standings[0] || [] : [];
         
-        const homePlayersData = homePlayersRes.ok ? (await homePlayersRes.json()).response || [] : [];
-        const awayPlayersData = awayPlayersRes.ok ? (await awayPlayersRes.json()).response || [] : [];
+        // 2. Collect all player IDs from lineups
+        const allPlayerIds = new Set<number>();
+        lineupsDataRaw.forEach((lineup: LineupData) => {
+            lineup.startXI.forEach(p => p.player.id && allPlayerIds.add(p.player.id));
+            lineup.substitutes.forEach(p => p.player.id && allPlayerIds.add(p.player.id));
+        });
 
-        const allPlayersData = [...homePlayersData, ...awayPlayersData];
+        // 3. Fetch full player data for both teams
+        let allPlayersData: PlayerStats[] = [];
+        if (allPlayerIds.size > 0) {
+            const [homePlayersRes, awayPlayersRes] = await Promise.all([
+                fetch(`/api/football/players?team=${homeTeamId}&season=${CURRENT_SEASON}`),
+                fetch(`/api/football/players?team=${awayTeamId}&season=${CURRENT_SEASON}`),
+            ]);
+            const homePlayers = homePlayersRes.ok ? (await homePlayersRes.json()).response || [] : [];
+            const awayPlayers = awayPlayersRes.ok ? (await awayPlayersRes.json()).response || [] : [];
+            allPlayersData = [...homePlayers, ...awayPlayers];
+        }
+
+        // 4. Create a map of full player details
         const playerDetailsMap = new Map<number, PlayerStats>();
         allPlayersData.forEach(p => {
           playerDetailsMap.set(p.player.id, p);
         });
 
+        // 5. Enrich lineup data with full player details
         const enrichedLineups = lineupsDataRaw.map((lineup: LineupData) => {
           const enrich = (players: PlayerStats[]) => players.map(p => {
             const details = playerDetailsMap.get(p.player.id);
+            // The lineup data from the API is minimal, we enrich it with data from the /players endpoint
             return {
-              ...p,
               player: {
                 ...p.player,
-                photo: details?.player.photo || p.player.photo || "https://media.api-sports.io/football/players/0.png"
+                photo: details?.player.photo || p.player.photo || "https://media.api-sports.io/football/players/0.png",
               },
               statistics: details?.statistics || p.statistics,
             };
