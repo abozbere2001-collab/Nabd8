@@ -19,14 +19,15 @@ interface PlayerWithStats {
 interface LineupData {
   startXI: PlayerWithStats[];
   substitutes: PlayerWithStats[];
-  coach?: { name: string; photo?: string };
+  coach?: { id: number; name: string; photo?: string };
 }
 
 interface LineupFieldProps {
   lineup: LineupData;
-  onRename: (id: number, name: string) => void;
+  onRename: (type: 'player' | 'coach', id: number, name: string) => void;
   isAdmin: boolean;
   getPlayerName: (id: number, defaultName: string) => string;
+  getCoachName: (id: number, defaultName: string) => string;
 }
 
 const PlayerOnPitch = ({
@@ -36,7 +37,7 @@ const PlayerOnPitch = ({
   getPlayerName,
 }: {
   player: PlayerWithStats;
-  onRename: (id: number, name: string) => void;
+  onRename: (type: 'player' | 'coach', id: number, name: string) => void;
   isAdmin: boolean;
   getPlayerName: (id: number, defaultName: string) => string;
 }) => {
@@ -53,7 +54,7 @@ const PlayerOnPitch = ({
           variant="ghost"
           size="icon"
           className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50"
-          onClick={() => onRename(p.id, displayName)}
+          onClick={() => onRename('player', p.id, displayName)}
         >
           <Pencil className="h-3 w-3" />
         </Button>
@@ -86,6 +87,7 @@ export const LineupField = ({
   onRename,
   isAdmin,
   getPlayerName,
+  getCoachName,
 }: LineupFieldProps) => {
   if (!lineup || lineup.startXI.length === 0) {
     return (
@@ -114,7 +116,7 @@ export const LineupField = ({
         style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}
       >
         <div className="absolute inset-0 flex flex-col justify-around p-2">
-          {rows.map((row, rowIndex) => (
+          {rows.reverse().map((row, rowIndex) => (
             <div key={rowIndex} className="flex justify-around items-center w-full">
               {row.map((player) => (
                 <PlayerOnPitch
@@ -133,12 +135,22 @@ export const LineupField = ({
       {lineup.coach && (
         <div className="mt-4 pt-4 border-t border-border">
           <h4 className="font-bold text-center mb-2">المدرب</h4>
-          <div className="flex flex-col items-center gap-2">
+          <div className="relative flex flex-col items-center gap-2">
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute -top-2 right-1/2 translate-x-[80px] h-6 w-6 z-20"
+                onClick={() => onRename('coach', lineup.coach!.id, getCoachName(lineup.coach!.id, lineup.coach!.name))}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
             <Avatar className="h-16 w-16">
               <AvatarImage src={lineup.coach.photo} alt={lineup.coach.name} />
               <AvatarFallback>{lineup.coach.name ? lineup.coach.name.charAt(0) : "C"}</AvatarFallback>
             </Avatar>
-            <span className="font-semibold">{lineup.coach.name}</span>
+            <span className="font-semibold">{getCoachName(lineup.coach.id, lineup.coach.name)}</span>
           </div>
         </div>
       )}
@@ -147,9 +159,9 @@ export const LineupField = ({
         <div className="mt-4 pt-4 border-t border-border">
           <h4 className="font-bold text-center mb-3">الاحتياط</h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {lineup.substitutes.map((player) => (
+            {lineup.substitutes.map((p) => (
               <div
-                key={player.player.id}
+                key={p.player.id}
                 className="relative flex flex-col items-center gap-1 p-2 rounded-lg bg-background/50 border"
               >
                 {isAdmin && (
@@ -157,28 +169,26 @@ export const LineupField = ({
                     variant="ghost"
                     size="icon"
                     className="absolute top-0 right-0 h-6 w-6 z-10"
-                    onClick={() =>
-                      onRename(player.player.id, getPlayerName(player.player.id, player.player.name))
-                    }
+                    onClick={() => onRename('player', p.player.id, getPlayerName(p.player.id, p.player.name))}
                   >
                     <Pencil className="h-3 w-3" />
                   </Button>
                 )}
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src={player.player.photo} alt={player.player.name} />
-                  <AvatarFallback>{player.player.name ? player.player.name.charAt(0) : "?"}</AvatarFallback>
+                  <AvatarImage src={p.player.photo} alt={p.player.name} />
+                  <AvatarFallback>{p.player.name ? p.player.name.charAt(0) : "?"}</AvatarFallback>
                 </Avatar>
                 <span className="text-xs font-medium truncate">
-                  {getPlayerName(player.player.id, player.player.name)}
+                  {getPlayerName(p.player.id, p.player.name)}
                 </span>
-                {player.statistics?.[0]?.games?.rating && (
+                {p.statistics?.[0]?.games?.rating && (
                   <span className="mt-0.5 text-[10px] font-bold text-blue-600">
-                    {parseFloat(player.statistics[0].games.rating).toFixed(1)}
+                    {parseFloat(p.statistics[0].games.rating).toFixed(1)}
                   </span>
                 )}
-                {player.player.number && (
+                {p.player.number && (
                   <span className="mt-0.5 text-[10px] font-bold text-white bg-gray-700 px-1 rounded">
-                    {player.player.number}
+                    {p.player.number}
                   </span>
                 )}
               </div>

@@ -1,110 +1,88 @@
 "use client";
-import React, { useState, useMemo } from "react";
-import { motion } from "framer-motion";
-import { FaFutbol, FaArrowsRotate, FaExclamation } from "react-icons/fa6";
-import { IoSquare } from "react-icons/io5";
+import React, { useState, useMemo } from 'react';
+import { Card } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Goal, RectangleVertical, ArrowLeftRight, AlertTriangle } from 'lucide-react';
 
-export default function MatchTimeline({ events = [], fixture }) {
-  const [filter, setFilter] = useState("all");
+interface MatchEvent {
+    time: { elapsed: number; extra: number | null };
+    team: { id: number; name: string; logo: string };
+    player: { id: number; name: string };
+    assist: { id: number | null; name: string | null };
+    type: 'Goal' | 'Card' | 'subst' | 'Var';
+    detail: string;
+    comments: string | null;
+}
 
-  const filteredEvents =
-    filter === "highlight" ? events.filter((e) => e.type === "Goal") : events;
+const EventIcon = ({ event }: { event: MatchEvent }) => {
+  if (event.type === 'Goal') return <Goal className="h-4 w-4 text-yellow-300" />;
+  if (event.type === 'Card' && event.detail.includes('Yellow')) return <RectangleVertical className="h-4 w-4 text-yellow-400 fill-current" />;
+  if (event.type === 'Card' && event.detail.includes('Red')) return <RectangleVertical className="h-4 w-4 text-red-500 fill-current" />;
+  if (event.type === 'subst') return <ArrowLeftRight className="h-4 w-4 text-blue-300" />;
+  if (event.type === 'Var') return <AlertTriangle className="h-4 w-4 text-orange-400" />;
+  return null;
+};
 
-  const getIcon = (type, detail) => {
-    if (type === "Goal") return <FaFutbol className="text-green-400 text-sm" />;
-    if (type === "subst")
-      return <FaArrowsRotate className="text-blue-400 text-sm" />;
-    if (type === "Card") {
-      if (detail === "Yellow Card")
-        return <IoSquare className="text-yellow-400 text-base" />;
-      if (detail === "Red Card")
-        return <IoSquare className="text-red-600 text-base" />;
-    }
-    // Fallback for other card types or Var
-    if (type === "Card") return <IoSquare className="text-yellow-400 text-base" />;
-    if (type === "Var") return <FaExclamation className="text-gray-300 text-sm" />;
-    return <FaFutbol className="text-gray-300 text-sm" />;
-  };
+export default function MatchTimeline({
+  events,
+  fixture,
+  homeTeamId,
+  getPlayerName,
+}: {
+  events: MatchEvent[];
+  fixture: any;
+  homeTeamId: number;
+  getPlayerName: (id: number, defaultName: string) => string;
+}) {
+  const [filter, setFilter] = useState<'all' | 'highlights'>('all');
+
+  const sortedEvents = useMemo(() => [...events].sort((a, b) => a.time.elapsed - b.time.elapsed), [events]);
+  
+  const filteredEvents = useMemo(() => {
+    if (filter === 'highlights') return sortedEvents.filter(e => e.type === 'Goal');
+    return sortedEvents;
+  }, [sortedEvents, filter]);
+
+  if (!events || events.length === 0) {
+    return <div className="text-muted-foreground text-center py-4">لا توجد أحداث متاحة لعرضها.</div>
+  }
 
   return (
-    <div className="relative flex flex-col items-center w-full mt-6">
-      {/* أزرار التبديل */}
-      <div className="flex gap-3 mb-4">
-        <button
-          onClick={() => setFilter("highlight")}
-          className={`px-4 py-1 rounded-full text-sm font-semibold border transition ${
-            filter === "highlight"
-              ? "bg-green-600 text-white border-green-600 shadow-md"
-              : "bg-white text-gray-800 border-gray-300"
-          }`}
-        >
-          الأبرز
-        </button>
-        <button
-          onClick={() => setFilter("all")}
-          className={`px-4 py-1 rounded-full text-sm font-semibold border transition ${
-            filter === "all"
-              ? "bg-green-600 text-white border-green-600 shadow-md"
-              : "bg-white text-gray-800 border-gray-300"
-          }`}
-        >
-          عرض الكل
-        </button>
+    <Card className="p-2 overflow-x-hidden bg-card">
+      <Tabs value={filter} onValueChange={(v) => setFilter(v as any)} className="mb-2 w-full">
+        <TabsList className="grid grid-cols-2">
+          <TabsTrigger value="all">عرض الكل</TabsTrigger>
+          <TabsTrigger value="highlights">الأبرز</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <div className="relative pt-4 pb-4">
+        <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-border -translate-x-1/2"></div>
+        {filteredEvents.map((event, idx) => {
+          const isHome = event.team.id === homeTeamId;
+          const sideClass = isHome ? "pr-[55%] justify-start" : "pl-[55%] justify-end";
+          const contentClass = isHome ? "flex-row-reverse text-right" : "flex-row text-left";
+          const timeClass = isHome ? "left-full ml-2" : "right-full mr-2";
+          
+          return (
+            <div key={idx} className={`flex w-full items-center my-3 relative ${sideClass}`}>
+              <div className="absolute left-1/2 -translate-x-1/2 w-3 h-3 bg-primary rounded-full border-2 border-card"></div>
+              
+              <div className={`flex items-center gap-2 ${contentClass}`}>
+                 <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-foreground">{getPlayerName(event.player.id, event.player.name)}</span>
+                    {event.assist.id && <span className="text-[10px] text-muted-foreground">صناعة: {getPlayerName(event.assist.id, event.assist.name!)}</span>}
+                    {event.type === 'Var' && <span className="text-[10px] text-orange-400">{event.detail}</span>}
+                 </div>
+                 <EventIcon event={event} />
+              </div>
+
+              <div className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-mono ${timeClass}`}>
+                  {event.time.elapsed}'{event.time.extra ? `+${event.time.extra}` : ''}
+              </div>
+            </div>
+          );
+        })}
       </div>
-
-      {/* عمود الزمن */}
-      <div className="relative w-[90%] sm:w-[70%] md:w-[60%] lg:w-[50%]">
-        <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-white opacity-80 z-0"></div>
-
-        <div className="flex flex-col-reverse items-center gap-4 mt-4">
-          {filteredEvents
-            .sort((a, b) => a.time.elapsed - b.time.elapsed)
-            .map((event, index) => {
-              const isHome = event.team.id === fixture.teams.home.id;
-              return (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className={`relative flex items-center w-full ${
-                  isHome
-                    ? "justify-start pl-[52%]" // المضيف يسار
-                    : "justify-end pr-[52%]"   // الضيف يمين
-                }`}
-              >
-                {/* الحاوية لكل حدث */}
-                <div
-                  className={`relative flex items-center gap-2 px-3 py-1.5 rounded-2xl shadow-md text-sm text-white max-w-[140px] ${
-                    isHome ? "bg-blue-700" : "bg-green-700"
-                  }`}
-                >
-                  <span>{getIcon(event.type, event.detail)}</span>
-                  <div className="flex flex-col">
-                    <span className="font-bold text-xs">{event.player?.name}</span>
-                    <span className="text-[11px] opacity-80">{event.detail}</span>
-                  </div>
-
-                  {/* نقطة العمود */}
-                  <div
-                    className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full border border-gray-400 shadow-sm z-10 ${
-                      isHome ? "-left-4" : "-right-4"
-                    }`}
-                  ></div>
-
-                  {/* الوقت */}
-                  <div
-                    className={`absolute top-1/2 -translate-y-1/2 text-[11px] text-white opacity-70 ${
-                      isHome ? "-left-10" : "-right-10"
-                    }`}
-                  >
-                    {event.time.elapsed}'
-                  </div>
-                </div>
-              </motion.div>
-            )})}
-        </div>
-      </div>
-    </div>
+    </Card>
   );
 }
