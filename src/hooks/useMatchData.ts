@@ -26,7 +26,7 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
     lineups: [], events: [], stats: [], standings: [], h2h: [], loading: true, error: null,
   });
 
-  const CURRENT_SEASON = useMemo(() => new Date(fixture?.fixture.date || Date.now()).getFullYear(), [fixture]);
+  const CURRENT_SEASON = useMemo(() => fixture ? new Date(fixture.fixture.date).getFullYear() : new Date().getFullYear(), [fixture]);
 
   useEffect(() => {
     if (!fixture) {
@@ -43,7 +43,6 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
         const homeTeamId = fixture.teams.home.id;
         const awayTeamId = fixture.teams.away.id;
         
-        // 1. Fetch primary data (lineups, events, etc.)
         const [lineupsRes, eventsRes, statsRes, h2hRes, standingsRes] = await Promise.all([
           fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
           fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
@@ -60,33 +59,43 @@ export function useMatchData(fixture?: FixtureType): MatchDataHook {
         const h2hData = h2hRes.ok ? (await h2hRes.json()).response || [] : [];
         const standingsData = standingsRes.ok ? (await standingsRes.json()).response[0]?.league?.standings[0] || [] : [];
 
-        // 2. Fetch full player data for each team in the lineup
         let allPlayersData: PlayerStats[] = [];
         if (lineupsDataRaw.length > 0) {
             for (const lineup of lineupsDataRaw) {
                 const teamId = lineup.team?.id;
                 if (!teamId) continue;
                 
-                // Fetch all players for the team to ensure we have data for everyone
-                const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`);
-                if (isCancelled) return;
-                
-                if (playersRes.ok) {
-                    const teamPlayers = (await playersRes.json()).response || [];
-                    allPlayersData.push(...teamPlayers);
+                let currentPage = 1;
+                let totalPages = 1;
+                while (currentPage <= totalPages) {
+                    const playersRes = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}&page=${currentPage}`);
+                    if (isCancelled) return;
+                    
+                    if (playersRes.ok) {
+                        const pageData = await playersRes.json();
+                        const teamPlayers = pageData.response || [];
+                        allPlayersData.push(...teamPlayers);
+
+                        if (pageData.paging && pageData.paging.total > currentPage) {
+                            totalPages = pageData.paging.total;
+                            currentPage++;
+                        } else {
+                            break;
+                        }
+                    } else {
+                       break; // Stop if there's an error fetching players
+                    }
                 }
             }
         }
 
-        // 3. Create a map of full player details
         const playerDetailsMap = new Map<number, PlayerStats>();
         allPlayersData.forEach(p => {
           playerDetailsMap.set(p.player.id, p);
         });
 
-        // 4. Enrich lineup data with full player details
         const enrichedLineups = lineupsDataRaw.map((lineup: LineupData) => {
-          const enrich = (players: { player: PlayerType }[]) => players.map(p => {
+          const enrich = (players: { player: PlayerType }[] | undefined) => (players || []).map(p => {
             const details = playerDetailsMap.get(p.player.id);
             return {
               player: {
