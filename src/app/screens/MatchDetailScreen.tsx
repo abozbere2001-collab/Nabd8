@@ -1,15 +1,16 @@
 "use client";
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { ScreenHeader } from '@/components/ScreenHeader';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from '@/hooks/use-toast';
-import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
+import { useAdmin, useFirestore } from '@/firebase/provider';
 import { doc, getDocs, collection, setDoc } from 'firebase/firestore';
 import type { Fixture as FixtureType, Player as PlayerType, Team, MatchEvent } from '@/lib/types';
-import { MatchView } from '@/components/MatchView'; // Import the new component
+import { MatchView } from '@/components/MatchView'; 
 import { RenameDialog } from '@/components/RenameDialog';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Types remain largely the same, but MatchData will be the comprehensive prop for MatchView
+
 interface PlayerWithStats {
   player: PlayerType & { pos?: string };
   statistics?: any[];
@@ -170,19 +171,15 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
       )
   }
 
-  // Assuming you want to display one team's view. Could be toggled.
-  const homeTeamId = initialFixture.teams.home.id;
-  const lineupForView = lineups.find(l => l.team.id === homeTeamId);
-
   // Construct the single `match` prop for MatchView
-  const matchDataForView: MatchDataForView = {
-    lineup: lineupForView,
+  const matchDataForView = (teamId: number): MatchDataForView => ({
+    lineup: lineups.find(l => l.team.id === teamId),
     events: events,
-    statistics: stats.find(s => s.team.id === homeTeamId),
+    statistics: stats.find(s => s.team.id === teamId),
     date: new Date(initialFixture.fixture.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }),
     time: new Date(initialFixture.fixture.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
     venue: initialFixture.fixture.venue.name || 'غير محدد',
-  };
+  });
 
   return (
     <div className="flex flex-col bg-background h-full">
@@ -197,10 +194,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
           </TabsList>
           <TabsContent value="home">
             <MatchView 
-              match={{
-                ...matchDataForView,
-                lineup: lineups.find(l => l.team.id === initialFixture.teams.home.id)
-              }}
+              match={matchDataForView(initialFixture.teams.home.id)}
               onRenamePlayer={handleRenamePlayer}
               isAdmin={!!isAdmin}
               getPlayerName={getPlayerName}
@@ -208,10 +202,7 @@ export function MatchDetailScreen({ fixture: initialFixture, goBack, canGoBack, 
           </TabsContent>
            <TabsContent value="away">
              <MatchView 
-              match={{
-                ...matchDataForView,
-                lineup: lineups.find(l => l.team.id === initialFixture.teams.away.id)
-              }}
+              match={matchDataForView(initialFixture.teams.away.id)}
               onRenamePlayer={handleRenamePlayer}
               isAdmin={!!isAdmin}
               getPlayerName={getPlayerName}
