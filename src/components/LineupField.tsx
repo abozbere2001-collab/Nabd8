@@ -7,7 +7,7 @@ import { Pencil, ArrowUp, ArrowDown } from 'lucide-react';
 import type { Player as PlayerType, Team, MatchEvent } from '@/lib/types';
 
 interface PlayerWithStats {
-  player: PlayerType & { pos?: string; grid?: string; number?: number; };
+  player: PlayerType & { pos?: string; grid?: string; number?: number; photo?: string };
   statistics: {
     games: {
       minutes: number;
@@ -17,7 +17,6 @@ interface PlayerWithStats {
       captain: boolean;
       substitute: boolean;
     };
-    rating?: string;
   }[];
 }
 
@@ -42,20 +41,9 @@ const PlayerOnPitch = ({
 }) => {
   const { player: p, statistics } = player;
   const displayName = getPlayerName(p.id, p.name);
-  
-  // ✅ منطق جديد وآمن لجلب التقييم
-  const rawRating = statistics?.[0]?.games?.rating || statistics?.[0]?.rating;
-  const rating = rawRating ? parseFloat(rawRating).toFixed(1) : null;
-
+  const ratingValue = statistics?.[0]?.games?.rating;
+  const rating = ratingValue ? parseFloat(ratingValue).toFixed(1) : null;
   const playerNumber = statistics?.[0]?.games?.number || p.number;
-
-  let ratingColor = "bg-blue-600";
-  if (rating) {
-    const val = parseFloat(rating);
-    if (val < 6) ratingColor = "bg-red-600";
-    else if (val < 7) ratingColor = "bg-yellow-600";
-    else ratingColor = "bg-green-600";
-  }
 
   return (
     <div className="relative flex flex-col items-center text-white text-xs w-16 text-center">
@@ -75,18 +63,22 @@ const PlayerOnPitch = ({
 
       <div className="relative w-12 h-12">
         <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
-          <AvatarImage src={p.photo || (p.id ? `https://media.api-sports.io/football/players/${p.id}.png` : '')} alt={displayName} />
+          <AvatarImage src={p.photo || "https://media.api-sports.io/football/players/0.png"} alt={displayName} />
           <AvatarFallback>{displayName?.charAt(0) || "?"}</AvatarFallback>
         </Avatar>
 
+        {/* رقم القميص */}
         {playerNumber && (
           <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
             {playerNumber}
           </div>
         )}
 
-        {rating && parseFloat(rating) > 0 && (
-          <div className={`absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background ${ratingColor} z-10`}>
+        {/* تقييم اللاعب */}
+        {rating && (
+          <div className={`absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background ${
+            parseFloat(rating) >= 7 ? 'bg-green-600' : parseFloat(rating) >= 6 ? 'bg-yellow-600' : 'bg-red-600'
+          } z-10`}>
             {rating}
           </div>
         )}
@@ -160,6 +152,7 @@ export function LineupField({
         </div>
       </div>
 
+      {/* المدرب */}
       {lineup.coach && (
         <div className="mt-4 pt-4 border-t border-border flex flex-col items-center gap-2">
           <h4 className="text-center font-bold mb-2">المدرب</h4>
@@ -186,38 +179,40 @@ export function LineupField({
         </div>
       )}
 
+      {/* التبديلات */}
       {substitutions.length > 0 && (
         <div className="mt-4 pt-4 border-t border-border">
           <h4 className="text-center font-bold mb-3">التبديلات</h4>
           <div className="space-y-3">
             {substitutions.map((event, idx) => (
-                <div key={idx} className="grid grid-cols-[1fr_auto_1fr] items-center text-sm">
-                    {/* اللاعب الخارج */}
-                    <div className="flex items-center justify-end gap-2 text-red-500">
-                        <span className="font-medium">{getPlayerName(event.player.id, event.player.name)}</span>
-                        <ArrowDown className="h-4 w-4" />
-                    </div>
-                    
-                    <span className="text-xs text-muted-foreground mx-2">{event.time.elapsed}'</span>
-
-                    {/* اللاعب الداخل */}
-                    <div className="flex items-center justify-start gap-2 text-green-500">
-                        <ArrowUp className="h-4 w-4" />
-                        <span className="font-medium">{getPlayerName(event.assist.id, event.assist.name)}</span>
-                    </div>
-                </div>
+               <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
+                 <div className="flex items-center gap-2 text-red-500">
+                   <ArrowDown className="h-4 w-4" />
+                   <span className="font-medium">{getPlayerName(event.player.id, event.player.name)}</span>
+                 </div>
+                 <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
+                 {event.assist && event.assist.id && (
+                   <div className="flex items-center gap-2 text-green-500">
+                     <ArrowUp className="h-4 w-4" />
+                     <span className="font-medium">{getPlayerName(event.assist.id, event.assist.name)}</span>
+                   </div>
+                 )}
+               </div>
             ))}
           </div>
         </div>
       )}
 
+      {/* الاحتياط */}
       {lineup.substitutes?.length > 0 && (
         <div className="mt-4 border-t border-border pt-4">
           <h4 className="text-center font-bold mb-2">الاحتياط</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {lineup.substitutes.map((p) => {
-               const playerNumber = p.statistics?.[0]?.games?.number || p.player.number;
-               return(
+              const playerNumber = p.statistics?.[0]?.games?.number || p.player.number;
+              const ratingValue = p.statistics?.[0]?.games?.rating;
+              const rating = ratingValue ? parseFloat(ratingValue).toFixed(1) : null;
+              return (
               <div key={p.player.id} className="relative flex items-center gap-3 p-2 rounded-lg border bg-background/40">
                 {isAdmin && (
                   <Button
@@ -233,12 +228,21 @@ export function LineupField({
                   </Button>
                 )}
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src={p.player.photo} />
+                  <AvatarImage src={p.player.photo || "https://media.api-sports.io/football/players/0.png"} />
                   <AvatarFallback>{p.player.name?.charAt(0) || '?'}</AvatarFallback>
                 </Avatar>
                 <div>
                   <span className="text-sm font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
                   {playerNumber && <p className="text-xs text-muted-foreground">الرقم: {playerNumber}</p>}
+                  {rating && (
+                    <div className="flex items-center gap-1 mt-1">
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full text-white ${
+                            parseFloat(rating) >= 7 ? 'bg-green-600' : parseFloat(rating) >= 6 ? 'bg-yellow-600' : 'bg-red-600'
+                        }`}>
+                           {rating}
+                        </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )})}
