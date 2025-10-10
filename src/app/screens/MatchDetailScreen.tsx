@@ -42,7 +42,10 @@ const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
   return (
     <div className="relative flex flex-col items-center">
       <div className="relative w-12 h-12">
-        <img src={playerImage} alt={player?.player?.name || "Player"} className="rounded-full border-2 border-white/50" />
+        <Avatar className="h-12 w-12 border-2 border-white/50">
+          <AvatarImage src={playerImage} alt={player?.player?.name || "Player"} />
+          <AvatarFallback>{player?.player?.name?.charAt(0) || 'P'}</AvatarFallback>
+        </Avatar>
         {playerNumber && <div className="absolute -top-1 -left-1 bg-gray-800 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background">{playerNumber}</div>}
         {rating && <div className={cn(`absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background`, getRatingColor())}>{rating}</div>}
       </div>
@@ -192,22 +195,22 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
         return <Clock className="w-5 h-5 text-muted-foreground" />;
     }
 
-    // Sort events by time, ascending
-    const sortedEvents = [...events].sort((a, b) => a.time.elapsed - b.time.elapsed);
+    // Sort events by time, descending (90 -> 1)
+    const sortedEvents = [...events].sort((a, b) => b.time.elapsed - a.time.elapsed);
 
     return (
         <div className="relative px-2 py-8">
-            <div className="absolute top-0 bottom-0 right-1/2 w-0.5 bg-border -translate-x-1/2"></div>
+            <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
             {sortedEvents.map((event, index) => {
                 const isHomeEvent = event.team.id === homeTeamId;
                 return (
-                    <div key={index} className={cn("relative flex my-4", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
+                    <div key={index} className={cn("relative flex my-4", !isHomeEvent ? "flex-row-reverse" : "flex-row")}>
                         <div className="flex-1 text-center px-4">
-                            <div className={cn("flex items-center gap-3 bg-card p-2 rounded-md border w-full", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
+                            <div className={cn("flex items-center gap-3 bg-card p-2 rounded-md border w-full", !isHomeEvent ? "flex-row-reverse" : "flex-row")}>
                                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background">
                                     {getEventIcon(event)}
                                 </div>
-                                <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
+                                <div className={cn("flex-1 text-sm", !isHomeEvent ? "text-right" : "text-left")}>
                                     <p className="font-semibold">{event.player.name}</p>
                                     {event.type === 'subst' && event.assist.name ? (
                                         <p className="text-xs text-muted-foreground">تبديل بـ {event.assist.name}</p>
@@ -217,7 +220,7 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
                                 </div>
                             </div>
                         </div>
-                        <div className="absolute top-1/2 right-1/2 -translate-y-1/2 translate-x-1/2 z-10 bg-background border rounded-full h-8 w-8 flex items-center justify-center font-bold text-xs">
+                        <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 z-10 bg-background border rounded-full h-8 w-8 flex items-center justify-center font-bold text-xs">
                            {event.time.elapsed}'
                         </div>
                          <div className="flex-1" />
@@ -248,10 +251,10 @@ const LineupsTab = ({ lineups, events }: { lineups: LineupData[] | null; events:
         }, {} as { [key: number]: PlayerWithStats[] });
 
         // Goalkeeper is usually row 1, we want it at the bottom.
-        const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => b - a);
+        const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
 
         return (
-             <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col justify-around p-2">
+             <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2">
                 {sortedRows.map(row => (
                     <div key={row} className="flex justify-around items-center">
                         {formationGrid[row]?.filter(Boolean).map(p => <PlayerCard key={p.player.id} player={p} />)}
@@ -277,20 +280,24 @@ const LineupsTab = ({ lineups, events }: { lineups: LineupData[] | null; events:
             <Card>
                 <CardContent className="p-2">
                     <h3 className="font-bold text-center p-2 text-sm">البدلاء والتبديلات</h3>
-                    <div className="grid grid-cols-1 divide-y">
+                     <div className="grid grid-cols-1 divide-y">
                         {activeLineup.substitutes.map(p => {
                              const subbedInEvent = events?.find(e => e.type === 'subst' && e.player.id === p.player.id);
-                             const subbedOutPlayerName = subbedInEvent?.assist.name;
+                             const subbedOutPlayer = subbedInEvent ? activeLineup.startXI.find(starter => starter.player.id === subbedInEvent.assist.id) : null;
 
                             return (
-                                <div key={p.player.id} className="flex items-center gap-2 p-1.5 text-xs">
-                                    <PlayerCard player={p} />
-                                    {subbedInEvent && (
-                                        <div className="flex items-center gap-1 text-green-500">
-                                            <ArrowUp className="h-3 w-3"/>
-                                            <span>دخل بديلاً لـ {subbedOutPlayerName}</span>
-                                        </div>
-                                    )}
+                                <div key={p.player.id} className="flex items-center justify-between p-1.5 text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <PlayerCard player={p} />
+                                        {subbedInEvent && subbedOutPlayer && (
+                                            <div className="flex items-center gap-2">
+                                                 <ArrowUp className="h-4 w-4 text-green-500"/>
+                                                 <PlayerCard player={subbedOutPlayer} />
+                                                 <ArrowDown className="h-4 w-4 text-red-500"/>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <span className="text-muted-foreground">{p.player.name}</span>
                                 </div>
                             )
                         })}
@@ -371,8 +378,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         }
 
         try {
-            const currentLeagueId = fixture?.league.id;
-            const currentSeason = fixture?.league.season;
+            const currentLeagueId = initialFixture?.league.id;
+            const currentSeason = initialFixture?.league.season;
 
             const endpoints = [
                 `fixtures?id=${fixtureId}`,
@@ -401,7 +408,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 setLoading(false);
             }
         }
-    }, [fixtureId, fixture?.league.id, fixture?.league.season]);
+    }, [fixtureId, initialFixture?.league.id, initialFixture?.league.season]);
 
     useEffect(() => {
         fetchData(true); 
