@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -498,5 +499,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixture, header
         </div>
     );
 }
+
+    
 
     
