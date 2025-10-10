@@ -116,7 +116,7 @@ export const LineupField = ({
         style={{ backgroundImage: `url('/football-pitch-vertical.svg')` }}
       >
         <div className="absolute inset-0 flex flex-col justify-around p-2">
-          {rows.reverse().map((row, rowIndex) => (
+          {rows.map((row, rowIndex) => (
             <div key={rowIndex} className="flex justify-around items-center w-full">
               {row.map((player) => (
                 <PlayerOnPitch
@@ -128,7 +128,7 @@ export const LineupField = ({
                 />
               ))}
             </div>
-          ))}
+          )).reverse()}
         </div>
       </div>
 
@@ -169,7 +169,9 @@ export const LineupField = ({
                     variant="ghost"
                     size="icon"
                     className="absolute top-0 right-0 h-6 w-6 z-10"
-                    onClick={() => onRename('player', p.player.id, getPlayerName(p.player.id, p.player.name))}
+                    onClick={() =>
+                      onRename('player', p.player.id, getPlayerName(p.player.id, p.player.name))
+                    }
                   >
                     <Pencil className="h-3 w-3" />
                   </Button>
@@ -199,3 +201,5 @@ export const LineupField = ({
     </Card>
   );
 };
+
+    

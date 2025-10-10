@@ -3,16 +3,8 @@ import React, { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Goal, RectangleVertical, ArrowLeftRight, AlertTriangle } from 'lucide-react';
+import type { MatchEvent } from '@/lib/types';
 
-interface MatchEvent {
-    time: { elapsed: number; extra: number | null };
-    team: { id: number; name: string; logo: string };
-    player: { id: number; name: string };
-    assist: { id: number | null; name: string | null };
-    type: 'Goal' | 'Card' | 'subst' | 'Var';
-    detail: string;
-    comments: string | null;
-}
 
 const EventIcon = ({ event }: { event: MatchEvent }) => {
   if (event.type === 'Goal') return <Goal className="h-4 w-4 text-yellow-300" />;
@@ -86,3 +78,5 @@ export default function MatchTimeline({
     </Card>
   );
 }
+
+    

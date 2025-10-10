@@ -12,7 +12,7 @@ import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
-import { Star, Pencil, Goal, ArrowLeftRight, RectangleVertical, Copy, Heart, ShieldCheck, Repeat, AlertTriangle, Calendar, Clock, MapPin } from 'lucide-react';
+import { Star, Pencil, Copy, Heart, ShieldCheck, Repeat, AlertTriangle, Calendar, Clock, MapPin } from 'lucide-react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { NoteDialog } from '@/components/NoteDialog';
 import { RenameDialog } from '@/components/RenameDialog';
@@ -156,7 +156,7 @@ export function MatchDetailScreen({ fixture, goBack, canGoBack, navigate }: Scre
       }
     });
     return stats;
-  }, [h2h, fixture.teams.home.id, fixture.teams.away.id]);
+  }, [h2h, fixture.teams.home.id]);
 
   const totalH2h = h2hStats ? h2hStats.wins.home + h2hStats.wins.away + h2hStats.draws : 0;
   const homeWinPercentage = totalH2h > 0 ? (h2hStats!.wins.home / totalH2h) * 100 : 0;
@@ -261,8 +261,8 @@ export function MatchDetailScreen({ fixture, goBack, canGoBack, navigate }: Scre
                         <TabsTrigger value="home">{fixture.teams.home.name}</TabsTrigger>
                         <TabsTrigger value="away">{fixture.teams.away.name}</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="home"><LineupField lineup={home} onRename={(id: any, name: any) => handleRename('player', id, name)} isAdmin={!!isAdmin} getPlayerName={getPlayerName} getCoachName={getCoachName} /></TabsContent>
-                    <TabsContent value="away"><LineupField lineup={away} onRename={(id: any, name: any) => handleRename('player', id, name)} isAdmin={!!isAdmin} getPlayerName={getPlayerName} getCoachName={getCoachName} /></TabsContent>
+                    <TabsContent value="home"><LineupField lineup={home} onRename={(type: any, id: any, name: any) => handleRename(type, id, name)} isAdmin={!!isAdmin} getPlayerName={getPlayerName} getCoachName={getCoachName} /></TabsContent>
+                    <TabsContent value="away"><LineupField lineup={away} onRename={(type: any, id: any, name: any) => handleRename(type, id, name)} isAdmin={!!isAdmin} getPlayerName={getPlayerName} getCoachName={getCoachName} /></TabsContent>
                 </Tabs>
                 <p className='text-center text-xs text-muted-foreground mt-2'>* التشكيلة قد تكون متوقعة قبل الإعلان الرسمي</p>
             </TabsContent>
@@ -319,3 +319,4 @@ export function MatchDetailScreen({ fixture, goBack, canGoBack, navigate }: Scre
     </div>
   );
 }
+    
