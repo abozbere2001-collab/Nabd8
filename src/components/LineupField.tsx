@@ -5,73 +5,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Pencil, ArrowUp, ArrowDown } from 'lucide-react';
 import type { Player as PlayerType, Team, MatchEvent, PlayerWithStats, LineupData } from '@/lib/types';
-
-const PlayerCard = ({
-  player,
-  onRename,
-  isAdmin,
-  getPlayerName
-}: {
-  player: PlayerWithStats;
-  onRename: (type: 'player', id: number, name: string) => void;
-  isAdmin: boolean;
-  getPlayerName: (id: number, name: string) => string;
-}) => {
-  const { player: p, statistics } = player;
-  const displayName = getPlayerName(p.id, p.name);
-  const ratingValue = statistics?.[0]?.games?.rating;
-  const rating = ratingValue && !isNaN(parseFloat(ratingValue)) ? parseFloat(ratingValue).toFixed(1) : null;
-  const playerNumber = statistics?.[0]?.games?.number || p.number;
-
-  let ratingColor = "bg-blue-600";
-  if (rating) {
-    const val = parseFloat(rating);
-    if (val < 6) ratingColor = "bg-red-600";
-    else if (val < 7) ratingColor = "bg-yellow-600";
-    else ratingColor = "bg-green-600";
-  }
-
-  return (
-    <div className="relative flex flex-col items-center text-white text-xs w-16 text-center">
-      {isAdmin && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute -top-2 -right-2 h-6 w-6 z-20 text-white/70 hover:bg-black/50"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRename('player', p.id, displayName);
-          }}
-        >
-          <Pencil className="h-3 w-3" />
-        </Button>
-      )}
-
-      <div className="relative w-12 h-12">
-        <Avatar className="w-12 h-12 border-2 border-white/50 bg-black/30">
-          <AvatarImage src={p.photo || "https://media.api-sports.io/football/players/0.png"} alt={displayName} />
-          <AvatarFallback>{displayName?.charAt(0) || "?"}</AvatarFallback>
-        </Avatar>
-
-        {playerNumber && (
-          <div className="absolute -top-1 -left-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background bg-gray-800 z-10">
-            {playerNumber}
-          </div>
-        )}
-
-        {rating && (
-          <div className={`absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background ${ratingColor} z-10`}>
-            {rating}
-          </div>
-        )}
-      </div>
-
-      <span className="mt-1 bg-black/50 px-1.5 py-0.5 rounded font-semibold truncate w-full text-[11px]">
-        {displayName}
-      </span>
-    </div>
-  );
-};
+import { PlayerCard } from '@/components/PlayerCard';
 
 
 export function LineupField({
@@ -115,6 +49,10 @@ export function LineupField({
     });
 
   const substitutions = events.filter(e => e.type === 'subst' && e.team.id === lineup.team.id);
+
+  const getPlayerFromLineup = (playerId: number): PlayerWithStats | undefined => {
+      return [...lineup.startXI, ...lineup.substitutes].find(p => p.player.id === playerId);
+  }
 
   return (
     <Card className="p-3 bg-card/80">
@@ -171,28 +109,46 @@ export function LineupField({
         <div className="mt-4 pt-4 border-t border-border">
           <h4 className="text-center font-bold mb-3">التبديلات</h4>
           <div className="space-y-3">
-            {substitutions.map((event, idx) => (
-              <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
-                {/* اللاعب الخارج */}
-                <div className="flex items-center gap-2 text-red-500">
-                  <ArrowDown className="h-4 w-4" />
-                  <span className="font-medium">{getPlayerName(event.player.id, event.player.name)}</span>
-                </div>
-                
-                <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
-                
-                {/* اللاعب الداخل */}
-                {event.assist && event.assist.id && (
-                  <div className="flex items-center gap-2 text-green-500">
-                    <ArrowUp className="h-4 w-4" />
-                    <span className="font-medium">{getPlayerName(event.assist.id, event.assist.name || '')}</span>
+            {substitutions.map((event, idx) => {
+              const playerIn = getPlayerFromLineup(event.player.id);
+              const playerInName = playerIn ? getPlayerName(playerIn.player.id, playerIn.player.name) : event.player.name;
+              const playerOutName = event.assist?.id ? getPlayerName(event.assist.id, event.assist.name || '') : '';
+              
+              return (
+                <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-md bg-background/40 border">
+                  
+                  {/* اللاعب الخارج */}
+                  <div className="flex items-center gap-2 text-red-500 w-2/5">
+                    <ArrowDown className="h-4 w-4" />
+                    <span className="font-medium truncate">{playerOutName}</span>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  <span className="text-xs text-muted-foreground">{event.time.elapsed}'</span>
+
+                  {/* اللاعب الداخل */}
+                  {playerIn && (
+                    <div className="flex items-center gap-2 text-green-500 justify-end w-2/5">
+                        <div className="text-right">
+                           <span className="font-medium block truncate">{playerInName}</span>
+                           {playerIn.statistics?.[0]?.games?.rating && (
+                               <span className="text-xs text-primary font-bold">
+                                   {parseFloat(playerIn.statistics[0].games.rating).toFixed(1)}
+                               </span>
+                           )}
+                        </div>
+                        <Avatar className="h-8 w-8">
+                            <AvatarImage src={playerIn.player.photo} />
+                        </Avatar>
+                        <ArrowUp className="h-4 w-4" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
+      
 
       {/* الاحتياط */}
       {lineup.substitutes?.length > 0 && (
@@ -200,38 +156,16 @@ export function LineupField({
           <h4 className="text-center font-bold mb-2">الاحتياط</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {lineup.substitutes.map((p) => {
-              const playerNumber = p.statistics?.[0]?.games?.number || p.player.number;
-              const ratingValue = p.statistics?.[0]?.games?.rating;
-              const rating = ratingValue && !isNaN(parseFloat(ratingValue)) ? parseFloat(ratingValue).toFixed(1) : null;
-              
+              if (!p) return null;
               return (
                 <div key={p.player.id} className="relative flex items-center gap-3 p-2 rounded-lg border bg-background/40">
-                  {isAdmin && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-1 right-1 h-7 w-7 z-10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRename('player', p.player.id, getPlayerName(p.player.id, p.player.name));
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={p.player.photo || "https://media.api-sports.io/football/players/0.png"} />
-                    <AvatarFallback>{p.player.name?.charAt(0) || '?'}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <span className="text-sm font-semibold">{getPlayerName(p.player.id, p.player.name)}</span>
-                    {playerNumber && <p className="text-xs text-muted-foreground">الرقم: {playerNumber}</p>}
-                    {rating && (
-                      <p className="text-xs font-bold text-primary">
-                        تقييم: {rating}
-                      </p>
-                    )}
-                  </div>
+                  <PlayerCard
+                    player={p}
+                    onRename={onRename}
+                    isAdmin={isAdmin}
+                    getPlayerName={getPlayerName}
+                    isSubstitute={true}
+                  />
                 </div>
               );
             })}
