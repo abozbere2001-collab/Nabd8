@@ -60,13 +60,15 @@ export default function MatchTimeline({ events = [], fixture }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
                 className={`relative flex items-center w-full ${
-                  isHomeTeam ? "justify-end pr-[52%]" : "justify-start pl-[52%]"
+                  isHomeTeam
+                    ? "justify-start pl-[52%]" // عكس الاتجاه: المضيف يسار الآن
+                    : "justify-end pr-[52%]"   // الضيف يمين الآن
                 }`}
               >
                 {/* الحاوية لكل حدث */}
                 <div
                   className={`relative flex items-center gap-2 px-3 py-1.5 rounded-2xl shadow-md text-sm text-white max-w-[140px] ${
-                    isHomeTeam ? "bg-green-700" : "bg-gray-700"
+                    isHomeTeam ? "bg-green-700" : "bg-blue-700"
                   }`}
                 >
                   <span>{getIcon(event.type)}</span>
@@ -76,16 +78,19 @@ export default function MatchTimeline({ events = [], fixture }) {
                   </div>
 
                   {/* نقطة العمود */}
-                  <div className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full border border-gray-400 shadow-sm z-10
-                    ${isHomeTeam ? "-right-4" : "-left-4"}`}></div>
+                  <div
+                    className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full border border-gray-400 shadow-sm z-10 ${
+                      isHomeTeam ? "-left-4" : "-right-4"
+                    }`}
+                  ></div>
 
-                  {/* الوقت الحقيقي */}
+                  {/* الوقت */}
                   <div
                     className={`absolute top-1/2 -translate-y-1/2 text-[11px] text-white opacity-70 ${
-                      isHomeTeam ? "-right-10" : "-left-10"
+                      isHomeTeam ? "-left-10" : "-right-10"
                     }`}
                   >
-                    {event.time.elapsed}' 
+                    {event.time.elapsed}'
                   </div>
                 </div>
               </motion.div>
