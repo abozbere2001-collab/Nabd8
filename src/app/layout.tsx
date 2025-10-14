@@ -24,6 +24,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <meta name="theme-color" content="#2563eb" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="font-body antialiased">
         <ThemeProvider
