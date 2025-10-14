@@ -31,8 +31,12 @@ interface GroupedFixtures {
     }
 }
 
+const isMatchLive = (status: FixtureType['fixture']['status']) => {
+    return ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(status.short);
+}
+
 // Live Timer Component
-const LiveMatchStatus = ({ fixture }: { fixture: FixtureType }) => {
+const LiveMatchStatus = ({ fixture, isLive }: { fixture: FixtureType, isLive: boolean }) => {
     const { status, date } = fixture.fixture;
     const [elapsedTime, setElapsedTime] = useState(status.elapsed);
 
@@ -46,16 +50,15 @@ const LiveMatchStatus = ({ fixture }: { fixture: FixtureType }) => {
         }
     }, [status.short, status.elapsed]);
 
-    const isLive = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(status.short);
     const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
 
     if (isLive) {
         return (
             <>
-                <div className="text-red-500 font-bold text-xs animate-pulse mb-1">
+                <div className="text-red-500 font-bold text-sm animate-pulse mb-1">
                     {elapsedTime ? `${elapsedTime}'` : status.long}
                 </div>
-                <div className="font-bold text-lg">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
+                <div className="font-bold text-xl">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
                 <div className="text-xs text-muted-foreground mt-1">{status.short === 'HT' ? 'استراحة' : 'مباشر'}</div>
             </>
         );
@@ -72,7 +75,7 @@ const LiveMatchStatus = ({ fixture }: { fixture: FixtureType }) => {
 
     return (
         <>
-            <div className="font-bold text-lg">{format(new Date(date), "HH:mm")}</div>
+            <div className="font-bold text-base">{format(new Date(date), "HH:mm")}</div>
             <div className="text-xs text-muted-foreground mt-1">{status.long}</div>
         </>
     );
@@ -80,52 +83,32 @@ const LiveMatchStatus = ({ fixture }: { fixture: FixtureType }) => {
 
 // Fixture Item Component
 const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
+    const live = isMatchLive(fixture.fixture.status);
     
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg bg-card border p-3 text-sm transition-all duration-300"
+        className={cn("rounded-lg bg-card border text-sm transition-all duration-300", live ? 'p-3' : 'p-2')}
+        onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
       >
-        <div 
-          className="hover:bg-accent/50 cursor-pointer -m-3 p-3"
-          onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id })}
-        >
-         <div 
-            className="flex items-center justify-center text-xs text-muted-foreground mb-2 cursor-pointer hover:underline"
-            onClick={(e) => {
-                e.stopPropagation();
-                navigate('CompetitionDetails', { leagueId: fixture.league.id, title: fixture.league.name, logo: fixture.league.logo });
-            }}
-          >
-              <Avatar className="h-4 w-4 ml-2">
-                  <AvatarImage src={fixture.league.logo} alt={fixture.league.name} />
-                  <AvatarFallback>{fixture.league.name.substring(0,1)}</AvatarFallback>
-              </Avatar>
-              <span className="truncate">{fixture.league.name}</span>
-         </div>
          <div className="flex items-center justify-between gap-2">
              <div className="flex items-center gap-2 flex-1 justify-end truncate">
                  <span className="font-semibold truncate">{fixture.teams.home.name}</span>
-                 <Avatar className="h-8 w-8">
-                     <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
-                     <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
-                 </Avatar>
+                 <Avatar className={cn(live ? 'h-8 w-8' : 'h-6 w-6')}><AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} /></Avatar>
              </div>
-             <div className="flex flex-col items-center justify-center min-w-[80px] text-center">
-                 <LiveMatchStatus fixture={fixture} />
+             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
+                 <LiveMatchStatus fixture={fixture} isLive={live} />
              </div>
              <div className="flex items-center gap-2 flex-1 truncate">
-                  <Avatar className="h-8 w-8">
-                     <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
-                     <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
-                  </Avatar>
+                  <Avatar className={cn(live ? 'h-8 w-8' : 'h-6 w-6')}><AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} /></Avatar>
                  <span className="font-semibold truncate">{fixture.teams.away.name}</span>
              </div>
          </div>
-         </div>
-         <div className="mt-2 pt-2 border-t border-border/50">
-            <CommentsButton matchId={fixture.fixture.id} navigate={navigate} commentsEnabled={commentsEnabled} />
-         </div>
+         {live && (
+            <div className="mt-2 pt-2 border-t border-border/50">
+                <CommentsButton matchId={fixture.fixture.id} navigate={navigate} commentsEnabled={commentsEnabled} />
+            </div>
+         )}
       </div>
     );
 });
@@ -159,7 +142,7 @@ const FixturesList = ({
         let fixturesToFilter = fixtures;
 
         if (showLiveOnly) {
-            fixturesToFilter = fixturesToFilter.filter(f => ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(f.fixture.status.short));
+            fixturesToFilter = fixturesToFilter.filter(f => isMatchLive(f.fixture.status));
         }
 
         if (activeTab === 'all-matches') {
@@ -203,7 +186,7 @@ const FixturesList = ({
         );
     }
     
-    const liveMatchesCount = fixtures.filter(f => ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(f.fixture.status.short)).length;
+    const liveMatchesCount = fixtures.filter(f => isMatchLive(f.fixture.status)).length;
 
     if (showLiveOnly && liveMatchesCount === 0) {
         return (
@@ -228,21 +211,43 @@ const FixturesList = ({
             </div>
         );
     }
+    
+    const sortedLeagues = Object.keys(groupedFixtures).sort((a,b) => {
+        const leagueA = groupedFixtures[a];
+        const leagueB = groupedFixtures[b];
+        
+        const aIsFavorite = leagueA.fixtures.some(f => favoritedTeamIds.includes(f.teams.home.id) || favoritedTeamIds.includes(f.teams.away.id)) || favoritedLeagueIds.includes(leagueA.league.id);
+        const bIsFavorite = leagueB.fixtures.some(f => favoritedTeamIds.includes(f.teams.home.id) || favoritedTeamIds.includes(f.teams.away.id)) || favoritedLeagueIds.includes(leagueB.league.id);
 
-    const sortedLeagues = Object.keys(groupedFixtures).sort((a,b) => a.localeCompare(b));
-
+        if (aIsFavorite && !bIsFavorite) return -1;
+        if (!aIsFavorite && bIsFavorite) return 1;
+        
+        return a.localeCompare(b);
+    });
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-3">
             {sortedLeagues.map(leagueName => {
                 const { league, fixtures } = groupedFixtures[leagueName];
                 return (
                     <Accordion type="single" collapsible defaultValue="item-1" key={leagueName}>
-                        <AccordionItem value="item-1">
-                            <AccordionTrigger className="font-bold text-foreground">
-                               {leagueName}
+                        <AccordionItem value="item-1" className="border-none">
+                            <AccordionTrigger 
+                                className="font-bold text-foreground py-2 px-3 rounded-md hover:no-underline bg-card border"
+                                onClick={(e) => {
+                                    if ((e.target as HTMLElement).closest('button')) return;
+                                    e.preventDefault();
+                                    navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo });
+                                }}
+                            >
+                               <div className="flex items-center gap-2 flex-1">
+                                    <Avatar className="h-5 w-5">
+                                        <AvatarImage src={league.logo} alt={league.name} />
+                                    </Avatar>
+                                    <span className="truncate">{leagueName}</span>
+                               </div>
                             </AccordionTrigger>
-                            <AccordionContent className="space-y-2">
+                            <AccordionContent className="space-y-2 pt-2">
                                 {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} />)}
                             </AccordionContent>
                         </AccordionItem>
