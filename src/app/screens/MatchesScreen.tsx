@@ -40,6 +40,7 @@ const FixturesList = ({
     hasAnyFavorites,
     favoritedLeagueIds,
     favoritedTeamIds,
+    commentedMatches,
     navigate,
 }: { 
     fixtures: FixtureType[], 
@@ -48,6 +49,7 @@ const FixturesList = ({
     hasAnyFavorites: boolean,
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
+    commentedMatches: { [key: number]: MatchDetails },
     navigate: ScreenProps['navigate'],
 }) => {
     
@@ -139,7 +141,14 @@ const FixturesList = ({
                             <span className="truncate">{leagueName}</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
-                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} />)}
+                            {fixtures.map(f => (
+                                <FixtureItem 
+                                    key={f.fixture.id} 
+                                    fixture={f} 
+                                    navigate={navigate}
+                                    commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled} 
+                                />
+                            ))}
                         </div>
                     </div>
                 )
@@ -231,6 +240,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [fixturesCache, setFixturesCache] = useState<Cache<FixtureType[]>>({});
   const [loadingFixtures, setLoadingFixtures] = useState(true);
   
+  const [commentedMatches, setCommentedMatches] = useState<{ [key: number]: MatchDetails }>({});
+
 
   useEffect(() => {
     if (!user || !db) {
@@ -250,6 +261,22 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
     return () => unsubscribe();
   }, [user, db]);
+
+  useEffect(() => {
+    if (!db) return;
+    const matchesCollectionRef = collection(db, 'matches');
+    const unsubscribe = onSnapshot(matchesCollectionRef, (snapshot) => {
+        const matches: { [key: number]: MatchDetails } = {};
+        snapshot.forEach(doc => {
+            matches[Number(doc.id)] = doc.data() as MatchDetails;
+        });
+        setCommentedMatches(matches);
+    }, (error) => {
+        const permissionError = new FirestorePermissionError({ path: 'matches', operation: 'list' });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+    return () => unsubscribe();
+  }, [db]);
   
   const fetchFixturesForDate = useCallback(async (dateKey: string) => {
     if (fixturesCache[dateKey]) {
@@ -349,6 +376,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favoritedLeagueIds={favoritedLeagueIds}
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
+                    commentedMatches={commentedMatches}
                     navigate={navigate}
                 />
             )}
@@ -356,5 +384,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-
-    
