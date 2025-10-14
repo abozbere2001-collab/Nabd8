@@ -85,11 +85,11 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       })
   }
   
-  const handleUpgrade = () => {
+  const handleUpgrade = async () => {
     if(!user) return;
     // In a real app, this would trigger a payment flow.
     // For now, we'll just simulate the upgrade.
-    setProUser(true);
+    await setProUser(true);
     toast({
         title: 'تمت الترقية بنجاح!',
         description: 'شكراً لك! لقد تم إخفاء جميع الإعلانات.',

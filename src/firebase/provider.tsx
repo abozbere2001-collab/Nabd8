@@ -15,7 +15,7 @@ interface FirebaseContextProps {
   user: User | null;
   isAdmin: boolean;
   isProUser: boolean;
-  setProUser: (isPro: boolean) => void;
+  setProUser: (isPro: boolean) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -83,10 +83,14 @@ export const FirebaseProvider = ({
     if (user) {
         const userDocRef = doc(firestore, 'users', user.uid);
         try {
-            await setDoc(userDocRef, { isProUser: isPro }, { merge: true });
+            // First, update the state locally for immediate UI feedback
             setProUser(isPro);
+            // Then, write to Firestore
+            await setDoc(userDocRef, { isProUser: isPro }, { merge: true });
         } catch (error) {
+            // If Firestore write fails, revert the local state and log error
             console.error("Failed to update pro status:", error);
+            setProUser(!isPro); 
         }
     }
   }
