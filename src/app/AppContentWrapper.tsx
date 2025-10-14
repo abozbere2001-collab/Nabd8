@@ -177,14 +177,6 @@ export function AppContentWrapper() {
   if (showSplashAd) {
     return <SplashScreenAd />;
   }
-
-  if (!ActiveScreenComponent) {
-    return (
-        <div className="flex items-center justify-center h-screen bg-background">
-          <p>شاشة غير موجودة: {activeStackItem.screen}</p>
-        </div>
-    );
-  }
   
   const screenProps = {
     ...activeStackItem.props,
@@ -196,24 +188,13 @@ export function AppContentWrapper() {
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
       <div className="relative flex-1 flex flex-col overflow-hidden">
-        {stack.map((item, index) => {
-          const ScreenComponent = screenConfig[item.screen]?.component;
-          const isVisible = index === stack.length - 1;
-          
-          if (!ScreenComponent) return null;
-          
-          // Simplified rendering: only render the top-most screen to avoid complexity.
-          if (!isVisible) return null;
-
-          return (
-            <div
-              key={item.key}
-              className='absolute inset-0 bg-background flex flex-col'
-            >
-              <ScreenComponent {...item.props} {...screenProps} isVisible={isVisible} />
-            </div>
-          );
-        })}
+        {ActiveScreenComponent ? (
+          <ActiveScreenComponent {...screenProps} />
+        ) : (
+          <div className="flex items-center justify-center h-screen bg-background">
+            <p>شاشة غير موجودة: {activeStackItem.screen}</p>
+          </div>
+        )}
       </div>
       
       {showBannerAd && <BannerAd />}
