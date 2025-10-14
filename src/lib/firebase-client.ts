@@ -6,11 +6,9 @@ import {
   GoogleAuthProvider, 
   signOut as firebaseSignOut, 
   onAuthStateChanged as firebaseOnAuthStateChanged,
-  getRedirectResult,
+  signInWithPopup,
   updateProfile,
   type User, 
-  type UserCredential,
-  signInWithRedirect,
 } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, enableIndexedDbPersistence } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from "firebase/app";
@@ -94,16 +92,20 @@ const handleNewUser = async (user: User) => {
 }
 
 
-export const signInWithGoogle = async (): Promise<void> => {
+export const signInWithGoogle = async (): Promise<User | null> => {
     const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
+    try {
+        const result = await signInWithPopup(auth, provider);
+        // The user object is available in result.user
+        // The onAuthStateChanged listener will also handle the user update globally.
+        return result.user;
+    } catch (error) {
+        // Let the calling component handle the error and display a message.
+        console.error("Popup sign-in error:", error);
+        throw error;
+    }
 };
 
-export const getAuthResult = async (): Promise<UserCredential | null> => {
-    // This function is designed to be called when the app loads.
-    // It processes the result of a sign-in redirect.
-    return getRedirectResult(auth);
-};
 
 export const signOut = (): Promise<void> => {
     sessionStorage.removeItem(GUEST_USER_KEY);

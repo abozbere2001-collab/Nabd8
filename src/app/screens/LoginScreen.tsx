@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -8,34 +8,15 @@ import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { signInWithGoogle, setGuestUser, getAuthResult } from '@/lib/firebase-client';
+import { signInWithGoogle, setGuestUser } from '@/lib/firebase-client';
 
 export function LoginScreen({ goBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // This effect runs once on mount to check if we are returning from a Google login redirect.
-  useEffect(() => {
-    const checkRedirect = async () => {
-        setLoading(true);
-        try {
-            const result = await getAuthResult();
-            // If `result` is not null, the onAuthStateChanged listener in FirebaseProvider
-            // will handle the user state update, and the app will navigate away from LoginScreen.
-            // If `result` is null, it means we are not coming back from a redirect, so we just stop loading.
-        } catch (e: any) {
-            handleAuthError(e);
-        } finally {
-            setLoading(false);
-        }
-    };
-    checkRedirect();
-  }, []);
-
-
   const handleAuthError = (e: any) => {
     console.error("Login Error:", e);
-     if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request' || e.code === 'auth/redirect-cancelled-by-user') {
+     if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
         setError('تم إلغاء عملية تسجيل الدخول.');
     } else if (e.code === 'auth/unauthorized-domain') {
         setError('النطاق غير مصرح به. يرجى التأكد من إضافة نطاق التطبيق إلى قائمة النطاقات المصرح بها في إعدادات Firebase Authentication.');
@@ -49,12 +30,12 @@ export function LoginScreen({ goBack }: ScreenProps) {
     setLoading(true);
     setError(null);
     try {
-      // signInWithGoogle now handles redirect. No result is expected here.
       await signInWithGoogle();
-      // The user will be redirected. We show a loader for a better UX in case of slow redirect.
+      // On success, the onAuthStateChanged listener in FirebaseProvider will handle the state update.
+      // We don't need to do anything here. The loader will be visible until the state changes.
     } catch (e: any) {
       handleAuthError(e);
-      setLoading(false);
+      setLoading(false); // Only stop loading on error, on success the component will unmount.
     }
   };
 
