@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -9,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, query, orderBy, onSnapshot, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, collection, query, orderBy, onSnapshot, writeBatch, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Upload } from 'lucide-react';
 import type { ManualTopScorer } from '@/lib/types';
@@ -38,12 +37,21 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
     if (!db) return;
     setLoading(true);
     const scorersRef = collection(db, 'iraqiLeagueTopScorers');
-    const q = query(scorersRef, orderBy('goals', 'desc'), orderBy('playerName', 'asc'));
+    // Simplified query to avoid composite index requirement.
+    const q = query(scorersRef, orderBy('goals', 'desc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       let fetchedScorers: Omit<ManualTopScorer, 'rank'>[] = [];
       if (!snapshot.empty) {
          fetchedScorers = snapshot.docs.map(doc => doc.data() as Omit<ManualTopScorer, 'rank'>);
+         
+         // Secondary sort on the client-side
+         fetchedScorers.sort((a, b) => {
+            if (a.goals !== b.goals) {
+                return 0; // Keep Firestore's goal sorting
+            }
+            return a.playerName.localeCompare(b.playerName);
+         });
       }
       
       const newScorers = Array.from({ length: NUM_SCORERS }, (_, i) => {
