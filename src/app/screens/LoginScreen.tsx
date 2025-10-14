@@ -8,7 +8,7 @@ import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { signInWithGoogle, getGoogleRedirectResult, setGuestUser } from '@/lib/firebase-client';
+import { signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase-client';
 
 export function LoginScreen({ goBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
@@ -58,11 +58,6 @@ export function LoginScreen({ goBack }: ScreenProps) {
       handleAuthError(e);
       setLoading(false);
     }
-  };
-
-  const handleSkip = () => {
-    // Guest/anonymous login is disabled to enforce full authentication.
-    // setGuestUser();
   };
 
   return (

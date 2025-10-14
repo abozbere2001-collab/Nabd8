@@ -94,10 +94,6 @@ export const signOut = (): Promise<void> => {
 };
 
 
-export const setGuestUser = async () => {
-    // This function is now disabled to enforce full authentication.
-};
-
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {
     if (!user) throw new Error("User not authenticated.");
 
