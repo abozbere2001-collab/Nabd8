@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { useFirestore } from '@/firebase/provider';
+import { useAdmin, useFirestore } from '@/firebase/provider';
 import { doc, getDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -14,30 +14,28 @@ declare global {
     interface IntrinsicElements {
       'api-sports-widget': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
         'data-type': string;
-        'data-team': string; // Team ID is a string for this widget
-        'data-p-statistics': string;
-        'data-p-squad': string;
-        'data-p-trophies': string;
-        'data-p-sidelined': string;
-        'data-p-transfers': string;
-        'data-p-matches': string;
+        'data-player-id': string;
+        'data-player-statistics': string;
+        'data-player-trophies': string;
+        'data-player-sidelined': string;
+        'data-player-transfers': string;
       };
     }
   }
 }
 
-export function TeamDetailScreen({ goBack, canGoBack, teamId }: ScreenProps & { teamId: number }) {
+export function PlayerDetailScreen({ goBack, canGoBack, playerId }: ScreenProps & { playerId: number }) {
   const { db } = useFirestore();
-  const [displayTitle, setDisplayTitle] = useState("الفريق");
+  const [displayTitle, setDisplayTitle] = useState("اللاعب");
 
   useEffect(() => {
-    if (!teamId) return;
+    if (!playerId) return;
 
-    const getTeamInfo = async () => {
+    const getPlayerInfo = async () => {
         try {
-            // First, check for a custom name in Firestore
+            // Check for a custom name in Firestore first
             if (db) {
-                const customNameDocRef = doc(db, "teamCustomizations", String(teamId));
+                const customNameDocRef = doc(db, "playerCustomizations", String(playerId));
                 const customNameDocSnap = await getDoc(customNameDocRef);
                 if (customNameDocSnap.exists()) {
                     setDisplayTitle(customNameDocSnap.data().customName);
@@ -45,19 +43,19 @@ export function TeamDetailScreen({ goBack, canGoBack, teamId }: ScreenProps & { 
                 }
             }
             
-            // If no custom name, fetch from the API as a fallback
-            const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
-            if (teamRes.ok) {
-                const teamData = await teamRes.json();
-                if (teamData.response?.[0]?.team?.name) {
-                    setDisplayTitle(teamData.response[0].team.name);
+            // Fallback to API if no custom name
+            const playerRes = await fetch(`/api/football/players?id=${playerId}&season=2023`); // Season might be needed
+            if (playerRes.ok) {
+                const playerData = await playerRes.json();
+                if (playerData.response?.[0]?.player?.name) {
+                    setDisplayTitle(playerData.response[0].player.name);
                 }
             }
         } catch (error) {
-            console.error("Error fetching team info:", error);
+            console.error("Error fetching player info:", error);
             if (db) {
                 const permissionError = new FirestorePermissionError({
-                    path: `teamCustomizations/${teamId}`,
+                    path: `playerCustomizations/${playerId}`,
                     operation: 'get',
                 });
                 errorEmitter.emit('permission-error', permissionError);
@@ -65,9 +63,9 @@ export function TeamDetailScreen({ goBack, canGoBack, teamId }: ScreenProps & { 
         }
     };
     
-    getTeamInfo();
+    getPlayerInfo();
     
-  }, [db, teamId]);
+  }, [db, playerId]);
 
 
   return (
@@ -84,14 +82,12 @@ export function TeamDetailScreen({ goBack, canGoBack, teamId }: ScreenProps & { 
       
       <div className="flex-1 overflow-y-auto p-4">
         <api-sports-widget
-          data-type="team"
-          data-team={String(teamId)}
-          data-p-statistics="true"
-          data-p-squad="true"
-          data-p-trophies="false"
-          data-p-sidelined="false"
-          data-p-transfers="false"
-          data-p-matches="true"
+          data-type="player"
+          data-player-id={String(playerId)}
+          data-player-statistics="true"
+          data-player-trophies="true"
+          data-player-sidelined="true"
+          data-player-transfers="true"
         ></api-sports-widget>
       </div>
     </div>

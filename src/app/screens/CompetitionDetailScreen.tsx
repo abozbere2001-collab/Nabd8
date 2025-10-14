@@ -394,13 +394,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
               <TabsTrigger value="teams" className='rounded-none data-[state=active]:rounded-md'><Users className="w-4 h-4 ml-1"/>الفرق</TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="matches" className="p-4 mt-0">
+          <TabsContent value="matches" className="p-0 mt-0">
              {loading ? (
-                <div className="space-y-4">
+                <div className="space-y-4 p-4">
                     {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
                 </div>
             ) : fixtures.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-3 p-4">
                     {fixtures.map((fixture) => (
                         <div key={fixture.fixture.id} className="rounded-lg border bg-card p-3 text-sm cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}>
                            <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
@@ -510,7 +510,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     </TableHeader>
                     <TableBody>
                         {topScorers.map(({ player, statistics }) => (
-                            <TableRow key={player.id}>
+                            <TableRow key={player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
                                 <TableCell>
                                     <div className="flex items-center gap-3 justify-end">
                                         <div className="relative">
@@ -526,12 +526,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                         </p>
                                     </div>
                                 </TableCell>
-                                <TableCell className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: statistics[0]?.team.id })}>
+                                <TableCell onClick={(e) => { e.stopPropagation(); navigate('TeamDetails', { teamId: statistics[0]?.team.id })}}>
                                      <p className="text-xs text-muted-foreground text-right">{getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name)}</p>
                                 </TableCell>
                                 <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
                                 <TableCell>
-                                    <div className='flex items-center justify-start opacity-80'>
+                                    <div className='flex items-center justify-start opacity-80' onClick={e => e.stopPropagation()}>
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('player', player.id, getDisplayName('player', player.id, player.name))}>
                                             <Pencil className="h-4 w-4 text-muted-foreground" />
                                         </Button>}

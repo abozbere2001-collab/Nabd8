@@ -18,7 +18,7 @@ import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 
 // --- PlayerCard Component ---
-const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
+const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: ScreenProps['navigate'] }) => {
   const fallbackImage = "https://media.api-sports.io/football/players/0.png";
   
   // Use the most up-to-date info first (from the secondary player fetch), then fallback to lineup data.
@@ -39,7 +39,7 @@ const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
   };
 
   return (
-    <div className="relative flex flex-col items-center">
+    <div className="relative flex flex-col items-center cursor-pointer" onClick={() => player.player.id && navigate('PlayerDetails', { playerId: player.player.id })}>
       <div className="relative w-12 h-12">
         <img 
           src={playerImage} 
@@ -69,7 +69,7 @@ const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
 
 // --- Reusable Components ---
 
-const MatchHeaderCard = ({ fixture }: { fixture: Fixture }) => {
+const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
     const isLive = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(fixture.fixture.status.short);
 
     return (
@@ -83,26 +83,22 @@ const MatchHeaderCard = ({ fixture }: { fixture: Fixture }) => {
                     <span>{format(new Date(fixture.fixture.date), 'd MMMM yyyy', { locale: ar })}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3 flex-1 justify-end truncate">
-                        <span className="font-bold text-lg truncate">{fixture.teams.home.name}</span>
+                    <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
                         <Avatar className="h-12 w-12 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                     <div className="flex flex-col items-center justify-center min-w-[90px] text-center">
-                        {isLive ? (
-                            <>
-                                <div className="font-bold text-3xl tracking-wider">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
-                                <div className="text-red-500 font-bold text-xs animate-pulse mt-1">
-                                    {fixture.fixture.status.elapsed ? `${fixture.fixture.status.elapsed}'` : 'مباشر'}
-                                </div>
-                            </>
-                        ) : (
-                             <div className="font-bold text-3xl tracking-wider">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
+                        <div className="font-bold text-3xl tracking-wider">{`${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`}</div>
+                        {isLive && (
+                             <div className="text-red-500 font-bold text-xs animate-pulse mt-1">
+                                {fixture.fixture.status.elapsed ? `${fixture.fixture.status.elapsed}'` : 'مباشر'}
+                            </div>
                         )}
                        
                     </div>
-                    <div className="flex items-center gap-3 flex-1 truncate">
+                    <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-12 w-12 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                        <span className="font-bold text-lg truncate">{fixture.teams.away.name}</span>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                 </div>
             </CardContent>
@@ -246,12 +242,15 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
 };
 
 
-const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: LineupData[] | null; events: MatchEvent[] | null; season: number; }) => {
+const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lineups: LineupData[] | null; events: MatchEvent[] | null; season: number; navigate: ScreenProps['navigate']; }) => {
     const [lineups, setLineups] = useState(initialLineups);
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
     useEffect(() => {
-        if (!initialLineups || initialLineups.length < 2) return;
+        if (!initialLineups || initialLineups.length < 2) {
+            setActiveTeamTab('home'); // Ensure a default value
+            return;
+        }
 
         const allPlayerIds = initialLineups.flatMap(l => 
             [...l.startXI, ...l.substitutes].map(p => p.player.id)
@@ -315,7 +314,12 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
     if (!lineups) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     if (lineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     
-    const [home, away] = lineups;
+    const home = lineups.find(l => l.team.id === initialLineups[0].team.id);
+    const away = lineups.find(l => l.team.id === initialLineups[1].team.id);
+    
+    if (!home || !away) return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
+
+
     const activeLineup = activeTeamTab === 'home' ? home : away;
 
     const renderPitch = (lineup: LineupData) => {
@@ -349,12 +353,12 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2">
                 {sortedRows.map(row => (
                     <div key={row} className="flex justify-around items-center">
-                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id} player={p} />)}
+                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id} player={p} navigate={navigate} />)}
                     </div>
                 ))}
                  {ungriddedPlayers.length > 0 && (
                     <div className="flex justify-around items-center">
-                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id} player={p} />)}
+                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id} player={p} navigate={navigate}/>)}
                     </div>
                 )}
             </div>
@@ -396,7 +400,7 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-muted-foreground">{p.player.name}</span>
-                                        <PlayerCard player={p} />
+                                        <PlayerCard player={p} navigate={navigate} />
                                     </div>
                                 </div>
                             )
@@ -411,7 +415,7 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
                     <div className="flex flex-col items-center gap-1">
                         <Avatar className="h-12 w-12">
                             <AvatarImage src={activeLineup.coach.photo} />
-                            <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
+                            <AvatarFallback>{activeLinep.coach.name?.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
                     </div>
@@ -422,7 +426,7 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
 };
 
 
-const StandingsTab = ({ standings, fixture }: { standings: Standing[] | null, fixture: Fixture }) => {
+const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] | null, fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
     if (!standings) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     if (standings.length === 0) return <p className="text-center text-muted-foreground p-8">جدول الترتيب غير متاح لهذه البطولة.</p>;
     
@@ -441,7 +445,7 @@ const StandingsTab = ({ standings, fixture }: { standings: Standing[] | null, fi
                 {standings.map((s) => {
                     const isRelevantTeam = s.team.id === fixture.teams.home.id || s.team.id === fixture.teams.away.id;
                     return (
-                        <TableRow key={s.team.id} className={cn(isRelevantTeam && "bg-primary/10")}>
+                        <TableRow key={s.team.id} className={cn(isRelevantTeam && "bg-primary/10", "cursor-pointer")} onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
                             <TableCell className="text-center font-bold">{s.points}</TableCell>
                             <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
                             <TableCell className="text-center">{s.all.played}</TableCell>
@@ -539,7 +543,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         <div className="flex h-full flex-col bg-background">
             <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} />
             <div className="flex-1 overflow-y-auto p-4">
-                <MatchHeaderCard fixture={fixture} />
+                <MatchHeaderCard fixture={fixture} navigate={navigate} />
                 <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-4 rounded-lg h-auto p-1 bg-card">
                         <TabsTrigger value="details"><ShieldCheck className="w-4 h-4 ml-1" />تفاصيل</TabsTrigger>
@@ -549,8 +553,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
-                    <TabsContent value="lineups" className="mt-4"><LineupsTab lineups={lineups} events={events} season={fixture.league.season} /></TabsContent>
-                    <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} /></TabsContent>
+                    <TabsContent value="lineups" className="mt-4"><LineupsTab lineups={lineups} events={events} season={fixture.league.season} navigate={navigate} /></TabsContent>
+                    <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} navigate={navigate} /></TabsContent>
                 </Tabs>
             </div>
         </div>
