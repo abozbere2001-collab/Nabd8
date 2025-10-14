@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -86,32 +87,27 @@ const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, isAdmin }:
     const live = isMatchLive(fixture.fixture.status);
     const hasCommentsFeature = commentsEnabled || isAdmin;
 
-    // Use a smaller height for non-live matches, and a slightly larger one for live matches
-    const cardHeight = live ? 'h-[105px]' : 'h-[80px]';
-
     return (
       <div 
         key={fixture.fixture.id} 
-        className={cn("rounded-lg bg-card border text-sm transition-all duration-300 flex flex-col justify-between", cardHeight)}
+        className="rounded-lg bg-card border text-sm transition-all duration-300 flex flex-col justify-between p-2"
         onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
       >
-         <div className="p-2 flex-1">
-            <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                    <span className="font-semibold truncate">{fixture.teams.home.name}</span>
-                    <Avatar className={'h-6 w-6'}><AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} /></Avatar>
-                </div>
-                <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
-                    <LiveMatchStatus fixture={fixture} isLive={live} />
-                </div>
-                <div className="flex items-center gap-2 flex-1 truncate">
-                    <Avatar className={'h-6 w-6'}><AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} /></Avatar>
-                    <span className="font-semibold truncate">{fixture.teams.away.name}</span>
-                </div>
+         <div className="flex-1 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-1 justify-end truncate">
+                <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+                <Avatar className={'h-6 w-6'}><AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} /></Avatar>
+            </div>
+            <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
+                <LiveMatchStatus fixture={fixture} isLive={live} />
+            </div>
+            <div className="flex items-center gap-2 flex-1 truncate">
+                <Avatar className={'h-6 w-6'}><AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} /></Avatar>
+                <span className="font-semibold truncate">{fixture.teams.away.name}</span>
             </div>
          </div>
          {hasCommentsFeature && (
-            <div className="mt-auto p-1 border-t border-border/50">
+            <div className="mt-2 pt-2 border-t border-border/50">
                 <CommentsButton 
                   matchId={fixture.fixture.id} 
                   navigate={navigate} 
@@ -260,7 +256,7 @@ const FixturesList = ({
                                     <span className="truncate">{leagueName}</span>
                                </div>
                             </AccordionTrigger>
-                            <AccordionContent className="space-y-1 pt-1">
+                            <AccordionContent className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
                                 {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} isAdmin={isAdmin} />)}
                             </AccordionContent>
                         </AccordionItem>
@@ -309,7 +305,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     }, [selectedDateKey]);
 
     return (
-        <div ref={scrollerRef} className="flex flex-row-reverse overflow-x-auto pb-2 px-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div ref={scrollerRef} className="flex flex-row-reverse overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {dates.map(date => {
                 const dateKey = formatDateKey(date);
                 const isSelected = dateKey === selectedDateKey;
@@ -467,12 +463,12 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                    <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
                </TabsList>
                 <TabsContent value="my-results" className="mt-0">
-                     <div className="py-2">
+                     <div className="py-2 px-4">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                     </div>
                 </TabsContent>
                 <TabsContent value="all-matches" className="mt-0">
-                     <div className="py-2">
+                     <div className="py-2 px-4">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                     </div>
                 </TabsContent>
@@ -482,7 +478,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
              </Tabs>
 
         </div>
-        <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
+        <div className="flex-1 overflow-y-auto p-1 space-y-4">
             {activeTab === 'predictions' ? (
                 <GlobalPredictionsScreen navigate={navigate} goBack={goBack} canGoBack={canGoBack} />
             ) : (

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -76,7 +77,7 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
         <Card className="mb-4 bg-card/80 backdrop-blur-sm">
             <CardContent className="p-4">
                 <div className="flex justify-between items-center text-xs text-muted-foreground mb-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('CompetitionDetails', { leagueId: fixture.league.id })}>
                         <Avatar className="h-5 w-5"><AvatarImage src={fixture.league.logo} /></Avatar>
                         <span>{fixture.league.name}</span>
                     </div>
@@ -246,9 +247,9 @@ const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lin
     const [lineups, setLineups] = useState(initialLineups);
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
+    // This must be at the top level
     useEffect(() => {
         if (!initialLineups || initialLineups.length < 2) {
-            setActiveTeamTab('home'); // Ensure a default value
             return;
         }
 
@@ -310,7 +311,7 @@ const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lin
         fetchPlayerStats();
         
     }, [initialLineups, season]);
-    
+
     if (!lineups) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     if (lineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     
@@ -318,7 +319,6 @@ const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lin
     const away = lineups.find(l => l.team.id === initialLineups[1].team.id);
     
     if (!home || !away) return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
-
 
     const activeLineup = activeTeamTab === 'home' ? home : away;
 
@@ -415,7 +415,7 @@ const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lin
                     <div className="flex flex-col items-center gap-1">
                         <Avatar className="h-12 w-12">
                             <AvatarImage src={activeLineup.coach.photo} />
-                            <AvatarFallback>{activeLinep.coach.name?.charAt(0)}</AvatarFallback>
+                            <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
                     </div>

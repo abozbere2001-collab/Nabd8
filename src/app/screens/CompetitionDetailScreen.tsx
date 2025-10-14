@@ -97,7 +97,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
+  const [teams, setTeams] = useState<{team: Team}[]>([]);
   const [customNames, setCustomNames] = useState<{ teams: Map<number, string>, players: Map<number, string> }>({ teams: new Map(), players: new Map() });
   const [season, setSeason] = useState<number>(CURRENT_SEASON);
 
@@ -546,9 +546,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 </Table>
             ) : <p className="pt-4 text-center text-muted-foreground">قائمة الهدافين غير متاحة حاليًا.</p>}
           </TabsContent>
-          <TabsContent value="teams" className="p-4 mt-0">
+          <TabsContent value="teams" className="mt-0">
             {loading ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
                     {Array.from({ length: 12 }).map((_, i) => (
                         <div key={i} className="flex flex-col items-center gap-2 rounded-lg border bg-card p-4">
                             <Skeleton className="h-16 w-16 rounded-full" />
@@ -557,7 +557,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     ))}
                 </div>
             ) : teams.length > 0 ? (
-                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
                     {teams.map(({ team }) => (
                         <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
                             <div className='relative'>
@@ -592,5 +592,3 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
-
-    

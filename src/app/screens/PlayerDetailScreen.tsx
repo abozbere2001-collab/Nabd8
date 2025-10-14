@@ -1,56 +1,200 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { useAdmin, useFirestore } from '@/firebase/provider';
+import { useFirestore } from '@/firebase/provider';
 import { doc, getDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import type { Player, PlayerStats } from '@/lib/types';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CURRENT_SEASON } from '@/lib/constants';
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      'api-sports-widget': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
-        'data-type': string;
-        'data-player-id': string;
-        'data-player-statistics': string;
-        'data-player-trophies': string;
-        'data-player-sidelined': string;
-        'data-player-transfers': string;
-      };
-    }
-  }
+interface PlayerInfo extends Player {
+    birth: { date: string; place: string; country: string; };
+    nationality: string;
+    height: string;
+    weight: string;
+    injured: boolean;
 }
 
-export function PlayerDetailScreen({ goBack, canGoBack, playerId }: ScreenProps & { playerId: number }) {
+interface PlayerData {
+    player: PlayerInfo;
+    statistics: PlayerStats[];
+}
+
+interface Transfer {
+    date: string;
+    type: string;
+    teams: {
+        in: { id: number; name: string; logo: string; };
+        out: { id: number; name: string; logo: string; };
+    };
+}
+
+
+const PlayerHeader = ({ player }: { player: PlayerInfo }) => (
+    <Card className="mb-4 overflow-hidden">
+        <div className="relative h-24 bg-gradient-to-r from-primary/20 to-accent/20">
+            <Avatar className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 h-24 w-24 border-4 border-background">
+                <AvatarImage src={player.photo} alt={player.name} />
+                <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+        </div>
+        <CardContent className="pt-16 text-center">
+            <h1 className="text-2xl font-bold">{player.name}</h1>
+            <p className="text-muted-foreground">{player.nationality}</p>
+            <div className="mt-4 flex justify-center gap-6 text-sm">
+                <div className="flex flex-col items-center">
+                    <span className="font-bold">{player.age}</span>
+                    <span className="text-xs text-muted-foreground">العمر</span>
+                </div>
+                <div className="flex flex-col items-center">
+                    <span className="font-bold">{player.height || '-'}</span>
+                    <span className="text-xs text-muted-foreground">الطول</span>
+                </div>
+                <div className="flex flex-col items-center">
+                    <span className="font-bold">{player.weight || '-'}</span>
+                    <span className="text-xs text-muted-foreground">الوزن</span>
+                </div>
+            </div>
+        </CardContent>
+    </Card>
+);
+
+const StatsTab = ({ statistics, navigate }: { statistics: PlayerStats[], navigate: ScreenProps['navigate'] }) => {
+    if (statistics.length === 0) {
+        return <p className="text-center text-muted-foreground p-8">لا توجد إحصائيات متاحة لهذا الموسم.</p>;
+    }
+    return (
+        <div className="space-y-4">
+            {statistics.map((stat, index) => (
+                <Card key={index} className="cursor-pointer" onClick={() => navigate('CompetitionDetails', { leagueId: stat.league.id })}>
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3 mb-4">
+                            <Avatar className="h-8 w-8"><AvatarImage src={stat.league.logo} /></Avatar>
+                            <div>
+                                <p className="font-bold">{stat.league.name}</p>
+                                <div className="flex items-center gap-2">
+                                     <p className="text-xs text-muted-foreground">{stat.team.name}</p>
+                                     <p className="text-xs text-muted-foreground">موسم {stat.league.season}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                                <p className="font-bold text-lg">{stat.games.appearences || 0}</p>
+                                <p className="text-xs text-muted-foreground">مباريات</p>
+                            </div>
+                            <div>
+                                <p className="font-bold text-lg">{stat.goals.total || 0}</p>
+                                <p className="text-xs text-muted-foreground">أهداف</p>
+                            </div>
+                            <div>
+                                <p className="font-bold text-lg">{stat.goals.assists || 0}</p>
+                                <p className="text-xs text-muted-foreground">صناعة</p>
+                            </div>
+                             <div>
+                                <p className="font-bold text-lg">{stat.cards.yellow || 0}</p>
+                                <p className="text-xs text-muted-foreground">بطاقات صفراء</p>
+                            </div>
+                             <div>
+                                <p className="font-bold text-lg">{stat.cards.red + stat.cards.yellowred || 0}</p>
+                                <p className="text-xs text-muted-foreground">بطاقات حمراء</p>
+                            </div>
+                             <div>
+                                <p className="font-bold text-lg">{stat.games.rating ? parseFloat(stat.games.rating).toFixed(1) : '-'}</p>
+                                <p className="text-xs text-muted-foreground">تقييم</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+    );
+};
+
+const TransfersTab = ({ transfers, navigate }: { transfers: Transfer[], navigate: ScreenProps['navigate'] }) => {
+     if (transfers.length === 0) {
+        return <p className="text-center text-muted-foreground p-8">لا يوجد تاريخ انتقالات لهذا اللاعب.</p>;
+    }
+
+    return (
+        <div className="space-y-3">
+            {transfers.map((transfer, index) => (
+                <Card key={index}>
+                    <CardContent className="p-4">
+                        <p className="text-sm text-muted-foreground mb-2">{new Date(transfer.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('TeamDetails', {teamId: transfer.teams.out.id })}>
+                                <Avatar className="h-8 w-8"><AvatarImage src={transfer.teams.out.logo} /></Avatar>
+                                <span className="font-semibold text-sm">{transfer.teams.out.name}</span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                 <p className="text-xs bg-muted px-2 py-1 rounded-md">{transfer.type}</p>
+                            </div>
+                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('TeamDetails', {teamId: transfer.teams.in.id })}>
+                                <span className="font-semibold text-sm">{transfer.teams.in.name}</span>
+                                <Avatar className="h-8 w-8"><AvatarImage src={transfer.teams.in.logo} /></Avatar>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+    );
+};
+
+
+export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: ScreenProps & { playerId: number }) {
   const { db } = useFirestore();
   const [displayTitle, setDisplayTitle] = useState("اللاعب");
+  const [playerData, setPlayerData] = useState<PlayerData | null>(null);
+  const [transfers, setTransfers] = useState<Transfer[] | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!playerId) return;
 
     const getPlayerInfo = async () => {
+        setLoading(true);
         try {
-            // Check for a custom name in Firestore first
-            if (db) {
-                const customNameDocRef = doc(db, "playerCustomizations", String(playerId));
-                const customNameDocSnap = await getDoc(customNameDocRef);
-                if (customNameDocSnap.exists()) {
-                    setDisplayTitle(customNameDocSnap.data().customName);
-                    return;
-                }
-            }
-            
-            // Fallback to API if no custom name
-            const playerRes = await fetch(`/api/football/players?id=${playerId}&season=2023`); // Season might be needed
+            // Fetch main player data
+            const playerRes = await fetch(`/api/football/players?id=${playerId}&season=${CURRENT_SEASON}`);
             if (playerRes.ok) {
-                const playerData = await playerRes.json();
-                if (playerData.response?.[0]?.player?.name) {
-                    setDisplayTitle(playerData.response[0].player.name);
+                const data = await playerRes.json();
+                if (data.response?.[0]) {
+                    setPlayerData(data.response[0]);
+                    const name = data.response[0].player.name;
+
+                    // Check for custom name
+                    if (db) {
+                         const customNameDocRef = doc(db, "playerCustomizations", String(playerId));
+                         const customNameDocSnap = await getDoc(customNameDocRef);
+                         if (customNameDocSnap.exists()) {
+                             setDisplayTitle(customNameDocSnap.data().customName);
+                         } else {
+                            setDisplayTitle(name);
+                         }
+                    } else {
+                        setDisplayTitle(name);
+                    }
                 }
             }
+
+            // Fetch transfer data
+            const transferRes = await fetch(`/api/football/transfers?player=${playerId}`);
+            if (transferRes.ok) {
+                 const data = await transferRes.json();
+                 setTransfers(data.response || []);
+            }
+
         } catch (error) {
             console.error("Error fetching player info:", error);
             if (db) {
@@ -60,6 +204,8 @@ export function PlayerDetailScreen({ goBack, canGoBack, playerId }: ScreenProps 
                 });
                 errorEmitter.emit('permission-error', permissionError);
             }
+        } finally {
+            setLoading(false);
         }
     };
     
@@ -67,13 +213,31 @@ export function PlayerDetailScreen({ goBack, canGoBack, playerId }: ScreenProps 
     
   }, [db, playerId]);
 
+  if(loading) {
+     return (
+        <div className="flex h-full flex-col bg-background">
+            <ScreenHeader title="جاري التحميل..." onBack={goBack} canGoBack={canGoBack} />
+             <div className="p-4 space-y-4">
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-64 w-full" />
+            </div>
+        </div>
+    );
+  }
+  
+  if(!playerData) {
+     return (
+        <div className="flex h-full flex-col bg-background">
+            <ScreenHeader title="خطأ" onBack={goBack} canGoBack={canGoBack} />
+            <p className="text-center p-8">لم يتم العثور على بيانات اللاعب.</p>
+        </div>
+    );
+  }
+
 
   return (
     <div className="flex flex-col bg-background h-full">
-      <script
-        async
-        src="https://widgets.api-sports.io/2.0.3/widgets.js"
-      ></script>
       <ScreenHeader 
         title={displayTitle}
         onBack={goBack} 
@@ -81,14 +245,19 @@ export function PlayerDetailScreen({ goBack, canGoBack, playerId }: ScreenProps 
       />
       
       <div className="flex-1 overflow-y-auto p-4">
-        <api-sports-widget
-          data-type="player"
-          data-player-id={String(playerId)}
-          data-player-statistics="true"
-          data-player-trophies="true"
-          data-player-sidelined="true"
-          data-player-transfers="true"
-        ></api-sports-widget>
+        <PlayerHeader player={playerData.player} />
+        <Tabs defaultValue="stats" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="stats">الإحصائيات</TabsTrigger>
+            <TabsTrigger value="transfers">الانتقالات</TabsTrigger>
+          </TabsList>
+          <TabsContent value="stats" className="mt-4">
+            <StatsTab statistics={playerData.statistics} navigate={navigate} />
+          </TabsContent>
+          <TabsContent value="transfers" className="mt-4">
+            {transfers ? <TransfersTab transfers={transfers} navigate={navigate}/> : <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
