@@ -11,7 +11,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import type { Player, PlayerStats } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CURRENT_SEASON } from '@/lib/constants';
@@ -33,8 +33,8 @@ interface Transfer {
     date: string;
     type: string;
     teams: {
-        in: { id: number; name: string; logo: string; };
-        out: { id: number; name: string; logo: string; };
+        in: { id: number; name: string; logo: string; } | null;
+        out: { id: number; name: string; logo: string; } | null;
     };
 }
 
@@ -131,17 +131,34 @@ const TransfersTab = ({ transfers, navigate }: { transfers: Transfer[], navigate
                 <Card key={index}>
                     <CardContent className="p-4">
                         <p className="text-sm text-muted-foreground mb-2">{new Date(transfer.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('TeamDetails', {teamId: transfer.teams.out.id })}>
-                                <Avatar className="h-8 w-8"><AvatarImage src={transfer.teams.out.logo} /></Avatar>
-                                <span className="font-semibold text-sm">{transfer.teams.out.name}</span>
+                        <div className="flex items-center justify-between gap-2">
+                             <div 
+                                className="flex-1 flex items-center gap-2 cursor-pointer justify-start" 
+                                onClick={() => transfer.teams.out && navigate('TeamDetails', {teamId: transfer.teams.out.id })}
+                            >
+                                {transfer.teams.out ? (
+                                    <>
+                                        <Avatar className="h-8 w-8"><AvatarImage src={transfer.teams.out.logo} /></Avatar>
+                                        <span className="font-semibold text-sm">{transfer.teams.out.name}</span>
+                                    </>
+                                ) : <span className="font-semibold text-sm text-muted-foreground">بداية المسيرة</span>}
                             </div>
-                            <div className="flex flex-col items-center">
-                                 <p className="text-xs bg-muted px-2 py-1 rounded-md">{transfer.type}</p>
+                            
+                            <div className="flex flex-col items-center text-muted-foreground">
+                                 <ArrowRight className="h-5 w-5"/>
+                                 <p className="text-xs bg-muted px-2 py-1 rounded-md mt-1">{transfer.type}</p>
                             </div>
-                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('TeamDetails', {teamId: transfer.teams.in.id })}>
-                                <span className="font-semibold text-sm">{transfer.teams.in.name}</span>
-                                <Avatar className="h-8 w-8"><AvatarImage src={transfer.teams.in.logo} /></Avatar>
+
+                             <div 
+                                className="flex-1 flex items-center gap-2 cursor-pointer justify-end" 
+                                onClick={() => transfer.teams.in && navigate('TeamDetails', {teamId: transfer.teams.in.id })}
+                            >
+                                {transfer.teams.in ? (
+                                    <>
+                                        <span className="font-semibold text-sm">{transfer.teams.in.name}</span>
+                                        <Avatar className="h-8 w-8"><AvatarImage src={transfer.teams.in.logo} /></Avatar>
+                                    </>
+                                ) : <span className="font-semibold text-sm text-muted-foreground">نهاية العقد</span>}
                             </div>
                         </div>
                     </CardContent>
