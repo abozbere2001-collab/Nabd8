@@ -10,8 +10,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Tajawal', 'sans-serif'],
-        headline: ['Tajawal', 'sans-serif'],
+        body: ['var(--font-cairo)', 'sans-serif'],
+        headline: ['var(--font-tajawal)', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {

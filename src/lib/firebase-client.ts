@@ -7,6 +7,7 @@ import {
   onAuthStateChanged as firebaseOnAuthStateChanged,
   signInWithRedirect,
   getRedirectResult,
+  signInAnonymously,
   updateProfile,
   type User, 
 } from "firebase/auth";
@@ -14,8 +15,9 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 import type { UserProfile, UserScore } from './types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { auth, db } from './firebase';
+import { initializeFirebase } from "@/firebase";
 
+const { auth, firestore: db } = initializeFirebase();
 
 // --- GUEST USER ---
 const GUEST_USER_KEY = 'isGuestUser';
@@ -25,11 +27,11 @@ export const guestUser = {
     displayName: 'زائر',
     email: null,
     photoURL: null,
-    isGuestUser: true,
+    isGuest: true,
 };
 
 export const isGuest = (user: any): user is typeof guestUser => {
-    return !!user && user.isGuestUser === true;
+    return !!user && user.isGuest === true;
 }
 // --- END GUEST USER ---
 
@@ -116,11 +118,12 @@ export const onAuthStateChange = (callback: (user: User | null | typeof guestUse
     return unsubscribe;
 };
 
-export const setGuestUser = () => {
-    sessionStorage.setItem(GUEST_USER_KEY, 'true');
-    // Force a reload to ensure all components re-evaluate the new guest state
-    // and onAuthStateChange fires correctly.
-    window.location.reload();
+export const setGuestUser = async () => {
+    try {
+        await signInAnonymously(auth);
+    } catch (error) {
+        console.error("Anonymous sign-in error:", error);
+    }
 }
 
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {

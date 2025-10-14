@@ -2,9 +2,8 @@
 "use client";
 
 import React from 'react';
-import type { User } from 'firebase/auth';
 import { LoginScreen } from './screens/LoginScreen';
-import { FirebaseProvider, useAuth } from '@/firebase/provider';
+import { FirebaseClientProvider, useUser } from '@/firebase';
 import { AppContentWrapper } from './AppContentWrapper';
 import { Loader2 } from 'lucide-react';
 import { AdProvider } from '@/components/AdProvider';
@@ -18,10 +17,9 @@ export type ScreenProps = {
 };
 
 function App() {
-  const { user } = useAuth();
+  const { user, isUserLoading } = useUser();
   
-  // This is the loading state while Firebase is determining the auth state.
-  if (user === undefined) {
+  if (isUserLoading) {
       return (
           <div className="flex items-center justify-center h-screen bg-background">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -30,22 +28,19 @@ function App() {
       );
   }
   
-  // If user is null (not a guest, not logged in), show the Login screen.
-  if (user === null) {
+  if (!user) {
     return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
   }
 
-  // If we have a user object (either a real user or a guest), show the main app content.
-  // This state is reached only after Firebase has confirmed the auth state.
   return <AppContentWrapper />;
 }
 
 export default function Home() {
   return (
-    <FirebaseProvider>
+    <FirebaseClientProvider>
         <AdProvider>
             <App />
         </AdProvider>
-    </FirebaseProvider>
+    </FirebaseClientProvider>
   );
 }
