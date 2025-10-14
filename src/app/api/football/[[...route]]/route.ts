@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
-import { API_FOOTBALL_KEY, API_FOOTBALL_HOST } from '@/lib/config';
+
+const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
 
 export async function GET(
   request: Request,
@@ -10,9 +11,11 @@ export async function GET(
   const routePath = params.route ? params.route.join('/') : '';
   const apiURL = `https://${API_FOOTBALL_HOST}/${routePath}?${searchParams.toString()}`;
 
-  const apiKey = API_FOOTBALL_KEY;
+  // Read the API key directly from environment variables
+  const apiKey = process.env.API_FOOTBALL_KEY;
 
   if (!apiKey) {
+    console.error('API key for football service is not configured in environment variables.');
     return NextResponse.json(
       { error: 'API key for football service is not configured.' },
       { status: 500 }
@@ -34,25 +37,22 @@ export async function GET(
       next: { revalidate: revalidateSeconds } 
     });
 
-    // Directly get the body for logging/error purposes, handle both JSON and text
     const responseBodyText = await apiResponse.text();
 
     if (!apiResponse.ok) {
-      console.error(`API Error for ${apiURL}:`, { status: apiResponse.status, body: responseBodyText });
-      // Try to parse as JSON, but fall back to text if it fails
       let errorDetails;
       try {
         errorDetails = JSON.parse(responseBodyText);
       } catch {
         errorDetails = { message: responseBodyText };
       }
+      console.error(`API Error for ${apiURL}:`, { status: apiResponse.status, body: errorDetails });
       return NextResponse.json(
-        { error: 'Failed to fetch data from football API', details: errorDetails.message || errorDetails },
+        { error: 'Failed to fetch data from football API', details: errorDetails },
         { status: apiResponse.status }
       );
     }
 
-    // Since we've consumed the body, we parse the stored text
     const data = JSON.parse(responseBodyText);
     return NextResponse.json(data);
     
