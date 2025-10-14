@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -14,6 +13,8 @@ import type { Notification } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 const NotificationIcon = ({ type }: { type: Notification['type'] }) => {
     switch (type) {
@@ -37,7 +38,7 @@ export function NotificationsScreen({ navigate, goBack, canGoBack, headerActions
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !db) {
       setLoading(false);
       return;
     }
@@ -50,20 +51,31 @@ export function NotificationsScreen({ navigate, goBack, canGoBack, headerActions
       setNotifications(fetchedNotifications);
       setLoading(false);
     }, (error) => {
-      console.error("Error fetching notifications:", error);
-      setLoading(false);
+        const permissionError = new FirestorePermissionError({
+            path: notifsRef.path,
+            operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        setLoading(false);
     });
 
     return () => unsubscribe();
   }, [user, db]);
 
   const handleNotificationClick = async (notification: Notification) => {
-    if (!user || !notification.id) return;
+    if (!user || !notification.id || !db) return;
     
     // Mark as read
     if (!notification.read) {
         const notifDocRef = doc(db, 'users', user.uid, 'notifications', notification.id);
-        await updateDoc(notifDocRef, { read: true });
+        updateDoc(notifDocRef, { read: true }).catch(serverError => {
+             const permissionError = new FirestorePermissionError({
+                path: notifDocRef.path,
+                operation: 'update',
+                requestResourceData: { read: true }
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
     }
 
     // Navigate to comments screen
