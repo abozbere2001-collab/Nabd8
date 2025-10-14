@@ -5,7 +5,7 @@ import type { User, Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, doc, onSnapshot, setDoc, initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 import { firebaseConfig } from '@/lib/firebase';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { isGuest, guestUser, onAuthStateChange } from '@/lib/firebase-client';
@@ -23,16 +23,16 @@ const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined
 
 const ADMIN_EMAIL = "sagralnarey@gmail.com";
 
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = initializeFirestore(app, {
+    cache: persistentLocalCache({})
+});
+
+
 export const FirebaseProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | typeof guestUser | null | undefined>(undefined);
   const [isProUser, setIsProUser] = useState(false);
-
-  const { auth, db } = useMemo(() => {
-    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    return { app, auth, db };
-  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange((currentUser) => {

@@ -12,11 +12,10 @@ import {
   type User, 
 } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, initializeFirestore, persistentLocalCache } from 'firebase/firestore';
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { firebaseConfig } from "./firebase";
 import type { UserProfile, UserScore } from './types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { auth, db } from '@/firebase/provider'; // Import centralized instances
 
 // --- GUEST USER ---
 const GUEST_USER_KEY = 'isGuestUser';
@@ -33,16 +32,6 @@ export const isGuest = (user: any): user is typeof guestUser => {
     return !!user && user.isGuestUser === true;
 }
 // --- END GUEST USER ---
-
-
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-// Use initializeFirestore to enable persistence with the new API
-const db = initializeFirestore(app, {
-    cache: persistentLocalCache({})
-});
-
 
 const handleNewUser = async (user: User) => {
     const userRef = doc(db, 'users', user.uid);
