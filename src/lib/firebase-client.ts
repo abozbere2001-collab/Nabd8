@@ -29,7 +29,15 @@ const handleNewUser = async (user: User) => {
                 email: user.email!,
                 photoURL: user.photoURL || '',
             };
-            await setDoc(userRef, userProfileData);
+            setDoc(userRef, userProfileData)
+              .catch((serverError) => {
+                const permissionError = new FirestorePermissionError({
+                  path: userRef.path,
+                  operation: 'create',
+                  requestResourceData: userProfileData,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+              });
         }
 
         const leaderboardDoc = await getDoc(leaderboardRef);
@@ -40,19 +48,24 @@ const handleNewUser = async (user: User) => {
                 userPhoto: user.photoURL || '',
                 totalPoints: 0,
             };
-            await setDoc(leaderboardRef, leaderboardEntry);
+            setDoc(leaderboardRef, leaderboardEntry)
+              .catch((serverError) => {
+                const permissionError = new FirestorePermissionError({
+                  path: leaderboardRef.path,
+                  operation: 'create',
+                  requestResourceData: leaderboardEntry,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+              });
         }
 
     } catch (error: any) {
-         if (error.name === 'FirestorePermissionError') {
-            errorEmitter.emit('permission-error', error);
-         } else {
-            const permissionError = new FirestorePermissionError({
-                path: `users/${user.uid} or leaderboard/${user.uid}`,
-                operation: 'create',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-         }
+        // This outer try-catch is for the getDoc calls, which should also be handled.
+        const permissionError = new FirestorePermissionError({
+            path: `users/${user.uid} or leaderboard/${user.uid}`,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
     }
 }
 
