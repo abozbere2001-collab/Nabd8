@@ -99,77 +99,57 @@ const handleNewUser = async (user: User) => {
 
 
 export const signInWithGoogle = async (): Promise<void> => {
-  isCurrentlyGuest = false;
-  const provider = new GoogleAuthProvider();
-  try {
-    await signInWithPopup(auth, provider);
-  } catch (error: any) {
-    if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/unauthorized-domain') {
-      // If popup fails, fall back to redirect
-      await signInWithRedirect(auth, provider);
-    } else {
-      // Rethrow other errors
-      throw error;
-    }
-  }
+    const provider = new GoogleAuthProvider();
+    await signInWithRedirect(auth, provider);
 };
-
 
 export const signOut = (): Promise<void> => {
     isCurrentlyGuest = false;
+    sessionStorage.removeItem(GUEST_USER_KEY);
     return firebaseSignOut(auth);
 };
 
 export const onAuthStateChange = (callback: (user: User | null | typeof guestUser) => void) => {
-  const unsubscribe = firebaseOnAuthStateChanged(auth, (user) => {
-    if (user) {
-        // A real user is logged in.
-        isCurrentlyGuest = false;
-        handleNewUser(user);
-        callback(user);
-    } else if (isCurrentlyGuest) {
-        // No real user, but we are in a guest session.
-        callback(guestUser);
-    } else {
-        // No real user, and not in a guest session.
-        callback(null);
+    if (sessionStorage.getItem(GUEST_USER_KEY)) {
+        isCurrentlyGuest = true;
     }
-  });
-  
-  return unsubscribe;
+    
+    const unsubscribe = firebaseOnAuthStateChanged(auth, (user) => {
+        if (user) {
+            isCurrentlyGuest = false;
+            sessionStorage.removeItem(GUEST_USER_KEY);
+            handleNewUser(user);
+            callback(user);
+        } else if (isCurrentlyGuest) {
+            callback(guestUser);
+        } else {
+            callback(null);
+        }
+    });
+
+    return unsubscribe;
 };
 
-// Function for other parts of the app to trigger a guest session
 export const setGuestUser = () => {
     isCurrentlyGuest = true;
-    // Manually trigger an auth state change by signing out, which will then fall back to guest logic in the listener.
-    // This is a bit of a hack but ensures a single source of truth for auth state changes.
-    // If the user is already null, we need to manually trigger the callback.
-    if (auth.currentUser === null) {
-        // To ensure the provider updates, we re-trigger the auth flow.
-        // A simple way is to re-initialize the listener, but that's messy.
-        // Instead, we can just call signOut which will trigger our listener. If already signed out, it's a no-op.
-        signOut();
-    } else {
-        signOut();
-    }
+    sessionStorage.setItem(GUEST_USER_KEY, 'true');
+    // Trigger auth state change listener to update the app state
+    signOut();
 }
 
 
-export const checkRedirectResult = async (): Promise<User | null> => {
+export const checkRedirectResult = async (): Promise<Error | null> => {
     try {
         const result = await getRedirectResult(auth);
-        if (result?.user) {
-            isCurrentlyGuest = false;
-            // handleNewUser will be called by the onAuthStateChanged listener
-            return result.user;
-        }
+        // If successful, onAuthStateChanged will handle the user creation logic.
+        // If there's an error, we'll return it to be handled by the caller.
         return null;
-    } catch (error) {
-        console.error("Error getting redirect result:", error);
-        return null;
+    } catch (error: any) {
+        console.error("Error from getRedirectResult:", error);
+        return error;
     }
 };
+
 
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {
     if (isGuest(user)) throw new Error("User not authenticated.");
