@@ -21,8 +21,6 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
 // --- GUEST USER ---
-// This is a simple object that looks like a user but has a special property
-// to identify it as a guest.
 const GUEST_USER_KEY = 'isGuestUser';
 export const guestUser = {
     uid: 'guest',
@@ -43,11 +41,11 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let authStateCallback: ((user: User | null | typeof guestUser) => void) | null = null;
-let currentAuthUser: User | null | typeof guestUser = undefined;
+let currentAuthUser: User | null | typeof guestUser | undefined = undefined;
 
 // Function for other parts of the app to trigger a guest session
 export const setGuestUser = () => {
-    if (authStateCallback) {
+    if (authStateCallback && !isGuest(currentAuthUser)) {
         currentAuthUser = guestUser;
         authStateCallback(guestUser);
     }
@@ -113,8 +111,7 @@ export const signInWithGoogle = async (): Promise<void> => {
   const provider = new GoogleAuthProvider();
   const result = await signInWithPopup(auth, provider);
   if (result.user) {
-    await handleNewUser(result.user);
-    // The onAuthStateChanged listener will handle the update
+    // The onAuthStateChanged listener will handle the user creation
   }
 };
 
@@ -126,31 +123,33 @@ export const signOut = (): Promise<void> => {
 
 export const onAuthStateChange = (callback: (user: User | null | typeof guestUser) => void) => {
   authStateCallback = callback;
-  if(currentAuthUser !== undefined) {
-      callback(currentAuthUser);
+  
+  if (currentAuthUser !== undefined) {
+    callback(currentAuthUser);
   }
   
-  return firebaseOnAuthStateChanged(auth, (user) => {
-    if (isGuest(currentAuthUser) && !user) {
-        // If we are in a guest session and firebase reports no user, stay as guest.
-        // Don't switch to null.
-        return;
+  const unsubscribe = firebaseOnAuthStateChanged(auth, (user) => {
+    // If the new user is null and we were previously a guest, stay as guest.
+    if (user === null && isGuest(currentAuthUser)) {
+        return; 
     }
-
+    
     currentAuthUser = user;
 
-    if(user) {
+    if (user) {
         handleNewUser(user);
     }
     callback(user);
   });
+  
+  return unsubscribe;
 };
 
 export const checkRedirectResult = async (): Promise<User | null> => {
     try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
-            await handleNewUser(result.user);
+            // handleNewUser will be called by the onAuthStateChanged listener
             return result.user;
         }
         return null;
