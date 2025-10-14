@@ -6,6 +6,7 @@ import {
   signOut as firebaseSignOut, 
   onAuthStateChanged as firebaseOnAuthStateChanged,
   signInWithRedirect,
+  signInWithPopup,
   getRedirectResult,
   updateProfile,
   type User, 
@@ -69,9 +70,10 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
 }
 
 
-export const signInWithGoogle = async (): Promise<void> => {
+export const signInWithGoogle = async (): Promise<User | null> => {
     const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
+    const result = await signInWithPopup(auth, provider);
+    return result.user;
 };
 
 

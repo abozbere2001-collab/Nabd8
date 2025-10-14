@@ -29,9 +29,6 @@ const AuthGate = () => {
     }
     
     if (!user) {
-        // Since LoginScreen doesn't have navigation props in this setup,
-        // we can pass dummy functions. The screen will handle its own logic
-        // and the auth state change will re-render this component.
         return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
     }
 

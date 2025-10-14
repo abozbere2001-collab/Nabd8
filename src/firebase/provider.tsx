@@ -4,7 +4,7 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
+import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { handleNewUser } from '@/lib/firebase-client';
@@ -39,62 +39,53 @@ export const FirebaseProvider = ({
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // This effect runs once on mount to check for redirect results.
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result && result.user) {
-          handleNewUser(result.user, firestore);
-        }
-      })
-      .catch((error) => {
-        console.error("Error handling redirect result:", error);
-      })
-      .finally(() => {
-        // After handling redirect, set up the normal auth state listener.
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-          setIsLoading(true);
-          if (firebaseUser) {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        setIsLoading(true);
+        if (firebaseUser) {
             setUser(firebaseUser);
-            const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
-            const userDocRef = doc(firestore, 'users', firebaseUser.uid);
+            // Check for admin and pro status in parallel
             try {
+                const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
+                const userDocRef = doc(firestore, 'users', firebaseUser.uid);
+                
                 const [adminDoc, userDoc] = await Promise.all([
                     getDoc(adminDocRef),
-                    getDoc(userDocRef)
+                    getDoc(userDoc)
                 ]);
+
                 setIsAdmin(adminDoc.exists());
 
+                // handleNewUser has already been called in LoginScreen
                 if (userDoc.exists()) {
                     setProUser(userDoc.data()?.isProUser || false);
-                } else {
-                    // This case should be rare if handleNewUser works correctly on redirect
-                    await handleNewUser(firebaseUser, firestore);
                 }
+
             } catch (error) {
-                console.error("Error checking admin or pro status:", error);
+                console.error("Error checking user status:", error);
                 setIsAdmin(false);
                 setProUser(false);
             }
-          } else {
+        } else {
             setUser(null);
             setIsAdmin(false);
             setProUser(false);
-          }
-          setIsLoading(false);
-        });
-        return () => unsubscribe();
-      });
+        }
+        setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [auth, firestore]);
   
   const handleSetPro = async (isPro: boolean) => {
     if (user && firestore) {
         const userDocRef = doc(firestore, 'users', user.uid);
         try {
-            setProUser(isPro);
             await setDoc(userDocRef, { isProUser: isPro }, { merge: true });
+            setProUser(isPro); // Update state after successful write
         } catch (error) {
             console.error("Failed to update pro status:", error);
-            setProUser(!isPro); 
+            // Optionally revert state if write fails
+            // setProUser(!isPro); 
         }
     }
   }
