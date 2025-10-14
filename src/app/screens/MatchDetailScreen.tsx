@@ -248,6 +248,7 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
 
 const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: LineupData[] | null; events: MatchEvent[] | null; season: number; }) => {
     const [lineups, setLineups] = useState(initialLineups);
+    const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
     useEffect(() => {
         if (!initialLineups || initialLineups.length < 2) return;
@@ -315,7 +316,6 @@ const LineupsTab = ({ lineups: initialLineups, events, season }: { lineups: Line
     if (lineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     
     const [home, away] = lineups;
-    const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
     const activeLineup = activeTeamTab === 'home' ? home : away;
 
     const renderPitch = (lineup: LineupData) => {
@@ -556,7 +556,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
-    
-
-    
