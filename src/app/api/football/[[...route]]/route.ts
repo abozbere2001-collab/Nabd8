@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: { route: string[] } }
 ) {
   const { searchParams, pathname } = new URL(request.url);
-  const routePath = params.route ? params.route.join('/') : '';
+  const routePath = (await params).route ? (await params).route.join('/') : '';
   const apiURL = `https://${API_FOOTBALL_HOST}/${routePath}?${searchParams.toString()}`;
 
   if (!API_FOOTBALL_KEY) {
