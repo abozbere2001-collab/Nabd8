@@ -10,7 +10,9 @@ export async function GET(
   const routePath = params.route ? params.route.join('/') : '';
   const apiURL = `https://${API_FOOTBALL_HOST}/${routePath}?${searchParams.toString()}`;
 
-  if (!API_FOOTBALL_KEY) {
+  const apiKey = API_FOOTBALL_KEY;
+
+  if (!apiKey) {
     return NextResponse.json(
       { error: 'API key for football service is not configured.' },
       { status: 500 }
@@ -27,7 +29,7 @@ export async function GET(
     const apiResponse = await fetch(apiURL, {
       headers: {
         'x-rapidapi-host': API_FOOTBALL_HOST,
-        'x-rapidapi-key': API_FOOTBALL_KEY,
+        'x-rapidapi-key': apiKey,
       },
       next: { revalidate: revalidateSeconds } 
     });
