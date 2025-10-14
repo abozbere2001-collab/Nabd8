@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -8,6 +7,7 @@ import { LoginScreen } from './screens/LoginScreen';
 import { FirebaseProvider, useAuth } from '@/firebase/provider';
 import { onAuthStateChange, guestUser } from '@/lib/firebase-client';
 import { AppContentWrapper } from './AppContentWrapper';
+import { Loader2 } from 'lucide-react';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails';
 
@@ -19,17 +19,18 @@ export type ScreenProps = {
 
 function App() {
   const { user } = useAuth();
-
-  // Unified loading and auth check
+  
   if (user === undefined) {
       return (
           <div className="flex items-center justify-center h-screen bg-background">
-              <p>جاري التحميل...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-4">جاري التحميل...</p>
           </div>
       );
   }
   
   if (user === null) {
+    // This provides dummy props as LoginScreen handles its own logic now
     return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
   }
 
@@ -41,6 +42,7 @@ export default function Home() {
   const [user, setUser] = useState<User | typeof guestUser | null | undefined>(undefined);
 
   useEffect(() => {
+    // onAuthStateChange now handles all user states including guest.
     const unsubscribe = onAuthStateChange((currentUser) => {
       setUser(currentUser);
     });

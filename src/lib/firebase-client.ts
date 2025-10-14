@@ -9,7 +9,6 @@ import {
   getRedirectResult,
   updateProfile,
   type User, 
-  type Auth, 
   signInWithRedirect,
 } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, enableIndexedDbPersistence } from 'firebase/firestore';
@@ -21,7 +20,6 @@ import { errorEmitter } from '@/firebase/error-emitter';
 
 // --- GUEST USER ---
 const GUEST_USER_KEY = 'isGuestUser';
-let isCurrentlyGuest = false;
 
 export const guestUser = {
     uid: 'guest',
@@ -85,7 +83,6 @@ const handleNewUser = async (user: User) => {
          if (error.name === 'FirestorePermissionError') {
             errorEmitter.emit('permission-error', error);
          } else {
-             // Fallback for other potential errors, though less likely for this operation
             const permissionError = new FirestorePermissionError({
                 path: `users/${user.uid} or leaderboard/${user.uid}`,
                 operation: 'create',
@@ -96,69 +93,67 @@ const handleNewUser = async (user: User) => {
 }
 
 
-export const signInWithGoogle = async (auth: Auth): Promise<void> => {
+export const signInWithGoogle = async (): Promise<void> => {
     const provider = new GoogleAuthProvider();
     await signInWithRedirect(auth, provider);
 };
 
 export const signOut = (): Promise<void> => {
-    isCurrentlyGuest = false;
     sessionStorage.removeItem(GUEST_USER_KEY);
     return firebaseSignOut(auth);
 };
 
 export const onAuthStateChange = (callback: (user: User | null | typeof guestUser) => void) => {
-    if (sessionStorage.getItem(GUEST_USER_KEY)) {
-        isCurrentlyGuest = true;
-    }
     
     const unsubscribe = firebaseOnAuthStateChanged(auth, (user) => {
         if (user) {
-            isCurrentlyGuest = false;
+            // A real user is signed in.
             sessionStorage.removeItem(GUEST_USER_KEY);
             handleNewUser(user);
             callback(user);
-        } else if (isCurrentlyGuest) {
-            callback(guestUser);
         } else {
-            callback(null);
+             // No real user. Check if we should be a guest.
+            if (sessionStorage.getItem(GUEST_USER_KEY) === 'true') {
+                callback(guestUser);
+            } else {
+                callback(null);
+            }
         }
     });
+
+    // Also check for redirect result when the app first loads
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          // User signed in via redirect. onAuthStateChanged will handle it.
+        }
+      })
+      .catch((error) => {
+        // Handle Errors here.
+        console.error("Redirect Error:", error);
+        // This could be 'auth/account-exists-with-different-credential', etc.
+        // You might want to notify the user.
+      });
 
     return unsubscribe;
 };
 
 export const setGuestUser = () => {
-    isCurrentlyGuest = true;
     sessionStorage.setItem(GUEST_USER_KEY, 'true');
-    // Trigger auth state change listener to update the app state
-    signOut();
+    // Trigger auth state change listener to update the app state to guest
+    onAuthStateChange(user => {});
+    // A bit of a hack: force a reload to ensure all components re-evaluate the new guest state
+    window.location.reload();
 }
-
-
-export const checkRedirectResult = async (authInstance: Auth): Promise<Error | null> => {
-    try {
-        const result = await getRedirectResult(authInstance);
-        // If successful, onAuthStateChanged will handle the user creation logic.
-        // If there's an error, we'll return it to be handled by the caller.
-        return null;
-    } catch (error: any) {
-        console.error("Error from getRedirectResult:", error);
-        return error;
-    }
-};
-
 
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {
     if (isGuest(user)) throw new Error("User not authenticated.");
 
-    // This updates the name in Firebase Auth itself
     await updateProfile(user, { displayName: newDisplayName });
 
     const userRef = doc(db, 'users', user.uid);
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
     
-    // Update user profile in 'users' collection
     const userProfileUpdateData = { displayName: newDisplayName };
     setDoc(userRef, userProfileUpdateData, { merge: true })
         .catch((serverError) => {
@@ -170,7 +165,6 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
             errorEmitter.emit('permission-error', permissionError);
         });
 
-    // Update leaderboard entry in 'leaderboard' collection
     const leaderboardUpdateData = { userName: newDisplayName };
     setDoc(leaderboardRef, leaderboardUpdateData, { merge: true })
         .catch((serverError) => {

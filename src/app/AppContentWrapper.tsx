@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { BottomNav } from '@/components/BottomNav';
 import { MatchesScreen } from './screens/MatchesScreen';
 import { CompetitionsScreen } from './screens/CompetitionsScreen';
@@ -134,7 +134,7 @@ export function AppContentWrapper() {
     if (stack.length > 1) {
       setStack(prev => prev.slice(0, -1));
     }
-  }, [stack]);
+  }, [stack.length]);
 
   const navigate = useCallback((screen: ScreenKey, props?: Record<string, any>) => {
     const isMainTab = mainTabs.includes(screen);
@@ -143,56 +143,39 @@ export function AppContentWrapper() {
 
     setStack(prevStack => {
       if (isMainTab) {
-        if (prevStack.length === 1 && prevStack[0].screen === screen) {
-           return prevStack;
-        }
+        // If it's a main tab, reset the stack to just this tab.
         return [newItem];
       } else {
-        if (prevStack.length > 0 && prevStack[prevStack.length - 1].screen === screen) {
-            return prevStack;
-        }
+        // Otherwise, push the new screen onto the stack.
         return [...prevStack, newItem];
       }
     });
   }, []);
-
-  useMemo(() => {
+  
+  useEffect(() => {
       if (typeof window !== 'undefined') {
           (window as any).appNavigate = navigate;
       }
   }, [navigate]);
 
-  if (!stack || stack.length === 0) {
-    return (
-        <div className="flex items-center justify-center h-screen bg-background">
-          <p>جاري التحميل...</p>
-        </div>
-    );
-  }
 
   const activeStackItem = stack[stack.length - 1];
-  const navigationProps = useMemo(() => ({
-      navigate,
-      goBack,
-      canGoBack: stack.length > 1,
-  }), [navigate, goBack, stack.length]);
+  const ActiveScreenComponent = screenConfig[activeStackItem.screen]?.component;
+  const showBottomNav = mainTabs.includes(activeStackItem.screen);
 
-  const activeScreenKey = activeStackItem.screen;
-  const showBottomNav = mainTabs.includes(activeScreenKey);
-  const ScreenComponent = screenConfig[activeStackItem.screen]?.component;
-
-  if (!ScreenComponent) {
+  if (!ActiveScreenComponent) {
     return (
         <div className="flex items-center justify-center h-screen bg-background">
-          <p>شاشة غير موجودة</p>
+          <p>شاشة غير موجودة: {activeStackItem.screen}</p>
         </div>
     );
   }
   
   const screenProps = {
-    ...navigationProps,
     ...activeStackItem.props,
-    isVisible: true,
+    navigate,
+    goBack,
+    canGoBack: stack.length > 1,
   };
 
 
@@ -202,29 +185,30 @@ export function AppContentWrapper() {
         {stack.map((item, index) => {
           const ScreenComponent = screenConfig[item.screen]?.component;
           const isVisible = index === stack.length - 1;
-          const isMainTab = mainTabs.includes(item.screen);
           
+          if (!ScreenComponent) return null;
+
           return (
             <div
               key={item.key}
               className={cn(
-                'absolute inset-0 bg-background flex flex-col transform transition-transform duration-300 ease-in-out',
-                !isVisible && 'translate-x-full',
-                index < stack.length - 1 && '-translate-x-1/4 opacity-50',
-                 isVisible && !isMainTab && 'animate-slide-in-from-right',
+                'absolute inset-0 bg-background flex flex-col',
+                { 'z-10': isVisible, 'z-0': !isVisible }
               )}
               style={{
-                zIndex: index + 1,
-                display: index < stack.length - 2 ? 'none' : 'flex'
+                 transform: isVisible ? 'translateX(0)' : 'translateX(100%)',
+                 transition: 'transform 0.3s ease-in-out',
+                 // Render only the top 2 screens for performance
+                 display: index < stack.length - 2 ? 'none' : 'flex'
               }}
             >
-              {ScreenComponent && <ScreenComponent {...navigationProps} {...item.props} isVisible={isVisible} />}
+              <ScreenComponent {...item.props} {...screenProps} isVisible={isVisible} />
             </div>
           );
         })}
       </div>
       
-      {showBottomNav && <BottomNav activeScreen={activeScreenKey} onNavigate={navigate} />}
+      {showBottomNav && <BottomNav activeScreen={activeStackItem.screen} onNavigate={navigate} />}
     </main>
   );
 }

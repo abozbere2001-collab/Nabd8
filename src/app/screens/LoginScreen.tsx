@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -8,34 +8,15 @@ import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { signInWithGoogle, setGuestUser, checkRedirectResult } from '@/lib/firebase-client';
-import { useAuth } from '@/firebase/provider';
+import { signInWithGoogle, setGuestUser } from '@/lib/firebase-client';
 
-export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+export function LoginScreen({ goBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { auth } = useAuth();
-  
-  // Check for redirect result on component mount
-  useEffect(() => {
-    const checkResult = async () => {
-      setLoading(true);
-      const redirectError = await checkRedirectResult(auth);
-      if (redirectError) {
-        handleAuthError(redirectError);
-      }
-      // If no error, onAuthStateChanged will handle the login.
-      // We might still be in a loading state until that triggers.
-      // A small delay can prevent a flicker if the redirect was not from us.
-      setTimeout(() => setLoading(false), 1000);
-    };
-    checkResult();
-  }, [auth]);
-
 
   const handleAuthError = (e: any) => {
     console.error("Login Error:", e);
-     if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+     if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request' || e.code === 'auth/redirect-cancelled-by-user') {
         setError('تم إلغاء عملية تسجيل الدخول.');
     } else if (e.code === 'auth/unauthorized-domain') {
         setError('النطاق غير مصرح به. يرجى التأكد من إضافة نطاق التطبيق إلى قائمة النطاقات المصرح بها في إعدادات Firebase Authentication.');
@@ -49,9 +30,9 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setLoading(true);
     setError(null);
     try {
-      await signInWithGoogle(auth);
-      // The browser will redirect. If it doesn't for some reason (e.g. popup blocker), 
-      // the loading state will eventually be handled by the effect hook.
+      // signInWithGoogle now handles redirect. No result is expected here.
+      await signInWithGoogle();
+      // The user will be redirected. We show a loader for a better UX in case of slow redirect.
     } catch (e: any) {
       handleAuthError(e);
       setLoading(false);
@@ -69,7 +50,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         {loading ? (
             <div className="flex flex-col items-center gap-4">
                 <Loader2 className="h-8 w-8 animate-spin" />
-                <p className="text-muted-foreground">جاري التحقق من المصادقة...</p>
+                <p className="text-muted-foreground">جاري تحويلك إلى صفحة جوجل...</p>
             </div>
         ) : (
           <>
@@ -92,17 +73,8 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                   disabled={loading}
                   size="lg"
                 >
-                  {loading ? (
-                    <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        جاري التحقق...
-                    </>
-                  ) : (
-                    <>
-                      <GoogleIcon className="h-5 w-5 mr-2" />
-                      تسجيل الدخول باستخدام جوجل
-                    </>
-                  )}
+                  <GoogleIcon className="h-5 w-5 mr-2" />
+                  تسجيل الدخول باستخدام جوجل
                 </Button>
 
                 <Button 
