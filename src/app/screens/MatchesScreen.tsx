@@ -55,11 +55,6 @@ const FixturesList = ({
     
     const filteredFixtures = useMemo(() => {
         let fixturesToFilter = fixtures;
-
-        // "All Matches" tab is now "Live Matches"
-        if (activeTab === 'all-matches') {
-            return fixturesToFilter.filter(f => isMatchLive(f.fixture.status));
-        }
         
         if (activeTab === 'my-results'){
              return fixturesToFilter.filter(f => 
@@ -68,7 +63,9 @@ const FixturesList = ({
                 favoritedLeagueIds.includes(f.league.id)
             );
         }
-        return [];
+        
+        return fixturesToFilter;
+
     }, [fixtures, activeTab, favoritedTeamIds, favoritedLeagueIds, showLiveOnly]);
 
     const groupedFixtures = useMemo(() => {
@@ -99,16 +96,6 @@ const FixturesList = ({
         );
     }
     
-    const liveMatchesCount = fixtures.filter(f => isMatchLive(f.fixture.status)).length;
-
-    if (activeTab === 'all-matches' && liveMatchesCount === 0) {
-        return (
-             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
-                <p>لا توجد مباريات مباشرة حاليًا.</p>
-            </div>
-        )
-    }
-
     if (fixtures.length > 0 && filteredFixtures.length === 0 && activeTab === 'my-results') {
        return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
@@ -117,7 +104,7 @@ const FixturesList = ({
         );
     }
 
-    if (Object.keys(groupedFixtures).length === 0 && activeTab !== 'all-matches') {
+    if (Object.keys(groupedFixtures).length === 0) {
         return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
                 <p>لا توجد مباريات لهذا اليوم.</p>
@@ -300,9 +287,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   const handleTabChange = (value: string) => {
     const tabValue = value as TabName;
-    if (tabValue === 'all-matches') {
-        setSelectedDateKey(formatDateKey(new Date()));
-    }
     setActiveTab(tabValue);
   };
 
@@ -334,7 +318,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
              <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
                <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
                    <TabsTrigger value="predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
-                   <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>مباشر</TabsTrigger>
+                   <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>كل المباريات</TabsTrigger>
                    <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
                </TabsList>
                 <TabsContent value="my-results" className="mt-0">
@@ -343,7 +327,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     </div>
                 </TabsContent>
                 <TabsContent value="all-matches" className="mt-0">
-                     {/* The "all-matches" tab is now for live matches and doesn't need a date scroller */}
+                     <div className="py-2 px-4">
+                        <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
+                    </div>
                 </TabsContent>
                 <TabsContent value="predictions" className="mt-0">
                     {/* Date scroller for predictions is handled inside the component */}
