@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server';
 
 const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
+// This is secure because this code only runs on the server.
+const API_FOOTBALL_KEY = '5a36c80242mshe57db12185b135bp19a31fjsn9a06674e402e';
 
 export async function GET(
   request: Request,
@@ -11,11 +13,8 @@ export async function GET(
   const routePath = params.route ? params.route.join('/') : '';
   const apiURL = `https://${API_FOOTBALL_HOST}/${routePath}?${searchParams.toString()}`;
 
-  // Read the API key directly from environment variables
-  const apiKey = process.env.API_FOOTBALL_KEY;
-
-  if (!apiKey) {
-    console.error('API key for football service is not configured in environment variables.');
+  if (!API_FOOTBALL_KEY) {
+    console.error('API key for football service is not configured.');
     return NextResponse.json(
       { error: 'API key for football service is not configured.' },
       { status: 500 }
@@ -32,7 +31,7 @@ export async function GET(
     const apiResponse = await fetch(apiURL, {
       headers: {
         'x-rapidapi-host': API_FOOTBALL_HOST,
-        'x-rapidapi-key': apiKey,
+        'x-rapidapi-key': API_FOOTBALL_KEY,
       },
       next: { revalidate: revalidateSeconds } 
     });
