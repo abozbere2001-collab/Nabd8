@@ -16,19 +16,21 @@ export function LoginScreen({ goBack }: ScreenProps) {
 
   // Check for redirect result on component mount
   useEffect(() => {
-    setLoading(true);
+    // Only show loader if we expect a redirect result
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('state')) {
+      setLoading(true);
+    }
+    
     getGoogleRedirectResult()
       .catch((e: any) => {
         handleAuthError(e);
       })
       .finally(() => {
-        // The onAuthStateChanged listener will handle success,
-        // so we only need to stop the loader if there's an error
-        // or if there's no redirect result.
-        const urlParams = new URLSearchParams(window.location.search);
-        if (!urlParams.has('state')) {
-            setLoading(false);
-        }
+        // The onAuthStateChanged listener will handle success and stop the loader
+        // by swapping the component. We only need to stop the loader here if there's
+        // an error or if there was no redirect attempt.
+        setLoading(false);
       });
   }, []);
 
