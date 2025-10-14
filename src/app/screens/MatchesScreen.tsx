@@ -41,9 +41,7 @@ const FixturesList = ({
     hasAnyFavorites,
     favoritedLeagueIds,
     favoritedTeamIds,
-    matchDetails,
     navigate,
-    isAdmin,
 }: { 
     fixtures: FixtureType[], 
     loading: boolean,
@@ -52,21 +50,17 @@ const FixturesList = ({
     hasAnyFavorites: boolean,
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
-    matchDetails: { [matchId: string]: MatchDetails },
     navigate: ScreenProps['navigate'],
-    isAdmin: boolean,
 }) => {
     
     const filteredFixtures = useMemo(() => {
         let fixturesToFilter = fixtures;
 
-        if (showLiveOnly) {
-            fixturesToFilter = fixturesToFilter.filter(f => isMatchLive(f.fixture.status));
-        }
-
+        // "All Matches" tab is now "Live Matches"
         if (activeTab === 'all-matches') {
-            return fixturesToFilter;
+            return fixturesToFilter.filter(f => isMatchLive(f.fixture.status));
         }
+        
         if (activeTab === 'my-results'){
              return fixturesToFilter.filter(f => 
                 favoritedTeamIds.includes(f.teams.home.id) ||
@@ -107,7 +101,7 @@ const FixturesList = ({
     
     const liveMatchesCount = fixtures.filter(f => isMatchLive(f.fixture.status)).length;
 
-    if (showLiveOnly && liveMatchesCount === 0) {
+    if (activeTab === 'all-matches' && liveMatchesCount === 0) {
         return (
              <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
                 <p>لا توجد مباريات مباشرة حاليًا.</p>
@@ -123,7 +117,7 @@ const FixturesList = ({
         );
     }
 
-    if (Object.keys(groupedFixtures).length === 0) {
+    if (Object.keys(groupedFixtures).length === 0 && activeTab !== 'all-matches') {
         return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
                 <p>لا توجد مباريات لهذا اليوم.</p>
@@ -149,7 +143,7 @@ const FixturesList = ({
             {sortedLeagues.map(leagueName => {
                 const { league, fixtures } = groupedFixtures[leagueName];
                 return (
-                    <div key={leagueName}>
+                    <div key={league.id}>
                         <div 
                             className="font-bold text-foreground py-2 px-3 rounded-md bg-card border flex items-center gap-2 cursor-pointer"
                             onClick={() => navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo })}
@@ -160,7 +154,7 @@ const FixturesList = ({
                             <span className="truncate">{leagueName}</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
-                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} isAdmin={isAdmin} />)}
+                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} />)}
                         </div>
                     </div>
                 )
@@ -254,8 +248,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   const [showLiveOnly, setShowLiveOnly] = useState(false);
 
-  const [matchDetails, setMatchDetails] = useState<{ [matchId: string]: MatchDetails }>({});
-  
   useEffect(() => {
     if (!user || !db) {
         setFavorites({userId: ''});
@@ -275,23 +267,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     return () => unsubscribe();
   }, [user, db]);
   
-  useEffect(() => {
-      if (!db) return;
-      const matchesColRef = collection(db, 'matches');
-      const unsubscribe = onSnapshot(matchesColRef, (snapshot) => {
-          const details: { [matchId: string]: MatchDetails } = {};
-          snapshot.forEach(doc => {
-              details[doc.id] = doc.data() as MatchDetails;
-          });
-          setMatchDetails(prevDetails => ({ ...prevDetails, ...details }));
-      }, (error) => {
-          const permissionError = new FirestorePermissionError({ path: 'matches', operation: 'list' });
-          errorEmitter.emit('permission-error', permissionError);
-      });
-      return () => unsubscribe();
-  }, [db]);
-
-
   const fetchFixturesForDate = useCallback(async (dateKey: string) => {
     if (fixturesCache[dateKey]) {
       setLoadingFixtures(false);
@@ -325,6 +300,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   const handleTabChange = (value: string) => {
     const tabValue = value as TabName;
+    if (tabValue === 'all-matches') {
+        setSelectedDateKey(formatDateKey(new Date()));
+    }
     setActiveTab(tabValue);
   };
 
@@ -348,11 +326,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                           <Search className="h-5 w-5" />
                       </Button>
                   </SearchSheet>
-                  <Switch
-                    id="live-only-switch"
-                    checked={showLiveOnly}
-                    onCheckedChange={setShowLiveOnly}
-                  />
                   <ProfileButton />
               </div>
             }
@@ -361,7 +334,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
              <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
                <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
                    <TabsTrigger value="predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
-                   <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>كل المباريات</TabsTrigger>
+                   <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>مباشر</TabsTrigger>
                    <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
                </TabsList>
                 <TabsContent value="my-results" className="mt-0">
@@ -370,9 +343,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     </div>
                 </TabsContent>
                 <TabsContent value="all-matches" className="mt-0">
-                     <div className="py-2 px-4">
-                        <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
-                    </div>
+                     {/* The "all-matches" tab is now for live matches and doesn't need a date scroller */}
                 </TabsContent>
                 <TabsContent value="predictions" className="mt-0">
                     {/* Date scroller for predictions is handled inside the component */}
@@ -392,14 +363,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favoritedLeagueIds={favoritedLeagueIds}
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
-                    matchDetails={matchDetails}
                     navigate={navigate}
-                    isAdmin={isAdmin}
                 />
             )}
         </div>
     </div>
   );
 }
-
-    
