@@ -15,11 +15,8 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 import type { UserProfile, UserScore } from './types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { initializeFirebase } from "@/firebase";
+import { auth, firestore as db } from "@/firebase";
 
-const { auth, firestore: db } = initializeFirebase();
-
-// --- GUEST USER ---
 const GUEST_USER_KEY = 'isGuestUser';
 
 export const guestUser = {
@@ -33,7 +30,6 @@ export const guestUser = {
 export const isGuest = (user: any): user is typeof guestUser => {
     return !!user && user.isGuest === true;
 }
-// --- END GUEST USER ---
 
 const handleNewUser = async (user: User) => {
     const userRef = doc(db, 'users', user.uid);
