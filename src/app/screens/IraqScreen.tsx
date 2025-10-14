@@ -227,7 +227,7 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     return (
         <div className="space-y-3 pt-4">
             {teams.map(team => (
-                <div key={team.teamId} onClick={() => navigate('TeamDetails', { teamId: team.teamId })} className="p-3 rounded-lg border bg-card cursor-pointer">
+                <div key={team.teamId} onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: team.teamId, teamName: team.name })} className="p-3 rounded-lg border bg-card cursor-pointer">
                     <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
                             <AvatarImage src={team.logo} alt={team.name} />
