@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut, User, Search, Goal, Redo, XCircle, Newspaper, Crown, Star } from 'lucide-react';
+import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut, User, Search, Goal, Redo, XCircle, Newspaper, Crown } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
@@ -43,7 +43,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const { user, isProUser, setProUser } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, makeAdmin } = useAdmin();
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -120,6 +120,13 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         }
       />
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        
+        {!isAdmin && (
+             <Button onClick={makeAdmin} className="w-full bg-amber-600 hover:bg-amber-700">
+                (للتجربة) ترقية إلى مدير
+            </Button>
+        )}
+
         <div className="space-y-2">
             <button onClick={toggleTheme} className="flex w-full items-center justify-between rounded-lg bg-card p-4 text-right transition-colors hover:bg-accent/50">
                <div className="flex items-center gap-4">
@@ -145,7 +152,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             ))}
         </div>
         
-        {!isProUser && (
+        {!isProUser && !isAdmin && (
         <Card className="border-primary/50">
             <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-primary">
@@ -156,24 +163,20 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                     احصل على تجربة خالية من الإعلانات تمامًا وادعم تطوير التطبيق.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
                 <Button onClick={handleUpgrade} className="w-full">الترقية الآن</Button>
-                <div className="flex justify-around text-center text-xs text-muted-foreground">
-                    <div>
-                        <p className="font-bold text-sm text-foreground">$1</p>
-                        <p>شهريًا</p>
-                    </div>
-                     <div>
-                        <p className="font-bold text-sm text-foreground">$15</p>
-                        <p>سنويًا</p>
-                    </div>
-                </div>
             </CardContent>
         </Card>
         )}
         
+        {isAdmin && !isProUser && (
+            <Button onClick={handleUpgrade} className="w-full">
+                (Admin) الترقية إلى برو
+            </Button>
+        )}
+        
         {isAdmin && isProUser && (
-            <Button onClick={() => setProUser(false)} variant="destructive">
+            <Button onClick={() => setProUser(false)} variant="destructive" className="w-full">
                 (Admin) إيقاف وضع البرو
             </Button>
         )}

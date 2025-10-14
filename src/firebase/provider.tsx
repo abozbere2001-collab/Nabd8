@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
+import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useCallback } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
@@ -19,6 +19,7 @@ interface FirebaseContextProps {
   isAdmin: boolean;
   isProUser: boolean;
   setProUser: (isPro: boolean) => Promise<void>;
+  makeAdmin: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -40,49 +41,51 @@ export const FirebaseProvider = ({
   const [isProUser, setProUser] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        setIsLoading(true);
-        if (firebaseUser) {
-            setUser(firebaseUser);
-            // Check for admin and pro status in parallel
-            try {
-                const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
-                const userDocRef = doc(firestore, 'users', firebaseUser.uid);
-                
-                const [adminDoc, userDoc] = await Promise.all([
-                    getDoc(adminDocRef).catch(err => { throw new FirestorePermissionError({ path: adminDocRef.path, operation: 'get' }) }),
-                    getDoc(userDocRef).catch(err => { throw new FirestorePermissionError({ path: userDocRef.path, operation: 'get' }) })
-                ]);
-
-                setIsAdmin(adminDoc.exists());
-                
-                if (userDoc.exists()) {
-                    setProUser(userDoc.data()?.isProUser || false);
-                } else {
-                    // This is a fallback in case the user was created but the doc wasn't
-                    await handleNewUser(firebaseUser, firestore);
-                }
-
-            } catch (error) {
-                if (error instanceof FirestorePermissionError) {
-                    errorEmitter.emit('permission-error', error);
-                } else {
-                    console.error("Error checking user status:", error);
-                }
-                setIsAdmin(false);
-                setProUser(false);
-            }
-        } else {
-            setUser(null);
-            setIsAdmin(false);
-            setProUser(false);
-        }
+  const checkUserStatus = useCallback(async (firebaseUser: User | null) => {
+    if (!firebaseUser || !firestore) {
+        setUser(null);
+        setIsAdmin(false);
+        setProUser(false);
         setIsLoading(false);
-    });
+        return;
+    }
 
+    setUser(firebaseUser);
+    setIsLoading(true);
+
+    try {
+        const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
+        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
+
+        const [adminDoc, userDoc] = await Promise.all([
+            getDoc(adminDocRef),
+            getDoc(userDocRef)
+        ]);
+
+        setIsAdmin(adminDoc.exists());
+        
+        if (userDoc.exists()) {
+            setProUser(userDoc.data()?.isProUser || false);
+        } else {
+            await handleNewUser(firebaseUser, firestore);
+        }
+    } catch (error) {
+        // This is a general catch, but our rules should be permissive enough for these reads.
+        // A specific permission error for this would be handled by the listener,
+        // but it's good practice to have a fallback.
+        console.error("Error checking user status:", error);
+        setIsAdmin(false);
+        setProUser(false);
+    } finally {
+        setIsLoading(false);
+    }
+}, [firestore]);
+
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, checkUserStatus);
     return () => unsubscribe();
-  }, [auth, firestore]);
+  }, [auth, checkUserStatus]);
   
   const handleSetPro = async (isPro: boolean) => {
     if (user && firestore) {
@@ -102,8 +105,26 @@ export const FirebaseProvider = ({
     }
   }
 
+  const handleMakeAdmin = async () => {
+    if (user && firestore) {
+        const adminDocRef = doc(firestore, 'admins', user.uid);
+        const data = { isAdmin: true, addedAt: new Date() };
+        try {
+            await setDoc(adminDocRef, data);
+            setIsAdmin(true); // Update state after successful write
+        } catch (error) {
+            const permissionError = new FirestorePermissionError({
+              path: adminDocRef.path,
+              operation: 'create',
+              requestResourceData: data,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    }
+  }
 
-  const value = { firebaseApp, firestore, auth, user, isAdmin, isProUser, setProUser: handleSetPro, isLoading };
+
+  const value = { firebaseApp, firestore, auth, user, isAdmin, isProUser, setProUser: handleSetPro, makeAdmin: handleMakeAdmin, isLoading };
 
   return (
     <FirebaseContext.Provider value={value}>
@@ -139,7 +160,10 @@ export const useAdmin = () => {
     if (context === undefined) {
         throw new Error('useAdmin must be used within a FirebaseProvider');
     }
-    return { isAdmin: context.isAdmin };
+    return { 
+        isAdmin: context.isAdmin,
+        makeAdmin: context.makeAdmin,
+    };
 };
 
 export const useFirestore = () => {

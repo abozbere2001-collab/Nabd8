@@ -24,14 +24,20 @@ export const AdProvider = ({ children }: { children: React.ReactNode }) => {
   const [sessionCount, setSessionCount] = useState(0);
 
   useEffect(() => {
-    const count = parseInt(sessionStorage.getItem(SESSION_COUNT_KEY) || '0', 10);
-    const newCount = count + 1;
-    sessionStorage.setItem(SESSION_COUNT_KEY, newCount.toString());
-    setSessionCount(newCount);
-  }, []);
+    // We only want to track sessions for non-pro users to show them ads.
+    if (!isProUser) {
+      const count = parseInt(sessionStorage.getItem(SESSION_COUNT_KEY) || '0', 10);
+      const newCount = count + 1;
+      sessionStorage.setItem(SESSION_COUNT_KEY, newCount.toString());
+      setSessionCount(newCount);
+    }
+  }, [isProUser]);
   
+  // Show splash ad on the first visit of a session for non-pro users.
   const showSplashAd = !isProUser && !splashAdShown;
-  const showBannerAd = !isProUser && sessionCount % 3 === 0;
+  
+  // Show banner ad every 3rd session for non-pro users.
+  const showBannerAd = !isProUser && sessionCount > 0 && sessionCount % 3 === 0;
 
   const value = {
     isProUser,
