@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -18,14 +19,23 @@ export type ScreenProps = {
 
 function App() {
   const { user } = useAuth();
-  if (!user) {
+  if (user === undefined) {
+      // Still checking auth state
+      return (
+          <div className="flex items-center justify-center h-screen bg-background">
+              <p>جاري التحميل...</p>
+          </div>
+      );
+  }
+  if (user === null) {
     return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
   }
+  // This will render for both a logged-in user and a guest user
   return <AppContentWrapper />;
 }
 
 export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null | undefined>(undefined);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {

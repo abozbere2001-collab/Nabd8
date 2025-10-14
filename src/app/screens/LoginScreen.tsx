@@ -9,7 +9,7 @@ import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from 'lucide-react';
-import { signInWithGoogle } from '@/lib/firebase-client';
+import { signInWithGoogle, setGuestUser } from '@/lib/firebase-client';
 
 export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
@@ -35,6 +35,10 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     }
   };
 
+  const handleSkip = () => {
+    setGuestUser();
+  };
+
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="تسجيل الدخول" onBack={goBack} canGoBack={false} />
@@ -49,23 +53,35 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         
         <GoalStackLogo className="h-24 w-24 mb-8" />
         <h1 className="text-2xl font-bold mb-2">مرحباً بك في Goal Stack</h1>
-        <p className="text-muted-foreground mb-8">سجل دخولك باستخدام جوجل للمتابعة.</p>
+        <p className="text-muted-foreground mb-8">سجل دخولك باستخدام جوجل للمتابعة أو تخطى للوصول السريع.</p>
         
-        <Button 
-          onClick={handleGoogleLogin} 
-          className="w-full max-w-xs" 
-          disabled={loading}
-          size="lg"
-        >
-          {loading ? (
-            'جاري التحقق...'
-          ) : (
-            <>
-              <GoogleIcon className="h-5 w-5 mr-2" />
-              تسجيل الدخول باستخدام جوجل
-            </>
-          )}
-        </Button>
+        <div className="w-full max-w-xs space-y-4">
+            <Button 
+              onClick={handleGoogleLogin} 
+              className="w-full" 
+              disabled={loading}
+              size="lg"
+            >
+              {loading ? (
+                'جاري التحقق...'
+              ) : (
+                <>
+                  <GoogleIcon className="h-5 w-5 mr-2" />
+                  تسجيل الدخول باستخدام جوجل
+                </>
+              )}
+            </Button>
+
+            <Button 
+                onClick={handleSkip}
+                variant="link"
+                className="w-full"
+                disabled={loading}
+            >
+                تخطي الآن
+            </Button>
+        </div>
+
 
         <p className="mt-8 text-xs text-muted-foreground/80 px-4">
           بالنقر على "تسجيل الدخول"، أنت توافق على شروط الخدمة وسياسة الخصوصية الخاصة بنا.

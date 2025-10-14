@@ -1,4 +1,5 @@
 
+
 "use client";
 import React, { createContext, useContext, useMemo, useEffect, useState } from 'react';
 import type { User, Auth } from 'firebase/auth';
@@ -8,11 +9,12 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { firebaseConfig } from '@/lib/firebase';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { isGuest } from '@/lib/firebase-client';
 
 interface FirebaseContextType {
   auth: Auth;
   db: Firestore;
-  user: User | null;
+  user: User | null | { isGuestUser: boolean };
   isAdmin: boolean;
 }
 
@@ -20,7 +22,7 @@ const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined
 
 const ADMIN_EMAIL = "sagralnarey@gmail.com";
 
-export const FirebaseProvider = ({ children, user }: { children: React.ReactNode, user: User | null }) => {
+export const FirebaseProvider = ({ children, user }: { children: React.ReactNode, user: User | null | { isGuestUser: boolean } | undefined }) => {
 
   const { auth, db } = useMemo(() => {
     const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -30,13 +32,15 @@ export const FirebaseProvider = ({ children, user }: { children: React.ReactNode
   }, []);
   
   const isAdmin = useMemo(() => {
-    return user?.email === ADMIN_EMAIL;
+      if (!user || isGuest(user)) return false;
+      // @ts-ignore
+      return user.email === ADMIN_EMAIL;
   }, [user]);
 
   const value = useMemo(() => ({
     auth,
     db,
-    user,
+    user: user === undefined ? undefined : user, // Propagate the undefined state
     isAdmin,
   }), [auth, db, user, isAdmin]);
 
