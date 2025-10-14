@@ -8,7 +8,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { useAuth, useFirestore } from '@/firebase/provider';
+import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -82,31 +82,40 @@ const LiveMatchStatus = ({ fixture, isLive }: { fixture: FixtureType, isLive: bo
 };
 
 // Fixture Item Component
-const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
+const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, isAdmin }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean, isAdmin: boolean }) => {
     const live = isMatchLive(fixture.fixture.status);
-    
+    const cardHeight = live ? 'h-32' : 'h-24';
+    const hasCommentsFeature = commentsEnabled || isAdmin;
+
     return (
       <div 
         key={fixture.fixture.id} 
-        className={cn("rounded-lg bg-card border text-sm transition-all duration-300", live ? 'p-3' : 'p-2')}
+        className={cn("rounded-lg bg-card border text-sm transition-all duration-300 flex flex-col justify-between", cardHeight)}
         onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
       >
-         <div className="flex items-center justify-between gap-2">
-             <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                 <span className="font-semibold truncate">{fixture.teams.home.name}</span>
-                 <Avatar className={cn(live ? 'h-8 w-8' : 'h-6 w-6')}><AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} /></Avatar>
-             </div>
-             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
-                 <LiveMatchStatus fixture={fixture} isLive={live} />
-             </div>
-             <div className="flex items-center gap-2 flex-1 truncate">
-                  <Avatar className={cn(live ? 'h-8 w-8' : 'h-6 w-6')}><AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} /></Avatar>
-                 <span className="font-semibold truncate">{fixture.teams.away.name}</span>
-             </div>
+         <div className="p-2 flex-1">
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1 justify-end truncate">
+                    <span className="font-semibold truncate">{fixture.teams.home.name}</span>
+                    <Avatar className={'h-6 w-6'}><AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} /></Avatar>
+                </div>
+                <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
+                    <LiveMatchStatus fixture={fixture} isLive={live} />
+                </div>
+                <div className="flex items-center gap-2 flex-1 truncate">
+                    <Avatar className={'h-6 w-6'}><AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} /></Avatar>
+                    <span className="font-semibold truncate">{fixture.teams.away.name}</span>
+                </div>
+            </div>
          </div>
-         {live && (
-            <div className="mt-2 pt-2 border-t border-border/50">
-                <CommentsButton matchId={fixture.fixture.id} navigate={navigate} commentsEnabled={commentsEnabled} />
+         {hasCommentsFeature && (
+            <div className="mt-auto p-1 border-t border-border/50">
+                <CommentsButton 
+                  matchId={fixture.fixture.id} 
+                  navigate={navigate} 
+                  commentsEnabled={commentsEnabled}
+                  size="sm"
+                />
             </div>
          )}
       </div>
@@ -126,6 +135,7 @@ const FixturesList = ({
     favoritedTeamIds,
     matchDetails,
     navigate,
+    isAdmin,
 }: { 
     fixtures: FixtureType[], 
     loading: boolean,
@@ -136,6 +146,7 @@ const FixturesList = ({
     favoritedTeamIds: number[],
     matchDetails: { [matchId: string]: MatchDetails },
     navigate: ScreenProps['navigate'],
+    isAdmin: boolean,
 }) => {
     
     const filteredFixtures = useMemo(() => {
@@ -247,8 +258,8 @@ const FixturesList = ({
                                     <span className="truncate">{leagueName}</span>
                                </div>
                             </AccordionTrigger>
-                            <AccordionContent className="space-y-2 pt-2">
-                                {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} />)}
+                            <AccordionContent className="space-y-1 pt-1">
+                                {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} isAdmin={isAdmin} />)}
                             </AccordionContent>
                         </AccordionItem>
                     </Accordion>
@@ -331,6 +342,7 @@ type Cache<T> = { [date: string]: T };
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: ScreenProps & { isVisible: boolean }) {
   const { user } = useAuth();
+  const { isAdmin } = useAdmin();
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
   const [activeTab, setActiveTab] = useState<TabName>('my-results');
@@ -482,6 +494,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     hasAnyFavorites={hasAnyFavorites}
                     matchDetails={matchDetails}
                     navigate={navigate}
+                    isAdmin={isAdmin}
                 />
             )}
         </div>

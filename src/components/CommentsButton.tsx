@@ -20,14 +20,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { cn } from '@/lib/utils';
+import type { VariantProps } from 'class-variance-authority';
+import { buttonVariants } from '@/components/ui/button';
+
 
 interface CommentsButtonProps {
   matchId: number;
   navigate: ScreenProps['navigate'];
   commentsEnabled?: boolean;
+  size?: VariantProps<typeof buttonVariants>['size'];
 }
 
-export function CommentsButton({ matchId, navigate, commentsEnabled }: CommentsButtonProps) {
+export function CommentsButton({ matchId, navigate, commentsEnabled, size = "default" }: CommentsButtonProps) {
   const { isAdmin } = useAdmin();
   const { db } = useFirestore();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -107,6 +112,7 @@ export function CommentsButton({ matchId, navigate, commentsEnabled }: CommentsB
             <Button 
               variant="outline" 
               className="w-full"
+              size={size}
               onClick={handleClick}
               onMouseDown={handleTouchStart}
               onMouseUp={handleTouchEnd}
@@ -114,7 +120,7 @@ export function CommentsButton({ matchId, navigate, commentsEnabled }: CommentsB
               onTouchEnd={handleTouchEnd}
             >
               <MessageSquare className="h-4 w-4 mr-2" />
-              عرض التعليقات (اضغط مطولاً للإلغاء)
+              <span className={cn(size === 'sm' && "text-xs")}>عرض التعليقات (اضغط مطولاً)</span>
             </Button>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -138,6 +144,7 @@ export function CommentsButton({ matchId, navigate, commentsEnabled }: CommentsB
       <Button 
         variant="secondary" 
         className="w-full" 
+        size={size}
         onClick={handleActivateComments}
         disabled={isProcessing}
       >
@@ -146,7 +153,7 @@ export function CommentsButton({ matchId, navigate, commentsEnabled }: CommentsB
         ) : (
             <MessageSquarePlus className="h-4 w-4 mr-2" />
         )}
-        تفعيل التعليقات
+        <span className={cn(size === 'sm' && "text-xs")}>تفعيل التعليقات</span>
       </Button>
     );
   }
@@ -157,10 +164,11 @@ export function CommentsButton({ matchId, navigate, commentsEnabled }: CommentsB
       <Button 
         variant="ghost" 
         className="w-full"
-        onClick={() => navigate('Comments', { matchId })}
+        size={size}
+        onClick={(e) => { e.stopPropagation(); navigate('Comments', { matchId })}}
       >
         <MessageSquare className="h-4 w-4 mr-2" />
-        التعليقات
+        <span className={cn(size === 'sm' && "text-xs")}>التعليقات</span>
       </Button>
     );
   }
