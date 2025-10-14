@@ -1,13 +1,13 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import type { User } from 'firebase/auth';
 import { LoginScreen } from './screens/LoginScreen';
 import { FirebaseProvider, useAuth } from '@/firebase/provider';
-import { onAuthStateChange, guestUser } from '@/lib/firebase-client';
 import { AppContentWrapper } from './AppContentWrapper';
 import { Loader2 } from 'lucide-react';
+import { isGuest } from '@/lib/firebase-client';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails';
 
@@ -29,11 +29,12 @@ function App() {
       );
   }
   
-  if (!user) { // This covers both null and guest users who aren't fully authenticated
+  // If user is null (not guest, not logged in), show Login.
+  if (!user) {
     return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
   }
 
-  // This will render for both a logged-in user and a guest user
+  // If user is logged in OR is a guest, show the main app.
   return <AppContentWrapper />;
 }
 

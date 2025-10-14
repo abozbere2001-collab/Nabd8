@@ -100,6 +100,8 @@ export const signInWithGoogle = async (): Promise<void> => {
 };
 
 export const getAuthResult = async (): Promise<UserCredential | null> => {
+    // This function is designed to be called when the app loads.
+    // It processes the result of a sign-in redirect.
     return getRedirectResult(auth);
 };
 

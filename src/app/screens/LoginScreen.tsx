@@ -14,19 +14,22 @@ export function LoginScreen({ goBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check for redirect result on component mount
+  // This effect runs once on mount to check if we are returning from a Google login redirect.
   useEffect(() => {
-    setLoading(true);
-    getAuthResult()
-      .then(result => {
-        // If result is not null, onAuthStateChanged will handle the user state.
-        // If result is null, it means we are not coming back from a redirect.
-        setLoading(false);
-      })
-      .catch(e => {
-        handleAuthError(e);
-        setLoading(false);
-      });
+    const checkRedirect = async () => {
+        setLoading(true);
+        try {
+            const result = await getAuthResult();
+            // If `result` is not null, the onAuthStateChanged listener in FirebaseProvider
+            // will handle the user state update, and the app will navigate away from LoginScreen.
+            // If `result` is null, it means we are not coming back from a redirect, so we just stop loading.
+        } catch (e: any) {
+            handleAuthError(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+    checkRedirect();
   }, []);
 
 
