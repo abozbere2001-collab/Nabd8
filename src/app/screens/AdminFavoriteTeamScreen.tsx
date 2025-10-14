@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import type { Fixture } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { FixtureItem } from '@/components/FixtureItem';
+import { CURRENT_SEASON } from '@/lib/constants';
 
 
 export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, teamName, headerActions }: ScreenProps & { teamId: number; teamName: string; headerActions?: React.ReactNode }) {
@@ -24,7 +25,8 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
             if (!teamId) return;
             setLoading(true);
             try {
-                const url = `/api/football/fixtures?team=${teamId}`;
+                // Fetch all fixtures for the current season for the team
+                const url = `/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
                 const res = await fetch(url);
                 if (!res.ok) {
                     throw new Error(`API fetch failed with status: ${res.status}`);
