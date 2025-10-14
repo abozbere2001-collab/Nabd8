@@ -22,16 +22,18 @@ import { errorEmitter } from '@/firebase/error-emitter';
 
 // --- GUEST USER ---
 const GUEST_USER_KEY = 'isGuestUser';
+let isCurrentlyGuest = false;
+
 export const guestUser = {
     uid: 'guest',
     displayName: 'زائر',
     email: null,
     photoURL: null,
-    [GUEST_USER_KEY]: true
+    isGuestUser: true,
 };
 
-export const isGuest = (user: any): boolean => {
-    return !!user && user[GUEST_USER_KEY];
+export const isGuest = (user: any): user is typeof guestUser => {
+    return !!user && user.isGuestUser === true;
 }
 // --- END GUEST USER ---
 
@@ -39,18 +41,6 @@ export const isGuest = (user: any): boolean => {
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-let authStateCallback: ((user: User | null | typeof guestUser) => void) | null = null;
-let currentAuthUser: User | null | typeof guestUser | undefined = undefined;
-
-// Function for other parts of the app to trigger a guest session
-export const setGuestUser = () => {
-    if (authStateCallback && !isGuest(currentAuthUser)) {
-        currentAuthUser = guestUser;
-        authStateCallback(guestUser);
-    }
-}
-
 
 // Enable offline persistence
 try {
@@ -108,6 +98,7 @@ const handleNewUser = async (user: User) => {
 
 
 export const signInWithGoogle = async (): Promise<void> => {
+  isCurrentlyGuest = false; // User is attempting to sign in, not a guest anymore.
   const provider = new GoogleAuthProvider();
   const result = await signInWithPopup(auth, provider);
   if (result.user) {
@@ -116,39 +107,51 @@ export const signInWithGoogle = async (): Promise<void> => {
 };
 
 export const signOut = (): Promise<void> => {
-    // When signing out, make sure we clear the guest user state
-    currentAuthUser = null;
+    isCurrentlyGuest = false;
     return firebaseSignOut(auth);
 };
 
 export const onAuthStateChange = (callback: (user: User | null | typeof guestUser) => void) => {
-  authStateCallback = callback;
-  
-  if (currentAuthUser !== undefined) {
-    callback(currentAuthUser);
-  }
-  
   const unsubscribe = firebaseOnAuthStateChanged(auth, (user) => {
-    // If the new user is null and we were previously a guest, stay as guest.
-    if (user === null && isGuest(currentAuthUser)) {
-        return; 
-    }
-    
-    currentAuthUser = user;
-
     if (user) {
+        // A real user is logged in.
+        isCurrentlyGuest = false;
         handleNewUser(user);
+        callback(user);
+    } else if (isCurrentlyGuest) {
+        // No real user, but we are in a guest session.
+        callback(guestUser);
+    } else {
+        // No real user, and not in a guest session.
+        callback(null);
     }
-    callback(user);
   });
   
   return unsubscribe;
 };
 
+// Function for other parts of the app to trigger a guest session
+export const setGuestUser = () => {
+    isCurrentlyGuest = true;
+    // Manually trigger an auth state change by signing out, which will then fall back to guest logic in the listener.
+    // This is a bit of a hack but ensures a single source of truth for auth state changes.
+    // If the user is already null, we need to manually trigger the callback.
+    if (auth.currentUser === null) {
+        // To ensure the provider updates, we re-trigger the auth flow.
+        // A simple way is to re-initialize the listener, but that's messy.
+        // Instead, we can just call signOut which will trigger our listener. If already signed out, it's a no-op.
+        signOut();
+    } else {
+        signOut();
+    }
+}
+
+
 export const checkRedirectResult = async (): Promise<User | null> => {
     try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
+            isCurrentlyGuest = false;
             // handleNewUser will be called by the onAuthStateChanged listener
             return result.user;
         }
@@ -160,7 +163,7 @@ export const checkRedirectResult = async (): Promise<User | null> => {
 };
 
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {
-    if (!user || isGuest(user)) throw new Error("User not authenticated.");
+    if (isGuest(user)) throw new Error("User not authenticated.");
 
     // This updates the name in Firebase Auth itself
     await updateProfile(user, { displayName: newDisplayName });

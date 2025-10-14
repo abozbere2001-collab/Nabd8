@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import type { User } from 'firebase/auth';
 import { LoginScreen } from './screens/LoginScreen';
 import { FirebaseProvider, useAuth } from '@/firebase/provider';
-import { onAuthStateChange } from '@/lib/firebase-client';
+import { onAuthStateChange, guestUser } from '@/lib/firebase-client';
 import { AppContentWrapper } from './AppContentWrapper';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails';
@@ -19,6 +19,7 @@ export type ScreenProps = {
 
 function App() {
   const { user } = useAuth();
+
   if (user === undefined) {
       // Still checking auth state
       return (
@@ -35,7 +36,7 @@ function App() {
 }
 
 export default function Home() {
-  const [user, setUser] = useState<User | null | undefined>(undefined);
+  const [user, setUser] = useState<User | typeof guestUser | null | undefined>(undefined);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {

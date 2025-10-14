@@ -9,12 +9,12 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { firebaseConfig } from '@/lib/firebase';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
-import { isGuest } from '@/lib/firebase-client';
+import { isGuest, guestUser } from '@/lib/firebase-client';
 
 interface FirebaseContextType {
   auth: Auth;
   db: Firestore;
-  user: User | null | { isGuestUser: boolean };
+  user: User | typeof guestUser | null | undefined;
   isAdmin: boolean;
 }
 
@@ -22,7 +22,7 @@ const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined
 
 const ADMIN_EMAIL = "sagralnarey@gmail.com";
 
-export const FirebaseProvider = ({ children, user }: { children: React.ReactNode, user: User | null | { isGuestUser: boolean } | undefined }) => {
+export const FirebaseProvider = ({ children, user }: { children: React.ReactNode, user: User | typeof guestUser | null | undefined }) => {
 
   const { auth, db } = useMemo(() => {
     const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -40,7 +40,7 @@ export const FirebaseProvider = ({ children, user }: { children: React.ReactNode
   const value = useMemo(() => ({
     auth,
     db,
-    user: user === undefined ? undefined : user, // Propagate the undefined state
+    user: user,
     isAdmin,
   }), [auth, db, user, isAdmin]);
 
