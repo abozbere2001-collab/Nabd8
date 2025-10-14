@@ -4,9 +4,9 @@ import React, { createContext, useContext, useMemo, useEffect, useState } from '
 import type { User, Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { isGuest, guestUser, onAuthStateChange } from '@/lib/firebase-client';
+import { auth, db } from '@/lib/firebase'; // Directly import the initialized instances
 
 interface FirebaseContextType {
   auth: Auth;
