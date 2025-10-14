@@ -7,7 +7,6 @@ import {
   onAuthStateChanged as firebaseOnAuthStateChanged,
   signInWithRedirect,
   getRedirectResult,
-  signInAnonymously,
   updateProfile,
   type User, 
 } from "firebase/auth";
@@ -24,10 +23,13 @@ const handleNewUser = async (user: User) => {
     try {
         const userDoc = await getDoc(userRef);
         if (!userDoc.exists()) {
+            const displayName = user.displayName || "مستخدم جديد";
+            const photoURL = user.photoURL || '';
+
             const userProfileData: UserProfile = {
-                displayName: user.displayName || 'مستخدم جديد',
+                displayName: displayName,
                 email: user.email!,
-                photoURL: user.photoURL || '',
+                photoURL: photoURL,
             };
             setDoc(userRef, userProfileData)
               .catch((serverError) => {
@@ -38,14 +40,11 @@ const handleNewUser = async (user: User) => {
                 });
                 errorEmitter.emit('permission-error', permissionError);
               });
-        }
 
-        const leaderboardDoc = await getDoc(leaderboardRef);
-        if (!leaderboardDoc.exists()) {
              const leaderboardEntry: UserScore = {
                 userId: user.uid,
-                userName: user.displayName || 'مستخدم جديد',
-                userPhoto: user.photoURL || '',
+                userName: displayName,
+                userPhoto: photoURL,
                 totalPoints: 0,
             };
             setDoc(leaderboardRef, leaderboardEntry)
@@ -97,11 +96,6 @@ export const signOut = (): Promise<void> => {
 
 export const setGuestUser = async () => {
     // This function is now disabled to enforce full authentication.
-    // try {
-    //     await signInAnonymously(auth);
-    // } catch (error) {
-    //     console.error("Anonymous sign-in error:", error);
-    // }
 };
 
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {

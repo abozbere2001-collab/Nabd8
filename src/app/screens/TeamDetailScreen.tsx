@@ -162,7 +162,7 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
             setLoading(true);
             try {
                 // Fetch stats first to get league ID
-                const statsRes = await fetch(`/api/football/teams/statistics?team=${teamId}&season=${PREVIOUS_SEASON}`);
+                const statsRes = await fetch(`/api/football/teams/statistics?team=${teamId}&season=${CURRENT_SEASON}`);
                 const statsData = await statsRes.json();
                 const leagueId = statsData?.response?.league?.id;
 
@@ -243,7 +243,7 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                 {stats ? (
                     <Card>
                         <CardHeader>
-                            <CardTitle>إحصائيات موسم {stats.league?.season || PREVIOUS_SEASON}</CardTitle>
+                            <CardTitle>إحصائيات موسم {stats.league?.season || CURRENT_SEASON}</CardTitle>
                         </CardHeader>
                         <CardContent>
                              <div className="grid grid-cols-2 gap-4 text-center">
@@ -376,7 +376,3 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
-
-    
-
-  
