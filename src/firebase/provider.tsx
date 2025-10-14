@@ -50,7 +50,7 @@ export const FirebaseProvider = ({
                 
                 const [adminDoc, userDoc] = await Promise.all([
                     getDoc(adminDocRef),
-                    getDoc(userDoc)
+                    getDoc(userDocRef)
                 ]);
 
                 setIsAdmin(adminDoc.exists());
