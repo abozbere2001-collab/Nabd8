@@ -11,7 +11,7 @@ import {
   updateProfile,
   type User, 
 } from "firebase/auth";
-import { getFirestore, doc, setDoc, getDoc, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { firebaseConfig } from "./firebase";
 import type { UserProfile, UserScore } from './types';
@@ -37,20 +37,11 @@ export const isGuest = (user: any): user is typeof guestUser => {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
 
-// Enable offline persistence
-try {
-    enableIndexedDbPersistence(db);
-} catch (err: any) {
-    if (err.code == 'failed-precondition') {
-        // Multiple tabs open, persistence can only be enabled in one.
-        // Silently fail.
-    } else if (err.code == 'unimplemented') {
-        // The current browser does not support all of the
-        // features required to enable persistence
-    }
-}
+// Use initializeFirestore to enable persistence with the new API
+const db = initializeFirestore(app, {
+    cache: persistentLocalCache({})
+});
 
 
 const handleNewUser = async (user: User) => {
