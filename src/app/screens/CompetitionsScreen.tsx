@@ -171,20 +171,19 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         
         favoriteData.leagues = { [itemId]: payload };
 
-        try {
-            if (isFavorited) {
-                await updateDoc(favRef, { [fieldPath]: deleteField() });
-            } else {
-                await setDoc(favRef, favoriteData, { merge: true });
-            }
-        } catch (error) {
-             const permissionError = new FirestorePermissionError({ 
-                path: favRef.path, 
+        const operation = isFavorited
+            ? updateDoc(favRef, { [fieldPath]: deleteField() })
+            : setDoc(favRef, favoriteData, { merge: true });
+
+        operation.catch(serverError => {
+            const permissionError = new FirestorePermissionError({
+                path: favRef.path,
                 operation: isFavorited ? 'update' : 'create',
-                requestResourceData: favoriteData 
+                requestResourceData: favoriteData
             });
             errorEmitter.emit('permission-error', permissionError);
-        }
+        });
+
     }, [user, db, favorites, getName]);
 
 
@@ -410,3 +409,5 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
+
+  

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -73,7 +72,11 @@ const PlayersTab = ({ teamId, navigate }: { teamId: number, navigate: ScreenProp
             snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
             setCustomNames(names);
         } catch (error) {
-            console.error("Error fetching custom player names:", error);
+            const permissionError = new FirestorePermissionError({
+                path: 'playerCustomizations',
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
         }
     }, [db]);
 
@@ -295,12 +298,20 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
                     // Check for a custom name in Firestore
                     if (db) {
                         const customNameDocRef = doc(db, "teamCustomizations", String(teamId));
-                        const customNameDocSnap = await getDoc(customNameDocRef);
-                        if (customNameDocSnap.exists()) {
-                            setDisplayTitle(customNameDocSnap.data().customName);
-                        } else {
-                            setDisplayTitle(name);
-                        }
+                        getDoc(customNameDocRef).then(customNameDocSnap => {
+                            if (customNameDocSnap.exists()) {
+                                setDisplayTitle(customNameDocSnap.data().customName);
+                            } else {
+                                setDisplayTitle(name);
+                            }
+                        }).catch(error => {
+                            const permissionError = new FirestorePermissionError({
+                                path: customNameDocRef.path,
+                                operation: 'get',
+                            });
+                            errorEmitter.emit('permission-error', permissionError);
+                            setDisplayTitle(name); // fallback to original name
+                        });
                     } else {
                          setDisplayTitle(name);
                     }
@@ -308,13 +319,6 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
             }
         } catch (error) {
             console.error("Error fetching team info:", error);
-            if (db) {
-                const permissionError = new FirestorePermissionError({
-                    path: `teamCustomizations/${teamId}`,
-                    operation: 'get',
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            }
         } finally {
             setLoading(false);
         }
@@ -374,3 +378,5 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
 }
 
     
+
+  

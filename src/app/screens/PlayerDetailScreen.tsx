@@ -191,12 +191,20 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
                     // Check for custom name in Firestore
                     if (db) {
                          const customNameDocRef = doc(db, "playerCustomizations", String(playerId));
-                         const customNameDocSnap = await getDoc(customNameDocRef);
-                         if (customNameDocSnap.exists()) {
-                             setDisplayTitle(customNameDocSnap.data().customName);
-                         } else {
-                            setDisplayTitle(name);
-                         }
+                         getDoc(customNameDocRef).then(customNameDocSnap => {
+                             if (customNameDocSnap.exists()) {
+                                 setDisplayTitle(customNameDocSnap.data().customName);
+                             } else {
+                                setDisplayTitle(name);
+                             }
+                         }).catch(error => {
+                            const permissionError = new FirestorePermissionError({
+                                path: customNameDocRef.path,
+                                operation: 'get',
+                            });
+                            errorEmitter.emit('permission-error', permissionError);
+                            setDisplayTitle(name); // fallback to original name
+                         });
                     } else {
                         setDisplayTitle(name);
                     }
@@ -212,13 +220,6 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
 
         } catch (error) {
             console.error("Error fetching player info:", error);
-            if (db) {
-                const permissionError = new FirestorePermissionError({
-                    path: `playerCustomizations/${playerId}`,
-                    operation: 'get',
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            }
         } finally {
             setLoading(false);
         }
@@ -268,3 +269,5 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
 }
 
     
+
+  

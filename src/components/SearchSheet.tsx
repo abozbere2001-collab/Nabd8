@@ -86,13 +86,10 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   
   const fetchAllCustomNames = useCallback(async () => {
     if (!db) return;
-    const leaguesCollection = collection(db, 'leagueCustomizations');
-    const teamsCollection = collection(db, 'teamCustomizations');
-    
     try {
         const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
-            getDocs(leaguesCollection),
-            getDocs(teamsCollection)
+            getDocs(collection(db, 'leagueCustomizations')),
+            getDocs(collection(db, 'teamCustomizations'))
         ]);
         
         const leagueNames = new Map<number, string>();
@@ -385,3 +382,5 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
 }
 
     
+
+  

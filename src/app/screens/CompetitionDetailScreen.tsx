@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -103,20 +102,34 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   useEffect(() => {
     if (!user || !db) return;
-    const unsub = onSnapshot(doc(db, 'favorites', user.uid), (doc) => {
+    const favDocRef = doc(db, 'favorites', user.uid);
+    const unsub = onSnapshot(favDocRef, (doc) => {
         setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {}, teams: {}, players: {} });
+    }, (error) => {
+        const permissionError = new FirestorePermissionError({
+            path: favDocRef.path,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
     });
     return () => unsub();
   }, [user, db]);
 
  useEffect(() => {
     if (leagueId && db) {
-        const unsub = onSnapshot(doc(db, "leagueCustomizations", String(leagueId)), (doc) => {
+        const leagueDocRef = doc(db, "leagueCustomizations", String(leagueId));
+        const unsub = onSnapshot(leagueDocRef, (doc) => {
             if (doc.exists()) {
                 setDisplayTitle(doc.data().customName);
             } else {
                 setDisplayTitle(initialTitle);
             }
+        }, (error) => {
+            const permissionError = new FirestorePermissionError({
+                path: leagueDocRef.path,
+                operation: 'get',
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
         return () => unsub();
     }
@@ -189,20 +202,18 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         favoriteData.players = { [item.id]: { playerId: item.id, name: displayName, photo: item.photo }};
     }
 
-    try {
-      if (isFavoritedCurrent) {
-          await updateDoc(favRef, { [fieldPath]: deleteField() });
-      } else {
-          await setDoc(favRef, favoriteData, { merge: true });
-      }
-    } catch (error) {
+    const operation = isFavoritedCurrent
+      ? updateDoc(favRef, { [fieldPath]: deleteField() })
+      : setDoc(favRef, favoriteData, { merge: true });
+
+    operation.catch(error => {
       const permissionError = new FirestorePermissionError({
           path: favRef.path,
           operation: 'update',
           requestResourceData: favoriteData,
       });
       errorEmitter.emit('permission-error', permissionError);
-    }
+    });
   };
   
   const handleOpenRename = (type: RenameType, id: string | number, name: string) => {
@@ -219,17 +230,18 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         case 'team': collectionName = 'teamCustomizations'; break;
         case 'player': collectionName = 'playerCustomizations'; break;
     }
-    try {
-      await setDoc(doc(db, collectionName, String(id)), { customName: newName });
-      await fetchAllCustomNames(); 
-    } catch(error) {
-      const permissionError = new FirestorePermissionError({
-          path: `${collectionName}/${id}`,
-          operation: 'create',
-          requestResourceData: { customName: newName },
-      });
-      errorEmitter.emit('permission-error', permissionError);
-    }
+    const docRef = doc(db, collectionName, String(id));
+    const data = { customName: newName };
+    setDoc(docRef, data)
+      .then(() => fetchAllCustomNames())
+      .catch(error => {
+        const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'create',
+            requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
   };
   
   const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
@@ -246,16 +258,15 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       logo: noteTeam.logo,
       note: note
     };
-    try {
-      await setDoc(docRef, data);
-    } catch(error) {
+    setDoc(docRef, data)
+     .catch(error => {
        const permissionError = new FirestorePermissionError({
           path: docRef.path,
           operation: 'create',
           requestResourceData: data
       });
       errorEmitter.emit('permission-error', permissionError);
-    }
+    });
   }
 
   const handleDeleteCompetition = async () => {
@@ -263,20 +274,22 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     setIsDeleting(true);
     const docRef = doc(db, 'managedCompetitions', String(leagueId));
 
-    try {
-        await deleteDoc(docRef);
+    deleteDoc(docRef)
+      .then(() => {
         toast({ title: 'نجاح', description: 'تم حذف البطولة بنجاح.' });
         goBack();
-    } catch (error) {
+      })
+      .catch(error => {
         const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: 'delete',
         });
         errorEmitter.emit('permission-error', permissionError);
-    } finally {
+      })
+      .finally(() => {
         setIsDeleting(false);
         setDeleteAlertOpen(false);
-    }
+      });
   }
 
 
@@ -531,3 +544,5 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 }
 
     
+
+  
