@@ -178,7 +178,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     fetchData();
   }, [leagueId, initialTitle, fetchAllCustomNames]);
 
-  const handleFavorite = async (type: 'league' | 'team' | 'player', item: any) => {
+  const handleFavorite = (type: 'league' | 'team' | 'player', item: any) => {
     if (!user || !db) return;
     const favRef = doc(db, 'favorites', user.uid);
     
@@ -221,7 +221,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     setRenameOpen(true);
   };
 
-  const handleSaveRename = async (newName: string) => {
+  const handleSaveRename = (newName: string) => {
     if (!renameItem || !db) return;
     const { id, type } = renameItem;
     let collectionName = '';
@@ -249,7 +249,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     setIsNoteOpen(true);
   }
 
-  const handleSaveNote = async (note: string) => {
+  const handleSaveNote = (note: string) => {
     if (!noteTeam || !db) return;
     const docRef = doc(db, "adminFavorites", String(noteTeam.id));
     const data = {
@@ -269,7 +269,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     });
   }
 
-  const handleDeleteCompetition = async () => {
+  const handleDeleteCompetition = () => {
     if (!isAdmin || !db || !leagueId) return;
     setIsDeleting(true);
     const docRef = doc(db, 'managedCompetitions', String(leagueId));

@@ -99,23 +99,22 @@ const PlayersTab = ({ teamId, navigate }: { teamId: number, navigate: ScreenProp
         fetchPlayers();
     }, [teamId, toast, fetchCustomNames]);
 
-    const handleSaveRename = async (newName: string) => {
+    const handleSaveRename = (newName: string) => {
         if (!renameItem || !db) return;
         const { id } = renameItem;
         const docRef = doc(db, 'playerCustomizations', String(id));
         const data = { customName: newName };
-        try {
-            await setDoc(docRef, data);
-            await fetchCustomNames();
+        setDoc(docRef, data).then(() => {
+            fetchCustomNames();
             toast({ title: "نجاح", description: "تم تحديث اسم اللاعب." });
-        } catch (error) {
+        }).catch(error => {
             const permissionError = new FirestorePermissionError({
                 path: docRef.path,
                 operation: 'create',
                 requestResourceData: data
             });
             errorEmitter.emit('permission-error', permissionError);
-        }
+        });
     };
 
 
@@ -293,8 +292,9 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
             if (teamRes.ok) {
                 const data = await teamRes.json();
                 if (data.response?.[0]) {
-                    setTeamData(data.response[0]);
-                    const name = data.response[0].team.name;
+                    const teamInfo = data.response[0];
+                    setTeamData(teamInfo);
+                    const name = teamInfo.team.name;
                     // Check for a custom name in Firestore
                     if (db) {
                         const customNameDocRef = doc(db, "teamCustomizations", String(teamId));
@@ -359,7 +359,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
         canGoBack={canGoBack} 
       />
       <div className="flex-1 overflow-y-auto p-1">
-        <TeamHeader team={teamData.team} venue={teamData.venue} />
+        <TeamHeader team={{...teamData.team, name: displayTitle}} venue={teamData.venue} />
          <Tabs defaultValue="details" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="details">التفاصيل</TabsTrigger>

@@ -144,14 +144,12 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         }, (error) => {
             setManagedCompetitions([]);
             setLoading(false);
-            if (!isAdmin) { 
-               const permissionError = new FirestorePermissionError({ path: 'managedCompetitions', operation: 'list' });
-               errorEmitter.emit('permission-error', permissionError);
-            }
+            const permissionError = new FirestorePermissionError({ path: 'managedCompetitions', operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
         });
 
         return () => unsubscribe();
-    }, [db, fetchAllCustomNames, isAdmin]);
+    }, [db, fetchAllCustomNames]);
 
     const handleFavorite = useCallback(async (item: ManagedCompetitionType) => {
         if (!user || !db) return;
@@ -262,7 +260,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
 
     }, [managedCompetitions, getName, customNames]);
 
-    const handleSaveRename = async (newName: string) => {
+    const handleSaveRename = (newName: string) => {
         if (!renameState.type || !renameState.id || !db) return;
         
         const collectionName = `${renameState.type}Customizations`;
@@ -298,7 +296,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                               <Search className="h-5 w-5" />
                           </Button>
                       </SearchSheet>
-                      <ProfileButton onProfileClick={() => navigate('Profile')} />
+                      <ProfileButton/>
                   </div>
                 }
             />
@@ -409,5 +407,3 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
-
-  

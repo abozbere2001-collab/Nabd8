@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -67,6 +66,7 @@ export function AddEditNewsScreen({ goBack, canGoBack, article, isEditing }: Add
       });
       return;
     }
+    if (!db) return;
 
     setSaving(true);
     let finalImageUrl: string | undefined = imageUrl.trim() || undefined;
@@ -84,28 +84,24 @@ export function AddEditNewsScreen({ goBack, canGoBack, article, isEditing }: Add
       ...(imageHint.trim() && { imageHint: imageHint.trim() }),
     };
 
+    const collectionRef = collection(db, 'news');
+    const operation = isEditing && article?.id 
+        ? setDoc(doc(collectionRef, article.id), newsData, { merge: true })
+        : addDoc(collectionRef, newsData);
 
-    try {
-      const collectionRef = collection(db, 'news');
-      if (isEditing && article?.id) {
-        const docRef = doc(collectionRef, article.id);
-        await setDoc(docRef, newsData, { merge: true });
-        toast({ title: 'نجاح', description: 'تم تحديث الخبر بنجاح.' });
-      } else {
-        await addDoc(collectionRef, newsData);
-        toast({ title: 'نجاح', description: 'تم نشر الخبر بنجاح.' });
-      }
-      goBack();
-    } catch (error) {
+    operation.then(() => {
+        toast({ title: 'نجاح', description: isEditing ? 'تم تحديث الخبر بنجاح.' : 'تم نشر الخبر بنجاح.' });
+        goBack();
+    }).catch(serverError => {
         const permissionError = new FirestorePermissionError({
             path: isEditing && article?.id ? `news/${article.id}` : 'news',
             operation: isEditing ? 'update' : 'create',
             requestResourceData: newsData,
         });
         errorEmitter.emit('permission-error', permissionError);
-    } finally {
-      setSaving(false);
-    }
+    }).finally(() => {
+        setSaving(false);
+    });
   };
 
   return (

@@ -185,8 +185,9 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
             if (playerRes.ok) {
                 const data = await playerRes.json();
                 if (data.response?.[0]) {
-                    setPlayerData(data.response[0]);
-                    const name = data.response[0].player.name;
+                    const playerInfo = data.response[0];
+                    setPlayerData(playerInfo);
+                    const name = playerInfo.player.name;
 
                     // Check for custom name in Firestore
                     if (db) {
@@ -260,14 +261,10 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
       />
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <PlayerHeader player={playerData.player} />
+        <PlayerHeader player={{...playerData.player, name: displayTitle}} />
         <CurrentTeamStats statistics={playerData.statistics} navigate={navigate} />
         <CareerHistory transfers={transfers} navigate={navigate}/>
       </div>
     </div>
   );
 }
-
-    
-
-  

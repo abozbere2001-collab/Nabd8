@@ -213,7 +213,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     setRenameOpen(true);
   };
 
-  const handleSaveRename = async (newName: string) => {
+  const handleSaveRename = (newName: string) => {
     if (!renameItem || !db) return;
     const { id, type } = renameItem;
     let collectionName = type === 'league' ? 'leagueCustomizations' : 'teamCustomizations';
@@ -236,7 +236,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     setIsNoteOpen(true);
   }
 
-  const handleSaveNote = async (note: string) => {
+  const handleSaveNote = (note: string) => {
     if (!noteTeam || !db) return;
     const docRef = doc(db, "adminFavorites", String(noteTeam.id));
     const data = {
@@ -256,7 +256,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
         });
   }
 
-  const handleFavorite = async (type: 'team' | 'league', item: any) => {
+  const handleFavorite = (type: 'team' | 'league', item: any) => {
     if (!user || !db) return;
     const favRef = doc(db, 'favorites', user.uid);
     const itemPath = type === 'team' ? 'teams' : 'leagues';
@@ -380,7 +380,3 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     </Sheet>
   );
 }
-
-    
-
-  
