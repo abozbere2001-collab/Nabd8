@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -8,34 +8,15 @@ import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { signInWithGoogle, getGoogleRedirectResult } from '@/lib/firebase-client';
+import { signInWithGoogle } from '@/lib/firebase-client';
 
 export function LoginScreen({ goBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check for redirect result on component mount
-  useEffect(() => {
-    // Only show loader if we expect a redirect result
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('state')) {
-      setLoading(true);
-    }
-    
-    getGoogleRedirectResult()
-      .catch((e: any) => {
-        handleAuthError(e);
-      })
-      .finally(() => {
-        // The onAuthStateChanged listener will handle success and stop the loader
-        // by swapping the component. We only need to stop the loader here if there's
-        // an error or if there was no redirect attempt.
-        setLoading(false);
-      });
-  }, []);
-
   const handleAuthError = (e: any) => {
     console.error("Login Error:", e);
+    // User-friendly error messages based on error codes
     if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
         setError('تم إلغاء عملية تسجيل الدخول.');
     } else if (e.code === 'auth/unauthorized-domain') {
@@ -52,8 +33,8 @@ export function LoginScreen({ goBack }: ScreenProps) {
     setLoading(true);
     setError(null);
     try {
-      await signInWithGoogle();
-      // After this, the page will redirect. The result is handled by the useEffect.
+      // This will trigger the redirect. The result is handled by AppContentWrapper.
+      await signInWithGoogle(); 
     } catch (e: any) {
       handleAuthError(e);
       setLoading(false);
@@ -67,7 +48,7 @@ export function LoginScreen({ goBack }: ScreenProps) {
         {loading ? (
             <div className="flex flex-col items-center gap-4">
                 <Loader2 className="h-8 w-8 animate-spin" />
-                <p className="text-muted-foreground">جاري تسجيل الدخول...</p>
+                <p className="text-muted-foreground">جاري التوجيه إلى جوجل...</p>
             </div>
         ) : (
           <>

@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User as UserIcon, Loader2 } from 'lucide-react';
-import { signOut } from '@/lib/firebase-client';
+import { signOut, getGoogleRedirectResult } from '@/lib/firebase-client';
 
 const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
@@ -135,8 +135,20 @@ export function AppContentWrapper() {
   const [stack, setStack] = useState<StackItem[]>([{ key: 'Matches-0', screen: 'Matches' }]);
   const { showSplashAd, showBannerAd } = useAd();
   const { user, isUserLoading } = useUser();
+  const [isHandlingRedirect, setIsHandlingRedirect] = useState(true);
 
 
+  useEffect(() => {
+    getGoogleRedirectResult()
+      .catch((e: any) => {
+        console.error("Redirect Error in AppWrapper:", e);
+      })
+      .finally(() => {
+        setIsHandlingRedirect(false);
+      });
+  }, []);
+  
+  
   const goBack = useCallback(() => {
     setStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
   }, []);
@@ -148,18 +160,14 @@ export function AppContentWrapper() {
 
     setStack(prevStack => {
       if (isMainTab) {
-        // If it's a main tab, just show this tab.
-        // If it's already the active main tab, do nothing.
         if (prevStack.length === 1 && prevStack[0].screen === screen) {
           return prevStack;
         }
         return [newItem];
       } else {
-        // Prevent pushing the same screen multiple times
         if (prevStack[prevStack.length-1].screen === screen) {
             return prevStack;
         }
-        // Otherwise, push the new screen onto the stack.
         return [...prevStack, newItem];
       }
     });
@@ -171,7 +179,7 @@ export function AppContentWrapper() {
       }
   }, [navigate]);
 
-  if (isUserLoading) {
+  if (isUserLoading || isHandlingRedirect) {
     return (
         <div className="flex items-center justify-center h-screen bg-background">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
