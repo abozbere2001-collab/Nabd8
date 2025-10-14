@@ -2,7 +2,6 @@
 import { NextResponse } from 'next/server';
 
 const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
-// This is secure because this code only runs on the server.
 const API_FOOTBALL_KEY = '5a36c80242mshe57db12185b135bp19a31fjsn9a06674e402e';
 
 export async function GET(
@@ -63,3 +62,5 @@ export async function GET(
     );
   }
 }
+
+    

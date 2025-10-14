@@ -37,7 +37,6 @@ const FixturesList = ({
     fixtures, 
     loading,
     activeTab, 
-    showLiveOnly,
     hasAnyFavorites,
     favoritedLeagueIds,
     favoritedTeamIds,
@@ -46,7 +45,6 @@ const FixturesList = ({
     fixtures: FixtureType[], 
     loading: boolean,
     activeTab: string, 
-    showLiveOnly: boolean,
     hasAnyFavorites: boolean,
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
@@ -66,7 +64,7 @@ const FixturesList = ({
         
         return fixturesToFilter;
 
-    }, [fixtures, activeTab, favoritedTeamIds, favoritedLeagueIds, showLiveOnly]);
+    }, [fixtures, activeTab, favoritedTeamIds, favoritedLeagueIds]);
 
     const groupedFixtures = useMemo(() => {
         return filteredFixtures.reduce((acc, fixture) => {
@@ -233,7 +231,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [fixturesCache, setFixturesCache] = useState<Cache<FixtureType[]>>({});
   const [loadingFixtures, setLoadingFixtures] = useState(true);
   
-  const [showLiveOnly, setShowLiveOnly] = useState(false);
 
   useEffect(() => {
     if (!user || !db) {
@@ -263,7 +260,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     const url = `/api/football/fixtures?date=${dateKey}`;
     try {
         const response = await fetch(url);
-        if (!response.ok) throw new Error('Failed to fetch fixtures');
+        if (!response.ok) {
+          const errorBody = await response.text();
+          console.error("API Error Body:", errorBody);
+          throw new Error('Failed to fetch fixtures');
+        }
         const data = await response.json();
         const fixtures = data.response || [];
         setFixturesCache(prev => ({ ...prev, [dateKey]: fixtures }));
@@ -345,7 +346,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     fixtures={currentFixtures}
                     loading={loadingFixtures}
                     activeTab={activeTab}
-                    showLiveOnly={showLiveOnly} 
                     favoritedLeagueIds={favoritedLeagueIds}
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
@@ -356,3 +356,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    
