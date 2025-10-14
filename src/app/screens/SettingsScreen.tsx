@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut, User, Search, Goal, Redo, XCircle, Newspaper } from 'lucide-react';
+import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut, User, Search, Goal, Redo, XCircle, Newspaper, Crown, Star } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
@@ -25,7 +25,9 @@ import {
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
+import { doc, setDoc } from 'firebase/firestore';
 
 
 const notificationSettings = [
@@ -40,6 +42,8 @@ const notificationSettings = [
 export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
+  const { user, isProUser, setProUser } = useAuth();
+  const { isAdmin } = useAdmin();
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -79,6 +83,17 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       toast({
           title: `تم ${checked ? 'تفعيل' : 'إلغاء'} إشعارات "${notificationSettings.find(s => s.id === id)?.label}"`,
       })
+  }
+  
+  const handleUpgrade = () => {
+    if(!user) return;
+    // In a real app, this would trigger a payment flow.
+    // For now, we'll just simulate the upgrade.
+    setProUser(true);
+    toast({
+        title: 'تمت الترقية بنجاح!',
+        description: 'شكراً لك! لقد تم إخفاء جميع الإعلانات.',
+    })
   }
 
   const settingsItems = [
@@ -129,6 +144,39 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                  </button>
             ))}
         </div>
+        
+        {!isProUser && (
+        <Card className="border-primary/50">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-primary">
+                    <Crown className="h-6 w-6" />
+                    <span>الترقية إلى النسخة برو</span>
+                </CardTitle>
+                <CardDescription>
+                    احصل على تجربة خالية من الإعلانات تمامًا وادعم تطوير التطبيق.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <Button onClick={handleUpgrade} className="w-full">الترقية الآن</Button>
+                <div className="flex justify-around text-center text-xs text-muted-foreground">
+                    <div>
+                        <p className="font-bold text-sm text-foreground">$1</p>
+                        <p>شهريًا</p>
+                    </div>
+                     <div>
+                        <p className="font-bold text-sm text-foreground">$15</p>
+                        <p>سنويًا</p>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+        )}
+        
+        {isAdmin && isProUser && (
+            <Button onClick={() => setProUser(false)} variant="destructive">
+                (Admin) إيقاف وضع البرو
+            </Button>
+        )}
         
         <Card>
             <CardHeader>

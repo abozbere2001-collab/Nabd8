@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
@@ -27,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { LoginScreen } from './screens/LoginScreen';
 import type { ScreenKey } from './page';
 
+import { useAd, SplashScreenAd, BannerAd } from '@/components/AdProvider';
 import { useAuth } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import {
@@ -131,6 +133,7 @@ export const ProfileButton = () => {
 
 export function AppContentWrapper() {
   const [stack, setStack] = useState<StackItem[]>([{ key: 'Matches-0', screen: 'Matches' }]);
+  const { showSplashAd, showBannerAd } = useAd();
 
   const goBack = useCallback(() => {
     setStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
@@ -171,6 +174,10 @@ export function AppContentWrapper() {
   const ActiveScreenComponent = screenConfig[activeStackItem.screen]?.component;
   const showBottomNav = mainTabs.includes(activeStackItem.screen);
 
+  if (showSplashAd) {
+    return <SplashScreenAd />;
+  }
+
   if (!ActiveScreenComponent) {
     return (
         <div className="flex items-center justify-center h-screen bg-background">
@@ -209,6 +216,7 @@ export function AppContentWrapper() {
         })}
       </div>
       
+      {showBannerAd && <BannerAd />}
       {showBottomNav && <BottomNav activeScreen={activeStackItem.screen} onNavigate={navigate} />}
     </main>
   );

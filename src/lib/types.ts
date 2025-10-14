@@ -1,5 +1,6 @@
 
 
+
 // This file contains all the type definitions for the data used in the app.
 
 // --- API Football Types ---
@@ -178,6 +179,7 @@ export interface UserProfile {
   displayName: string;
   email: string;
   photoURL: string;
+  isProUser?: boolean;
 }
 
 export interface GlobalPredictionMatch {

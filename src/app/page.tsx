@@ -7,7 +7,7 @@ import { LoginScreen } from './screens/LoginScreen';
 import { FirebaseProvider, useAuth } from '@/firebase/provider';
 import { AppContentWrapper } from './AppContentWrapper';
 import { Loader2 } from 'lucide-react';
-import { isGuest } from '@/lib/firebase-client';
+import { AdProvider } from '@/components/AdProvider';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'PlayerDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails';
 
@@ -41,7 +41,9 @@ function App() {
 export default function Home() {
   return (
     <FirebaseProvider>
-      <App />
+        <AdProvider>
+            <App />
+        </AdProvider>
     </FirebaseProvider>
   );
 }

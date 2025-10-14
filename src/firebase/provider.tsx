@@ -5,7 +5,7 @@ import type { User, Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
 import { firebaseConfig } from '@/lib/firebase';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { isGuest, guestUser, onAuthStateChange } from '@/lib/firebase-client';
@@ -15,6 +15,8 @@ interface FirebaseContextType {
   db: Firestore;
   user: User | typeof guestUser | null | undefined;
   isAdmin: boolean;
+  isProUser: boolean;
+  setProUser: (isPro: boolean) => void;
 }
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
@@ -23,6 +25,7 @@ const ADMIN_EMAIL = "sagralnarey@gmail.com";
 
 export const FirebaseProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | typeof guestUser | null | undefined>(undefined);
+  const [isProUser, setIsProUser] = useState(false);
 
   const { auth, db } = useMemo(() => {
     const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -43,12 +46,38 @@ export const FirebaseProvider = ({ children }: { children: React.ReactNode }) =>
       return user.email === ADMIN_EMAIL;
   }, [user]);
 
+  // Listen for pro status changes in Firestore
+  useEffect(() => {
+    if (user && !isGuest(user) && db) {
+      const userDocRef = doc(db, 'users', user.uid);
+      const unsubscribe = onSnapshot(userDocRef, (doc) => {
+        setIsProUser(doc.data()?.isProUser || false);
+      });
+      return () => unsubscribe();
+    } else {
+        // Reset for guest or logged out users
+        setIsProUser(false);
+    }
+  }, [user, db]);
+
+  // Function to manually set pro status (for admin or after payment)
+  const setProUser = async (isPro: boolean) => {
+    if (user && !isGuest(user) && db) {
+        const userDocRef = doc(db, 'users', user.uid);
+        await setDoc(userDocRef, { isProUser: isPro }, { merge: true });
+        setIsProUser(isPro); // Optimistically update state
+    }
+  };
+
+
   const value = useMemo(() => ({
     auth,
     db,
     user: user,
     isAdmin,
-  }), [auth, db, user, isAdmin]);
+    isProUser,
+    setProUser,
+  }), [auth, db, user, isAdmin, isProUser]);
 
   return (
     <FirebaseContext.Provider value={value}>
@@ -71,7 +100,7 @@ export const useAuth = () => {
     if (context === undefined) {
         throw new Error('useAuth must be used within a FirebaseProvider');
     }
-    return { auth: context.auth, user: context.user };
+    return { auth: context.auth, user: context.user, isProUser: context.isProUser, setProUser: context.setProUser };
 }
 
 export const useFirestore = () => {

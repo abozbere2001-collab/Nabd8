@@ -19,6 +19,10 @@
           "type": "string",
           "format": "uri",
           "description": "URL of the user's profile picture."
+        },
+        "isProUser": {
+            "type": "boolean",
+            "description": "Whether the user has a pro subscription."
         }
       },
       "required": ["displayName", "email"]
@@ -400,5 +404,3 @@
     }
   }
 }
-
-    
