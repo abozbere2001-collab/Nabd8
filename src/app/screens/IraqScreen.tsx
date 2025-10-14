@@ -244,13 +244,25 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   useEffect(() => {
       if (db) {
           const scorersRef = collection(db, 'iraqiLeagueTopScorers');
-          const q = query(scorersRef, orderBy('goals', 'desc'), orderBy('playerName', 'asc'));
+          // Query only by goals, then sort by name on the client
+          const q = query(scorersRef, orderBy('goals', 'desc'));
           const unsubscribe = onSnapshot(q, (snapshot) => {
-              const fetchedScorers = snapshot.docs.map((doc, index) => ({
-                ...(doc.data() as Omit<ManualTopScorer, 'rank'>),
+              const fetchedScorers = snapshot.docs.map((doc) => doc.data() as Omit<ManualTopScorer, 'rank'>);
+
+              // Client-side sort for name
+              fetchedScorers.sort((a, b) => {
+                  if (a.goals !== b.goals) {
+                      return 0; // Keep Firestore's goal sorting
+                  }
+                  return a.playerName.localeCompare(b.playerName);
+              });
+              
+              const rankedScorers = fetchedScorers.map((scorer, index) => ({
+                ...scorer,
                 rank: index + 1
               }));
-              setTopScorers(fetchedScorers);
+
+              setTopScorers(rankedScorers);
           }, (error) => {
               const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
               errorEmitter.emit('permission-error', permissionError);
