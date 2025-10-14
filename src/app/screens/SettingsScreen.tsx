@@ -152,7 +152,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             ))}
         </div>
         
-        {!isProUser && !isAdmin && (
+        {!isProUser && (
         <Card className="border-primary/50">
             <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-primary">

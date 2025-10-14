@@ -8,7 +8,6 @@ import { GoalStackLogo } from './icons/GoalStackLogo';
 
 // --- Ad Context ---
 interface AdContextType {
-  isProUser: boolean;
   showSplashAd: boolean;
   showBannerAd: boolean;
   setSplashAdShown: () => void;
@@ -20,30 +19,43 @@ const SESSION_COUNT_KEY = 'goalstack_session_count';
 
 export const AdProvider = ({ children }: { children: React.ReactNode }) => {
   const { isProUser } = useAuth();
-  const [splashAdShown, setSplashAdShown] = useState(false);
+  const [splashAdShownThisSession, setSplashAdShownThisSession] = useState(
+    () => sessionStorage.getItem('splashAdShown') === 'true'
+  );
   const [sessionCount, setSessionCount] = useState(0);
 
   useEffect(() => {
-    // We only want to track sessions for non-pro users to show them ads.
-    if (!isProUser) {
-      const count = parseInt(sessionStorage.getItem(SESSION_COUNT_KEY) || '0', 10);
-      const newCount = count + 1;
-      sessionStorage.setItem(SESSION_COUNT_KEY, newCount.toString());
-      setSessionCount(newCount);
+    // Only track sessions and show ads for non-pro users.
+    if (isProUser) {
+      setSessionCount(0); // Reset count if user becomes pro
+      return;
+    };
+    const count = parseInt(sessionStorage.getItem(SESSION_COUNT_KEY) || '0', 10);
+    // Only increment on the first render of a session
+    if (count === 0 && sessionCount === 0) {
+        const newCount = 1;
+        sessionStorage.setItem(SESSION_COUNT_KEY, newCount.toString());
+        setSessionCount(newCount);
+    } else {
+        setSessionCount(count);
     }
-  }, [isProUser]);
+  }, [isProUser, sessionCount]);
   
+  const setSplashAdShown = () => {
+      setSplashAdShownThisSession(true);
+      sessionStorage.setItem('splashAdShown', 'true');
+  }
+
   // Show splash ad on the first visit of a session for non-pro users.
-  const showSplashAd = !isProUser && !splashAdShown;
+  const showSplashAd = !isProUser && !splashAdShownThisSession;
   
-  // Show banner ad every 3rd session for non-pro users.
-  const showBannerAd = !isProUser && sessionCount > 0 && sessionCount % 3 === 0;
+  // Show banner ad for non-pro users.
+  const showBannerAd = !isProUser;
 
   const value = {
-    isProUser,
     showSplashAd,
     showBannerAd,
-    setSplashAdShown: () => setSplashAdShown(true),
+    setSplashAdShown,
   };
 
   return <AdContext.Provider value={value}>{children}</AdContext.Provider>;
