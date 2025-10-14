@@ -42,10 +42,10 @@ export async function GET(
       try {
         errorDetails = JSON.parse(responseBodyText);
       } catch {
-        errorDetails = responseBodyText;
+        errorDetails = { message: responseBodyText };
       }
       return NextResponse.json(
-        { error: 'Failed to fetch data from football API', details: errorDetails },
+        { error: 'Failed to fetch data from football API', details: errorDetails.message || errorDetails },
         { status: apiResponse.status }
       );
     }
