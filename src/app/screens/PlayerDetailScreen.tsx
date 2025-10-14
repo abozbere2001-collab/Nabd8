@@ -52,7 +52,7 @@ const PlayerHeader = ({ player }: { player: PlayerInfo }) => (
             <p className="text-muted-foreground">{player.nationality}</p>
             <div className="mt-4 flex justify-center gap-6 text-sm">
                 <div className="flex flex-col items-center">
-                    <span className="font-bold">{player.age}</span>
+                    <span className="font-bold">{player.age || '-'}</span>
                     <span className="text-xs text-muted-foreground">العمر</span>
                 </div>
                 <div className="flex flex-col items-center">
@@ -68,54 +68,51 @@ const PlayerHeader = ({ player }: { player: PlayerInfo }) => (
     </Card>
 );
 
-const StatsTab = ({ statistics, navigate }: { statistics: PlayerStats[], navigate: ScreenProps['navigate'] }) => {
+const DetailsTab = ({ statistics, navigate }: { statistics: PlayerStats[], navigate: ScreenProps['navigate'] }) => {
     if (statistics.length === 0) {
         return <p className="text-center text-muted-foreground p-8">لا توجد إحصائيات متاحة لهذا الموسم.</p>;
     }
+    const currentLeagueStats = statistics[0]; // Assuming the first one is the primary league for the season
+
     return (
         <div className="space-y-4">
-            {statistics.map((stat, index) => (
-                <Card key={index} className="cursor-pointer" onClick={() => navigate('CompetitionDetails', { leagueId: stat.league.id })}>
+             <Card className="cursor-pointer" onClick={() => navigate('CompetitionDetails', { leagueId: currentLeagueStats.league.id })}>
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3 mb-4">
-                            <Avatar className="h-8 w-8"><AvatarImage src={stat.league.logo} /></Avatar>
+                            <Avatar className="h-10 w-10"><AvatarImage src={currentLeagueStats.team.logo} /></Avatar>
                             <div>
-                                <p className="font-bold">{stat.league.name}</p>
-                                <div className="flex items-center gap-2">
-                                     <p className="text-xs text-muted-foreground">{stat.team.name}</p>
-                                     <p className="text-xs text-muted-foreground">موسم {stat.league.season}</p>
-                                </div>
+                                <p className="font-bold">{currentLeagueStats.team.name}</p>
+                                <p className="text-xs text-muted-foreground">{currentLeagueStats.league.name} - {currentLeagueStats.league.season}</p>
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-4 text-center">
                             <div>
-                                <p className="font-bold text-lg">{stat.games.appearences || 0}</p>
+                                <p className="font-bold text-lg">{currentLeagueStats.games.appearences || 0}</p>
                                 <p className="text-xs text-muted-foreground">مباريات</p>
                             </div>
                             <div>
-                                <p className="font-bold text-lg">{stat.goals.total || 0}</p>
+                                <p className="font-bold text-lg">{currentLeagueStats.goals.total || 0}</p>
                                 <p className="text-xs text-muted-foreground">أهداف</p>
                             </div>
                             <div>
-                                <p className="font-bold text-lg">{stat.goals.assists || 0}</p>
+                                <p className="font-bold text-lg">{currentLeagueStats.goals.assists || 0}</p>
                                 <p className="text-xs text-muted-foreground">صناعة</p>
                             </div>
                              <div>
-                                <p className="font-bold text-lg">{stat.cards.yellow || 0}</p>
+                                <p className="font-bold text-lg">{currentLeagueStats.cards.yellow || 0}</p>
                                 <p className="text-xs text-muted-foreground">بطاقات صفراء</p>
                             </div>
                              <div>
-                                <p className="font-bold text-lg">{stat.cards.red + stat.cards.yellowred || 0}</p>
+                                <p className="font-bold text-lg">{currentLeagueStats.cards.red + currentLeagueStats.cards.yellowred || 0}</p>
                                 <p className="text-xs text-muted-foreground">بطاقات حمراء</p>
                             </div>
                              <div>
-                                <p className="font-bold text-lg">{stat.games.rating ? parseFloat(stat.games.rating).toFixed(1) : '-'}</p>
+                                <p className="font-bold text-lg">{currentLeagueStats.games.rating ? parseFloat(currentLeagueStats.games.rating).toFixed(1) : '-'}</p>
                                 <p className="text-xs text-muted-foreground">تقييم</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
-            ))}
         </div>
     );
 };
@@ -263,13 +260,13 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
       
       <div className="flex-1 overflow-y-auto p-4">
         <PlayerHeader player={playerData.player} />
-        <Tabs defaultValue="stats" className="w-full">
+        <Tabs defaultValue="details" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="stats">الإحصائيات</TabsTrigger>
+            <TabsTrigger value="details">تفاصيل</TabsTrigger>
             <TabsTrigger value="transfers">الانتقالات</TabsTrigger>
           </TabsList>
-          <TabsContent value="stats" className="mt-4">
-            <StatsTab statistics={playerData.statistics} navigate={navigate} />
+          <TabsContent value="details" className="mt-4">
+            <DetailsTab statistics={playerData.statistics} navigate={navigate} />
           </TabsContent>
           <TabsContent value="transfers" className="mt-4">
             {transfers ? <TransfersTab transfers={transfers} navigate={navigate}/> : <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>}
@@ -279,3 +276,5 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
     </div>
   );
 }
+
+    
