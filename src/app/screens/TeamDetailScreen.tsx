@@ -5,7 +5,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Loader2, Pencil, Star } from 'lucide-react';
@@ -258,23 +258,23 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                         <CardContent>
                              <div className="grid grid-cols-2 gap-4 text-center">
                                  <div className="p-4 bg-card-foreground/5 rounded-lg">
-                                    <p className="font-bold text-2xl">{stats.fixtures.played.total}</p>
+                                    <p className="font-bold text-2xl">{stats.fixtures?.played?.total || 0}</p>
                                     <p className="text-sm text-muted-foreground">مباريات</p>
                                  </div>
                                   <div className="p-4 bg-card-foreground/5 rounded-lg">
-                                    <p className="font-bold text-2xl">{stats.fixtures.wins.total}</p>
+                                    <p className="font-bold text-2xl">{stats.fixtures?.wins?.total || 0}</p>
                                     <p className="text-sm text-muted-foreground">فوز</p>
                                  </div>
                                   <div className="p-4 bg-card-foreground/5 rounded-lg">
-                                    <p className="font-bold text-2xl">{stats.fixtures.draws.total}</p>
+                                    <p className="font-bold text-2xl">{stats.fixtures?.draws?.total || 0}</p>
                                     <p className="text-sm text-muted-foreground">تعادل</p>
                                  </div>
                                   <div className="p-4 bg-card-foreground/5 rounded-lg">
-                                    <p className="font-bold text-2xl">{stats.fixtures.loses.total}</p>
+                                    <p className="font-bold text-2xl">{stats.fixtures?.loses?.total || 0}</p>
                                     <p className="text-sm text-muted-foreground">خسارة</p>
                                  </div>
                                   <div className="p-4 bg-card-foreground/5 rounded-lg col-span-2">
-                                    <p className="font-bold text-2xl">{stats.goals.for.total.total}</p>
+                                    <p className="font-bold text-2xl">{stats.goals?.for?.total?.total || 0}</p>
                                     <p className="text-sm text-muted-foreground">الأهداف المسجلة</p>
                                  </div>
                              </div>
@@ -385,3 +385,5 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
+
+    
