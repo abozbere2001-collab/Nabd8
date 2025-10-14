@@ -1,5 +1,4 @@
 
-
 "use client";
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -10,43 +9,50 @@ import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { signInWithGoogle, setGuestUser, checkRedirectResult } from '@/lib/firebase-client';
+import { useFirebase } from '@/firebase/provider';
 
 export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+  const { auth } = useFirebase();
   const [loading, setLoading] = useState(false);
   const [authInProgress, setAuthInProgress] = useState(true); // To handle redirect state
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    checkRedirectResult()
+    // This function will now only handle errors from a potential redirect flow
+    checkRedirectResult(auth)
       .then((err) => {
         if (err) {
-          if (err.message.includes('auth/popup-closed-by-user') || err.message.includes('auth/cancelled-popup-request')) {
-              setError('تم إلغاء عملية تسجيل الدخول.');
-          } else {
-              setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
-          }
+            handleAuthError(err);
         }
-        // If no error, onAuthStateChanged listener will handle the successful login.
       })
       .finally(() => {
         setAuthInProgress(false);
       });
-  }, []);
+  }, [auth]);
+
+  const handleAuthError = (e: any) => {
+    console.error("Login Error:", e);
+     if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+        setError('تم إلغاء عملية تسجيل الدخول.');
+    } else if (e.code === 'auth/unauthorized-domain') {
+        setError('النطاق غير مصرح به. يرجى التأكد من أنك في بيئة تطوير معتمدة.');
+    } else {
+        setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+    }
+  }
 
   const handleGoogleLogin = async () => {
     if (loading || authInProgress) return;
     setLoading(true);
-    setAuthInProgress(true);
     setError(null);
     try {
-      await signInWithGoogle();
-      // After calling signInWithRedirect, the page will reload.
-      // We show a loading state until that happens.
+      // Pass the auth object directly
+      await signInWithGoogle(auth);
+      // onAuthStateChanged will handle the rest
     } catch (e: any) {
-      console.error("Login Error:", e);
-      setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
-      setLoading(false);
-      setAuthInProgress(false);
+      handleAuthError(e);
+    } finally {
+        setLoading(false);
     }
   };
 

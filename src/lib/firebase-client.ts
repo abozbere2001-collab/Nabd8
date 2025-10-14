@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { 
@@ -40,7 +39,7 @@ export const isGuest = (user: any): user is typeof guestUser => {
 
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
+const defaultAuth = getAuth(app);
 const db = getFirestore(app);
 
 // Enable offline persistence
@@ -98,15 +97,15 @@ const handleNewUser = async (user: User) => {
 }
 
 
-export const signInWithGoogle = async (): Promise<void> => {
+export const signInWithGoogle = async (auth: Auth): Promise<void> => {
     const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
+    await signInWithPopup(auth, provider);
 };
 
 export const signOut = (): Promise<void> => {
     isCurrentlyGuest = false;
     sessionStorage.removeItem(GUEST_USER_KEY);
-    return firebaseSignOut(auth);
+    return firebaseSignOut(defaultAuth);
 };
 
 export const onAuthStateChange = (callback: (user: User | null | typeof guestUser) => void) => {
@@ -114,7 +113,7 @@ export const onAuthStateChange = (callback: (user: User | null | typeof guestUse
         isCurrentlyGuest = true;
     }
     
-    const unsubscribe = firebaseOnAuthStateChanged(auth, (user) => {
+    const unsubscribe = firebaseOnAuthStateChanged(defaultAuth, (user) => {
         if (user) {
             isCurrentlyGuest = false;
             sessionStorage.removeItem(GUEST_USER_KEY);
@@ -138,7 +137,7 @@ export const setGuestUser = () => {
 }
 
 
-export const checkRedirectResult = async (): Promise<Error | null> => {
+export const checkRedirectResult = async (auth: Auth): Promise<Error | null> => {
     try {
         const result = await getRedirectResult(auth);
         // If successful, onAuthStateChanged will handle the user creation logic.
