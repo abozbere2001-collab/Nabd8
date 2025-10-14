@@ -5,13 +5,14 @@
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithPopup,
+  signInWithPopup, 
   signOut as firebaseSignOut, 
   onAuthStateChanged as firebaseOnAuthStateChanged,
   getRedirectResult,
   updateProfile,
   type User, 
   type Auth, 
+  signInWithRedirect,
 } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, enableIndexedDbPersistence } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from "firebase/app";
@@ -100,10 +101,8 @@ const handleNewUser = async (user: User) => {
 export const signInWithGoogle = async (): Promise<void> => {
   isCurrentlyGuest = false; // User is attempting to sign in, not a guest anymore.
   const provider = new GoogleAuthProvider();
-  const result = await signInWithPopup(auth, provider);
-  if (result.user) {
-    // The onAuthStateChanged listener will handle the user creation
-  }
+  // Using signInWithRedirect instead of signInWithPopup
+  await signInWithRedirect(auth, provider);
 };
 
 export const signOut = (): Promise<void> => {

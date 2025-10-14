@@ -1,19 +1,35 @@
 
 
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle } from 'lucide-react';
-import { signInWithGoogle, setGuestUser } from '@/lib/firebase-client';
+import { AlertTriangle, Loader2 } from 'lucide-react';
+import { signInWithGoogle, setGuestUser, checkRedirectResult } from '@/lib/firebase-client';
 
 export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+      setLoading(true);
+      checkRedirectResult().catch(e => {
+          console.error("Login Error on redirect:", e);
+          if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+              setError('تم إلغاء عملية تسجيل الدخول.');
+          } else {
+              setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+          }
+      }).finally(() => {
+          // The onAuthStateChanged listener will handle successful login, 
+          // so we only need to stop loading here.
+          setLoading(false);
+      });
+  }, []);
 
   const handleGoogleLogin = async () => {
     if (loading) return;
@@ -21,16 +37,11 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setError(null);
     try {
       await signInWithGoogle();
-      // With signInWithPopup, successful login will trigger the onAuthStateChanged listener.
-      // We don't need to do anything else here. The loading state will be reset if there's an error.
+      // After calling signInWithRedirect, the page will reload.
+      // We show a loading state until that happens.
     } catch (e: any) {
       console.error("Login Error:", e);
-      // Handle specific error for popup closed by user
-      if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
-        setError('تم إلغاء عملية تسجيل الدخول.');
-      } else {
-        setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
-      }
+      setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
       setLoading(false);
     }
   };
@@ -63,7 +74,10 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
               size="lg"
             >
               {loading ? (
-                'جاري التحقق...'
+                <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    جاري التحقق...
+                </>
               ) : (
                 <>
                   <GoogleIcon className="h-5 w-5 mr-2" />
