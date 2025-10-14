@@ -107,7 +107,7 @@ const PlayersTab = ({ teamId, navigate }: { teamId: number, navigate: ScreenProp
         setDoc(docRef, data).then(() => {
             fetchCustomNames();
             toast({ title: "نجاح", description: "تم تحديث اسم اللاعب." });
-        }).catch(error => {
+        }).catch(serverError => {
             const permissionError = new FirestorePermissionError({
                 path: docRef.path,
                 operation: 'create',
@@ -298,20 +298,21 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
                     // Check for a custom name in Firestore
                     if (db) {
                         const customNameDocRef = doc(db, "teamCustomizations", String(teamId));
-                        getDoc(customNameDocRef).then(customNameDocSnap => {
+                        try {
+                            const customNameDocSnap = await getDoc(customNameDocRef);
                             if (customNameDocSnap.exists()) {
                                 setDisplayTitle(customNameDocSnap.data().customName);
                             } else {
                                 setDisplayTitle(name);
                             }
-                        }).catch(error => {
+                        } catch (error) {
                             const permissionError = new FirestorePermissionError({
                                 path: customNameDocRef.path,
                                 operation: 'get',
                             });
                             errorEmitter.emit('permission-error', permissionError);
                             setDisplayTitle(name); // fallback to original name
-                        });
+                        }
                     } else {
                          setDisplayTitle(name);
                     }

@@ -206,7 +206,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       ? updateDoc(favRef, { [fieldPath]: deleteField() })
       : setDoc(favRef, favoriteData, { merge: true });
 
-    operation.catch(error => {
+    operation.catch(serverError => {
       const permissionError = new FirestorePermissionError({
           path: favRef.path,
           operation: 'update',
@@ -234,7 +234,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     const data = { customName: newName };
     setDoc(docRef, data)
       .then(() => fetchAllCustomNames())
-      .catch(error => {
+      .catch(serverError => {
         const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: 'create',
@@ -259,7 +259,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       note: note
     };
     setDoc(docRef, data)
-     .catch(error => {
+     .catch(serverError => {
        const permissionError = new FirestorePermissionError({
           path: docRef.path,
           operation: 'create',
@@ -279,7 +279,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         toast({ title: 'نجاح', description: 'تم حذف البطولة بنجاح.' });
         goBack();
       })
-      .catch(error => {
+      .catch(serverError => {
         const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: 'delete',

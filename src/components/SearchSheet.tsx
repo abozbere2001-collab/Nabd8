@@ -154,53 +154,58 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
                 limit(10)
             );
 
-            const [teamCustomSnap, leagueCustomSnap] = await Promise.all([
-                getDocs(teamCustomQuery),
-                getDocs(leagueCustomQuery),
-            ]);
-            
-            const firestoreTeamIds: string[] = [];
-            teamCustomSnap.forEach(doc => firestoreTeamIds.push(doc.id));
-            
-            const firestoreLeagueIds: string[] = [];
-            leagueCustomSnap.forEach(doc => firestoreLeagueIds.push(doc.id));
+            try {
+                const [teamCustomSnap, leagueCustomSnap] = await Promise.all([
+                    getDocs(teamCustomQuery),
+                    getDocs(leagueCustomQuery),
+                ]);
+                
+                const firestoreTeamIds: string[] = [];
+                teamCustomSnap.forEach(doc => firestoreTeamIds.push(doc.id));
+                
+                const firestoreLeagueIds: string[] = [];
+                leagueCustomSnap.forEach(doc => firestoreLeagueIds.push(doc.id));
 
 
-            const teamPromises = firestoreTeamIds.map(async teamId => {
-                if (!resultsMap.has(`team-${teamId}`)) {
-                    const res = await fetch(`/api/football/teams?id=${teamId}`);
-                    const data = await res.json();
-                    if (data.response?.[0]) {
-                        resultsMap.set(`team-${teamId}`, { ...data.response[0], type: 'team' });
+                const teamPromises = firestoreTeamIds.map(async teamId => {
+                    if (!resultsMap.has(`team-${teamId}`)) {
+                        const res = await fetch(`/api/football/teams?id=${teamId}`);
+                        const data = await res.json();
+                        if (data.response?.[0]) {
+                            resultsMap.set(`team-${teamId}`, { ...data.response[0], type: 'team' });
+                        }
                     }
-                }
-            });
+                });
 
-            const leaguePromises = firestoreLeagueIds.map(async leagueId => {
-                if (!resultsMap.has(`league-${leagueId}`)) {
-                    const res = await fetch(`/api/football/leagues?id=${leagueId}`);
-                    const data = await res.json();
-                    if (data.response?.[0]) {
-                        resultsMap.set(`league-${leagueId}`, { ...data.response[0], type: 'league' });
+                const leaguePromises = firestoreLeagueIds.map(async leagueId => {
+                    if (!resultsMap.has(`league-${leagueId}`)) {
+                        const res = await fetch(`/api/football/leagues?id=${leagueId}`);
+                        const data = await res.json();
+                        if (data.response?.[0]) {
+                            resultsMap.set(`league-${leagueId}`, { ...data.response[0], type: 'league' });
+                        }
                     }
-                }
-            });
+                });
 
-            await Promise.all([...teamPromises, ...leaguePromises]);
+                await Promise.all([...teamPromises, ...leaguePromises]);
+            } catch (error) {
+                const permissionError = new FirestorePermissionError({
+                    path: 'teamCustomizations/leagueCustomizations',
+                    operation: 'list'
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
         }
       
       setResults(Array.from(resultsMap.values()));
     } catch (error) {
-      const permissionError = new FirestorePermissionError({
-        path: 'teamCustomizations/leagueCustomizations',
-        operation: 'list'
-      });
-      errorEmitter.emit('permission-error', permissionError);
+      console.error("API Search Error: ", error);
+      toast({variant: 'destructive', title: 'خطأ في البحث', description: 'فشل الاتصال بالخادم.'});
       setResults([]);
     } finally {
       setLoading(false);
     }
-  }, [db]);
+  }, [db, toast]);
 
   useEffect(() => {
     if (isOpen) {
