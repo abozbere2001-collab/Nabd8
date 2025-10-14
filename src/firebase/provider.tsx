@@ -8,6 +8,8 @@ import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { handleNewUser } from '@/lib/firebase-client';
+import { FirestorePermissionError } from './errors';
+import { errorEmitter } from './error-emitter';
 
 interface FirebaseContextProps {
   firebaseApp: FirebaseApp | null;
@@ -49,19 +51,25 @@ export const FirebaseProvider = ({
                 const userDocRef = doc(firestore, 'users', firebaseUser.uid);
                 
                 const [adminDoc, userDoc] = await Promise.all([
-                    getDoc(adminDocRef),
-                    getDoc(userDocRef)
+                    getDoc(adminDocRef).catch(err => { throw new FirestorePermissionError({ path: adminDocRef.path, operation: 'get' }) }),
+                    getDoc(userDocRef).catch(err => { throw new FirestorePermissionError({ path: userDocRef.path, operation: 'get' }) })
                 ]);
 
                 setIsAdmin(adminDoc.exists());
-
-                // handleNewUser has already been called in LoginScreen
+                
                 if (userDoc.exists()) {
                     setProUser(userDoc.data()?.isProUser || false);
+                } else {
+                    // This is a fallback in case the user was created but the doc wasn't
+                    await handleNewUser(firebaseUser, firestore);
                 }
 
             } catch (error) {
-                console.error("Error checking user status:", error);
+                if (error instanceof FirestorePermissionError) {
+                    errorEmitter.emit('permission-error', error);
+                } else {
+                    console.error("Error checking user status:", error);
+                }
                 setIsAdmin(false);
                 setProUser(false);
             }
@@ -79,13 +87,17 @@ export const FirebaseProvider = ({
   const handleSetPro = async (isPro: boolean) => {
     if (user && firestore) {
         const userDocRef = doc(firestore, 'users', user.uid);
+        const data = { isProUser: isPro };
         try {
-            await setDoc(userDocRef, { isProUser: isPro }, { merge: true });
+            await setDoc(userDocRef, data, { merge: true });
             setProUser(isPro); // Update state after successful write
         } catch (error) {
-            console.error("Failed to update pro status:", error);
-            // Optionally revert state if write fails
-            // setProUser(!isPro); 
+            const permissionError = new FirestorePermissionError({
+              path: userDocRef.path,
+              operation: 'update',
+              requestResourceData: data,
+            });
+            errorEmitter.emit('permission-error', permissionError);
         }
     }
   }

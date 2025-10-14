@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
-const API_FOOTBALL_KEY = '5a36c80242mshe57db12185b135bp19a31fjsn9a06674e402e';
+const API_FOOTBALL_KEY = 'a697517d9cdab4e718088c31c9ca7911';
 
 export async function GET(
   request: Request,
@@ -62,5 +62,3 @@ export async function GET(
     );
   }
 }
-
-    
