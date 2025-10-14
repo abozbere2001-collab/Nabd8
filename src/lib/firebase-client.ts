@@ -99,11 +99,21 @@ const handleNewUser = async (user: User) => {
 
 
 export const signInWithGoogle = async (): Promise<void> => {
-  isCurrentlyGuest = false; // User is attempting to sign in, not a guest anymore.
+  isCurrentlyGuest = false;
   const provider = new GoogleAuthProvider();
-  // Using signInWithRedirect instead of signInWithPopup
-  await signInWithRedirect(auth, provider);
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error: any) {
+    if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/unauthorized-domain') {
+      // If popup fails, fall back to redirect
+      await signInWithRedirect(auth, provider);
+    } else {
+      // Rethrow other errors
+      throw error;
+    }
+  }
 };
+
 
 export const signOut = (): Promise<void> => {
     isCurrentlyGuest = false;
