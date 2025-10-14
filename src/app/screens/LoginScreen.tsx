@@ -61,7 +61,8 @@ export function LoginScreen({ goBack }: ScreenProps) {
   };
 
   const handleSkip = () => {
-    setGuestUser();
+    // Guest/anonymous login is disabled to enforce full authentication.
+    // setGuestUser();
   };
 
   return (
@@ -85,7 +86,7 @@ export function LoginScreen({ goBack }: ScreenProps) {
             
             <GoalStackLogo className="h-24 w-24 mb-8" />
             <h1 className="text-2xl font-bold mb-2">مرحباً بك في Goal Stack</h1>
-            <p className="text-muted-foreground mb-8">سجل دخولك باستخدام جوجل للمتابعة أو تخطى للوصول السريع.</p>
+            <p className="text-muted-foreground mb-8">سجل دخولك باستخدام جوجل للمتابعة.</p>
             
             <div className="w-full max-w-xs space-y-4">
                 <Button 
@@ -98,14 +99,6 @@ export function LoginScreen({ goBack }: ScreenProps) {
                   تسجيل الدخول باستخدام جوجل
                 </Button>
 
-                <Button 
-                    onClick={handleSkip}
-                    variant="link"
-                    className="w-full"
-                    disabled={loading}
-                >
-                    تخطي الآن
-                </Button>
             </div>
 
             <p className="mt-8 text-xs text-muted-foreground/80 px-4">

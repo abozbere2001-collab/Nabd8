@@ -96,12 +96,13 @@ export const signOut = (): Promise<void> => {
 
 
 export const setGuestUser = async () => {
-    try {
-        await signInAnonymously(auth);
-    } catch (error) {
-        console.error("Anonymous sign-in error:", error);
-    }
-}
+    // This function is now disabled to enforce full authentication.
+    // try {
+    //     await signInAnonymously(auth);
+    // } catch (error) {
+    //     console.error("Anonymous sign-in error:", error);
+    // }
+};
 
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {
     if (!user) throw new Error("User not authenticated.");
