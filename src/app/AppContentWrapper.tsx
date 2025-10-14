@@ -141,7 +141,7 @@ export function AppContentWrapper() {
   useEffect(() => {
     getGoogleRedirectResult()
       .catch((e: any) => {
-        console.error("Redirect Error in AppWrapper:", e);
+        console.error("Redirect Error in AppWrapper. This may be expected if you just loaded the page without being redirected from Google.", e);
       })
       .finally(() => {
         setIsHandlingRedirect(false);

@@ -24,7 +24,7 @@ export function LoginScreen({ goBack }: ScreenProps) {
     } else if (e.code === 'auth/account-exists-with-different-credential') {
         setError('يوجد حساب بنفس البريد الإلكتروني ولكن بطريقة تسجيل دخول مختلفة.');
     } else {
-        setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+        setError(e.message || 'حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
     }
   }
 
