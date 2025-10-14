@@ -5,12 +5,13 @@ import { initializeFirestore, persistentLocalCache, getFirestore, CACHE_SIZE_UNL
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 export const firebaseConfig = {
-  "projectId": "goal-stack-top100-599550-3e16a",
-  "appId": "1:596409947873:web:7a3938533fe1ed561b09a0",
-  "apiKey": "AIzaSyAFxnjh0irb66bOhjScsx_0SIthCwT-Nx4",
-  "authDomain": "goal-stack-top100-599550-3e16a.firebaseapp.com",
-  "measurementId": "",
-  "messagingSenderId": "596409947873"
+  "apiKey": "AIzaSyBulT93NEsAv3go51e4yNs82l5C8VNLr-g",
+  "authDomain": "studio-3417145591-24d0a.firebaseapp.com",
+  "projectId": "studio-3417145591-24d0a",
+  "storageBucket": "studio-3417145591-24d0a.appspot.com",
+  "messagingSenderId": "1053443048552",
+  "appId": "1:1053443048552:web:a657c933932a39d89a4dfb",
+  "measurementId": "G-49S0V05QKV"
 };
 
 
@@ -26,9 +27,23 @@ if (getApps().length) {
 }
 
 const auth = getAuth(app);
-const db = initializeFirestore(app, {
-    cache: persistentLocalCache({ cacheSizeBytes: CACHE_SIZE_UNLIMITED })
-});
+let db: ReturnType<typeof getFirestore>;
+
+// Check if running in a browser environment before initializing Firestore with cache
+if (typeof window !== 'undefined') {
+  try {
+    db = initializeFirestore(app, {
+      cache: persistentLocalCache({ cacheSizeBytes: CACHE_SIZE_UNLIMITED })
+    });
+  } catch (e) {
+    // This can happen with Next.js fast refresh.
+    // If it's already initialized, just get the instance.
+    db = getFirestore(app);
+  }
+} else {
+  // For server-side rendering, initialize without cache
+  db = getFirestore(app);
+}
 
 
 export { app, auth, db };
