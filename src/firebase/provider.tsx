@@ -53,13 +53,25 @@ export const FirebaseProvider = ({
     setUser(firebaseUser);
     setIsLoading(true);
 
+    const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
+    const userDocRef = doc(firestore, 'users', firebaseUser.uid);
+
     try {
-        const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
-        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
+        const adminDocPromise = getDoc(adminDocRef).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: adminDocRef.path, operation: 'get' });
+            errorEmitter.emit('permission-error', permissionError);
+            throw permissionError; // Re-throw to be caught by Promise.all's catch block
+        });
+
+        const userDocPromise = getDoc(userDocRef).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
+            errorEmitter.emit('permission-error', permissionError);
+            throw permissionError; // Re-throw to be caught by Promise.all's catch block
+        });
 
         const [adminDoc, userDoc] = await Promise.all([
-            getDoc(adminDocRef),
-            getDoc(userDocRef)
+            adminDocPromise,
+            userDocPromise
         ]);
 
         setIsAdmin(adminDoc.exists());
@@ -67,19 +79,20 @@ export const FirebaseProvider = ({
         if (userDoc.exists()) {
             setProUser(userDoc.data()?.isProUser || false);
         } else {
+            // This will also have its own internal error handling
             await handleNewUser(firebaseUser, firestore);
         }
+
     } catch (error) {
-        // This is a general catch, but our rules should be permissive enough for these reads.
-        // A specific permission error for this would be handled by the listener,
-        // but it's good practice to have a fallback.
-        console.error("Error checking user status:", error);
+        // Errors are now emitted from the individual catches, 
+        // but we can still log a general failure if needed.
+        console.error("Failed to check user status due to a permission error.", error);
         setIsAdmin(false);
         setProUser(false);
     } finally {
         setIsLoading(false);
     }
-}, [firestore]);
+  }, [firestore]);
 
 
   useEffect(() => {
