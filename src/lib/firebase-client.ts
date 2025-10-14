@@ -10,15 +10,15 @@ import {
   updateProfile,
   type User, 
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, Firestore } from 'firebase/firestore';
 import type { UserProfile, UserScore } from './types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { auth, firestore as db } from "@/firebase";
 
-const handleNewUser = async (user: User) => {
-    const userRef = doc(db, 'users', user.uid);
-    const leaderboardRef = doc(db, 'leaderboard', user.uid);
+export const handleNewUser = async (user: User, firestore: Firestore) => {
+    const userRef = doc(firestore, 'users', user.uid);
+    const leaderboardRef = doc(firestore, 'leaderboard', user.uid);
 
     try {
         const userDoc = await getDoc(userRef);
@@ -30,8 +30,9 @@ const handleNewUser = async (user: User) => {
                 displayName: displayName,
                 email: user.email!,
                 photoURL: photoURL,
+                isProUser: false,
             };
-            setDoc(userRef, userProfileData)
+            await setDoc(userRef, userProfileData)
               .catch((serverError) => {
                 const permissionError = new FirestorePermissionError({
                   path: userRef.path,
@@ -47,7 +48,7 @@ const handleNewUser = async (user: User) => {
                 userPhoto: photoURL,
                 totalPoints: 0,
             };
-            setDoc(leaderboardRef, leaderboardEntry)
+            await setDoc(leaderboardRef, leaderboardEntry)
               .catch((serverError) => {
                 const permissionError = new FirestorePermissionError({
                   path: leaderboardRef.path,
@@ -59,7 +60,6 @@ const handleNewUser = async (user: User) => {
         }
 
     } catch (error: any) {
-        // This outer try-catch is for the getDoc calls, which should also be handled.
         const permissionError = new FirestorePermissionError({
             path: `users/${user.uid} or leaderboard/${user.uid}`,
             operation: 'get',
@@ -72,20 +72,6 @@ const handleNewUser = async (user: User) => {
 export const signInWithGoogle = async (): Promise<void> => {
     const provider = new GoogleAuthProvider();
     await signInWithRedirect(auth, provider);
-};
-
-export const getGoogleRedirectResult = async (): Promise<User | null> => {
-    try {
-        const result = await getRedirectResult(auth);
-        if (result && result.user) {
-            await handleNewUser(result.user);
-            return result.user;
-        }
-        return null;
-    } catch (error) {
-        console.error("Redirect sign-in error:", error);
-        throw error;
-    }
 };
 
 

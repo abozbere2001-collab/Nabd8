@@ -4,9 +4,10 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged } from 'firebase/auth';
+import { Auth, User, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { handleNewUser } from '@/lib/firebase-client';
 
 interface FirebaseContextProps {
   firebaseApp: FirebaseApp | null;
@@ -38,57 +39,60 @@ export const FirebaseProvider = ({
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setIsLoading(true);
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
-        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
-        try {
-            const [adminDoc, userDoc] = await Promise.all([
-                getDoc(adminDocRef),
-                getDoc(userDocRef)
-            ]);
-            setIsAdmin(adminDoc.exists());
+    // This effect runs once on mount to check for redirect results.
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          handleNewUser(result.user, firestore);
+        }
+      })
+      .catch((error) => {
+        console.error("Error handling redirect result:", error);
+      })
+      .finally(() => {
+        // After handling redirect, set up the normal auth state listener.
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+          setIsLoading(true);
+          if (firebaseUser) {
+            setUser(firebaseUser);
+            const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
+            const userDocRef = doc(firestore, 'users', firebaseUser.uid);
+            try {
+                const [adminDoc, userDoc] = await Promise.all([
+                    getDoc(adminDocRef),
+                    getDoc(userDocRef)
+                ]);
+                setIsAdmin(adminDoc.exists());
 
-            if (userDoc.exists()) {
-                setProUser(userDoc.data()?.isProUser || false);
-            } else {
-                // If user doc doesn't exist, create it.
-                const newUserProfile = {
-                    displayName: firebaseUser.displayName,
-                    email: firebaseUser.email,
-                    photoURL: firebaseUser.photoURL,
-                    isProUser: false,
-                };
-                await setDoc(userDocRef, newUserProfile);
+                if (userDoc.exists()) {
+                    setProUser(userDoc.data()?.isProUser || false);
+                } else {
+                    // This case should be rare if handleNewUser works correctly on redirect
+                    await handleNewUser(firebaseUser, firestore);
+                }
+            } catch (error) {
+                console.error("Error checking admin or pro status:", error);
+                setIsAdmin(false);
+                setProUser(false);
             }
-        } catch (error) {
-            console.error("Error checking admin or pro status:", error);
+          } else {
+            setUser(null);
             setIsAdmin(false);
             setProUser(false);
-        }
-      } else {
-        setUser(null);
-        setIsAdmin(false);
-        setProUser(false);
-      }
-      setIsLoading(false);
-    });
-
-    return () => unsubscribe();
+          }
+          setIsLoading(false);
+        });
+        return () => unsubscribe();
+      });
   }, [auth, firestore]);
   
   const handleSetPro = async (isPro: boolean) => {
-    if (user) {
+    if (user && firestore) {
         const userDocRef = doc(firestore, 'users', user.uid);
         try {
-            // First, update the state locally for immediate UI feedback
             setProUser(isPro);
-            // Then, write to Firestore
             await setDoc(userDocRef, { isProUser: isPro }, { merge: true });
         } catch (error) {
-            // If Firestore write fails, revert the local state and log error
             console.error("Failed to update pro status:", error);
             setProUser(!isPro); 
         }
@@ -165,8 +169,6 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | 
 export const useUser = (): { user: User | null; isUserLoading: boolean } => {
   const context = useContext(FirebaseContext);
   if (context === undefined) {
-    // This can happen on the very first render before the provider has mounted.
-    // In this case, we are definitely loading.
     return { user: null, isUserLoading: true };
   }
   return { user: context.user, isUserLoading: context.isLoading };
