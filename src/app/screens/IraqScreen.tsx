@@ -22,94 +22,11 @@ import { Button } from '@/components/ui/button';
 import { Users, Search } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
+import { FixtureItem } from '@/components/FixtureItem';
 
 
 const IRAQI_LEAGUE_ID = 542;
 const CURRENT_SEASON = 2025;
-
-
-const LiveMatchStatus = ({ fixture }: { fixture: Fixture }) => {
-    const { status, date } = fixture.fixture;
-
-    const isLive = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(status.short);
-    const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
-
-    if (isLive) {
-        return (
-            <>
-                <div className="text-red-500 font-bold text-xs animate-pulse mb-1">
-                    {status.elapsed ? `${status.elapsed}'` : status.long}
-                </div>
-                <div className="font-bold text-lg">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
-                <div className="text-xs text-muted-foreground mt-1">{status.short === 'HT' ? 'استراحة' : 'مباشر'}</div>
-            </>
-        );
-    }
-    
-    if (isFinished) {
-         return (
-            <>
-                <div className="font-bold text-lg">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
-                <div className="text-xs text-muted-foreground mt-1">انتهت</div>
-            </>
-        );
-    }
-
-    return (
-        <>
-            <div className="font-bold text-lg">{format(new Date(date), "HH:mm")}</div>
-            <div className="text-xs text-muted-foreground mt-1">{status.long}</div>
-        </>
-    );
-};
-
-
-const FixtureItem = React.memo(({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
-    return (
-      <div 
-        key={fixture.fixture.id} 
-        className="rounded-lg bg-card border p-3 text-sm transition-all duration-300"
-      >
-        <div 
-          className="hover:bg-accent/50 cursor-pointer -m-3 p-3"
-          onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
-        >
-         <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
-              <div className="flex items-center gap-2">
-                  <Avatar className="h-4 w-4">
-                      <AvatarImage src={fixture.league.logo} alt={fixture.league.name} />
-                      <AvatarFallback>{fixture.league.name.substring(0,1)}</AvatarFallback>
-                  </Avatar>
-                  <span className="truncate">{fixture.league.name}</span>
-              </div>
-         </div>
-         <div className="flex items-center justify-between gap-2">
-             <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                 <span className="font-semibold truncate">{fixture.teams.home.name}</span>
-                 <Avatar className="h-8 w-8">
-                     <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
-                     <AvatarFallback>{fixture.teams.home.name.substring(0, 2)}</AvatarFallback>
-                 </Avatar>
-             </div>
-              <div className="flex flex-col items-center justify-center min-w-[80px] text-center">
-                 <LiveMatchStatus fixture={fixture} />
-             </div>
-             <div className="flex items-center gap-2 flex-1 truncate">
-                  <Avatar className="h-8 w-8">
-                     <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
-                     <AvatarFallback>{fixture.teams.away.name.substring(0, 2)}</AvatarFallback>
-                  </Avatar>
-                 <span className="font-semibold truncate">{fixture.teams.away.name}</span>
-             </div>
-         </div>
-         </div>
-         <div className="mt-2 pt-2 border-t border-border/50">
-            <CommentsButton matchId={fixture.fixture.id} navigate={navigate} />
-         </div>
-      </div>
-    );
-});
-FixtureItem.displayName = 'FixtureItem';
 
 
 function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
@@ -310,7 +227,7 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     return (
         <div className="space-y-3 pt-4">
             {teams.map(team => (
-                <div key={team.teamId} onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: team.teamId, teamName: team.name })} className="p-3 rounded-lg border bg-card cursor-pointer">
+                <div key={team.teamId} onClick={() => navigate('TeamDetails', { teamId: team.teamId })} className="p-3 rounded-lg border bg-card cursor-pointer">
                     <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
                             <AvatarImage src={team.logo} alt={team.name} />
@@ -342,7 +259,7 @@ export function IraqScreen({ navigate, goBack, canGoBack, ...props }: ScreenProp
                       <Search className="h-5 w-5" />
                   </Button>
               </SearchSheet>
-              <ProfileButton onProfileClick={() => navigate('Profile')} />
+              <ProfileButton/>
           </div>
         }
       />

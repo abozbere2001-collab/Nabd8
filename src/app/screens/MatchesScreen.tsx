@@ -4,7 +4,6 @@
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
@@ -13,7 +12,6 @@ import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -23,7 +21,8 @@ import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import type { Fixture as FixtureType, Favorites, MatchDetails } from '@/lib/types';
 import { GlobalPredictionsScreen } from './GlobalPredictionsScreen';
-
+import { FixtureItem } from '@/components/FixtureItem';
+import { isMatchLive } from '@/lib/matchStatus';
 
 interface GroupedFixtures {
     [leagueName: string]: {
@@ -31,95 +30,6 @@ interface GroupedFixtures {
         fixtures: FixtureType[];
     }
 }
-
-const isMatchLive = (status: FixtureType['fixture']['status']) => {
-    return ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(status.short);
-}
-
-// Live Timer Component
-const LiveMatchStatus = ({ fixture, isLive }: { fixture: FixtureType, isLive: boolean }) => {
-    const { status, date } = fixture.fixture;
-    const [elapsedTime, setElapsedTime] = useState(status.elapsed);
-
-    useEffect(() => {
-        setElapsedTime(status.elapsed);
-        if (['1H', '2H', 'ET', 'P', 'BT'].includes(status.short) && status.elapsed !== null) {
-            const interval = setInterval(() => {
-                setElapsedTime(prev => (prev ? prev + 1 : 1));
-            }, 60000);
-            return () => clearInterval(interval);
-        }
-    }, [status.short, status.elapsed]);
-
-    const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
-
-    if (isLive) {
-        return (
-            <>
-                <div className="text-red-500 font-bold text-sm animate-pulse mb-1">
-                    {elapsedTime ? `${elapsedTime}'` : status.long}
-                </div>
-                <div className="font-bold text-xl">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
-                <div className="text-xs text-muted-foreground mt-1">{status.short === 'HT' ? 'استراحة' : 'مباشر'}</div>
-            </>
-        );
-    }
-    
-    if (isFinished) {
-         return (
-            <>
-                <div className="font-bold text-lg">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
-                <div className="text-xs text-muted-foreground mt-1">انتهت</div>
-            </>
-        );
-    }
-
-    return (
-        <>
-            <div className="font-bold text-base">{format(new Date(date), "HH:mm")}</div>
-            <div className="text-xs text-muted-foreground mt-1">{status.long}</div>
-        </>
-    );
-};
-
-// Fixture Item Component
-const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, isAdmin }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean, isAdmin: boolean }) => {
-    const live = isMatchLive(fixture.fixture.status);
-    const hasCommentsFeature = commentsEnabled || isAdmin;
-
-    return (
-      <div 
-        key={fixture.fixture.id} 
-        className="rounded-lg bg-card border text-sm transition-all duration-300 flex flex-col justify-between p-2"
-        onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
-      >
-         <div className="flex-1 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                <span className="font-semibold truncate">{fixture.teams.home.name}</span>
-                <Avatar className={'h-6 w-6'}><AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} /></Avatar>
-            </div>
-            <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
-                <LiveMatchStatus fixture={fixture} isLive={live} />
-            </div>
-            <div className="flex items-center gap-2 flex-1 truncate">
-                <Avatar className={'h-6 w-6'}><AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} /></Avatar>
-                <span className="font-semibold truncate">{fixture.teams.away.name}</span>
-            </div>
-         </div>
-         {hasCommentsFeature && (
-            <div className="mt-2 pt-2 border-t border-border/50">
-                <CommentsButton 
-                  matchId={fixture.fixture.id} 
-                  navigate={navigate} 
-                  commentsEnabled={commentsEnabled}
-                  size="sm"
-                />
-            </div>
-         )}
-      </div>
-    );
-});
-FixtureItem.displayName = 'FixtureItem';
 
 
 // Fixtures List Component
@@ -235,32 +145,24 @@ const FixturesList = ({
     });
 
     return (
-        <div className="space-y-2">
+        <div className="space-y-4">
             {sortedLeagues.map(leagueName => {
                 const { league, fixtures } = groupedFixtures[leagueName];
                 return (
-                    <Accordion type="single" collapsible defaultValue="item-1" key={leagueName}>
-                        <AccordionItem value="item-1" className="border-none">
-                            <AccordionTrigger 
-                                className="font-bold text-foreground py-2 px-3 rounded-md hover:no-underline bg-card border"
-                                onClick={(e) => {
-                                    if ((e.target as HTMLElement).closest('button')) return;
-                                    e.preventDefault();
-                                    navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo });
-                                }}
-                            >
-                               <div className="flex items-center gap-2 flex-1">
-                                    <Avatar className="h-5 w-5">
-                                        <AvatarImage src={league.logo} alt={league.name} />
-                                    </Avatar>
-                                    <span className="truncate">{leagueName}</span>
-                               </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
-                                {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} isAdmin={isAdmin} />)}
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
+                    <div key={leagueName}>
+                        <div 
+                            className="font-bold text-foreground py-2 px-3 rounded-md bg-card border flex items-center gap-2 cursor-pointer"
+                            onClick={() => navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo })}
+                        >
+                            <Avatar className="h-5 w-5">
+                                <AvatarImage src={league.logo} alt={league.name} />
+                            </Avatar>
+                            <span className="truncate">{leagueName}</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
+                            {fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} commentsEnabled={matchDetails[f.fixture.id]?.commentsEnabled} isAdmin={isAdmin} />)}
+                        </div>
+                    </div>
                 )
             })}
         </div>
@@ -499,3 +401,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    

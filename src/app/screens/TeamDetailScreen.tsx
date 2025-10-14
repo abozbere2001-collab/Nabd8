@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -20,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Team, Player, Fixture, Standing, TeamStatistics } from '@/lib/types';
 import { CURRENT_SEASON, PREVIOUS_SEASON } from '@/lib/constants';
+import { FixtureItem } from '@/components/FixtureItem';
 
 interface TeamData {
     team: Team;
@@ -196,22 +198,7 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
             </TabsList>
             <TabsContent value="matches" className="mt-4 space-y-3">
                 {fixtures.length > 0 ? fixtures.map(fixture => (
-                    <Card key={fixture.fixture.id} className="p-3 cursor-pointer" onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}>
-                        <p className="text-xs text-muted-foreground mb-2 text-center">{new Date(fixture.fixture.date).toLocaleDateString('ar-EG', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-                        <div className="flex items-center justify-between gap-2">
-                             <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                                <span className="font-semibold truncate">{fixture.teams.home.name}</span>
-                                <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                            </div>
-                            <div className="font-bold text-lg text-center min-w-[70px]">
-                                {fixture.goals.home ?? '-'} : {fixture.goals.away ?? '-'}
-                            </div>
-                             <div className="flex items-center gap-2 flex-1 truncate">
-                                <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                                <span className="font-semibold truncate">{fixture.teams.away.name}</span>
-                            </div>
-                        </div>
-                    </Card>
+                    <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />
                 )) : <p className="text-center text-muted-foreground p-8">لا توجد مباريات متاحة.</p>}
             </TabsContent>
             <TabsContent value="standings" className="mt-4">
@@ -367,7 +354,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
         onBack={goBack} 
         canGoBack={canGoBack} 
       />
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-1">
         <TeamHeader team={teamData.team} venue={teamData.venue} />
          <Tabs defaultValue="details" className="w-full">
           <TabsList className="grid w-full grid-cols-2">

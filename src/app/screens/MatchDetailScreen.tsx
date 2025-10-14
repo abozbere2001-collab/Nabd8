@@ -17,6 +17,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
+import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 
 // --- PlayerCard Component ---
 const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: ScreenProps['navigate'] }) => {
@@ -71,8 +72,6 @@ const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: S
 // --- Reusable Components ---
 
 const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
-    const isLive = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(fixture.fixture.status.short);
-
     return (
         <Card className="mb-4 bg-card/80 backdrop-blur-sm">
             <CardContent className="p-4">
@@ -88,14 +87,8 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
                         <Avatar className="h-12 w-12 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
                         <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
-                    <div className="flex flex-col items-center justify-center min-w-[90px] text-center">
-                        <div className="font-bold text-3xl tracking-wider">{`${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`}</div>
-                        {isLive && (
-                             <div className="text-red-500 font-bold text-xs animate-pulse mt-1">
-                                {fixture.fixture.status.elapsed ? `${fixture.fixture.status.elapsed}'` : 'مباشر'}
-                            </div>
-                        )}
-                       
+                     <div className="flex flex-col items-center justify-center min-w-[120px] text-center">
+                        <LiveMatchStatus fixture={fixture} large />
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-12 w-12 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
@@ -245,8 +238,7 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
 
 const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lineups: LineupData[] | null; events: MatchEvent[] | null; season: number; navigate: ScreenProps['navigate']; }) => {
     const [lineups, setLineups] = useState(initialLineups);
-    const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
-
+    
     // This must be at the top level
     useEffect(() => {
         if (!initialLineups || initialLineups.length < 2) {
@@ -312,9 +304,9 @@ const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lin
         
     }, [initialLineups, season]);
 
-    if (!lineups) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    if (lineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
-    
+    const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
+    if (!lineups || lineups.length < 2) return <div className="flex justify-center p-8">{!lineups ? <Loader2 className="h-6 w-6 animate-spin" /> : <p className="text-center text-muted-foreground">التشكيلات غير متاحة حاليًا.</p>}</div>;
+
     const home = lineups.find(l => l.team.id === initialLineups[0].team.id);
     const away = lineups.find(l => l.team.id === initialLineups[1].team.id);
     
@@ -542,7 +534,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     return (
         <div className="flex h-full flex-col bg-background">
             <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} />
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-1">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} />
                 <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-4 rounded-lg h-auto p-1 bg-card">
@@ -560,3 +552,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
