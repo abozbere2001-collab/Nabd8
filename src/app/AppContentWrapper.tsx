@@ -29,7 +29,7 @@ import { LoginScreen } from './screens/LoginScreen';
 import type { ScreenKey } from './page';
 
 import { useAd, SplashScreenAd, BannerAd } from '@/components/AdProvider';
-import { useAuth } from '@/firebase/provider';
+import { useUser } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -40,7 +40,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LogOut, User as UserIcon } from 'lucide-react';
+import { LogOut, User as UserIcon, Loader2 } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
 
 const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
@@ -78,7 +78,7 @@ type StackItem = {
 };
 
 export const ProfileButton = () => {
-    const { user } = useAuth();
+    const { user } = useUser();
 
     const handleSignOut = async () => {
         await signOut();
@@ -134,6 +134,8 @@ export const ProfileButton = () => {
 export function AppContentWrapper() {
   const [stack, setStack] = useState<StackItem[]>([{ key: 'Matches-0', screen: 'Matches' }]);
   const { showSplashAd, showBannerAd } = useAd();
+  const { user, isUserLoading } = useUser();
+
 
   const goBack = useCallback(() => {
     setStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
@@ -169,14 +171,26 @@ export function AppContentWrapper() {
       }
   }, [navigate]);
 
-
-  const activeStackItem = stack[stack.length - 1];
-  const ActiveScreenComponent = screenConfig[activeStackItem.screen]?.component;
-  const showBottomNav = mainTabs.includes(activeStackItem.screen);
+  if (isUserLoading) {
+    return (
+        <div className="flex items-center justify-center h-screen bg-background">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-4">جاري التحميل...</p>
+        </div>
+    );
+  }
 
   if (showSplashAd) {
     return <SplashScreenAd />;
   }
+  
+  if (!user) {
+    return <LoginScreen navigate={navigate} goBack={goBack} canGoBack={false} />;
+  }
+
+  const activeStackItem = stack[stack.length - 1];
+  const ActiveScreenComponent = screenConfig[activeStackItem.screen]?.component;
+  const showBottomNav = mainTabs.includes(activeStackItem.screen);
   
   const screenProps = {
     ...activeStackItem.props,
