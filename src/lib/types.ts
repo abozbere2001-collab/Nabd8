@@ -1,4 +1,5 @@
 
+
 // This file contains all the type definitions for the data used in the app.
 
 // --- API Football Types ---
@@ -148,7 +149,7 @@ export interface Notification {
   senderId: string;
   senderName: string;
   senderPhoto: string;
-  type: 'like' | 'reply';
+  type: 'like' | 'reply' | 'goal' | 'news';
   matchId: number;
   commentId: string;
   commentText: string;

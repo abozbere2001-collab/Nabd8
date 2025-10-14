@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2 } from 'lucide-react';
+import { Heart, MessageSquare, CornerDownRight, Newspaper, Goal } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { useAuth, useFirestore } from '@/firebase/provider';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
@@ -14,6 +14,21 @@ import type { Notification } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+
+const NotificationIcon = ({ type }: { type: Notification['type'] }) => {
+    switch (type) {
+        case 'like':
+            return <Heart className="h-5 w-5 text-red-500 fill-current" />;
+        case 'reply':
+            return <CornerDownRight className="h-5 w-5 text-blue-500" />;
+        case 'goal':
+            return <Goal className="h-5 w-5 text-green-500" />;
+        case 'news':
+            return <Newspaper className="h-5 w-5 text-orange-500" />;
+        default:
+            return <MessageSquare className="h-5 w-5 text-gray-500" />;
+    }
+};
 
 export function NotificationsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
   const { user } = useAuth();
@@ -56,17 +71,35 @@ export function NotificationsScreen({ navigate, goBack, canGoBack, headerActions
   };
   
   const getNotificationText = (notification: Notification) => {
-      const baseText = notification.type === 'like' ? 'أعجب بتعليقك:' : 'رد على تعليقك:';
+      let baseText = 'لديك إشعار جديد';
+      switch (notification.type) {
+        case 'like':
+            baseText = 'أعجب بتعليقك:';
+            break;
+        case 'reply':
+            baseText = 'رد على تعليقك:';
+            break;
+        case 'goal':
+             baseText = 'سجل هدفاً!';
+             break;
+        case 'news':
+            baseText = 'خبر جديد:';
+            break;
+      }
+      
+      const commentText = notification.commentText ? (
+           ` "${notification.commentText.length > 30 ? `${notification.commentText.substring(0, 30)}...` : notification.commentText}"`
+      ) : '';
+
+
       return (
         <p className="text-sm">
           <span className="font-bold">{notification.senderName}</span>
           {' '}
           {baseText}
-          {' "'}
-          <span className="text-muted-foreground italic truncate">
-            {notification.commentText.length > 30 ? `${notification.commentText.substring(0, 30)}...` : notification.commentText}
+          <span className="text-muted-foreground italic">
+            {commentText}
           </span>
-          {'"'}
         </p>
       );
   }
@@ -99,17 +132,23 @@ export function NotificationsScreen({ navigate, goBack, canGoBack, headerActions
                   !notif.read && "bg-primary/5"
                 )}
               >
-                <Avatar className="h-10 w-10 border">
-                  <AvatarImage src={notif.senderPhoto} />
-                  <AvatarFallback>{notif.senderName?.charAt(0)}</AvatarFallback>
-                </Avatar>
+                <div className="relative">
+                    <Avatar className="h-10 w-10 border">
+                        <AvatarImage src={notif.senderPhoto} />
+                        <AvatarFallback>{notif.senderName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5">
+                        <NotificationIcon type={notif.type} />
+                    </div>
+                </div>
+
                 <div className="flex-1">
                   {getNotificationText(notif)}
                   <p className="text-xs text-muted-foreground mt-1">
                     {notif.timestamp ? formatDistanceToNow(notif.timestamp.toDate(), { addSuffix: true, locale: ar }) : ''}
                   </p>
                 </div>
-                {!notif.read && <div className="h-2.5 w-2.5 rounded-full bg-primary mt-1"></div>}
+                {!notif.read && <div className="h-2.5 w-2.5 rounded-full bg-primary mt-1 self-center"></div>}
               </li>
             ))}
           </ul>

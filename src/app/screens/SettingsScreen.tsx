@@ -2,10 +2,10 @@
 
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut, User, Search } from 'lucide-react';
+import { ChevronLeft, Moon, Sun, Languages, Bell, LogOut, User, Search, Goal, Redo, XCircle, Newspaper } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
@@ -24,11 +24,33 @@ import {
 } from "@/components/ui/alert-dialog"
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
+import { Switch } from '@/components/ui/switch';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+
+const notificationSettings = [
+    { id: 'match-start', label: 'بداية المباراة', description: 'تنبيه عند انطلاق أي مباراة مهمة.', icon: Bell },
+    { id: 'match-end', label: 'نهاية المباراة', description: 'تنبيه عند انتهاء المباريات بنتائجها النهائية.', icon: Bell },
+    { id: 'goals', label: 'الأهداف', description: 'تنبيه فوري عند تسجيل هدف.', icon: Goal },
+    { id: 'red-cards', label: 'البطاقات الحمراء', description: 'تنبيه عند إشهار بطاقة حمراء.', icon: XCircle },
+    { id: 'penalties', label: 'ركلات الجزاء', description: 'تنبيه عند احتساب أو تسجيل ركلة جزاء.', icon: Redo },
+    { id: 'news', label: 'الأخبار العاجلة', description: 'تنبيهات للأخبار والمقالات المهمة.', icon: Newspaper },
+];
 
 export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    // In a real app, you would fetch these preferences from Firestore.
+    // For now, we'll initialize them all to true for demonstration.
+    const initialPrefs = notificationSettings.reduce((acc, item) => {
+        acc[item.id] = true;
+        return acc;
+    }, {} as Record<string, boolean>);
+    setNotifPrefs(initialPrefs);
+  }, []);
   
   const handleSignOut = async () => {
     try {
@@ -51,10 +73,17 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
+  const handleNotifChange = (id: string, checked: boolean) => {
+      setNotifPrefs(prev => ({...prev, [id]: checked}));
+      // In a real app, you would save this preference to Firestore here.
+      toast({
+          title: `تم ${checked ? 'تفعيل' : 'إلغاء'} إشعارات "${notificationSettings.find(s => s.id === id)?.label}"`,
+      })
+  }
+
   const settingsItems = [
     { label: 'الملف الشخصي', icon: User, detail: '', action: () => navigate('Profile') },
     { label: 'اللغة', icon: Languages, detail: 'العربية', action: () => {} },
-    { label: 'الإشعارات', icon: Bell, detail: '', action: () => navigate('Notifications') },
   ]
 
 
@@ -71,11 +100,11 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                       <Search className="h-5 w-5" />
                   </Button>
               </SearchSheet>
-              <ProfileButton onProfileClick={() => navigate('Profile')} />
+              <ProfileButton/>
           </div>
         }
       />
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <div className="space-y-2">
             <button onClick={toggleTheme} className="flex w-full items-center justify-between rounded-lg bg-card p-4 text-right transition-colors hover:bg-accent/50">
                <div className="flex items-center gap-4">
@@ -100,6 +129,33 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                  </button>
             ))}
         </div>
+        
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Bell className="h-5 w-5 text-primary" />
+                    إعدادات الإشعارات
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+                 {notificationSettings.map(item => (
+                    <div key={item.id} className="flex items-center justify-between p-3 rounded-md hover:bg-accent/50">
+                        <div className="flex items-start gap-3">
+                            <item.icon className="h-5 w-5 mt-1 text-muted-foreground" />
+                            <div>
+                                <label htmlFor={item.id} className="font-medium cursor-pointer">{item.label}</label>
+                                <p className="text-xs text-muted-foreground">{item.description}</p>
+                            </div>
+                        </div>
+                        <Switch
+                            id={item.id}
+                            checked={notifPrefs[item.id] || false}
+                            onCheckedChange={(checked) => handleNotifChange(item.id, checked)}
+                        />
+                    </div>
+                 ))}
+            </CardContent>
+        </Card>
         
         <Separator className="my-8" />
         <AlertDialog>
