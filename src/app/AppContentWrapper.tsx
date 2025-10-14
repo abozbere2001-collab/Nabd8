@@ -40,6 +40,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User as UserIcon } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
+import { cn } from '@/lib/utils';
 
 const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
@@ -83,9 +84,6 @@ export const ProfileButton = () => {
     };
     
     const navigateToProfile = () => {
-        // This is a placeholder. The actual navigation is handled by the parent component.
-        // We'll call a prop passed down for navigation.
-        // For now, we find the AppContentWrapper's navigate function on the window.
         if ((window as any).appNavigate) {
             (window as any).appNavigate('Profile');
         }
@@ -130,31 +128,55 @@ export const ProfileButton = () => {
 
 
 export function AppContentWrapper() {
-  const [stack, setStack] = useState<StackItem[]>([{ key: 'Matches-0', screen: 'Matches' }]);
+  const [navigationState, setNavigationState] = useState<{ activeTab: ScreenKey, stacks: Record<string, StackItem[]> }>({
+    activeTab: 'Matches',
+    stacks: {
+        'Matches': [{ key: 'Matches-0', screen: 'Matches' }],
+        'Competitions': [{ key: 'Competitions-0', screen: 'Competitions' }],
+        'Iraq': [{ key: 'Iraq-0', screen: 'Iraq' }],
+        'News': [{ key: 'News-0', screen: 'News' }],
+        'Settings': [{ key: 'Settings-0', screen: 'Settings' }],
+    },
+  });
+
   const { showSplashAd, showBannerAd } = useAd();
   
   const goBack = useCallback(() => {
-    setStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
+    setNavigationState(prevState => {
+        const currentStack = prevState.stacks[prevState.activeTab];
+        if (currentStack.length > 1) {
+            return {
+                ...prevState,
+                stacks: {
+                    ...prevState.stacks,
+                    [prevState.activeTab]: currentStack.slice(0, -1),
+                }
+            };
+        }
+        return prevState;
+    });
   }, []);
 
   const navigate = useCallback((screen: ScreenKey, props?: Record<string, any>) => {
-    const isMainTab = mainTabs.includes(screen);
     const newKey = `${screen}-${Date.now()}`;
     const newItem = { key: newKey, screen, props };
 
-    setStack(prevStack => {
-      if (isMainTab) {
-        if (prevStack.length === 1 && prevStack[0].screen === screen) {
-          return prevStack;
-        }
-        return [newItem];
-      } else {
-        if (prevStack[prevStack.length-1].screen === screen) {
-            return prevStack;
-        }
-        return [...prevStack, newItem];
-      }
-    });
+    if (mainTabs.includes(screen)) {
+        // Switch to a main tab
+        setNavigationState(prevState => ({
+            ...prevState,
+            activeTab: screen,
+        }));
+    } else {
+        // Push to the current tab's stack
+        setNavigationState(prevState => ({
+            ...prevState,
+            stacks: {
+                ...prevState.stacks,
+                [prevState.activeTab]: [...prevState.stacks[prevState.activeTab], newItem],
+            }
+        }));
+    }
   }, []);
   
   useEffect(() => {
@@ -166,32 +188,54 @@ export function AppContentWrapper() {
   if (showSplashAd) {
     return <SplashScreenAd />;
   }
-
-  const activeStackItem = stack[stack.length - 1];
-  const ActiveScreenComponent = screenConfig[activeStackItem.screen]?.component;
-  const showBottomNav = mainTabs.includes(activeStackItem.screen);
   
-  const screenProps = {
-    ...activeStackItem.props,
-    navigate,
-    goBack,
-    canGoBack: stack.length > 1,
-  };
+  const activeStack = navigationState.stacks[navigationState.activeTab] || [];
+  const activeStackItem = activeStack[activeStack.length - 1];
+  const showBottomNav = mainTabs.includes(activeStackItem.screen);
 
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
       <div className="relative flex-1 flex flex-col overflow-hidden">
-        {ActiveScreenComponent ? (
-          <ActiveScreenComponent {...screenProps} />
-        ) : (
-          <div className="flex items-center justify-center h-screen bg-background">
-            <p>شاشة غير موجودة: {activeStackItem.screen}</p>
-          </div>
-        )}
+        {Object.entries(navigationState.stacks).map(([tabKey, stack]) => {
+          const currentStackItem = stack[stack.length - 1];
+          if (!currentStackItem) return null;
+          
+          const isActiveTab = navigationState.activeTab === tabKey;
+          const ScreenComponent = screenConfig[currentStackItem.screen]?.component;
+
+          if (!ScreenComponent) return null;
+
+          // By using CSS to hide/show, we keep the component mounted and preserve its state
+          return (
+            <div key={tabKey} className={cn("absolute inset-0 flex flex-col", isActiveTab ? "z-10" : "-z-10")}>
+                {stack.map((stackItem, index) => {
+                    const isVisible = index === stack.length - 1;
+                    const Component = screenConfig[stackItem.screen]?.component;
+                    if (!Component) return null;
+                    
+                    const screenProps = {
+                        ...stackItem.props,
+                        navigate,
+                        goBack,
+                        canGoBack: stack.length > 1,
+                        isVisible, // Pass isVisible prop
+                    };
+
+                    return (
+                        <div key={stackItem.key} className={cn("absolute inset-0 flex flex-col", isVisible ? "z-10" : "-z-10")}>
+                           <Component {...screenProps} />
+                        </div>
+                    )
+                })}
+            </div>
+          )
+        })}
       </div>
       
       {showBannerAd && <BannerAd />}
-      {showBottomNav && <BottomNav activeScreen={activeStackItem.screen} onNavigate={navigate} />}
+      {showBottomNav && <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => navigate(screen)} />}
     </main>
   );
 }
+
+    
