@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -8,11 +8,27 @@ import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { signInWithGoogle, setGuestUser } from '@/lib/firebase-client';
+import { signInWithGoogle, setGuestUser, getAuthResult } from '@/lib/firebase-client';
 
 export function LoginScreen({ goBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Check for redirect result on component mount
+  useEffect(() => {
+    setLoading(true);
+    getAuthResult()
+      .then(result => {
+        // If result is not null, onAuthStateChanged will handle the user state.
+        // If result is null, it means we are not coming back from a redirect.
+        setLoading(false);
+      })
+      .catch(e => {
+        handleAuthError(e);
+        setLoading(false);
+      });
+  }, []);
+
 
   const handleAuthError = (e: any) => {
     console.error("Login Error:", e);
@@ -50,7 +66,7 @@ export function LoginScreen({ goBack }: ScreenProps) {
         {loading ? (
             <div className="flex flex-col items-center gap-4">
                 <Loader2 className="h-8 w-8 animate-spin" />
-                <p className="text-muted-foreground">جاري تحويلك إلى صفحة جوجل...</p>
+                <p className="text-muted-foreground">جاري تسجيل الدخول...</p>
             </div>
         ) : (
           <>

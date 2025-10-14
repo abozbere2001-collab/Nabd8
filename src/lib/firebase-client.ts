@@ -9,6 +9,7 @@ import {
   getRedirectResult,
   updateProfile,
   type User, 
+  type UserCredential,
   signInWithRedirect,
 } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, enableIndexedDbPersistence } from 'firebase/firestore';
@@ -98,6 +99,10 @@ export const signInWithGoogle = async (): Promise<void> => {
     await signInWithRedirect(auth, provider);
 };
 
+export const getAuthResult = async (): Promise<UserCredential | null> => {
+    return getRedirectResult(auth);
+};
+
 export const signOut = (): Promise<void> => {
     sessionStorage.removeItem(GUEST_USER_KEY);
     return firebaseSignOut(auth);
@@ -107,12 +112,10 @@ export const onAuthStateChange = (callback: (user: User | null | typeof guestUse
     
     const unsubscribe = firebaseOnAuthStateChanged(auth, (user) => {
         if (user) {
-            // A real user is signed in.
             sessionStorage.removeItem(GUEST_USER_KEY);
             handleNewUser(user);
             callback(user);
         } else {
-             // No real user. Check if we should be a guest.
             if (sessionStorage.getItem(GUEST_USER_KEY) === 'true') {
                 callback(guestUser);
             } else {
@@ -121,28 +124,13 @@ export const onAuthStateChange = (callback: (user: User | null | typeof guestUse
         }
     });
 
-    // Also check for redirect result when the app first loads
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result && result.user) {
-          // User signed in via redirect. onAuthStateChanged will handle it.
-        }
-      })
-      .catch((error) => {
-        // Handle Errors here.
-        console.error("Redirect Error:", error);
-        // This could be 'auth/account-exists-with-different-credential', etc.
-        // You might want to notify the user.
-      });
-
     return unsubscribe;
 };
 
 export const setGuestUser = () => {
     sessionStorage.setItem(GUEST_USER_KEY, 'true');
-    // Trigger auth state change listener to update the app state to guest
-    onAuthStateChange(user => {});
-    // A bit of a hack: force a reload to ensure all components re-evaluate the new guest state
+    // Force a reload to ensure all components re-evaluate the new guest state
+    // and onAuthStateChange fires correctly.
     window.location.reload();
 }
 

@@ -131,10 +131,8 @@ export function AppContentWrapper() {
   const [stack, setStack] = useState<StackItem[]>([{ key: 'Matches-0', screen: 'Matches' }]);
 
   const goBack = useCallback(() => {
-    if (stack.length > 1) {
-      setStack(prev => prev.slice(0, -1));
-    }
-  }, [stack.length]);
+    setStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
+  }, []);
 
   const navigate = useCallback((screen: ScreenKey, props?: Record<string, any>) => {
     const isMainTab = mainTabs.includes(screen);
@@ -143,9 +141,17 @@ export function AppContentWrapper() {
 
     setStack(prevStack => {
       if (isMainTab) {
-        // If it's a main tab, reset the stack to just this tab.
+        // If it's a main tab, just show this tab.
+        // If it's already the active main tab, do nothing.
+        if (prevStack.length === 1 && prevStack[0].screen === screen) {
+          return prevStack;
+        }
         return [newItem];
       } else {
+        // Prevent pushing the same screen multiple times
+        if (prevStack[prevStack.length-1].screen === screen) {
+            return prevStack;
+        }
         // Otherwise, push the new screen onto the stack.
         return [...prevStack, newItem];
       }
@@ -178,7 +184,6 @@ export function AppContentWrapper() {
     canGoBack: stack.length > 1,
   };
 
-
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
       <div className="relative flex-1 flex flex-col overflow-hidden">
@@ -187,20 +192,14 @@ export function AppContentWrapper() {
           const isVisible = index === stack.length - 1;
           
           if (!ScreenComponent) return null;
+          
+          // Simplified rendering: only render the top-most screen to avoid complexity.
+          if (!isVisible) return null;
 
           return (
             <div
               key={item.key}
-              className={cn(
-                'absolute inset-0 bg-background flex flex-col',
-                { 'z-10': isVisible, 'z-0': !isVisible }
-              )}
-              style={{
-                 transform: isVisible ? 'translateX(0)' : 'translateX(100%)',
-                 transition: 'transform 0.3s ease-in-out',
-                 // Render only the top 2 screens for performance
-                 display: index < stack.length - 2 ? 'none' : 'flex'
-              }}
+              className='absolute inset-0 bg-background flex flex-col'
             >
               <ScreenComponent {...item.props} {...screenProps} isVisible={isVisible} />
             </div>

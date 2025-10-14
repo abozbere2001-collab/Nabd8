@@ -29,8 +29,7 @@ function App() {
       );
   }
   
-  if (user === null) {
-    // This provides dummy props as LoginScreen handles its own logic now
+  if (!user) { // This covers both null and guest users who aren't fully authenticated
     return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
   }
 
@@ -39,19 +38,8 @@ function App() {
 }
 
 export default function Home() {
-  const [user, setUser] = useState<User | typeof guestUser | null | undefined>(undefined);
-
-  useEffect(() => {
-    // onAuthStateChange now handles all user states including guest.
-    const unsubscribe = onAuthStateChange((currentUser) => {
-      setUser(currentUser);
-    });
-    
-    return () => unsubscribe();
-  }, []);
-
   return (
-    <FirebaseProvider user={user}>
+    <FirebaseProvider>
       <App />
     </FirebaseProvider>
   );
