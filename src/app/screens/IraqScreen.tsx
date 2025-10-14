@@ -9,13 +9,9 @@ import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
 import { collection, getDocs, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { useFirestore, useAdmin } from '@/firebase/provider';
 import type { Fixture, Standing, AdminFavorite, ManualTopScorer } from '@/lib/types';
-import { CommentsButton } from '@/components/CommentsButton';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
@@ -23,57 +19,25 @@ import { Users, Search } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { FixtureItem } from '@/components/FixtureItem';
-
+import { CURRENT_SEASON } from '@/lib/constants';
 
 const IRAQI_LEAGUE_ID = 542;
-const CURRENT_SEASON = 2025;
 
-
-function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
-    const [loading, setLoading] = useState(true);
-    const [fixtures, setFixtures] = useState<Fixture[]>([]);
-    const [standings, setStandings] = useState<Standing[]>([]);
-    const [topScorers, setTopScorers] = useState<ManualTopScorer[]>([]);
-    const { isAdmin } = useAdmin();
-    const { db } = useFirestore();
-
-    useEffect(() => {
-        async function fetchData() {
-            setLoading(true);
-            try {
-                const [fixturesRes, standingsRes] = await Promise.all([
-                    fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`),
-                    fetch(`/api/football/standings?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`),
-                ]);
-
-                const fixturesData = await fixturesRes.json();
-                const standingsData = await standingsRes.json();
-                
-                if (fixturesData.response) setFixtures(fixturesData.response);
-                if (standingsData.response[0]?.league?.standings[0]) setStandings(standingsData.response[0].league.standings[0]);
-
-            } catch (error) {
-                console.error("Failed to fetch Iraqi league details:", error);
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchData();
-
-        if (db) {
-            const scorersRef = collection(db, 'iraqiLeagueTopScorers');
-            const q = query(scorersRef, orderBy('rank', 'asc'));
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                const fetchedScorers = snapshot.docs.map(doc => doc.data() as ManualTopScorer);
-                setTopScorers(fetchedScorers);
-            }, (error) => {
-                const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
-                errorEmitter.emit('permission-error', permissionError);
-            });
-             return () => unsubscribe();
-        }
-    }, [db]);
-
+function OurLeagueTab({ 
+    navigate, 
+    fixtures, 
+    standings, 
+    topScorers, 
+    loading, 
+    isAdmin 
+}: { 
+    navigate: ScreenProps['navigate'],
+    fixtures: Fixture[],
+    standings: Standing[],
+    topScorers: ManualTopScorer[],
+    loading: boolean,
+    isAdmin: boolean
+}) {
     return (
         <Tabs defaultValue="matches" className="w-full">
             <div className="sticky top-0 bg-background z-10 border-b -mx-4 px-4">
@@ -115,7 +79,7 @@ function OurLeagueTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                     </TableHeader>
                     <TableBody>
                         {standings.map((s) => (
-                            <TableRow key={`${s.rank}-${s.team.id}`} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
+                            <TableRow key={`${s.rank}-${s.team.id}`} className="cursor-pointer" onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: s.team.id, teamName: s.team.name })}>
                                 <TableCell className="text-center font-bold">{s.points}</TableCell>
                                 <TableCell className="text-center">{s.all.lose}</TableCell>
                                 <TableCell className="text-center">{s.all.draw}</TableCell>
@@ -244,7 +208,56 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     );
 }
 
-export function IraqScreen({ navigate, goBack, canGoBack, ...props }: ScreenProps) {
+export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+  const [loading, setLoading] = useState(true);
+  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [standings, setStandings] = useState<Standing[]>([]);
+  const [topScorers, setTopScorers] = useState<ManualTopScorer[]>([]);
+  const { isAdmin } = useAdmin();
+  const { db } = useFirestore();
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [fixturesRes, standingsRes] = await Promise.all([
+        fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`),
+        fetch(`/api/football/standings?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`),
+      ]);
+
+      const fixturesData = await fixturesRes.json();
+      const standingsData = await standingsRes.json();
+      
+      setFixtures(fixturesData.response || []);
+      setStandings(standingsData.response?.[0]?.league?.standings?.[0] || []);
+
+    } catch (error) {
+      console.error("Failed to fetch Iraqi league details:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+  
+  useEffect(() => {
+      if (db) {
+          const scorersRef = collection(db, 'iraqiLeagueTopScorers');
+          const q = query(scorersRef, orderBy('goals', 'desc'), orderBy('playerName', 'asc'));
+          const unsubscribe = onSnapshot(q, (snapshot) => {
+              const fetchedScorers = snapshot.docs.map((doc, index) => ({
+                ...(doc.data() as Omit<ManualTopScorer, 'rank'>),
+                rank: index + 1
+              }));
+              setTopScorers(fetchedScorers);
+          }, (error) => {
+              const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
+              errorEmitter.emit('permission-error', permissionError);
+          });
+           return () => unsubscribe();
+      }
+  }, [db]);
   
   return (
     <div className="flex h-full flex-col bg-background">
@@ -272,7 +285,14 @@ export function IraqScreen({ navigate, goBack, canGoBack, ...props }: ScreenProp
             </TabsList>
           </div>
           <TabsContent value="our-league" className="pt-0">
-            <OurLeagueTab navigate={navigate} />
+            <OurLeagueTab 
+                navigate={navigate} 
+                fixtures={fixtures}
+                standings={standings}
+                topScorers={topScorers}
+                loading={loading}
+                isAdmin={isAdmin}
+            />
           </TabsContent>
           <TabsContent value="our-ball" className="pt-0">
              <OurBallTab navigate={navigate} />
@@ -282,5 +302,3 @@ export function IraqScreen({ navigate, goBack, canGoBack, ...props }: ScreenProp
     </div>
   );
 }
-
-    

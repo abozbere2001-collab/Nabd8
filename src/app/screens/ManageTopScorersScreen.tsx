@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -16,12 +17,11 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-const NUM_SCORERS = 10;
+const NUM_SCORERS = 20;
 
 export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
-  const [scorers, setScorers] = useState<ManualTopScorer[]>(() => 
-    Array.from({ length: NUM_SCORERS }, (_, i) => ({
-      rank: i + 1,
+  const [scorers, setScorers] = useState<Omit<ManualTopScorer, 'rank'>[]>(() => 
+    Array.from({ length: NUM_SCORERS }, () => ({
       playerName: '',
       teamName: '',
       goals: 0,
@@ -38,18 +38,16 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
     if (!db) return;
     setLoading(true);
     const scorersRef = collection(db, 'iraqiLeagueTopScorers');
-    const q = query(scorersRef, orderBy('rank', 'asc'));
+    const q = query(scorersRef, orderBy('goals', 'desc'), orderBy('playerName', 'asc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (snapshot.empty) {
-         setLoading(false);
-         return;
+      let fetchedScorers: Omit<ManualTopScorer, 'rank'>[] = [];
+      if (!snapshot.empty) {
+         fetchedScorers = snapshot.docs.map(doc => doc.data() as Omit<ManualTopScorer, 'rank'>);
       }
-      const fetchedScorers = snapshot.docs.map(doc => doc.data() as ManualTopScorer);
       
       const newScorers = Array.from({ length: NUM_SCORERS }, (_, i) => {
-        const existing = fetchedScorers.find(s => s.rank === i + 1);
-        return existing || { rank: i + 1, playerName: '', teamName: '', goals: 0, playerPhoto: '' };
+        return fetchedScorers[i] || { playerName: '', teamName: '', goals: 0, playerPhoto: '' };
       });
 
       setScorers(newScorers);
@@ -63,20 +61,20 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
     return () => unsubscribe();
   }, [db]);
 
-  const handleInputChange = (rank: number, field: keyof ManualTopScorer, value: string | number) => {
-    setScorers(prevScorers =>
-      prevScorers.map(scorer =>
-        scorer.rank === rank ? { ...scorer, [field]: value } : scorer
-      )
-    );
+  const handleInputChange = (index: number, field: keyof Omit<ManualTopScorer, 'rank'>, value: string | number) => {
+    setScorers(prevScorers => {
+        const newScorers = [...prevScorers];
+        newScorers[index] = {...newScorers[index], [field]: value };
+        return newScorers;
+    });
   };
   
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, rank: number) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        handleInputChange(rank, 'playerPhoto', reader.result as string);
+        handleInputChange(index, 'playerPhoto', reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -87,14 +85,16 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
     setSaving(true);
     try {
       const batch = writeBatch(db);
-      scorers.forEach(scorer => {
-        if(scorer.playerName.trim() || scorer.teamName.trim() || scorer.goals > 0 || scorer.playerPhoto) {
-            const docRef = doc(db, 'iraqiLeagueTopScorers', String(scorer.rank));
-            const dataToSave: ManualTopScorer = {
-                rank: scorer.rank,
+      const existingDocsSnapshot = await getDocs(collection(db, 'iraqiLeagueTopScorers'));
+      existingDocsSnapshot.forEach(doc => batch.delete(doc.ref));
+
+      scorers.forEach((scorer, index) => {
+        if(scorer.playerName.trim()) {
+            const docRef = doc(db, 'iraqiLeagueTopScorers', `${scorer.playerName.replace(/\s+/g, '_')}_${index}`);
+            const dataToSave: Omit<ManualTopScorer, 'rank'> = {
                 playerName: scorer.playerName.trim(),
                 teamName: scorer.teamName.trim(),
-                goals: scorer.goals,
+                goals: scorer.goals || 0,
                 playerPhoto: scorer.playerPhoto || undefined
             };
             batch.set(docRef, dataToSave);
@@ -127,9 +127,9 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
       <ScreenHeader title="إدارة الهدافين" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {scorers.map((scorer, index) => (
-          <Card key={scorer.rank}>
+          <Card key={index}>
             <CardContent className="flex items-center gap-2 p-3">
-              <span className="font-bold text-lg w-8 text-center">{scorer.rank}</span>
+              <span className="font-bold text-lg w-8 text-center">{index + 1}</span>
                <button onClick={() => fileInputRefs.current[index]?.click()} className="flex-shrink-0">
                   <Avatar className="h-12 w-12 cursor-pointer">
                     <AvatarImage src={scorer.playerPhoto} />
@@ -139,7 +139,7 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
                 <input
                     type="file"
                     ref={el => fileInputRefs.current[index] = el}
-                    onChange={(e) => handleFileChange(e, scorer.rank)}
+                    onChange={(e) => handleFileChange(e, index)}
                     className="hidden"
                     accept="image/*"
                 />
@@ -147,19 +147,19 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
                 <Input
                   placeholder="اسم اللاعب"
                   value={scorer.playerName}
-                  onChange={(e) => handleInputChange(scorer.rank, 'playerName', e.target.value)}
+                  onChange={(e) => handleInputChange(index, 'playerName', e.target.value)}
                 />
                  <Input
                   placeholder="اسم الفريق"
                   value={scorer.teamName}
-                  onChange={(e) => handleInputChange(scorer.rank, 'teamName', e.target.value)}
+                  onChange={(e) => handleInputChange(index, 'teamName', e.target.value)}
                 />
               </div>
               <Input
                 type="number"
                 placeholder="الأهداف"
                 value={scorer.goals || ''}
-                onChange={(e) => handleInputChange(scorer.rank, 'goals', Number(e.target.value))}
+                onChange={(e) => handleInputChange(index, 'goals', Number(e.target.value))}
                 className="w-24 text-center"
               />
             </CardContent>
