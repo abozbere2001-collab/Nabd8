@@ -4,7 +4,7 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -16,6 +16,7 @@ interface FirebaseContextProps {
   isAdmin: boolean;
   isProUser: boolean;
   setProUser: (isPro: boolean) => void;
+  isLoading: boolean;
 }
 
 const FirebaseContext = createContext<FirebaseContextProps | undefined>(undefined);
@@ -38,6 +39,7 @@ export const FirebaseProvider = ({
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setIsLoading(true);
       if (firebaseUser) {
         setUser(firebaseUser);
         const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
@@ -48,20 +50,25 @@ export const FirebaseProvider = ({
                 getDoc(userDoc)
             ]);
             setIsAdmin(adminDoc.exists());
+
             if (userDoc.exists()) {
                 setProUser(userDoc.data()?.isProUser || false);
+            } else {
+                // If user doc doesn't exist, create it.
+                const newUserProfile = {
+                    displayName: firebaseUser.displayName,
+                    email: firebaseUser.email,
+                    photoURL: firebaseUser.photoURL,
+                    isProUser: false,
+                };
+                await setDoc(userDocRef, newUserProfile);
             }
         } catch (error) {
-            // Handle potential permission errors gracefully
             console.error("Error checking admin or pro status:", error);
             setIsAdmin(false);
             setProUser(false);
         }
       } else {
-        // Handle unauthenticated state, maybe sign in anonymously
-        signInAnonymously(auth).catch(error => {
-            console.error("Anonymous sign in failed:", error);
-        });
         setUser(null);
         setIsAdmin(false);
         setProUser(false);
@@ -85,12 +92,12 @@ export const FirebaseProvider = ({
   }
 
 
-  const value = { firebaseApp, firestore, auth, user, isAdmin, isProUser, setProUser: handleSetPro };
+  const value = { firebaseApp, firestore, auth, user, isAdmin, isProUser, setProUser: handleSetPro, isLoading };
 
   return (
     <FirebaseContext.Provider value={value}>
        <FirebaseErrorListener />
-      {!isLoading && children}
+      {children}
     </FirebaseContext.Provider>
   );
 };
@@ -153,7 +160,9 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | 
 export const useUser = (): { user: User | null; isUserLoading: boolean } => {
   const context = useContext(FirebaseContext);
   if (context === undefined) {
+    // This can happen on the very first render before the provider has mounted.
+    // In this case, we are definitely loading.
     return { user: null, isUserLoading: true };
   }
-  return { user: context.user, isUserLoading: false };
+  return { user: context.user, isUserLoading: context.isLoading };
 };

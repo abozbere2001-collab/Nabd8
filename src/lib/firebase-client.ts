@@ -17,20 +17,6 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { auth, firestore as db } from "@/firebase";
 
-const GUEST_USER_KEY = 'isGuestUser';
-
-export const guestUser = {
-    uid: 'guest',
-    displayName: 'زائر',
-    email: null,
-    photoURL: null,
-    isGuest: true,
-};
-
-export const isGuest = (user: any): user is typeof guestUser => {
-    return !!user && user.isGuest === true;
-}
-
 const handleNewUser = async (user: User) => {
     const userRef = doc(db, 'users', user.uid);
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
@@ -80,6 +66,7 @@ export const getGoogleRedirectResult = async (): Promise<User | null> => {
     try {
         const result = await getRedirectResult(auth);
         if (result && result.user) {
+            await handleNewUser(result.user);
             return result.user;
         }
         return null;
@@ -91,28 +78,9 @@ export const getGoogleRedirectResult = async (): Promise<User | null> => {
 
 
 export const signOut = (): Promise<void> => {
-    sessionStorage.removeItem(GUEST_USER_KEY);
     return firebaseSignOut(auth);
 };
 
-export const onAuthStateChange = (callback: (user: User | null | typeof guestUser) => void) => {
-    
-    const unsubscribe = firebaseOnAuthStateChanged(auth, (user) => {
-        if (user) {
-            sessionStorage.removeItem(GUEST_USER_KEY);
-            handleNewUser(user);
-            callback(user);
-        } else {
-            if (sessionStorage.getItem(GUEST_USER_KEY) === 'true') {
-                callback(guestUser);
-            } else {
-                callback(null);
-            }
-        }
-    });
-
-    return unsubscribe;
-};
 
 export const setGuestUser = async () => {
     try {
@@ -123,7 +91,7 @@ export const setGuestUser = async () => {
 }
 
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {
-    if (isGuest(user)) throw new Error("User not authenticated.");
+    if (!user) throw new Error("User not authenticated.");
 
     await updateProfile(user, { displayName: newDisplayName });
 
