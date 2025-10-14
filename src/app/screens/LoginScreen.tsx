@@ -8,26 +8,30 @@ import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { signInWithGoogle, setGuestUser } from '@/lib/firebase-client';
+import { signInWithGoogle, setGuestUser, checkRedirectResult } from '@/lib/firebase-client';
 import { useAuth } from '@/firebase/provider';
 
 export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
-  const [authInProgress, setAuthInProgress] = useState(true);
-
+  const { auth } = useAuth();
+  
+  // Check for redirect result on component mount
   useEffect(() => {
-    // Give auth state a moment to settle
-    const timer = setTimeout(() => {
-        if(user === undefined) {
-             setAuthInProgress(true);
-        } else {
-             setAuthInProgress(false);
-        }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [user]);
+    const checkResult = async () => {
+      setLoading(true);
+      const redirectError = await checkRedirectResult(auth);
+      if (redirectError) {
+        handleAuthError(redirectError);
+      }
+      // If no error, onAuthStateChanged will handle the login.
+      // We might still be in a loading state until that triggers.
+      // A small delay can prevent a flicker if the redirect was not from us.
+      setTimeout(() => setLoading(false), 1000);
+    };
+    checkResult();
+  }, [auth]);
+
 
   const handleAuthError = (e: any) => {
     console.error("Login Error:", e);
@@ -41,16 +45,16 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   }
 
   const handleGoogleLogin = async () => {
-    if (loading || authInProgress) return;
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
-      await signInWithGoogle();
-      // onAuthStateChanged will handle the rest
+      await signInWithGoogle(auth);
+      // The browser will redirect. If it doesn't for some reason (e.g. popup blocker), 
+      // the loading state will eventually be handled by the effect hook.
     } catch (e: any) {
       handleAuthError(e);
-    } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -62,7 +66,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="تسجيل الدخول" onBack={goBack} canGoBack={false} />
       <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-        {authInProgress ? (
+        {loading ? (
             <div className="flex flex-col items-center gap-4">
                 <Loader2 className="h-8 w-8 animate-spin" />
                 <p className="text-muted-foreground">جاري التحقق من المصادقة...</p>

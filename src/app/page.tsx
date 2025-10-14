@@ -20,41 +20,33 @@ export type ScreenProps = {
 function App() {
   const { user } = useAuth();
 
+  // Unified loading and auth check
   if (user === undefined) {
-      // Still checking auth state
       return (
           <div className="flex items-center justify-center h-screen bg-background">
               <p>جاري التحميل...</p>
           </div>
       );
   }
+  
   if (user === null) {
     return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
   }
+
   // This will render for both a logged-in user and a guest user
   return <AppContentWrapper />;
 }
 
 export default function Home() {
   const [user, setUser] = useState<User | typeof guestUser | null | undefined>(undefined);
-  const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange((currentUser) => {
       setUser(currentUser);
-      setLoadingAuth(false);
     });
     
     return () => unsubscribe();
   }, []);
-
-  if (loadingAuth) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <p>جاري التحميل...</p>
-      </div>
-    );
-  }
 
   return (
     <FirebaseProvider user={user}>
