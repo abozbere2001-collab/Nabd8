@@ -239,7 +239,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   }, [db, matchId]);
   
   useEffect(() => {
-    if (!user || !commentsColRef) {
+    if (!user || !commentsColRef || !db) {
         setLoading(false);
         setComments([]);
         return;
@@ -253,28 +253,40 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
         const commentPromises = snapshot.docs.map(async (doc) => {
             const commentData = { id: doc.id, ...doc.data() } as MatchComment;
             
-            const repliesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies');
-            const repliesQuery = query(repliesRef, orderBy('timestamp', 'asc'));
-            const repliesSnapshot = await getDocs(repliesQuery);
-            const replies = repliesSnapshot.docs.map(replyDoc => ({ id: replyDoc.id, ...replyDoc.data() } as MatchComment));
+            try {
+                const repliesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies');
+                const repliesQuery = query(repliesRef, orderBy('timestamp', 'asc'));
+                const repliesSnapshot = await getDocs(repliesQuery);
+                const replies = repliesSnapshot.docs.map(replyDoc => ({ id: replyDoc.id, ...replyDoc.data() } as MatchComment));
+                commentData.replies = replies;
 
-            const likesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'likes');
-            const likesSnapshot = await getDocs(likesRef);
-            const likes = likesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
+                const likesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'likes');
+                const likesSnapshot = await getDocs(likesRef);
+                commentData.likes = likesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
 
-            const repliesWithLikes = await Promise.all(replies.map(async (reply) => {
-                if (!reply.id) return reply;
-                const replyLikesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies', reply.id, 'likes');
-                const replyLikesSnapshot = await getDocs(replyLikesRef);
-                const replyLikes = replyLikesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
-                return { ...reply, likes: replyLikes };
-            }));
+                commentData.replies = await Promise.all(replies.map(async (reply) => {
+                    if (!reply.id) return reply;
+                    const replyLikesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies', reply.id, 'likes');
+                    const replyLikesSnapshot = await getDocs(replyLikesRef);
+                    const replyLikes = replyLikesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
+                    return { ...reply, likes: replyLikes };
+                }));
 
-            return {
-                ...commentData,
-                replies: repliesWithLikes,
-                likes
-            };
+            } catch (error) {
+                // This is likely a permission error on a subcollection
+                 const permissionError = new FirestorePermissionError({
+                    path: `${commentsColRef.path}/${doc.id}/...`, // Indicative path
+                    operation: 'list',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+                // Return comment data without subcollections if they fail
+                return {
+                    ...commentData,
+                    replies: commentData.replies || [],
+                    likes: commentData.likes || []
+                };
+            }
+            return commentData;
         });
 
         try {
@@ -282,8 +294,8 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
             // Reverse the array to show the oldest of the last 20 comments first.
             setComments(resolvedComments.reverse());
         } catch(error) {
-            // This could be a permission error on subcollections
-            const permissionError = new FirestorePermissionError({
+            // This catch is for Promise.all, in case one of the promises rejects unexpectedly
+             const permissionError = new FirestorePermissionError({
                 path: `${commentsColRef.path}/...`, // Indicative path
                 operation: 'list',
             });

@@ -72,9 +72,15 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
 
 export const signInWithGoogle = async (): Promise<User | null> => {
     const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    return result.user;
+    await signInWithRedirect(auth, provider);
+    // The result is handled by getRedirectResult in the AppContentWrapper
+    return null; 
 };
+
+export const getGoogleRedirectResult = async (): Promise<User | null> => {
+    const result = await getRedirectResult(auth);
+    return result?.user || null;
+}
 
 
 export const signOut = (): Promise<void> => {
@@ -85,11 +91,13 @@ export const signOut = (): Promise<void> => {
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {
     if (!user) throw new Error("User not authenticated.");
 
+    // Update Firebase Auth profile first
     await updateProfile(user, { displayName: newDisplayName });
 
     const userRef = doc(db, 'users', user.uid);
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
     
+    // Update users collection
     const userProfileUpdateData = { displayName: newDisplayName };
     setDoc(userRef, userProfileUpdateData, { merge: true })
         .catch((serverError) => {
@@ -101,6 +109,7 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
             errorEmitter.emit('permission-error', permissionError);
         });
 
+    // Update leaderboard collection
     const leaderboardUpdateData = { userName: newDisplayName };
     setDoc(leaderboardRef, leaderboardUpdateData, { merge: true })
         .catch((serverError) => {
