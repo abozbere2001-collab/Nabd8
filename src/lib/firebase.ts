@@ -1,8 +1,10 @@
 
-import { initializeApp, getApps, getApp, type FirebaseOptions, type FirebaseApp } from "firebase/app";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { initializeFirestore, persistentLocalCache, getFirestore, CACHE_SIZE_UNLIMITED } from "firebase/firestore";
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-export const firebaseConfig: FirebaseOptions = {
+export const firebaseConfig = {
   "projectId": "goal-stack-top100-599550-3e16a",
   "appId": "1:596409947873:web:7a3938533fe1ed561b09a0",
   "apiKey": "AIzaSyAFxnjh0irb66bOhjScsx_0SIthCwT-Nx4",
@@ -13,15 +15,20 @@ export const firebaseConfig: FirebaseOptions = {
 
 
 // Initialize Firebase
-export function initializeFirebase(): FirebaseApp {
-    if (getApps().length) {
-        return getApp();
-    }
-    
+let app: FirebaseApp;
+if (getApps().length) {
+    app = getApp();
+} else {
     if (!firebaseConfig.apiKey) {
-      // This should not happen with a hardcoded config, but as a safeguard.
       throw new Error("Firebase API Key is missing in the configuration.");
     }
-
-    return initializeApp(firebaseConfig);
+    app = initializeApp(firebaseConfig);
 }
+
+const auth = getAuth(app);
+const db = initializeFirestore(app, {
+    cache: persistentLocalCache({ cacheSizeBytes: CACHE_SIZE_UNLIMITED })
+});
+
+
+export { app, auth, db };

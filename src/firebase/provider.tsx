@@ -3,10 +3,8 @@
 import React, { createContext, useContext, useMemo, useEffect, useState } from 'react';
 import type { User, Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, setDoc, initializeFirestore, persistentLocalCache } from 'firebase/firestore';
-import { firebaseConfig } from '@/lib/firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { isGuest, guestUser, onAuthStateChange } from '@/lib/firebase-client';
 
@@ -22,13 +20,6 @@ interface FirebaseContextType {
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
 
 const ADMIN_EMAIL = "sagralnarey@gmail.com";
-
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = initializeFirestore(app, {
-    cache: persistentLocalCache({})
-});
-
 
 export const FirebaseProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | typeof guestUser | null | undefined>(undefined);
@@ -77,7 +68,7 @@ export const FirebaseProvider = ({ children }: { children: React.ReactNode }) =>
     isAdmin,
     isProUser,
     setProUser,
-  }), [auth, db, user, isAdmin, isProUser]);
+  }), [user, isAdmin, isProUser]);
 
   return (
     <FirebaseContext.Provider value={value}>

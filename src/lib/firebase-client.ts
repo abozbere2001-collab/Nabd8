@@ -2,7 +2,6 @@
 "use client";
 
 import { 
-  getAuth, 
   GoogleAuthProvider, 
   signOut as firebaseSignOut, 
   onAuthStateChanged as firebaseOnAuthStateChanged,
@@ -11,11 +10,12 @@ import {
   updateProfile,
   type User, 
 } from "firebase/auth";
-import { getFirestore, doc, setDoc, getDoc, initializeFirestore, persistentLocalCache } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import type { UserProfile, UserScore } from './types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { auth, db } from '@/firebase/provider'; // Import centralized instances
+import { auth, db } from './firebase';
+
 
 // --- GUEST USER ---
 const GUEST_USER_KEY = 'isGuestUser';
