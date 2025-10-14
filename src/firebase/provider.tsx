@@ -47,7 +47,7 @@ export const FirebaseProvider = ({
         try {
             const [adminDoc, userDoc] = await Promise.all([
                 getDoc(adminDocRef),
-                getDoc(userDoc)
+                getDoc(userDocRef)
             ]);
             setIsAdmin(adminDoc.exists());
 
@@ -118,7 +118,8 @@ export const useAuth = () => {
     return { 
         user: context.user, 
         isProUser: context.isProUser, 
-        setProUser: context.setProUser 
+        setProUser: context.setProUser,
+        isUserLoading: context.isLoading
     };
 };
 
