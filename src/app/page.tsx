@@ -20,6 +20,7 @@ export type ScreenProps = {
 function App() {
   const { user } = useAuth();
   
+  // This is the loading state while Firebase is determining the auth state.
   if (user === undefined) {
       return (
           <div className="flex items-center justify-center h-screen bg-background">
@@ -29,12 +30,13 @@ function App() {
       );
   }
   
-  // If user is null (not guest, not logged in), show Login.
-  if (!user) {
+  // If user is null (not a guest, not logged in), show the Login screen.
+  if (user === null) {
     return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
   }
 
-  // If user is logged in OR is a guest, show the main app.
+  // If we have a user object (either a real user or a guest), show the main app content.
+  // This state is reached only after Firebase has confirmed the auth state.
   return <AppContentWrapper />;
 }
 
