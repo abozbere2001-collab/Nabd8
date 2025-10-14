@@ -20,34 +20,46 @@ import { Progress } from '@/components/ui/progress';
 // --- PlayerCard Component ---
 const PlayerCard = ({ player }: { player: PlayerWithStats }) => {
   const fallbackImage = "https://media.api-sports.io/football/players/0.png";
-  const gameStats = player?.statistics?.[0]?.games || {};
-  const playerNumber = player?.player?.number ?? gameStats.number || "";
   
-  const rating = player?.player?.rating && !isNaN(parseFloat(player.player.rating))
-      ? parseFloat(player.player.rating).toFixed(1)
-      : (gameStats.rating && !isNaN(parseFloat(gameStats.rating))
-          ? parseFloat(gameStats.rating).toFixed(1)
-          : null);
+  // Use the most up-to-date info first (from the secondary player fetch), then fallback to lineup data.
+  const playerImage = player?.player?.photo || fallbackImage;
+  const playerNumber = player?.player?.number ?? player?.statistics?.[0]?.games?.number;
+  const ratingValue = player?.player?.rating ?? player?.statistics?.[0]?.games?.rating;
+  
+  const rating = ratingValue && !isNaN(parseFloat(ratingValue)) 
+    ? parseFloat(ratingValue).toFixed(1) 
+    : null;
 
-  const playerImage =
-    player?.player?.photo && player.player.photo.includes("http")
-      ? player.player.photo
-      : fallbackImage;
-
-  const getRatingColor = () => {
-    if (!rating) return 'bg-gray-500';
-    const r = parseFloat(rating);
-    if (r >= 8) return 'bg-green-600';
-    if (r >= 7) return 'bg-yellow-600';
+  const getRatingColor = (r: string | null) => {
+    if (!r) return 'bg-gray-500';
+    const val = parseFloat(r);
+    if (val >= 8) return 'bg-green-600';
+    if (val >= 7) return 'bg-yellow-600';
     return 'bg-red-600';
-  }
+  };
 
   return (
     <div className="relative flex flex-col items-center">
       <div className="relative w-12 h-12">
-         <img src={playerImage} alt={player?.player?.name || "Player"} className="rounded-full w-12 h-12 object-cover border-2 border-white/50" onError={(e) => (e.currentTarget.src = fallbackImage)} />
-        {playerNumber && <div className="absolute -top-1 -left-1 bg-gray-800 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background">{playerNumber}</div>}
-        {rating && <div className={cn(`absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background`, getRatingColor())}>{rating}</div>}
+        <img 
+          src={playerImage} 
+          alt={player?.player?.name || "Player"} 
+          className="rounded-full w-12 h-12 object-cover border-2 border-white/50" 
+          onError={(e) => (e.currentTarget.src = fallbackImage)} 
+        />
+        {playerNumber && (
+          <div className="absolute -top-1 -left-1 bg-gray-800 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background">
+            {playerNumber}
+          </div>
+        )}
+        {rating && (
+          <div className={cn(
+            `absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background`,
+            getRatingColor(rating)
+          )}>
+            {rating}
+          </div>
+        )}
       </div>
       <span className="mt-1 text-[11px] font-semibold text-center truncate w-16">{player?.player?.name || "غير معروف"}</span>
     </div>
@@ -544,5 +556,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
 
     
