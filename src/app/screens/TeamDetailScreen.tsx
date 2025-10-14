@@ -253,7 +253,7 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                 {stats ? (
                     <Card>
                         <CardHeader>
-                            <CardTitle>إحصائيات موسم {stats.league.season}</CardTitle>
+                            <CardTitle>إحصائيات موسم {stats.league?.season || PREVIOUS_SEASON}</CardTitle>
                         </CardHeader>
                         <CardContent>
                              <div className="grid grid-cols-2 gap-4 text-center">
