@@ -6,7 +6,8 @@ import {
   GoogleAuthProvider, 
   signOut as firebaseSignOut, 
   onAuthStateChanged as firebaseOnAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   updateProfile,
   type User, 
 } from "firebase/auth";
@@ -92,16 +93,20 @@ const handleNewUser = async (user: User) => {
 }
 
 
-export const signInWithGoogle = async (): Promise<User | null> => {
+export const signInWithGoogle = async (): Promise<void> => {
     const provider = new GoogleAuthProvider();
+    await signInWithRedirect(auth, provider);
+};
+
+export const getGoogleRedirectResult = async (): Promise<User | null> => {
     try {
-        const result = await signInWithPopup(auth, provider);
-        // The user object is available in result.user
-        // The onAuthStateChanged listener will also handle the user update globally.
-        return result.user;
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+            return result.user;
+        }
+        return null;
     } catch (error) {
-        // Let the calling component handle the error and display a message.
-        console.error("Popup sign-in error:", error);
+        console.error("Redirect sign-in error:", error);
         throw error;
     }
 };

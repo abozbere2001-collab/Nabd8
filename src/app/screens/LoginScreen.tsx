@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -8,18 +8,38 @@ import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { signInWithGoogle, setGuestUser } from '@/lib/firebase-client';
+import { signInWithGoogle, getGoogleRedirectResult, setGuestUser } from '@/lib/firebase-client';
 
 export function LoginScreen({ goBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Check for redirect result on component mount
+  useEffect(() => {
+    setLoading(true);
+    getGoogleRedirectResult()
+      .catch((e: any) => {
+        handleAuthError(e);
+      })
+      .finally(() => {
+        // The onAuthStateChanged listener will handle success,
+        // so we only need to stop the loader if there's an error
+        // or if there's no redirect result.
+        const urlParams = new URLSearchParams(window.location.search);
+        if (!urlParams.has('state')) {
+            setLoading(false);
+        }
+      });
+  }, []);
+
   const handleAuthError = (e: any) => {
     console.error("Login Error:", e);
-     if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+    if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
         setError('تم إلغاء عملية تسجيل الدخول.');
     } else if (e.code === 'auth/unauthorized-domain') {
         setError('النطاق غير مصرح به. يرجى التأكد من إضافة نطاق التطبيق إلى قائمة النطاقات المصرح بها في إعدادات Firebase Authentication.');
+    } else if (e.code === 'auth/account-exists-with-different-credential') {
+        setError('يوجد حساب بنفس البريد الإلكتروني ولكن بطريقة تسجيل دخول مختلفة.');
     } else {
         setError('حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
     }
@@ -31,11 +51,10 @@ export function LoginScreen({ goBack }: ScreenProps) {
     setError(null);
     try {
       await signInWithGoogle();
-      // On success, the onAuthStateChanged listener in FirebaseProvider will handle the state update.
-      // We don't need to do anything here. The loader will be visible until the state changes.
+      // After this, the page will redirect. The result is handled by the useEffect.
     } catch (e: any) {
       handleAuthError(e);
-      setLoading(false); // Only stop loading on error, on success the component will unmount.
+      setLoading(false);
     }
   };
 
