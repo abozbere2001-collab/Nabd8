@@ -262,9 +262,20 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
     );
 }
 
-const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate']; }) => {
+const LineupsTab = ({ initialLineups, events, navigate }: { initialLineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate']; }) => {
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
-    if (!lineups || lineups.length < 2) return <div className="flex justify-center p-8">{!lineups ? <Loader2 className="h-6 w-6 animate-spin" /> : <p className="text-center text-muted-foreground">التشكيلات غير متاحة حاليًا.</p>}</div>;
+    const [lineups, setLineups] = useState<LineupData[] | null>(initialLineups);
+    const [loading, setLoading] = useState(!initialLineups);
+
+    useEffect(() => {
+        setLineups(initialLineups);
+        if (initialLineups) {
+            setLoading(false);
+        }
+    }, [initialLineups]);
+
+    if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    if (!lineups || lineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
 
     const home = lineups.find(l => l.team.id === lineups[0].team.id);
     const away = lineups.find(l => l.team.id === lineups[1].team.id);
@@ -504,12 +515,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
-                    <TabsContent value="lineups" className="mt-4"><LineupsTab lineups={lineups} events={events} navigate={navigate} /></TabsContent>
+                    <TabsContent value="lineups" className="mt-4"><LineupsTab initialLineups={lineups} events={events} navigate={navigate} /></TabsContent>
                     <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} navigate={navigate} /></TabsContent>
                 </Tabs>
             </div>
         </div>
     );
 }
-
-    
