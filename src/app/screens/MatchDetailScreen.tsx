@@ -266,22 +266,81 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
 
 const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate']; season: number }) => {
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
-    const [lineups, setLineups] = useState<LineupData[] | null>(initialLineups);
     const [loading, setLoading] = useState(!initialLineups);
+    
+    // We only need to enrich the initial lineups, so we can do this once.
+    const [enrichedLineups, setEnrichedLineups] = useState<LineupData[] | null>(initialLineups);
 
     useEffect(() => {
-        if (initialLineups) {
-            setLineups(initialLineups);
+        if (!initialLineups || initialLineups.length < 2) {
             setLoading(false);
+            return;
         }
-    }, [initialLineups]);
+
+        const enrichLineups = async () => {
+            setLoading(true);
+            const allPlayerIds = initialLineups.flatMap(l => [...l.startXI, ...l.substitutes]).map(p => p.player.id).filter(id => id);
+
+            if (allPlayerIds.length === 0) {
+                setEnrichedLineups(initialLineups);
+                setLoading(false);
+                return;
+            }
+            
+            try {
+                // Fetch all player stats in one go
+                const playerStatsRes = await fetch(`/api/football/players?id=${allPlayerIds.join('-')}&season=${season}`);
+                const playerStatsData = await playerStatsRes.json();
+                
+                const playerStatsMap = new Map<number, any>();
+                if (playerStatsData.response) {
+                    playerStatsData.response.forEach((p: any) => {
+                        playerStatsMap.set(p.player.id, p);
+                    });
+                }
+                
+                // Create new lineup data with enriched player info
+                const newEnrichedLineups = initialLineups.map(lineup => {
+                    const enrichPlayerList = (list: PlayerWithStats[]) => list.map(playerWrapper => {
+                        const extraStats = playerStatsMap.get(playerWrapper.player.id);
+                        if (extraStats) {
+                            return {
+                                ...playerWrapper,
+                                player: { ...playerWrapper.player, ...extraStats.player },
+                                statistics: extraStats.statistics,
+                            };
+                        }
+                        return playerWrapper;
+                    });
+
+                    return {
+                        ...lineup,
+                        startXI: enrichPlayerList(lineup.startXI),
+                        substitutes: enrichPlayerList(lineup.substitutes),
+                    };
+                });
+                
+                setEnrichedLineups(newEnrichedLineups);
+
+            } catch (error) {
+                console.error("Error enriching lineups:", error);
+                setEnrichedLineups(initialLineups); // Fallback to initial data on error
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        enrichLineups();
+        // We only want to run this once when the initial data is available.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialLineups, season]);
     
 
     if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    if (!lineups || lineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
+    if (!enrichedLineups || enrichedLineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
 
-    const home = lineups.find(l => l.team.id === lineups[0].team.id);
-    const away = lineups.find(l => l.team.id === lineups[1].team.id);
+    const home = enrichedLineups.find(l => l.team.id === enrichedLineups[0].team.id);
+    const away = enrichedLineups.find(l => l.team.id === enrichedLineups[1].team.id);
     
     if (!home || !away) return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
 
