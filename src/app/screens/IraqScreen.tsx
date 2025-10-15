@@ -270,12 +270,11 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             setPinnedMatch(null);
         }
         setLoadingPinnedMatch(false);
-    }, (error) => {
-        // This is a real error (like permission denied), so we should handle it.
-        // For this specific case, we can just log it and assume no pinned match.
-        console.error("Error fetching pinned match:", error);
+    }, (serverError) => {
         setPinnedMatch(null);
         setLoadingPinnedMatch(false);
+        const permissionError = new FirestorePermissionError({ path: pinnedMatchRef.path, operation: 'get' });
+        errorEmitter.emit('permission-error', permissionError);
     });
 
     return () => unsub();
