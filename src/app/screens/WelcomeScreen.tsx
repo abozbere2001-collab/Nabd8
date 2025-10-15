@@ -9,7 +9,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2, User } from 'lucide-react';
 import { signInWithGoogle, signInAnonymously, handleNewUser } from '@/lib/firebase-client';
 import { useFirestore } from '@/firebase/provider';
-import Link from 'next/link';
+import { ScreenProps } from '@/app/page';
+
 
 interface WelcomeScreenProps {
   onOnboardingComplete: () => void;
@@ -88,9 +89,9 @@ export function WelcomeScreen({ onOnboardingComplete }: WelcomeScreenProps) {
 
         <p className="mt-12 text-xs text-muted-foreground/80 px-4">
             بالاستمرار، أنت توافق على 
-            <Link href="/terms-of-service" className="underline hover:text-primary px-1">شروط الخدمة</Link> 
+            <button className="underline hover:text-primary px-1" onClick={() => (window as any).appNavigate && (window as any).appNavigate('TermsOfService')}>شروط الخدمة</button> 
             و 
-            <Link href="/privacy-policy" className="underline hover:text-primary px-1">سياسة الخصوصية</Link>
+            <button className="underline hover:text-primary px-1" onClick={() => (window as any).appNavigate && (window as any).appNavigate('PrivacyPolicy')}>سياسة الخصوصية</button>
             .
         </p>
       </div>

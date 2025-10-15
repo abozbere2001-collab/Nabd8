@@ -51,6 +51,7 @@ export interface Team {
   name: string;
   logo: string;
   national?: boolean;
+  type?: 'Club' | 'National';
 }
 
 export interface Player {
@@ -234,6 +235,7 @@ export interface UserProfile {
   photoURL: string;
   isProUser?: boolean;
   isAnonymous?: boolean;
+  onboardingComplete?: boolean;
 }
 
 export interface GlobalPredictionMatch {
