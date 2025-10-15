@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import type { Player, SeasonPrediction } from '@/lib/types';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
@@ -59,9 +59,14 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
     const [loading, setLoading] = useState(true);
     const [predictedTopScorerId, setPredictedTopScorerId] = useState<number | undefined>();
 
-    const predictionDocRef = useMemo(() => {
+    const privatePredictionDocRef = useMemo(() => {
         if (!user || !db) return null;
         return doc(db, 'seasonPredictions', `${user.uid}_${leagueId}_${CURRENT_SEASON}`);
+    }, [user, db, leagueId]);
+
+    const publicPredictionDocRef = useMemo(() => {
+        if(!user || !db) return null;
+        return doc(db, 'publicSeasonPredictions', `${user.uid}_${leagueId}_${CURRENT_SEASON}`);
     }, [user, db, leagueId]);
 
     // Fetch players with pagination
@@ -106,8 +111,8 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
 
     // Fetch existing prediction
     useEffect(() => {
-        if (!predictionDocRef) return;
-        getDoc(predictionDocRef)
+        if (!privatePredictionDocRef) return;
+        getDoc(privatePredictionDocRef)
             .then(docSnap => {
                 if (docSnap.exists()) {
                     const data = docSnap.data() as SeasonPrediction;
@@ -115,17 +120,27 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                 }
             })
             .catch(error => {
-                const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'get' });
+                const permissionError = new FirestorePermissionError({ path: privatePredictionDocRef.path, operation: 'get' });
                 errorEmitter.emit('permission-error', permissionError);
             });
-    }, [predictionDocRef]);
+    }, [privatePredictionDocRef]);
 
-    const handleScorerSelect = useCallback((playerId: number) => {
+    const handleScorerSelect = useCallback(async (playerId: number) => {
         const newScorerId = predictedTopScorerId === playerId ? undefined : playerId;
         setPredictedTopScorerId(newScorerId);
         
-        if (predictionDocRef && user) {
-            const predictionData: Partial<SeasonPrediction> = {
+        if (!privatePredictionDocRef || !publicPredictionDocRef || !user || !db) return;
+
+        try {
+            const batch = writeBatch(db);
+
+            const privateData: Partial<SeasonPrediction> = {
+                predictedTopScorerId: newScorerId,
+                timestamp: new Date(),
+            };
+            batch.set(privatePredictionDocRef, privateData, { merge: true });
+
+            const publicData: Partial<SeasonPrediction> = {
                 userId: user.uid,
                 leagueId: leagueId,
                 leagueName: leagueName,
@@ -133,13 +148,17 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                 predictedTopScorerId: newScorerId,
                 timestamp: new Date(),
             };
-            setDoc(predictionDocRef, predictionData, { merge: true })
-                .catch(serverError => {
-                    const permissionError = new FirestorePermissionError({ path: predictionDocRef.path, operation: 'create', requestResourceData: predictionData });
-                    errorEmitter.emit('permission-error', permissionError);
-                });
+            batch.set(publicPredictionDocRef, publicData, { merge: true });
+
+            await batch.commit();
+        } catch (error) {
+             const permissionError = new FirestorePermissionError({
+                path: `batch write to ${privatePredictionDocRef.path} and ${publicPredictionDocRef.path}`,
+                operation: 'write',
+            });
+            errorEmitter.emit('permission-error', permissionError);
         }
-    }, [predictionDocRef, user, leagueId, leagueName, predictedTopScorerId]);
+    }, [predictedTopScorerId, privatePredictionDocRef, publicPredictionDocRef, user, db, leagueId, leagueName]);
 
 
     const Row = ({ index, style }: { index: number, style: React.CSSProperties }) => {
@@ -191,3 +210,5 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
         </div>
     );
 }
+
+    

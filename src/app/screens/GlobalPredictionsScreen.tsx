@@ -341,9 +341,14 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
         const fetchInitialData = async () => {
             setLoading(true);
             try {
-                // Fetch all necessary data in parallel
+                // Determine which collection to query based on whether we are viewing our own profile or someone else's
+                const currentUser = getAuth().currentUser;
+                const isOwnProfile = currentUser ? currentUser.uid === userId : false;
+
+                const predictionCollectionName = isOwnProfile ? "seasonPredictions" : "publicSeasonPredictions";
+                
                 const [predsSnapshot, scoreDoc, userDoc, teamsCustomSnap, playersCustomSnap] = await Promise.all([
-                    getDocs(query(collection(db, "seasonPredictions"), where("userId", "==", userId), where("season", "==", CURRENT_SEASON))),
+                    getDocs(query(collection(db, predictionCollectionName), where("userId", "==", userId), where("season", "==", CURRENT_SEASON))),
                     getDoc(doc(db, 'leaderboard', userId)),
                     getDoc(doc(db, 'users', userId)),
                     getDocs(collection(db, 'teamCustomizations')),
@@ -930,3 +935,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
+    
