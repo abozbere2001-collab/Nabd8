@@ -28,6 +28,8 @@ import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { NotificationSettingsScreen } from './screens/NotificationSettingsScreen';
 import { GeneralSettingsScreen } from './screens/GeneralSettingsScreen';
+import { DiscoverScreen } from './screens/DiscoverScreen';
+import { DiscoverAllScreen } from './screens/DiscoverAllScreen';
 import type { ScreenKey } from './page';
 
 import { useAd, SplashScreenAd, BannerAd } from '@/components/AdProvider';
@@ -73,6 +75,8 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   SignUp: { component: LoginScreen },
   NotificationSettings: { component: NotificationSettingsScreen },
   GeneralSettings: { component: GeneralSettingsScreen },
+  Discover: { component: DiscoverScreen },
+  DiscoverAll: { component: DiscoverAllScreen },
 };
 
 
