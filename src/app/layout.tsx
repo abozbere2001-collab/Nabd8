@@ -31,17 +31,19 @@ export default function RootLayout({
 }>) {
   return (
     <LanguageProvider>
-      <body className={`${tajawal.variable} ${cairo.variable} font-body antialiased`}>
-        <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem
-            disableTransitionOnChange
-        >
-            {children}
-            <Toaster />
-        </ThemeProvider>
-      </body>
+        <html>
+            <body className={`${tajawal.variable} ${cairo.variable} font-body antialiased`}>
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="dark"
+                    enableSystem
+                    disableTransitionOnChange
+                >
+                    {children}
+                    <Toaster />
+                </ThemeProvider>
+            </body>
+        </html>
     </LanguageProvider>
   );
 }
