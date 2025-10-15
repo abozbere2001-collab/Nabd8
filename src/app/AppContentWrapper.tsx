@@ -174,6 +174,11 @@ export function AppContentWrapper() {
         setNavigationState(prevState => ({
             ...prevState,
             activeTab: screen,
+            // Reset stack to root when switching to a main tab
+            stacks: {
+              ...prevState.stacks,
+              [screen]: [newItem]
+            }
         }));
     } else {
         // Push to the current tab's stack
@@ -199,7 +204,6 @@ export function AppContentWrapper() {
   
   const activeStack = navigationState.stacks[navigationState.activeTab] || [];
   const activeStackItem = activeStack[activeStack.length - 1];
-  const showBottomNav = mainTabs.includes(activeStackItem.screen);
 
   return (
     <main className="h-screen w-screen bg-background flex flex-col">
@@ -241,7 +245,7 @@ export function AppContentWrapper() {
       </div>
       
       {showBannerAd && <BannerAd />}
-      {showBottomNav && <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => navigate(screen)} />}
+      <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => navigate(screen)} />
     </main>
   );
 }

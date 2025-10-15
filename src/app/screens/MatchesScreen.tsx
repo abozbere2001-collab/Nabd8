@@ -381,7 +381,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
               </div>
             }
         />
-        <div className="flex flex-col border-b bg-background">
+        <div className="flex flex-col border-b bg-card">
              <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
                <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
                    <TabsTrigger value="predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
