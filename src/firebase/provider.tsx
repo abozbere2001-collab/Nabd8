@@ -57,38 +57,43 @@ export const FirebaseProvider = ({
     const userDocRef = doc(firestore, 'users', firebaseUser.uid);
 
     try {
-        const adminDocPromise = getDoc(adminDocRef).catch(serverError => {
-            const permissionError = new FirestorePermissionError({ path: adminDocRef.path, operation: 'get' });
-            errorEmitter.emit('permission-error', permissionError);
-            throw permissionError; // Re-throw to be caught by Promise.all's catch block
-        });
+        // Check admin status. We expect this to fail for non-admins.
+        const adminDocPromise = getDoc(adminDocRef)
+            .then(docSnap => docSnap.exists()) // Returns true if admin, false otherwise
+            .catch(error => {
+                // If it's a permission error, it's expected for non-admins. Return false.
+                if (error.code === 'permission-denied') {
+                    return false;
+                }
+                // For other errors, emit a proper permission error
+                const permissionError = new FirestorePermissionError({ path: adminDocRef.path, operation: 'get' });
+                errorEmitter.emit('permission-error', permissionError);
+                throw permissionError;
+            });
 
+        // Check user profile data (pro status, etc.)
         const userDocPromise = getDoc(userDocRef).catch(serverError => {
             const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
             errorEmitter.emit('permission-error', permissionError);
-            throw permissionError; // Re-throw to be caught by Promise.all's catch block
+            throw permissionError;
         });
 
-        const [adminDoc, userDoc] = await Promise.all([
+        const [isAdminStatus, userDoc] = await Promise.all([
             adminDocPromise,
             userDocPromise
         ]);
 
-        setIsAdmin(adminDoc.exists());
+        setIsAdmin(isAdminStatus);
         
         if (userDoc.exists()) {
             setProUser(userDoc.data()?.isProUser || false);
         } else {
-            // This will also have its own internal error handling
             await handleNewUser(firebaseUser, firestore);
+            setProUser(false);
         }
 
     } catch (error) {
-        // Errors are now emitted from the individual catches, 
-        // but we can still log a general failure if needed.
-        console.error("Failed to check user status due to a permission error.", error);
-        setIsAdmin(false);
-        setProUser(false);
+        console.error("Failed to check user status, this might be expected for some operations.", error);
     } finally {
         setIsLoading(false);
     }
