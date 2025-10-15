@@ -405,12 +405,12 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   }, [selectedDateKey, fetchFixturesForDate, activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'live') {
+    if (activeTab === 'live' && isVisible) {
         fetchLiveFixtures(); // Fetch immediately
         const interval = setInterval(fetchLiveFixtures, 60000); // And every minute
         return () => clearInterval(interval);
     }
-  }, [activeTab, fetchLiveFixtures]);
+  }, [activeTab, fetchLiveFixtures, isVisible]);
 
 
   const handleDateChange = (dateKey: string) => {

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -19,6 +20,7 @@ import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { OddsTab } from '@/components/OddsTab';
+import { useTranslation } from '@/components/LanguageProvider';
 
 const PlayerCard = ({ player, navigate }: { player: PlayerType, navigate: ScreenProps['navigate'] }) => {
     const fallbackImage = "https://media.api-sports.io/football/players/0.png";
@@ -288,11 +290,12 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
 };
 
 const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; homeTeamId: number }) => {
+    const { t } = useTranslation();
     return (
         <Tabs defaultValue="highlights" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="highlights">الأبرز</TabsTrigger>
-                <TabsTrigger value="all">كل الأحداث</TabsTrigger>
+                <TabsTrigger value="highlights">{t('highlights')}</TabsTrigger>
+                <TabsTrigger value="all">{t('all_events')}</TabsTrigger>
             </TabsList>
             <TabsContent value="highlights">
                 <TimelineTabContent events={events} homeTeamId={homeTeamId} highlightsOnly={true} />
@@ -471,6 +474,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [statistics, setStatistics] = useState<MatchStatistics[] | null>(null);
     const [standings, setStandings] = useState<Standing[] | null>(null);
     const [loading, setLoading] = useState(!initialFixture);
+    const { t } = useTranslation();
 
     const mergePlayerData = useCallback((lineups: LineupData[], players: { player: PlayerType, statistics: any[] }[]): LineupData[] => {
         if (!players || players.length === 0) return lineups;
@@ -593,11 +597,11 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 <MatchHeaderCard fixture={fixture} navigate={navigate} />
                 <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-5 rounded-lg h-auto p-1 bg-card">
-                        <TabsTrigger value="details"><ShieldCheck className="w-4 h-4 ml-1" />تفاصيل</TabsTrigger>
-                        <TabsTrigger value="odds"><TrendingUp className="w-4 h-4 ml-1" />احتمالات</TabsTrigger>
-                        <TabsTrigger value="events"><Clock className="w-4 h-4 ml-1" />مُجريات</TabsTrigger>
-                        <TabsTrigger value="lineups"><Users className="w-4 h-4 ml-1" />التشكيل</TabsTrigger>
-                        <TabsTrigger value="standings"><BarChart className="w-4 h-4 ml-1" />الترتيب</TabsTrigger>
+                        <TabsTrigger value="details"><ShieldCheck className="w-4 h-4 ml-1" />{t('details')}</TabsTrigger>
+                        <TabsTrigger value="odds"><TrendingUp className="w-4 h-4 ml-1" />{t('odds')}</TabsTrigger>
+                        <TabsTrigger value="events"><Clock className="w-4 h-4 ml-1" />{t('events')}</TabsTrigger>
+                        <TabsTrigger value="lineups"><Users className="w-4 h-4 ml-1" />{t('lineups')}</TabsTrigger>
+                        <TabsTrigger value="standings"><BarChart className="w-4 h-4 ml-1" />{t('standings')}</TabsTrigger>
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="odds" className="mt-4"><OddsTab fixtureId={fixture.fixture.id} /></TabsContent>

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -21,6 +22,7 @@ import type { Team, Player, Fixture, Standing, TeamStatistics } from '@/lib/type
 import { CURRENT_SEASON } from '@/lib/constants';
 import { FixtureItem } from '@/components/FixtureItem';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useTranslation } from '@/components/LanguageProvider';
 
 interface TeamData {
     team: Team;
@@ -155,6 +157,7 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
     const [standings, setStandings] = useState<Standing[]>([]);
     const [stats, setStats] = useState<TeamStatistics | null>(null);
     const [loading, setLoading] = useState(true);
+    const { t } = useTranslation();
     
     useEffect(() => {
         const fetchData = async () => {
@@ -196,9 +199,9 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
     return (
         <Tabs defaultValue="matches" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="matches">المباريات</TabsTrigger>
-                <TabsTrigger value="standings">الترتيب</TabsTrigger>
-                <TabsTrigger value="stats">الإحصائيات</TabsTrigger>
+                <TabsTrigger value="matches">{t('matches')}</TabsTrigger>
+                <TabsTrigger value="standings">{t('standings')}</TabsTrigger>
+                <TabsTrigger value="stats">{t('stats')}</TabsTrigger>
             </TabsList>
             <TabsContent value="matches" className="mt-4 space-y-3">
                 {fixtures.length > 0 ? fixtures.map(fixture => (
@@ -283,6 +286,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   const [displayTitle, setDisplayTitle] = useState("الفريق");
   const [teamData, setTeamData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!teamId) return;
@@ -364,8 +368,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
         <TeamHeader team={{...teamData.team, name: displayTitle}} venue={teamData.venue} />
          <Tabs defaultValue="details" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="details">التفاصيل</TabsTrigger>
-            <TabsTrigger value="players">اللاعبون</TabsTrigger>
+            <TabsTrigger value="details">{t('details')}</TabsTrigger>
+            <TabsTrigger value="players">{t('players_tab')}</TabsTrigger>
           </TabsList>
           <TabsContent value="details" className="mt-4">
             <TeamDetailsTabs teamId={teamId} navigate={navigate} />
