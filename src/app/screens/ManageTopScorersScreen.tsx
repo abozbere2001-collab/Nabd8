@@ -80,28 +80,39 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
   const handleSave = async () => {
     if (!db) return;
     setSaving(true);
+
     try {
       const batch = writeBatch(db);
-      
-      scorers.forEach((scorer, index) => {
-        const rank = index + 1;
-        const docRef = doc(db, 'iraqiLeagueTopScorers', String(rank));
 
+      // First, get all existing documents to delete them
+      const existingDocsSnapshot = await getDocs(collection(db, 'iraqiLeagueTopScorers'));
+      existingDocsSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+
+      // Then, set the new documents for scorers that have a name
+      scorers.forEach((scorer, index) => {
         if (scorer.playerName && scorer.playerName.trim()) {
-          const dataToSave: ManualTopScorer = {
+          const rank = index + 1;
+          const docRef = doc(db, 'iraqiLeagueTopScorers', String(rank));
+          
+          const dataToSave: Partial<ManualTopScorer> = {
             rank: rank,
             playerName: scorer.playerName.trim(),
             teamName: scorer.teamName?.trim() ?? '',
             goals: Number(scorer.goals) || 0,
-            playerPhoto: scorer.playerPhoto || undefined
           };
+          
+          if (scorer.playerPhoto) {
+            dataToSave.playerPhoto = scorer.playerPhoto;
+          }
+
           batch.set(docRef, dataToSave);
-        } else {
-          batch.delete(docRef);
         }
       });
       
       await batch.commit();
+
       toast({ title: 'نجاح', description: 'تم حفظ قائمة الهدافين.' });
       goBack();
     } catch (error) {
