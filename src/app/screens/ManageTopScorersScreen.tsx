@@ -112,7 +112,7 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
       toast({ title: 'نجاح', description: 'تم حفظ قائمة الهدافين.' });
       goBack();
     } catch (error) {
-       const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'update' });
+       const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'write' });
        errorEmitter.emit('permission-error', permissionError);
     } finally {
         setSaving(false);
