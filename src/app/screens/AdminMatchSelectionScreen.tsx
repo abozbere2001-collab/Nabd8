@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -123,7 +124,7 @@ interface GroupedFixtures {
 }
 
 // --- Main Screen Component ---
-export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
+export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
     const [allFixtures, setAllFixtures] = useState<Fixture[]>([]);
     const [selectedFixtureIds, setSelectedFixtureIds] = useState<Set<number>>(new Set());

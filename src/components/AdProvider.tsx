@@ -7,6 +7,7 @@ import { Button } from './ui/button';
 import { GoalStackLogo } from './icons/GoalStackLogo';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isToday, isBefore, addMonths, parseISO, format } from 'date-fns';
 
 // --- Ad Context ---
 interface AdContextType {
@@ -18,27 +19,55 @@ interface AdContextType {
 
 const AdContext = createContext<AdContextType | undefined>(undefined);
 
-const SPLASH_AD_SEEN_KEY = 'goalstack_splash_ad_seen'; // Use localStorage for persistence
-const BANNER_AD_DISMISSED_KEY = 'goalstack_banner_ad_dismissed_session'; // Use sessionStorage for session-only dismissal
+const FIRST_USE_DATE_KEY = 'goalstack_first_use_date';
+const SPLASH_AD_LAST_SHOWN_KEY = 'goalstack_splash_ad_last_shown';
+const BANNER_AD_DISMISSED_KEY = 'goalstack_banner_ad_dismissed_session';
 
 export const AdProvider = ({ children }: { children: React.ReactNode }) => {
   const { isProUser } = useAuth();
-  
-  // Splash ad state (persistent)
-  const [splashAdSeen, setSplashAdSeen] = useState(() => {
-    if (typeof window === 'undefined') return true; // Don't show on server
-    return localStorage.getItem(SPLASH_AD_SEEN_KEY) === 'true';
-  });
-
-  // Banner ad state (session-based)
+  const [shouldShowSplash, setShouldShowSplash] = useState(false);
   const [bannerAdDismissed, setBannerAdDismissed] = useState(() => {
-    if (typeof window === 'undefined') return true; // Don't show on server
+    if (typeof window === 'undefined') return true;
     return sessionStorage.getItem(BANNER_AD_DISMISSED_KEY) === 'true';
   });
 
+  useEffect(() => {
+    if (isProUser || typeof window === 'undefined') {
+      setShouldShowSplash(false);
+      return;
+    }
+
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const lastShownDate = localStorage.getItem(SPLASH_AD_LAST_SHOWN_KEY);
+
+    if (lastShownDate === todayStr) {
+      setShouldShowSplash(false); // Already shown today
+      return;
+    }
+    
+    const firstUseDateStr = localStorage.getItem(FIRST_USE_DATE_KEY);
+
+    if (!firstUseDateStr) {
+      // First time user ever, set the date but don't show the ad.
+      localStorage.setItem(FIRST_USE_DATE_KEY, new Date().toISOString());
+      setShouldShowSplash(false);
+    } else {
+      const firstUseDate = parseISO(firstUseDateStr);
+      const oneMonthLater = addMonths(firstUseDate, 1);
+      
+      // Show the ad only if one month has passed since first use.
+      if (isBefore(new Date(), oneMonthLater)) {
+        setShouldShowSplash(false);
+      } else {
+        setShouldShowSplash(true);
+      }
+    }
+  }, [isProUser]);
+
   const setSplashAdShown = () => {
-    setSplashAdSeen(true);
-    localStorage.setItem(SPLASH_AD_SEEN_KEY, 'true');
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    localStorage.setItem(SPLASH_AD_LAST_SHOWN_KEY, todayStr);
+    setShouldShowSplash(false);
   }
 
   const dismissBannerAd = () => {
@@ -46,10 +75,7 @@ export const AdProvider = ({ children }: { children: React.ReactNode }) => {
     sessionStorage.setItem(BANNER_AD_DISMISSED_KEY, 'true');
   }
 
-  // Show splash ad only for non-pro users who have never seen it before
-  const showSplashAd = !isProUser && !splashAdSeen;
-  
-  // Show banner ad for non-pro users if it hasn't been dismissed this session
+  const showSplashAd = !isProUser && shouldShowSplash;
   const showBannerAd = !isProUser && !bannerAdDismissed;
 
   const value = {
@@ -70,7 +96,7 @@ export const useAd = () => {
   return context;
 };
 
-// --- Ad Components (Placeholders) ---
+// --- Ad Components ---
 
 export const SplashScreenAd = () => {
   const { setSplashAdShown } = useAd();
