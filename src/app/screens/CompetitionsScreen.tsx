@@ -1,16 +1,16 @@
 
 "use client";
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Star, Plus, Users, Trophy, User as PlayerIcon, Search, Bell, BellOff } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDocs, collection } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import type { Favorites } from '@/lib/types';
+import type { Favorites, ManagedCompetition } from '@/lib/types';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -26,7 +26,37 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     const { toast } = useToast();
     const [favorites, setFavorites] = useState<Favorites | null>(null);
     const [loading, setLoading] = useState(true);
-    const [notificationPrefs, setNotificationPrefs] = useState<Record<string, boolean>>({});
+    const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string> }>({ leagues: new Map(), teams: new Map() });
+
+
+    const fetchAllCustomNames = useCallback(async () => {
+        if (!db) return;
+        try {
+            const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+                getDocs(collection(db, 'leagueCustomizations')),
+                getDocs(collection(db, 'teamCustomizations'))
+            ]);
+            
+            const leagueNames = new Map<number, string>();
+            leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+
+            const teamNames = new Map<number, string>();
+            teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+            
+            setCustomNames({ leagues: leagueNames, teams: teamNames });
+
+        } catch (error) {
+            const permissionError = new FirestorePermissionError({ path: 'customizations collections', operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    }, [db]);
+
+     const getDisplayName = useCallback((type: 'league' | 'team', id: number, defaultName: string) => {
+        const key = `${type}s` as 'leagues' | 'teams';
+        const map = customNames[key] as Map<number, string>;
+        return map?.get(id) || defaultName;
+    }, [customNames]);
+
 
     useEffect(() => {
         if (!user || !db) {
@@ -34,20 +64,11 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             return;
         };
         setLoading(true);
+        fetchAllCustomNames();
         const docRef = doc(db, 'favorites', user.uid);
         const unsubscribe = onSnapshot(docRef, (doc) => {
             const favs = (doc.data() as Favorites) || { userId: user.uid, leagues: {}, teams: {}, players: {} };
             setFavorites(favs);
-            
-            // Initialize notification preferences from favorites
-            const initialPrefs: Record<string, boolean> = {};
-            if (favs.leagues) {
-                Object.values(favs.leagues).forEach(league => {
-                    initialPrefs[league.leagueId] = league.notificationsEnabled ?? true; // Default to true if not set
-                });
-            }
-            setNotificationPrefs(initialPrefs);
-
             setLoading(false);
         }, (error) => {
             const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
@@ -55,23 +76,25 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             setLoading(false);
         });
         return () => unsubscribe();
-    }, [user, db]);
+    }, [user, db, fetchAllCustomNames]);
 
-    const handleToggleNotification = (leagueId: number) => {
-        const currentStatus = notificationPrefs[leagueId] ?? true;
-        const newStatus = !currentStatus;
-        setNotificationPrefs(prev => ({...prev, [leagueId]: newStatus}));
-        
-        // Here you would typically update this preference in Firestore
-        // For example: updateDoc(doc(db, 'favorites', user.uid), { [`leagues.${leagueId}.notificationsEnabled`]: newStatus });
-        toast({
-            title: newStatus ? 'تم تفعيل الإشعارات' : 'تم إلغاء تفعيل الإشعارات',
-            description: `لهذه البطولة.`,
-        });
-    };
 
-    const favoriteTeams = useMemo(() => favorites?.teams ? Object.values(favorites.teams) : [], [favorites]);
-    const favoriteLeagues = useMemo(() => favorites?.leagues ? Object.values(favorites.leagues) : [], [favorites]);
+    const favoriteTeams = useMemo(() => {
+      if (!favorites?.teams) return [];
+      return Object.values(favorites.teams).map(team => ({
+        ...team,
+        name: getDisplayName('team', team.teamId, team.name)
+      }));
+    }, [favorites, getDisplayName]);
+
+    const favoriteLeagues = useMemo(() => {
+        if (!favorites?.leagues) return [];
+        return Object.values(favorites.leagues).map(comp => ({
+            ...comp,
+            name: getDisplayName('league', comp.leagueId, comp.name)
+        }));
+    }, [favorites, getDisplayName]);
+
     const favoritePlayers = useMemo(() => favorites?.players ? Object.values(favorites.players) : [], [favorites]);
 
     const AddChoiceCard = () => (
@@ -105,7 +128,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             <div className="flex-1 flex flex-col min-h-0">
                 <Tabs defaultValue="my-choices" className="w-full">
                     <TabsList className="grid w-full grid-cols-2 bg-transparent px-4">
-                        <TabsTrigger value="notifications" disabled>إشعارات</TabsTrigger>
+                        <TabsTrigger value="notifications" onClick={() => navigate('Notifications')}>إشعارات</TabsTrigger>
                         <TabsTrigger value="my-choices">اختياراتي</TabsTrigger>
                     </TabsList>
                 </Tabs>
@@ -145,7 +168,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                             
                             <TabsContent value="teams" className="mt-4">
                                 <div className="grid grid-cols-4 gap-4">
-                                    <div className="h-[76px] w-full">
+                                     <div className="h-[76px] w-full">
                                         <AddChoiceCard />
                                     </div>
                                     {favoriteTeams.map((team, index) => 
@@ -174,17 +197,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                             </Avatar>
                                             <span className="text-[11px] font-medium truncate w-full">{comp.name}</span>
                                             <Star className="absolute top-1 right-1 h-3 w-3 text-yellow-400 fill-current" />
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="absolute top-0 left-0 h-7 w-7"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleToggleNotification(comp.leagueId);
-                                                }}
-                                            >
-                                                {notificationPrefs[comp.leagueId] ?? true ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
-                                            </Button>
                                         </div>
                                     )}
                                 </div>
