@@ -1,12 +1,14 @@
 
 "use client";
-import { Star, Newspaper, BarChart2, Tv, MoreHorizontal, Shield } from 'lucide-react';
+import { Star, Newspaper, MoreHorizontal, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ScreenKey } from '@/app/page';
+import { FootballIcon } from './icons/FootballIcon';
 
 const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
   { key: 'Matches', label: 'المباريات', icon: Shield },
   { key: 'Competitions', label: 'اختياراتي', icon: Star },
+  { key: 'Iraq', label: 'العراق', icon: FootballIcon },
   { key: 'News', label: 'أخبار', icon: Newspaper },
   { key: 'Settings', label: 'المزيد', icon: MoreHorizontal },
 ];
