@@ -33,7 +33,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const mainSettingsItems = [
       { label: t('profile'), icon: User, action: (navigate: ScreenProps['navigate']) => navigate('Profile') },
       { label: t('all_competitions'), icon: Trophy, action: (navigate: ScreenProps['navigate']) => navigate('AllCompetitions') },
-      { label: t('notification_settings'), icon: Bell, action: (navigate: ScreenProps['navigate']) => navigate('NotificationSettings')},
+      { label: t('notifications'), icon: Bell, action: (navigate: ScreenProps['navigate']) => navigate('Notifications') },
       { label: t('general_settings'), icon: SettingsIcon, action: (navigate: ScreenProps['navigate']) => navigate('GeneralSettings')},
   ];
 

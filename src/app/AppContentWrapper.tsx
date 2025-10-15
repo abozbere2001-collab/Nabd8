@@ -83,7 +83,7 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
 };
 
 
-const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Notifications'];
+const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
 
 type StackItem = {
   key: string;
@@ -150,7 +150,7 @@ export function AppContentWrapper() {
         'Competitions': [{ key: 'Competitions-0', screen: 'Competitions' }],
         'Iraq': [{ key: 'Iraq-0', screen: 'Iraq' }],
         'News': [{ key: 'News-0', screen: 'News' }],
-        'Notifications': [{ key: 'Notifications-0', screen: 'Notifications' }],
+        'Settings': [{ key: 'Settings-0', screen: 'Settings' }],
     },
   });
 
