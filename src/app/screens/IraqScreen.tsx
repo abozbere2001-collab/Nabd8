@@ -252,9 +252,16 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { isAdmin } = useAdmin();
   const { db } = useFirestore();
   const [pinnedMatch, setPinnedMatch] = useState<PinnedMatch | null>(null);
+  const [loadingPinnedMatch, setLoadingPinnedMatch] = useState(true);
+
 
   useEffect(() => {
-    if (!db) return;
+    if (!db) {
+        setLoadingPinnedMatch(false);
+        return;
+    };
+    
+    setLoadingPinnedMatch(true);
     const pinnedMatchRef = doc(db, 'pinnedIraqiMatch', 'special');
     const unsub = onSnapshot(pinnedMatchRef, (doc) => {
         if (doc.exists()) {
@@ -262,10 +269,15 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         } else {
             setPinnedMatch(null);
         }
+        setLoadingPinnedMatch(false);
     }, (error) => {
-        const permissionError = new FirestorePermissionError({ path: pinnedMatchRef.path, operation: 'get' });
-        errorEmitter.emit('permission-error', permissionError);
+        // This is a real error (like permission denied), so we should handle it.
+        // For this specific case, we can just log it and assume no pinned match.
+        console.error("Error fetching pinned match:", error);
+        setPinnedMatch(null);
+        setLoadingPinnedMatch(false);
     });
+
     return () => unsub();
   }, [db]);
 
@@ -341,13 +353,19 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         }
       />
       <div className="flex-1 overflow-y-auto px-4">
-        {isAdmin && !pinnedMatch?.isEnabled && (
-            <Button className="w-full my-2" onClick={() => navigate('ManagePinnedMatch')}>
-                <Pin className="ml-2 h-4 w-4" />
-                إدارة المباراة المثبتة
-            </Button>
+        {loadingPinnedMatch ? (
+            <Skeleton className="h-28 w-full mb-4" />
+        ) : (
+            <>
+              {isAdmin && (!pinnedMatch || !pinnedMatch.isEnabled) && (
+                  <Button className="w-full my-2" onClick={() => navigate('ManagePinnedMatch')}>
+                      <Pin className="ml-2 h-4 w-4" />
+                      إدارة المباراة المثبتة
+                  </Button>
+              )}
+              {pinnedMatch && <PinnedMatchCard match={pinnedMatch} onManage={() => navigate('ManagePinnedMatch')} isAdmin={isAdmin} />}
+            </>
         )}
-        {pinnedMatch && <PinnedMatchCard match={pinnedMatch} onManage={() => navigate('ManagePinnedMatch')} isAdmin={isAdmin} />}
 
         <Tabs defaultValue="our-league" className="w-full">
           <div className="sticky top-0 bg-background z-10">
