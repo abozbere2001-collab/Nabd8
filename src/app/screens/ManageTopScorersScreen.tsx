@@ -32,34 +32,37 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
     const q = query(scorersRef, orderBy('rank', 'asc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-        const fetchedScorersMap = new Map<number, ManualTopScorer>();
-        if (!snapshot.empty) {
-            snapshot.docs.forEach(doc => {
-                const data = doc.data() as ManualTopScorer;
-                fetchedScorersMap.set(data.rank, data);
-            });
-        }
+      const fetchedScorersMap = new Map<number, ManualTopScorer>();
+      if (!snapshot.empty) {
+        snapshot.docs.forEach(doc => {
+          const data = doc.data() as ManualTopScorer;
+          if (data.rank) {
+            fetchedScorersMap.set(data.rank, data);
+          }
+        });
+      }
       
-        const newScorersList: Omit<ManualTopScorer, 'rank'>[] = [];
-        for (let i = 1; i <= NUM_SCORERS; i++) {
-            if (fetchedScorersMap.has(i)) {
-                newScorersList.push(fetchedScorersMap.get(i)!);
-            } else {
-                newScorersList.push({
-                    playerName: '',
-                    teamName: '',
-                    goals: 0,
-                    playerPhoto: ''
-                });
-            }
+      const newScorersList: Omit<ManualTopScorer, 'rank'>[] = [];
+      for (let i = 1; i <= NUM_SCORERS; i++) {
+        if (fetchedScorersMap.has(i)) {
+          const { rank, ...rest } = fetchedScorersMap.get(i)!;
+          newScorersList.push(rest);
+        } else {
+          newScorersList.push({
+            playerName: '',
+            teamName: '',
+            goals: 0,
+            playerPhoto: ''
+          });
         }
+      }
       
-        setScorers(newScorersList);
-        setLoading(false);
+      setScorers(newScorersList);
+      setLoading(false);
     }, (error) => {
-        const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
-        errorEmitter.emit('permission-error', permissionError);
-        setLoading(false);
+      const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
+      errorEmitter.emit('permission-error', permissionError);
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -67,10 +70,10 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
 
   const handleInputChange = (index: number, field: keyof Omit<ManualTopScorer, 'rank'>, value: string | number) => {
     setScorers(prevScorers => {
-        const newScorers = [...prevScorers];
-        const updatedScorer = { ...newScorers[index], [field]: value };
-        newScorers[index] = updatedScorer;
-        return newScorers;
+      const newScorers = [...prevScorers];
+      const updatedScorer = { ...newScorers[index], [field]: value };
+      newScorers[index] = updatedScorer;
+      return newScorers;
     });
   };
   
@@ -96,16 +99,16 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
         const docRef = doc(db, 'iraqiLeagueTopScorers', String(rank));
 
         if (scorer.playerName && scorer.playerName.trim()) {
-            const dataToSave: ManualTopScorer = {
-                rank: rank,
-                playerName: scorer.playerName.trim(),
-                teamName: scorer.teamName.trim(),
-                goals: Number(scorer.goals) || 0,
-                playerPhoto: scorer.playerPhoto || undefined
-            };
-            batch.set(docRef, dataToSave);
+          const dataToSave: ManualTopScorer = {
+            rank: rank,
+            playerName: scorer.playerName.trim(),
+            teamName: scorer.teamName.trim(),
+            goals: Number(scorer.goals) || 0,
+            playerPhoto: scorer.playerPhoto || undefined
+          };
+          batch.set(docRef, dataToSave);
         } else {
-            batch.delete(docRef);
+          batch.delete(docRef);
         }
       });
       
@@ -113,7 +116,7 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
       toast({ title: 'نجاح', description: 'تم حفظ قائمة الهدافين.' });
       goBack();
     } catch (error) {
-       const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'write' });
+       const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers (batch)', operation: 'write' });
        errorEmitter.emit('permission-error', permissionError);
        toast({
         variant: "destructive",
