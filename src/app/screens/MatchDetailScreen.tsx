@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -22,10 +23,11 @@ import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: ScreenProps['navigate'] }) => {
   const fallbackImage = "https://media.api-sports.io/football/players/0.png";
   
-  // Use the most up-to-date info first (from the secondary player fetch), then fallback to lineup data.
-  const playerImage = player?.player?.photo || fallbackImage;
-  const playerNumber = player?.player?.number ?? player?.statistics?.[0]?.games?.number;
-  const ratingValue = player?.player?.rating ?? player?.statistics?.[0]?.games?.rating;
+  // Updated logic: Check for photo/rating in the direct player object first, then fallback to nested structure.
+  const playerInfo = player.player;
+  const playerImage = playerInfo?.photo || fallbackImage;
+  const playerNumber = playerInfo?.number ?? player?.statistics?.[0]?.games?.number;
+  const ratingValue = playerInfo?.rating ?? player?.statistics?.[0]?.games?.rating;
   
   const rating = ratingValue && !isNaN(parseFloat(ratingValue)) 
     ? parseFloat(ratingValue).toFixed(1) 
@@ -40,11 +42,11 @@ const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: S
   };
 
   return (
-    <div className="relative flex flex-col items-center cursor-pointer" onClick={() => player.player.id && navigate('PlayerDetails', { playerId: player.player.id })}>
+    <div className="relative flex flex-col items-center cursor-pointer" onClick={() => playerInfo.id && navigate('PlayerDetails', { playerId: playerInfo.id })}>
       <div className="relative w-12 h-12">
         <img 
           src={playerImage} 
-          alt={player?.player?.name || "Player"} 
+          alt={playerInfo?.name || "Player"} 
           className="rounded-full w-12 h-12 object-cover border-2 border-white/50" 
           onError={(e) => (e.currentTarget.src = fallbackImage)} 
         />
@@ -62,7 +64,7 @@ const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: S
           </div>
         )}
       </div>
-      <span className="mt-1 text-[11px] font-semibold text-center truncate w-16">{player?.player?.name || "غير معروف"}</span>
+      <span className="mt-1 text-[11px] font-semibold text-center truncate w-16">{playerInfo?.name || "غير معروف"}</span>
     </div>
   );
 };
@@ -299,6 +301,7 @@ const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lin
                     const updatePlayer = (p: PlayerWithStats): PlayerWithStats => {
                         const info = playerInfoMap.get(p.player.id);
                         if (info) {
+                            // Important: Merge new info with existing player object
                             return {
                                 ...p,
                                 player: {
