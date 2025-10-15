@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -262,7 +261,11 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
 const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'] }) => {
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
-    if (!lineups || lineups.length < 2) {
+    if (lineups === null) {
+        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    }
+    
+    if (lineups.length < 2) {
         return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     }
 
@@ -423,39 +426,36 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
 
     const fetchData = useCallback(async (isInitialLoad: boolean) => {
         if (!fixtureId) return;
-        if (isInitialLoad) {
-            setLoading(true);
-        }
-
+        if (isInitialLoad) setLoading(true);
+    
         try {
             const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
             const fixtureData = await fixtureRes.json();
             const currentFixture = fixtureData.response?.[0];
-
-            if (!currentFixture) {
-                throw new Error("Fixture not found");
-            }
-            setFixture(currentFixture);
+    
+            if (!currentFixture) throw new Error("Fixture not found");
             
+            if (!fixture || JSON.stringify(fixture) !== JSON.stringify(currentFixture)) {
+                 setFixture(currentFixture);
+            }
+    
             const currentLeagueId = currentFixture.league.id;
             const currentSeason = currentFixture.league.season || CURRENT_SEASON;
-            
-            // Fetch non-player data concurrently
+    
             const [eventsData, statisticsData, standingsData, lineupsData] = await Promise.all([
                 fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).then(res => res.json()),
                 fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`).then(res => res.json()),
                 fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`).then(res => res.json()),
                 fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`).then(res => res.json())
             ]);
-            
+    
             setEvents(eventsData.response || []);
             setStatistics(statisticsData.response || []);
             setStandings(standingsData?.response?.[0]?.league?.standings[0] || []);
-
+            
             const initialLineups = lineupsData.response || [];
-
             if (initialLineups.length > 0) {
-                const allPlayerIds = initialLineups.flatMap((l: LineupData) => [...l.startXI, ...l.substitutes]).map((p: PlayerWithStats) => p.player.id).filter((id: number | null): id is number => id !== null);
+                 const allPlayerIds = initialLineups.flatMap((l: LineupData) => [...l.startXI, ...l.substitutes]).map((p: PlayerWithStats) => p.player.id).filter((id: number | null): id is number => id !== null);
                 
                 if (allPlayerIds.length > 0) {
                     const uniquePlayerIds = [...new Set(allPlayerIds)];
@@ -467,23 +467,19 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     }
                     
                     for (const batch of batches) {
-                        try {
-                            const res = await fetch(`/api/football/players?id=${batch.join('-')}&season=${currentSeason}`);
-                            if (res.ok) {
-                                const data = await res.json();
-                                (data.response || []).forEach((item: { player: PlayerType, statistics: any[] }) => {
-                                    if (item.player) {
-                                        const stats = item.statistics?.[0] || {};
-                                        playersDataMap.set(item.player.id, {
-                                            ...item.player,
-                                            rating: stats.games?.rating,
-                                            number: item.player.number ?? stats.games?.number,
-                                        });
-                                    }
-                                });
-                            }
-                        } catch (e) {
-                            console.error("Failed to fetch player batch", e);
+                        const res = await fetch(`/api/football/players?id=${batch.join('-')}&season=${currentSeason}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            (data.response || []).forEach((item: { player: PlayerType, statistics: any[] }) => {
+                                if (item.player) {
+                                    const stats = item.statistics?.[0] || {};
+                                    playersDataMap.set(item.player.id, {
+                                        ...item.player,
+                                        rating: stats.games?.rating,
+                                        number: item.player.number ?? stats.games?.number,
+                                    });
+                                }
+                            });
                         }
                     }
 
@@ -505,20 +501,18 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             } else {
                  setLineups([]);
             }
+    
         } catch (error) {
             console.error("Failed to fetch match details:", error);
         } finally {
-            if (isInitialLoad) {
-                setLoading(false);
-            }
+            if (isInitialLoad) setLoading(false);
         }
-    }, [fixtureId]);
+    }, [fixtureId, fixture]);
 
     useEffect(() => {
-        const isLive = fixture?.fixture.status.short && ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(fixture.fixture.status.short);
-        
         fetchData(true); // Initial fetch
         
+        const isLive = fixture?.fixture.status.short && ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(fixture.fixture.status.short);
         let interval: NodeJS.Timeout | null = null;
         if (isLive) {
           interval = setInterval(() => fetchData(false), 30000); 
@@ -527,7 +521,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         return () => {
           if (interval) clearInterval(interval);
         };
-    }, [fixtureId, fetchData]);
+    }, [fixtureId, fetchData, fixture]);
 
 
     if (loading && !fixture) {
@@ -563,7 +557,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
                     <TabsContent value="lineups" className="mt-4">
-                        {lineups === null ? <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div> : <LineupsTab lineups={lineups} events={events} navigate={navigate} />}
+                        <LineupsTab lineups={lineups} events={events} navigate={navigate} />
                     </TabsContent>
                     <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} navigate={navigate} /></TabsContent>
                 </Tabs>
@@ -571,5 +565,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
 
     
