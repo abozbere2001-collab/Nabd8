@@ -99,7 +99,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             setIsTopCompetition(false);
           }
       };
-      checkTopStatus();
+      if (isAdmin) {
+        checkTopStatus();
+      }
 
       // For top teams, we can still listen as it's a broader list
       const unsubTopTeams = onSnapshot(collection(db, "topTeams"), (snapshot) => {
@@ -113,7 +115,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         unsubTopTeams();
       }
 
-  }, [db, leagueId]);
+  }, [db, leagueId, isAdmin]);
 
   const getDisplayName = useCallback((type: 'team' | 'player', id: number, defaultName: string) => {
     const key = `${type}s` as 'teams' | 'players';
@@ -294,7 +296,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             requestResourceData: data,
         });
         errorEmitter.emit('permission-error', permissionError);
-    });
+      });
   };
   
   const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
@@ -377,13 +379,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-             <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleToggleTopItem('league', {id: leagueId, name: displayTitle || '', logo: logo || ''})}
-            >
-                <Crown className={cn("h-5 w-5", isTopCompetition ? "text-yellow-500 fill-current" : "text-muted-foreground")} />
-            </Button>
             <Button
                 variant="ghost"
                 size="icon"
@@ -461,17 +456,16 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     </TableHeader>
                     <TableBody>
                         {standings.map((s) => {
-                            const isTopTeam = topTeamIds.has(s.team.id);
+                            const isFavoritedTeam = !!favorites?.teams?.[s.team.id];
                             return (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
                                 <TableCell onClick={e => e.stopPropagation()}>
                                      <div className='flex items-center justify-start opacity-80'>
-                                        {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleToggleTopItem('team', s.team)}><Crown className={cn("h-4 w-4", isTopTeam ? "text-yellow-500 fill-current" : "text-muted-foreground")} /></Button>}
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('team', s.team.id, getDisplayName('team', s.team.id, s.team.name))}>
                                             <Pencil className="h-4 w-4 text-muted-foreground" />
                                         </Button>}
                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleFavorite('team', {...s.team, name: getDisplayName('team', s.team.id, s.team.name)})}>
-                                            <Star className={cn("h-5 w-5", favorites?.teams?.[s.team.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
+                                            <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                         </Button>
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenNote({...s.team, name: getDisplayName('team', s.team.id, s.team.name)})}>
                                             <Heart className="h-4 w-4 text-muted-foreground" />
@@ -572,7 +566,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             ) : teams.length > 0 ? (
                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
                     {teams.map(({ team }) => {
-                        const isTopTeam = topTeamIds.has(team.id);
+                        const isFavoritedTeam = !!favorites?.teams?.[team.id];
                         return (
                         <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
                             <div className='relative'>
@@ -587,12 +581,11 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 {isAdmin && <span className="block text-xs text-muted-foreground">(ID: {team.id})</span>}
                             </span>
                             <div className="absolute top-1 left-1 flex opacity-80">
-                                {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleToggleTopItem('team', team);}}><Crown className={cn("h-4 w-4", isTopTeam ? "text-yellow-500 fill-current" : "text-muted-foreground")} /></Button>}
                                 {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, getDisplayName('team', team.id, team.name))}}>
                                     <Pencil className="h-4 w-4 text-muted-foreground" />
                                 </Button>}
                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('team', {...team, name: getDisplayName('team', team.id, team.name)});}}>
-                                    <Star className={cn("h-5 w-5", favorites?.teams?.[team.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
+                                    <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
                                 {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenNote({...team, name: getDisplayName('team', team.id, team.name)});}}>
                                     <Heart className="h-4 w-4 text-muted-foreground" />
@@ -608,3 +601,5 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+
+    
