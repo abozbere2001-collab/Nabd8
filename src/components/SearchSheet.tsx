@@ -144,9 +144,10 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     const fieldPath = `${type}.${item.id}`;
     const isFavorited = !!favorites?.[type]?.[item.id];
 
+    // Optimistically update UI
     const currentFavorites = { ...favorites };
     if (!currentFavorites[type]) {
-      currentFavorites[type] = {};
+      (currentFavorites as any)[type] = {};
     }
 
     if (isFavorited) {
@@ -157,7 +158,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
           [idKey]: item.id, 
           name: item.name, 
           logo: item.logo,
-          type: item.type, // Store the type (Club/National)
+          type: item.type,
       };
     }
     setFavorites(currentFavorites);
@@ -165,10 +166,19 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     const dataToSave: any = {
       name: item.name,
       logo: item.logo || '',
-      type: item.type || 'Club' // Default to Club if type is missing
     };
-    if (type === 'teams') dataToSave.teamId = item.id;
-    else dataToSave.leagueId = item.id;
+
+    if (type === 'teams') {
+      dataToSave.teamId = item.id;
+      // This is the key fix: ensure the type ('Club' or 'National') is saved.
+      // The API response for teams includes a `national` boolean. We map this to our type.
+      // We look up the original search result to get this info.
+      const originalResult = searchResults.find(r => r.type === 'team' && r.team.id === item.id) as (TeamResult & {type: 'team'}) | undefined;
+      const isNational = originalResult ? (originalResult as any).team.national : false;
+      dataToSave.type = isNational ? 'National' : 'Club';
+    } else {
+      dataToSave.leagueId = item.id;
+    }
 
 
     const operation = isFavorited
@@ -204,7 +214,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         searchResults.map(result => {
           const item = result.type === 'team' ? result.team : result.league;
           const isFavorited = !!favorites?.[result.type]?.[item.id];
-          return <ItemRow key={`${result.type}-${item.id}`} item={item} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={(t) => handleFavorite(t, result.type)} onResultClick={() => handleResultClick(result)} />;
+          // For search results, we pass the full item from the result to handleFavorite
+          return <ItemRow key={`${result.type}-${item.id}`} item={item} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={() => handleFavorite(item, result.type)} onResultClick={() => handleResultClick(result)} />;
         })
       ) : <p className="text-muted-foreground text-center pt-8">لا توجد نتائج بحث.</p>;
     }
@@ -252,5 +263,3 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
-
-    
