@@ -36,7 +36,8 @@ const TabsTrigger = React.forwardRef<
     {...props}
   >
     {props.children}
-    <div className="absolute bottom-[-9px] h-0.5 w-full scale-x-0 rounded-full bg-primary transition-transform duration-300 data-[state=active]:scale-x-100" />
+    {/* The green line indicator */}
+    <div className="absolute bottom-[-1px] h-0.5 w-full scale-x-0 rounded-full bg-primary transition-transform duration-300 data-[state=active]:scale-x-100" />
   </TabsPrimitive.Trigger>
 ))
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
