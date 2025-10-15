@@ -16,7 +16,7 @@ import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Card } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
@@ -133,23 +133,30 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                 إضافة بطولة
                             </Button>
                         </SearchSheet>
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-4">
                             {favoriteLeagues.length > 0 ? (
                                 favoriteLeagues.map((comp, index) => 
-                                    <Card key={`${comp.leagueId}-${index}`} className="p-0">
-                                        <div className="flex w-full items-center justify-between p-3 group cursor-pointer">
-                                            <div className="flex items-center gap-3 flex-1" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
-                                                <img src={comp.logo} alt={comp.name} className="h-8 w-8 object-contain" />
-                                                <span className="font-semibold">{comp.name}</span>
-                                            </div>
-                                            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleFavoriteAction('league', { id: comp.leagueId })}>
-                                                <Star className="h-6 w-6 text-yellow-400 fill-current" />
-                                            </Button>
-                                        </div>
+                                    <Card 
+                                        key={`${comp.leagueId}-${index}`} 
+                                        className="relative p-0 group cursor-pointer"
+                                        onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
+                                    >
+                                        <CardContent className="flex flex-col items-center justify-center p-4 text-center">
+                                            <img src={comp.logo} alt={comp.name} className="h-16 w-16 object-contain mb-2" />
+                                            <span className="font-semibold text-sm leading-tight">{comp.name}</span>
+                                        </CardContent>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="absolute top-1 right-1 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" 
+                                            onClick={(e) => {e.stopPropagation(); handleFavoriteAction('league', { id: comp.leagueId })}}
+                                        >
+                                            <Star className="h-5 w-5 text-yellow-400 fill-current" />
+                                        </Button>
                                     </Card>
                                 )
                             ) : (
-                                <p className="text-muted-foreground text-center pt-4">لم تقم بإضافة بطولات مفضلة بعد.</p>
+                                <div className="col-span-2 text-muted-foreground text-center pt-4">لم تقم بإضافة بطولات مفضلة بعد.</div>
                             )}
                         </div>
                     </TabsContent>
@@ -161,26 +168,33 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                 إضافة فريق
                             </Button>
                         </SearchSheet>
-                         <div className="space-y-2">
+                         <div className="grid grid-cols-2 gap-4">
                              {favoriteTeams.length > 0 ? (
                                 favoriteTeams.map((team, index) => 
-                                    <Card key={`${team.teamId}-${index}`} className="p-0">
-                                        <div className="flex w-full items-center justify-between p-3 group cursor-pointer">
-                                            <div className="flex items-center gap-3 flex-1" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarImage src={team.logo} />
-                                                    <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
-                                                </Avatar>
-                                                <span className="font-semibold">{team.name}</span>
-                                            </div>
-                                            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleFavoriteAction('team', { id: team.teamId })}>
-                                                <Star className="h-6 w-6 text-yellow-400 fill-current" />
-                                            </Button>
-                                        </div>
+                                    <Card 
+                                        key={`${team.teamId}-${index}`}
+                                        className="relative p-0 group cursor-pointer"
+                                        onClick={() => navigate('TeamDetails', { teamId: team.teamId })}
+                                    >
+                                        <CardContent className="flex flex-col items-center justify-center p-4 text-center">
+                                            <Avatar className="h-16 w-16 mb-2">
+                                                <AvatarImage src={team.logo} />
+                                                <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            <span className="font-semibold text-sm leading-tight">{team.name}</span>
+                                        </CardContent>
+                                         <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="absolute top-1 right-1 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" 
+                                            onClick={(e) => { e.stopPropagation(); handleFavoriteAction('team', { id: team.teamId })}}
+                                        >
+                                            <Star className="h-5 w-5 text-yellow-400 fill-current" />
+                                        </Button>
                                     </Card>
                                 )
                             ) : (
-                                <p className="text-muted-foreground text-center pt-4">لم تقم بإضافة فرق مفضلة بعد.</p>
+                                <div className="col-span-2 text-muted-foreground text-center pt-4">لم تقم بإضافة فرق مفضلة بعد.</div>
                             )}
                         </div>
                     </TabsContent>
@@ -199,3 +213,5 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
+
+    
