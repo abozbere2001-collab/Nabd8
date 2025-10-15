@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, query, orderBy, onSnapshot, writeBatch, getDocs } from 'firebase/firestore';
+import { doc, setDoc, collection, query, orderBy, onSnapshot, writeBatch, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Upload } from 'lucide-react';
 import type { ManualTopScorer } from '@/lib/types';
@@ -83,17 +83,12 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
     setSaving(true);
     try {
       const batch = writeBatch(db);
-      const scorersRef = collection(db, 'iraqiLeagueTopScorers');
       
-      const oldDocsSnapshot = await getDocs(scorersRef);
-      oldDocsSnapshot.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-
       scorers.forEach((scorer, index) => {
+        const rank = index + 1;
+        const docRef = doc(db, 'iraqiLeagueTopScorers', String(rank));
+
         if (scorer.playerName && scorer.playerName.trim()) {
-          const rank = index + 1;
-          const docRef = doc(db, 'iraqiLeagueTopScorers', String(rank));
           const dataToSave: ManualTopScorer = {
             rank: rank,
             playerName: scorer.playerName.trim(),
@@ -102,6 +97,9 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
             playerPhoto: scorer.playerPhoto || undefined
           };
           batch.set(docRef, dataToSave);
+        } else {
+          // If the player name is empty, delete the document for that rank
+          batch.delete(docRef);
         }
       });
       
@@ -109,6 +107,7 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
       toast({ title: 'نجاح', description: 'تم حفظ قائمة الهدافين.' });
       goBack();
     } catch (error) {
+       // This will now correctly report an error on a specific document if one occurs
        const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'write' });
        errorEmitter.emit('permission-error', permissionError);
        toast({
