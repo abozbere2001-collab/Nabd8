@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -219,7 +220,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     if (type === 'league' && leagueId) {
         fieldPath = `leagues.${leagueId}`;
         isFavoritedCurrent = !!favorites?.leagues?.[leagueId];
-        favoriteData.leagues = { [leagueId]: { leagueId, name: displayTitle, logo }};
+        favoriteData.leagues = { [leagueId]: { leagueId, name: displayTitle, logo: logo || '' }};
     } else if (type === 'team') {
         fieldPath = `teams.${item.id}`;
         isFavoritedCurrent = !!favorites?.teams?.[item.id];
@@ -601,5 +602,3 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
-
-    

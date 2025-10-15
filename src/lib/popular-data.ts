@@ -128,6 +128,8 @@ export const POPULAR_LEAGUES = [
     { id: 128, name: "Argentine Primera División", logo: "https://media.api-sports.io/football/leagues/128.png"},
     { id: 88, name: "Eredivisie", logo: "https://media.api-sports.io/football/leagues/88.png" },
     { id: 94, name: "Primeira Liga", logo: "https://media.api-sports.io/football/leagues/94.png" },
-    { id: 197, name: "Turkish Süper Lig", logo: "https://media.api-sports.io/football/leagues/203.png"},
+    { id: 197, name: "Turkish Süper Lig", logo: "https://media.api-sports.io/football/leagues/197.png"},
     { id: 40, name: "Championship", logo: "https://media.api-sports.io/football/leagues/40.png" },
+    { id: 10, name: "Copa del Rey", logo: "https://media.api-sports.io/football/leagues/143.png"},
+    { id: 8, name: "FA Cup", logo: "https://media.api-sports.io/football/leagues/45.png"},
 ];
