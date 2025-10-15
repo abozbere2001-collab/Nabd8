@@ -185,9 +185,18 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
 };
 
 
-const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, homeTeamId: number }) => {
+const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: MatchEvent[] | null, homeTeamId: number, highlightsOnly: boolean }) => {
     if (!events) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    if (events.length === 0) return <p className="text-center text-muted-foreground p-8">لا توجد أحداث رئيسية في المباراة بعد.</p>;
+    
+    const filteredEvents = useMemo(() => {
+        if (!highlightsOnly) return events;
+        return events.filter(e => e.type === 'Goal' || (e.type === 'Card' && e.detail.includes('Red')));
+    }, [events, highlightsOnly]);
+
+    if (filteredEvents.length === 0) {
+        const message = highlightsOnly ? "لا توجد أهداف أو بطاقات حمراء." : "لا توجد أحداث رئيسية في المباراة بعد.";
+        return <p className="text-center text-muted-foreground p-8">{message}</p>;
+    }
 
     const getEventIcon = (event: MatchEvent) => {
         if (event.type === 'Goal') return <FootballIcon className="w-5 h-5 text-green-500" />;
@@ -197,18 +206,17 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
         return <Clock className="w-5 h-5 text-muted-foreground" />;
     }
 
-    // Sort events by time, ascending (1 -> 90) to display from bottom up
-    const sortedEvents = [...events].sort((a, b) => a.time.elapsed - b.time.elapsed);
+    const sortedEvents = [...filteredEvents].sort((a, b) => a.time.elapsed - b.time.elapsed);
 
     return (
         <div className="relative px-2 py-8">
             <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
-             <div className="flex flex-col-reverse">
+            <div className="flex flex-col-reverse">
                 {sortedEvents.map((event, index) => {
                     const isHomeEvent = event.team.id === homeTeamId;
                     return (
-                        <div key={index} className={cn("relative flex my-4", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
-                             <div className="flex-1 px-4">
+                        <div key={`${event.time.elapsed}-${event.player.name}-${index}`} className={cn("relative flex my-4", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
+                            <div className="flex-1 px-4">
                                 <div className={cn("flex items-center gap-3 bg-card p-2 rounded-md border w-full", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
                                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background">
                                         {getEventIcon(event)}
@@ -224,9 +232,9 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
                                 </div>
                             </div>
                             <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 z-10 bg-background border rounded-full h-8 w-8 flex items-center justify-center font-bold text-xs">
-                               {event.time.elapsed}'
+                                {event.time.elapsed}'
                             </div>
-                             <div className="flex-1" />
+                            <div className="flex-1" />
                         </div>
                     );
                 })}
@@ -235,6 +243,22 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null, home
     );
 };
 
+const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; homeTeamId: number }) => {
+    return (
+        <Tabs defaultValue="highlights" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="highlights">الأبرز</TabsTrigger>
+                <TabsTrigger value="all">كل الأحداث</TabsTrigger>
+            </TabsList>
+            <TabsContent value="highlights">
+                <TimelineTabContent events={events} homeTeamId={homeTeamId} highlightsOnly={true} />
+            </TabsContent>
+            <TabsContent value="all">
+                <TimelineTabContent events={events} homeTeamId={homeTeamId} highlightsOnly={false} />
+            </TabsContent>
+        </Tabs>
+    );
+}
 
 const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lineups: LineupData[] | null; events: MatchEvent[] | null; season: number; navigate: ScreenProps['navigate']; }) => {
     const [lineups, setLineups] = useState(initialLineups);

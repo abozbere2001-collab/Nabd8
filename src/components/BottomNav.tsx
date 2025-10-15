@@ -29,7 +29,7 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
   if (!isMainTabActive) return null;
 
   return (
-    <div className="h-20 flex-shrink-0 border-t bg-background/80 backdrop-blur-md">
+    <div className="h-20 flex-shrink-0 border-t bg-card/80 backdrop-blur-md">
       <nav className="flex h-full items-center justify-around px-2 max-w-md mx-auto">
         {navItems.map(({ key, label, icon: Icon }) => {
           const isActive = activeScreen === key;

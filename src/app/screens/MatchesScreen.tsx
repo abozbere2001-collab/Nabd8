@@ -195,7 +195,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     }, [selectedDateKey]);
 
     return (
-        <div ref={scrollerRef} className="flex flex-row-reverse overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div ref={scrollerRef} className="flex flex-row-reverse overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {dates.map(date => {
                 const dateKey = formatDateKey(date);
                 const isSelected = dateKey === selectedDateKey;
@@ -204,17 +204,17 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                         key={dateKey}
                         ref={isSelected ? selectedButtonRef : null}
                         className={cn(
-                            "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors ml-2",
+                            "relative flex flex-col items-center justify-center h-auto py-1 px-2 min-w-[40px] rounded-lg transition-colors ml-2",
                             "text-foreground/80 hover:text-primary",
                             isSelected && "text-primary"
                         )}
                         onClick={() => onDateSelect(dateKey)}
                         data-state={isSelected ? 'active' : 'inactive'}
                     >
-                        <span className="text-xs font-normal">{getDayLabel(date)}</span>
-                        <span className="font-bold text-sm">{format(date, 'd')}</span>
+                        <span className="text-[10px] font-normal">{getDayLabel(date)}</span>
+                        <span className="font-semibold text-sm">{format(date, 'd')}</span>
                         <span className={cn(
-                            "absolute bottom-0 h-0.5 w-4 rounded-full bg-primary transition-transform scale-x-0",
+                            "absolute bottom-0 h-0.5 w-3 rounded-full bg-primary transition-transform scale-x-0",
                             isSelected && "scale-x-100"
                         )} />
                     </button>
@@ -350,12 +350,12 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                    <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
                </TabsList>
                 <TabsContent value="my-results" className="mt-0">
-                     <div className="py-2 px-4">
+                     <div className="py-2 px-2">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                     </div>
                 </TabsContent>
                 <TabsContent value="all-matches" className="mt-0">
-                     <div className="py-2 px-4">
+                     <div className="py-2 px-2">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                     </div>
                 </TabsContent>
@@ -384,3 +384,4 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
