@@ -12,12 +12,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats } from '@/lib/types';
+import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
+import { CURRENT_SEASON } from '@/lib/constants';
 
 // --- PlayerCard Component ---
 const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: ScreenProps['navigate'] }) => {
@@ -28,7 +29,9 @@ const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: S
 
   const playerImage = playerInfo?.photo || fallbackImage;
   const playerNumber = playerInfo?.number ?? playerStats?.games?.number;
-  const ratingValue = playerStats?.games?.rating;
+  
+  // Use the rating from the statistics object if available, otherwise fallback to the one on the player object itself
+  const ratingValue = playerStats?.games?.rating ?? playerInfo?.rating;
   
   const rating = ratingValue && !isNaN(parseFloat(ratingValue)) 
     ? parseFloat(ratingValue).toFixed(1) 
@@ -441,27 +444,39 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
          if (!fixtureId) return;
         if (isInitialLoad) {
             setLoading(true);
+            setLineups(null);
+            setEvents(null);
+            setStatistics(null);
+            setStandings(null);
         }
 
         try {
-            const currentLeagueId = fixture?.league.id || initialFixture?.league.id;
-            const currentSeason = fixture?.league.season || initialFixture?.league.season;
+            // Fetch fixture first to get league and season info
+            const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
+            const fixtureData = await fixtureRes.json();
+            const currentFixture = fixtureData.response?.[0];
+
+            if (!currentFixture) {
+                throw new Error("Fixture not found");
+            }
+            setFixture(currentFixture);
+            
+            const currentLeagueId = currentFixture.league.id;
+            const currentSeason = currentFixture.league.season || CURRENT_SEASON;
             
             const endpoints = [
-                `fixtures?id=${fixtureId}`,
                 `fixtures/lineups?fixture=${fixtureId}`,
                 `fixtures/events?fixture=${fixtureId}`,
                 `fixtures/statistics?fixture=${fixtureId}`,
-                currentLeagueId && currentSeason ? `standings?league=${currentLeagueId}&season=${currentSeason}` : null
-            ].filter(Boolean) as string[];
+                `standings?league=${currentLeagueId}&season=${currentSeason}`
+            ];
 
             const responses = await Promise.all(
                 endpoints.map(endpoint => fetch(`/api/football/${endpoint}`).then(res => res.json()))
             );
             
-            const [fixtureData, lineupsData, eventsData, statisticsData, standingsData] = responses;
+            const [lineupsData, eventsData, statisticsData, standingsData] = responses;
 
-            if (fixtureData.response?.[0]) setFixture(fixtureData.response[0]);
             if (lineupsData.response) setLineups(lineupsData.response);
             if (eventsData.response) setEvents(eventsData.response);
             if (statisticsData.response) setStatistics(statisticsData.response);
@@ -474,7 +489,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 setLoading(false);
             }
         }
-    }, [fixtureId, initialFixture?.league.id, initialFixture?.league.season, fixture?.league.id, fixture?.league.season]);
+    }, [fixtureId]);
 
     useEffect(() => {
         fetchData(true); 
@@ -522,3 +537,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
