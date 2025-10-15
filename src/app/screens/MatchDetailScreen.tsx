@@ -19,53 +19,46 @@ import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
 
-const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: ScreenProps['navigate'] }) => {
-  const fallbackImage = "https://media.api-sports.io/football/players/0.png";
-  
-  const playerInfo = player.player;
-  const playerStats = player.statistics?.[0];
+const PlayerCard = ({ player, navigate }: { player: PlayerType, navigate: ScreenProps['navigate'] }) => {
+    const fallbackImage = "https://media.api-sports.io/football/players/0.png";
+    const playerImage = player.photo || fallbackImage;
 
-  const playerImage = playerInfo?.photo || fallbackImage;
-  const playerNumber = playerInfo?.number ?? playerStats?.games?.number;
-  
-  const ratingValue = playerInfo?.rating ?? playerStats?.games?.rating;
-  
-  const rating = ratingValue && !isNaN(parseFloat(ratingValue)) 
-    ? parseFloat(ratingValue).toFixed(1) 
-    : null;
+    const rating = player.rating && !isNaN(parseFloat(player.rating))
+        ? parseFloat(player.rating).toFixed(1)
+        : null;
 
-  const getRatingColor = (r: string | null) => {
-    if (!r) return 'bg-gray-500';
-    const val = parseFloat(r);
-    if (val >= 8) return 'bg-green-600';
-    if (val >= 7) return 'bg-yellow-600';
-    return 'bg-red-600';
-  };
+    const getRatingColor = (r: string | null) => {
+        if (!r) return 'bg-gray-500';
+        const val = parseFloat(r);
+        if (val >= 8) return 'bg-green-600';
+        if (val >= 7) return 'bg-yellow-600';
+        return 'bg-red-600';
+    };
 
-  return (
-    <div className="relative flex flex-col items-center cursor-pointer" onClick={() => playerInfo.id && navigate('PlayerDetails', { playerId: playerInfo.id })}>
-      <div className="relative w-12 h-12">
-        <Avatar className="rounded-full w-12 h-12 object-cover border-2 border-white/50">
-          <AvatarImage src={playerImage} alt={playerInfo?.name || "Player"} />
-          <AvatarFallback>{playerInfo?.name?.charAt(0) || 'P'}</AvatarFallback>
-        </Avatar>
-        {playerNumber && (
-          <div className="absolute -top-1 -left-1 bg-gray-800 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background">
-            {playerNumber}
-          </div>
-        )}
-        {rating && (
-          <div className={cn(
-            `absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background`,
-            getRatingColor(rating)
-          )}>
-            {rating}
-          </div>
-        )}
-      </div>
-      <span className="mt-1 text-[11px] font-semibold text-center truncate w-16">{playerInfo?.name || "غير معروف"}</span>
-    </div>
-  );
+    return (
+        <div className="relative flex flex-col items-center cursor-pointer" onClick={() => player.id && navigate('PlayerDetails', { playerId: player.id })}>
+            <div className="relative w-12 h-12">
+                <Avatar className="rounded-full w-12 h-12 object-cover border-2 border-white/50">
+                    <AvatarImage src={playerImage} alt={player?.name || "Player"} />
+                    <AvatarFallback>{player?.name?.charAt(0) || 'P'}</AvatarFallback>
+                </Avatar>
+                {player.number && (
+                    <div className="absolute -top-1 -left-1 bg-gray-800 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background">
+                        {player.number}
+                    </div>
+                )}
+                {rating && (
+                    <div className={cn(
+                        `absolute -top-1 -right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background`,
+                        getRatingColor(rating)
+                    )}>
+                        {rating}
+                    </div>
+                )}
+            </div>
+            <span className="mt-1 text-[11px] font-semibold text-center truncate w-16">{player?.name || "غير معروف"}</span>
+        </div>
+    );
 };
 
 
@@ -303,12 +296,12 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2">
                 {sortedRows.map(row => (
                     <div key={row} className="flex justify-around items-center">
-                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p} navigate={navigate} />)}
+                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} />)}
                     </div>
                 ))}
                  {ungriddedPlayers.length > 0 && (
                     <div className="flex justify-around items-center">
-                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p} navigate={navigate}/>)}
+                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate}/>)}
                     </div>
                 )}
             </div>
@@ -350,7 +343,7 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-muted-foreground">{p.player.name}</span>
-                                        <PlayerCard player={p} navigate={navigate} />
+                                        <PlayerCard player={p.player} navigate={navigate} />
                                     </div>
                                 </div>
                             )
@@ -414,6 +407,40 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
     );
 };
 
+// --- Main Screen Component ---
+
+const mergePlayerData = (lineups: LineupData[], players: { player: PlayerType, statistics: any[] }[]): LineupData[] => {
+    if (!players || players.length === 0) return lineups;
+
+    const playersMap = new Map(players.map(p => [p.player.id, p]));
+
+    return lineups.map(team => ({
+        ...team,
+        startXI: team.startXI.map(p => {
+            const extraData = p.player.id ? playersMap.get(p.player.id) : null;
+            return {
+                ...p,
+                player: {
+                    ...p.player,
+                    photo: extraData?.player.photo || p.player.photo,
+                    rating: extraData?.statistics?.[0]?.games?.rating || p.player.rating || null,
+                }
+            };
+        }),
+        substitutes: team.substitutes.map(p => {
+            const extraData = p.player.id ? playersMap.get(p.player.id) : null;
+            return {
+                ...p,
+                player: {
+                    ...p.player,
+                    photo: extraData?.player.photo || p.player.photo,
+                    rating: extraData?.statistics?.[0]?.games?.rating || p.player.rating || null,
+                }
+            };
+        })
+    }));
+};
+
 export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixture: initialFixture }: ScreenProps & { fixtureId: number, fixture?: Fixture }) {
     const [fixture, setFixture] = useState<Fixture | null>(initialFixture || null);
     const [lineups, setLineups] = useState<LineupData[] | null>(null);
@@ -432,75 +459,40 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             const currentFixture = fixtureData.response?.[0];
     
             if (!currentFixture) throw new Error("Fixture not found");
-            
             setFixture(currentFixture);
     
             const currentLeagueId = currentFixture.league.id;
             const currentSeason = currentFixture.league.season || CURRENT_SEASON;
     
-            // Fetch non-lineup data first
-            const [eventsData, statisticsData, standingsData] = await Promise.all([
+            const [eventsData, statisticsData, standingsData, lineupsData] = await Promise.all([
                 fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).then(res => res.json()),
                 fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`).then(res => res.json()),
-                fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`).then(res => res.json())
+                fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`).then(res => res.json()),
+                fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`).then(res => res.json())
             ]);
     
             setEvents(eventsData.response || []);
             setStatistics(statisticsData.response || []);
             setStandings(standingsData?.response?.[0]?.league?.standings[0] || []);
-
-            // Now fetch lineups
-            const lineupsRes = await fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`);
-            const lineupsData = await lineupsRes.json();
+            
             const initialLineups = lineupsData.response || [];
-
             if (initialLineups.length > 0) {
-                 const allPlayerIds = initialLineups.flatMap((l: LineupData) => [...l.startXI, ...l.substitutes]).map((p: PlayerWithStats) => p.player.id).filter((id: number | null): id is number => id !== null);
-                
-                if (allPlayerIds.length > 0) {
-                    const uniquePlayerIds = [...new Set(allPlayerIds)];
-                    const playersDataMap = new Map<number, PlayerType>();
-                    const batches: number[][] = [];
+                const allPlayerIds = initialLineups.flatMap((l: LineupData) => 
+                    [...l.startXI, ...l.substitutes]
+                ).map((p: PlayerWithStats) => p.player.id).filter(Boolean);
 
-                    for (let i = 0; i < uniquePlayerIds.length; i += 20) {
-                        batches.push(uniquePlayerIds.slice(i, i + 20));
-                    }
-                    
-                    for (const batch of batches) {
-                        // Corrected API call with 'id' instead of 'player'
-                        const res = await fetch(`/api/football/players?id=${batch.join('-')}&season=${currentSeason}`);
-                        if (res.ok) {
-                            const data = await res.json();
-                            (data.response || []).forEach((item: { player: PlayerType, statistics: any[] }) => {
-                                if (item.player) {
-                                    const stats = item.statistics?.[0] || {};
-                                    playersDataMap.set(item.player.id, {
-                                        ...item.player,
-                                        rating: stats.games?.rating,
-                                    });
-                                }
-                            });
-                        }
-                    }
+                const uniquePlayerIds = [...new Set(allPlayerIds)];
 
-                    // Safely enrich lineup data
-                    const enrichedLineups = initialLineups.map((lineup: LineupData) => ({
-                        ...lineup,
-                        startXI: lineup.startXI.map(p => {
-                            const extraData = p.player.id ? playersDataMap.get(p.player.id) : null;
-                            return extraData ? { ...p, player: { ...p.player, ...extraData } } : p;
-                        }),
-                        substitutes: lineup.substitutes.map(p => {
-                            const extraData = p.player.id ? playersDataMap.get(p.player.id) : null;
-                            return extraData ? { ...p, player: { ...p.player, ...extraData } } : p;
-                        }),
-                    }));
-                    setLineups(enrichedLineups); // Set the enriched lineups
+                if (uniquePlayerIds.length > 0) {
+                    const playersRes = await fetch(`/api/football/players?id=${uniquePlayerIds.join('-')}&season=${currentSeason}`);
+                    const playersData = await playersRes.json();
+                    const enrichedLineups = mergePlayerData(initialLineups, playersData.response || []);
+                    setLineups(enrichedLineups);
                 } else {
-                   setLineups(initialLineups);
+                    setLineups(initialLineups);
                 }
             } else {
-                 setLineups([]);
+                setLineups([]);
             }
     
         } catch (error) {
@@ -511,18 +503,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     }, [fixtureId]);
 
     useEffect(() => {
-        fetchData(true); // Initial fetch
-        
-        const isLive = fixture?.fixture.status.short && ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(fixture.fixture.status.short);
-        let interval: NodeJS.Timeout | null = null;
-        if (isLive) {
-          interval = setInterval(() => fetchData(false), 60000); // Fetch every 60 seconds for live matches
-        }
-        
-        return () => {
-          if (interval) clearInterval(interval);
-        };
-    }, [fixtureId, fetchData]); // Removed 'fixture' from dependencies to prevent re-triggering interval
+        fetchData(true);
+    }, [fetchData]);
 
 
     if (loading && !fixture) {
@@ -566,7 +548,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
-    
 
     
