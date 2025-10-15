@@ -8,20 +8,56 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { collection, getDocs, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { useFirestore, useAdmin } from '@/firebase/provider';
-import type { Fixture, Standing, AdminFavorite, ManualTopScorer } from '@/lib/types';
+import type { Fixture, Standing, AdminFavorite, ManualTopScorer, PinnedMatch } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
-import { Users, Search } from 'lucide-react';
+import { Users, Search, Pin } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { FixtureItem } from '@/components/FixtureItem';
 import { CURRENT_SEASON } from '@/lib/constants';
+import { Card, CardContent } from '@/components/ui/card';
 
 const IRAQI_LEAGUE_ID = 542;
+
+function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onManage: () => void, isAdmin: boolean}) {
+    if (!match.isEnabled) return null;
+
+    return (
+        <Card className="mb-4 border-primary/50 border-2">
+            <CardContent className="p-3 relative">
+                <div className="flex items-center justify-center text-center mb-2">
+                     <Pin className="h-4 w-4 text-primary mr-2" />
+                    <p className="text-sm font-bold text-primary">مباراة مثبتة</p>
+                </div>
+                 <div className="flex-1 flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-2 flex-1 justify-end truncate">
+                        <span className="font-semibold text-sm truncate">{match.homeTeamName}</span>
+                        <Avatar className={'h-8 w-8'}><AvatarImage src={match.homeTeamLogo} alt={match.homeTeamName} /></Avatar>
+                    </div>
+                    <div className="flex flex-col items-center justify-center min-w-[90px] text-center">
+                        <div className="font-bold text-lg">{match.matchTime}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{match.matchDate}</div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-1 truncate">
+                        <Avatar className={'h-8 w-8'}><AvatarImage src={match.awayTeamLogo} alt={match.awayTeamName} /></Avatar>
+                        <span className="font-semibold text-sm truncate">{match.awayTeamName}</span>
+                    </div>
+                 </div>
+                 <p className="text-center text-xs text-muted-foreground mt-2">{match.competitionName}</p>
+                 {isAdmin && (
+                     <Button variant="ghost" size="sm" className="absolute top-1 left-1" onClick={onManage}>
+                         تعديل
+                     </Button>
+                 )}
+            </CardContent>
+        </Card>
+    );
+}
 
 function OurLeagueTab({ 
     navigate, 
@@ -215,6 +251,24 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [topScorers, setTopScorers] = useState<ManualTopScorer[]>([]);
   const { isAdmin } = useAdmin();
   const { db } = useFirestore();
+  const [pinnedMatch, setPinnedMatch] = useState<PinnedMatch | null>(null);
+
+  useEffect(() => {
+    if (!db) return;
+    const pinnedMatchRef = doc(db, 'pinnedIraqiMatch', 'special');
+    const unsub = onSnapshot(pinnedMatchRef, (doc) => {
+        if (doc.exists()) {
+            setPinnedMatch(doc.data() as PinnedMatch);
+        } else {
+            setPinnedMatch(null);
+        }
+    }, (error) => {
+        const permissionError = new FirestorePermissionError({ path: pinnedMatchRef.path, operation: 'get' });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+    return () => unsub();
+  }, [db]);
+
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -244,15 +298,13 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   useEffect(() => {
       if (db) {
           const scorersRef = collection(db, 'iraqiLeagueTopScorers');
-          // Query only by goals, then sort by name on the client
           const q = query(scorersRef, orderBy('goals', 'desc'));
           const unsubscribe = onSnapshot(q, (snapshot) => {
               const fetchedScorers = snapshot.docs.map((doc) => doc.data() as Omit<ManualTopScorer, 'rank'>);
 
-              // Client-side sort for name
               fetchedScorers.sort((a, b) => {
                   if (a.goals !== b.goals) {
-                      return 0; // Keep Firestore's goal sorting
+                      return 0;
                   }
                   return a.playerName.localeCompare(b.playerName);
               });
@@ -289,6 +341,14 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         }
       />
       <div className="flex-1 overflow-y-auto px-4">
+        {isAdmin && !pinnedMatch?.isEnabled && (
+            <Button className="w-full my-2" onClick={() => navigate('ManagePinnedMatch')}>
+                <Pin className="ml-2 h-4 w-4" />
+                إدارة المباراة المثبتة
+            </Button>
+        )}
+        {pinnedMatch && <PinnedMatchCard match={pinnedMatch} onManage={() => navigate('ManagePinnedMatch')} isAdmin={isAdmin} />}
+
         <Tabs defaultValue="our-league" className="w-full">
           <div className="sticky top-0 bg-background z-10">
             <TabsList className="grid w-full grid-cols-2 flex-row-reverse">
