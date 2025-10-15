@@ -23,7 +23,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { POPULAR_TEAMS, POPULAR_LEAGUES } from '@/lib/popular-data';
 
-type Item = { id: number; name: string; logo: string; };
+type Item = { id: number; name: string; logo: string; type?: 'Club' | 'National' };
 type ItemType = 'teams' | 'leagues';
 
 interface TeamResult { team: Item; }
@@ -153,13 +153,27 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
       delete (currentFavorites[type] as any)[item.id];
     } else {
       const idKey = type === 'teams' ? 'teamId' : 'leagueId';
-      (currentFavorites[type] as any)[item.id] = { [idKey]: item.id, name: item.name, logo: item.logo };
+      (currentFavorites[type] as any)[item.id] = { 
+          [idKey]: item.id, 
+          name: item.name, 
+          logo: item.logo,
+          type: item.type, // Store the type (Club/National)
+      };
     }
     setFavorites(currentFavorites);
 
+    const dataToSave: any = {
+      name: item.name,
+      logo: item.logo || '',
+      type: item.type || 'Club' // Default to Club if type is missing
+    };
+    if (type === 'teams') dataToSave.teamId = item.id;
+    else dataToSave.leagueId = item.id;
+
+
     const operation = isFavorited
       ? updateDoc(favRef, { [fieldPath]: deleteField() })
-      : setDoc(favRef, { [type]: { [item.id]: { [`${type.slice(0,-1)}Id`]: item.id, name: item.name, logo: item.logo } } }, { merge: true });
+      : setDoc(favRef, { [type]: { [item.id]: dataToSave } }, { merge: true });
 
     operation.catch(serverError => {
       setFavorites(favorites); // Revert on error
@@ -202,7 +216,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
           const isFavorited = !!favorites?.[itemType]?.[item.id];
           return <ItemRow key={item.id} item={item} itemType={itemType} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, itemType)} onResultClick={() => handleResultClick({[itemType.slice(0,-1)]: item, type: itemType} as any)} />;
         })}
-        {!showAllPopular && (
+        {!showAllPopular && popularItems.length > 6 && (
           <Button variant="ghost" className="w-full" onClick={() => setShowAllPopular(true)}>عرض الكل</Button>
         )}
       </div>
@@ -225,6 +239,12 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        {!debouncedSearchTerm && (
+             <div className="flex items-center justify-center pt-2">
+                <Button variant={itemType === 'teams' ? 'secondary' : 'ghost'} size="sm" onClick={() => setItemType('teams')}>الفرق</Button>
+                <Button variant={itemType === 'leagues' ? 'secondary' : 'ghost'} size="sm" onClick={() => setItemType('leagues')}>البطولات</Button>
+            </div>
+        )}
         <div className="mt-4 flex-1 overflow-y-auto space-y-1 pr-2">
           {renderContent()}
         </div>
@@ -232,3 +252,5 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
+
+    
