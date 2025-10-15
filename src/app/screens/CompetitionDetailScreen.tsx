@@ -12,7 +12,7 @@ import { Crown } from '@/components/icons/Crown';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { doc, setDoc, onSnapshot, updateDoc, deleteField, getDocs, collection, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, updateDoc, deleteField, getDocs, collection, deleteDoc, getDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
@@ -42,7 +42,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const { toast } = useToast();
 
   const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || '', leagues: {}, teams: {}, players: {} });
-  const [topItems, setTopItems] = useState<{ leagues: Set<number>, teams: Set<number> }>({ leagues: new Set(), teams: new Set() });
+  const [isTopCompetition, setIsTopCompetition] = useState(false);
+  const [topTeamIds, setTopTeamIds] = useState<Set<number>>(new Set());
 
   const [loading, setLoading] = useState(true);
   const [displayTitle, setDisplayTitle] = useState(initialTitle);
@@ -80,38 +81,39 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         
         setCustomNames({ teams: teamNames, players: playerNames });
     } catch (error) {
-        const permissionError = new FirestorePermissionError({
-          path: 'teamCustomizations or playerCustomizations',
-          operation: 'list',
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        // This might fail for regular users, which is okay. Admin features will be hidden.
+        console.warn("Could not fetch custom names, this is expected for non-admins:", error);
     }
   }, [db]);
   
   useEffect(() => {
-    if (!db) return;
+    if (!db || !leagueId) return;
+      const checkTopStatus = async () => {
+          const topLeagueDocRef = doc(db, "topCompetitions", String(leagueId));
+          try {
+            const docSnap = await getDoc(topLeagueDocRef);
+            setIsTopCompetition(docSnap.exists());
+          } catch(e) {
+            // This is expected to fail for non-admins if rules are strict
+            console.warn("Could not check top competition status, this is expected for non-admins");
+            setIsTopCompetition(false);
+          }
+      };
+      checkTopStatus();
 
-    const unsubTopLeagues = onSnapshot(collection(db, "topCompetitions"), (snapshot) => {
-      const leagueIds = new Set(snapshot.docs.map(doc => Number(doc.id)));
-      setTopItems(prev => ({...prev, leagues: leagueIds}));
-    }, (error) => {
-        const permissionError = new FirestorePermissionError({ path: 'topCompetitions', operation: 'list' });
-        errorEmitter.emit('permission-error', permissionError);
-    });
+      // For top teams, we can still listen as it's a broader list
+      const unsubTopTeams = onSnapshot(collection(db, "topTeams"), (snapshot) => {
+          const teamIds = new Set(snapshot.docs.map(doc => Number(doc.id)));
+          setTopTeamIds(teamIds);
+      }, (error) => {
+          console.warn("Could not listen to top teams, this is expected for non-admins:", error);
+      });
+      
+      return () => {
+        unsubTopTeams();
+      }
 
-    const unsubTopTeams = onSnapshot(collection(db, "topTeams"), (snapshot) => {
-        const teamIds = new Set(snapshot.docs.map(doc => Number(doc.id)));
-        setTopItems(prev => ({ ...prev, teams: teamIds }));
-    }, (error) => {
-        const permissionError = new FirestorePermissionError({ path: 'topTeams', operation: 'list' });
-        errorEmitter.emit('permission-error', permissionError);
-    });
-
-    return () => {
-      unsubTopLeagues();
-      unsubTopTeams();
-    };
-  }, [db]);
+  }, [db, leagueId]);
 
   const getDisplayName = useCallback((type: 'team' | 'player', id: number, defaultName: string) => {
     const key = `${type}s` as 'teams' | 'players';
@@ -120,7 +122,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   
   const isFavorited = leagueId && favorites?.leagues?.[leagueId];
-  const isTopCompetition = leagueId && topItems.leagues.has(leagueId);
 
   const handleCopy = (url: string | null) => {
     if (!url) return;
@@ -153,11 +154,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 setDisplayTitle(initialTitle);
             }
         }, (error) => {
-            const permissionError = new FirestorePermissionError({
-                path: leagueDocRef.path,
-                operation: 'get',
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            console.warn("Could not listen to league customizations, this is expected for non-admins:", error);
+            setDisplayTitle(initialTitle);
         });
         return () => unsub();
     }
@@ -251,13 +249,17 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       const docId = String(item.id);
       const docRef = doc(db, collectionName, docId);
 
-      const isCurrentlyTop = topItems[type === 'league' ? 'leagues' : 'teams'].has(item.id);
+      const isCurrentlyTop = type === 'league' ? isTopCompetition : topTeamIds.has(item.id);
 
       const operation = isCurrentlyTop
         ? deleteDoc(docRef)
         : setDoc(docRef, item);
       
-      operation.catch(serverError => {
+      operation
+      .then(() => {
+        if(type === 'league') setIsTopCompetition(!isCurrentlyTop);
+      })
+      .catch(serverError => {
         const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: isCurrentlyTop ? 'delete' : 'create',
@@ -459,7 +461,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     </TableHeader>
                     <TableBody>
                         {standings.map((s) => {
-                            const isTopTeam = topItems.teams.has(s.team.id);
+                            const isTopTeam = topTeamIds.has(s.team.id);
                             return (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
                                 <TableCell onClick={e => e.stopPropagation()}>
@@ -570,7 +572,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             ) : teams.length > 0 ? (
                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
                     {teams.map(({ team }) => {
-                        const isTopTeam = topItems.teams.has(team.id);
+                        const isTopTeam = topTeamIds.has(team.id);
                         return (
                         <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
                             <div className='relative'>
@@ -606,3 +608,5 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+
+    
