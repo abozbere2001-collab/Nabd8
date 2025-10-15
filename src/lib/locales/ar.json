@@ -1,0 +1,17 @@
+
+{
+    "general_settings": "الإعدادات العامة",
+    "appearance": "مظهر التطبيق",
+    "appearance_desc": "اختر المظهر المفضل لديك.",
+    "light": "فاتح",
+    "dark": "داكن",
+    "system": "النظام",
+    "app_language": "لغة التطبيق",
+    "app_language_desc": "اختر لغة الواجهة.",
+    "account_settings": "إعدادات الحساب",
+    "account_settings_desc": "قم بترقية حسابك أو تعديل صلاحياتك.",
+    "pro_version": "النسخة المدفوعة (Pro)",
+    "upgrade_to_admin": "ترقية إلى حساب مدير",
+    "upgrade_success_title": "تمت الترقية!",
+    "upgrade_success_desc": "لقد حصلت على صلاحيات المدير."
+}

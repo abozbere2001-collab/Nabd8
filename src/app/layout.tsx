@@ -4,6 +4,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from '@/components/theme-provider';
 import { Tajawal, Cairo } from 'next/font/google';
+import { LanguageProvider } from '@/components/LanguageProvider';
 
 const tajawal = Tajawal({
   subsets: ['arabic'],
@@ -29,12 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-        <meta name="theme-color" content="#2563eb" />
-        <link rel="manifest" href="/manifest.json" />
-      </head>
+    <LanguageProvider>
       <body className={`${tajawal.variable} ${cairo.variable} font-body antialiased`}>
         <ThemeProvider
             attribute="class"
@@ -46,7 +42,6 @@ export default function RootLayout({
             <Toaster />
         </ThemeProvider>
       </body>
-    </html>
+    </LanguageProvider>
   );
 }
-

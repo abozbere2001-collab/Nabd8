@@ -1,0 +1,17 @@
+
+{
+    "general_settings": "General Settings",
+    "appearance": "Appearance",
+    "appearance_desc": "Choose your preferred theme.",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "app_language": "App Language",
+    "app_language_desc": "Choose the interface language.",
+    "account_settings": "Account Settings",
+    "account_settings_desc": "Upgrade your account or modify your permissions.",
+    "pro_version": "Pro Version",
+    "upgrade_to_admin": "Upgrade to Admin Account",
+    "upgrade_success_title": "Upgraded!",
+    "upgrade_success_desc": "You have been granted admin privileges."
+}
