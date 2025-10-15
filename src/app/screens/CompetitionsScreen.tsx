@@ -7,7 +7,7 @@ import { Star, Plus, Search, Users, Trophy, User as PlayerIcon } from 'lucide-re
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import type { Favorites } from '@/lib/types';
@@ -66,6 +66,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 title="" 
                 onBack={goBack} 
                 canGoBack={canGoBack} 
+                actions={<ProfileButton />}
             />
             <Tabs defaultValue="my-choices" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 bg-transparent px-4">
@@ -109,8 +110,8 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                             
                             <TabsContent value="teams" className="mt-4">
                                 <div className="grid grid-cols-4 gap-4">
-                                    {favoriteTeams.map((team) => 
-                                        <div key={team.teamId} className="relative flex flex-col items-center gap-2 text-center p-2 rounded-2xl cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
+                                    {favoriteTeams.map((team, index) => 
+                                        <div key={`${team.teamId}-${index}`} className="relative flex flex-col items-center gap-2 text-center p-2 rounded-2xl cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
                                             <Avatar className="h-12 w-12 border-2 border-border">
                                                 <AvatarImage src={team.logo} />
                                                 <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
@@ -127,10 +128,10 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                             
                             <TabsContent value="competitions" className="mt-4">
                                 <div className="grid grid-cols-4 gap-4">
-                                    {favoriteLeagues.map((comp) => 
-                                        <div key={comp.leagueId} className="relative flex flex-col items-center gap-2 text-center p-2 rounded-2xl cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
-                                            <Avatar className="h-12 w-12 border-2 border-border">
-                                                <AvatarImage src={comp.logo} />
+                                    {favoriteLeagues.map((comp, index) => 
+                                        <div key={`${comp.leagueId}-${index}`} className="relative flex flex-col items-center gap-2 text-center p-2 rounded-2xl cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
+                                            <Avatar className="h-12 w-12 border-2 border-border p-1">
+                                                <AvatarImage src={comp.logo} className="object-contain" />
                                                 <AvatarFallback>{comp.name.charAt(0)}</AvatarFallback>
                                             </Avatar>
                                             <span className="text-[11px] font-medium truncate w-full">{comp.name}</span>
@@ -145,7 +146,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
 
                             <TabsContent value="players" className="mt-4">
                                 <div className="grid grid-cols-4 gap-4">
-                                    {/* Placeholder for players */}
                                      <div className="h-[76px] w-full col-span-4">
                                         <p className="text-muted-foreground text-center pt-4">قائمة اللاعبين المفضلين قيد التطوير.</p>
                                      </div>
@@ -164,3 +164,5 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
+
+    
