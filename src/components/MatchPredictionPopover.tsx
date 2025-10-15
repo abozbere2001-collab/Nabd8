@@ -53,7 +53,7 @@ export function MatchPredictionPopover({ fixtureId }: { fixtureId: number }) {
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-xs px-2">1x2</Button>
+                <Button variant="outline" size="sm" className="h-7 text-xs px-2" disabled>1x2</Button>
             </PopoverTrigger>
             <PopoverContent className="w-60 p-3" align="center" side="top">
                 {loading ? (

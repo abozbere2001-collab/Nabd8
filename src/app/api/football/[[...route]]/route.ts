@@ -21,10 +21,10 @@ export async function GET(
   }
 
   // Smart Caching Strategy:
-  // - Fixtures change often (live scores), so we revalidate frequently.
+  // - Fixtures and odds change often, so we revalidate frequently.
   // - Other data (teams, leagues, players) is more static, so we can cache it for longer.
-  const isFixturesRequest = routePath.includes('fixtures');
-  const revalidateSeconds = isFixturesRequest ? 60 : 3600; // 1 minute for fixtures, 1 hour for others
+  const isVolatileRequest = routePath.includes('fixtures') || routePath.includes('odds');
+  const revalidateSeconds = isVolatileRequest ? 60 : 3600; // 1 minute for volatile, 1 hour for others
 
   try {
     const apiResponse = await fetch(apiURL, {
@@ -34,6 +34,40 @@ export async function GET(
       },
       next: { revalidate: revalidateSeconds } 
     });
+
+    // Special handling for odds to include history
+    if (routePath.includes('odds') && apiResponse.ok) {
+        const oddsData = await apiResponse.json();
+        const fixtureId = searchParams.get('fixture');
+        if (fixtureId) {
+            const historyUrl = `https://${API_FOOTBALL_HOST}/odds/history?fixture=${fixtureId}&bookmaker=8&bet=1`;
+            const historyResponse = await fetch(historyUrl, {
+                 headers: {
+                    'x-rapidapi-host': API_FOOTBALL_HOST,
+                    'x-rapidapi-key': API_FOOTBALL_KEY,
+                 },
+                 next: { revalidate: revalidateSeconds }
+            });
+            if (historyResponse.ok) {
+                const historyData = await historyResponse.json();
+                oddsData.odds_history = historyData.response.reduce((acc: any, item: any) => {
+                    if (!acc[item.fixture.id]) {
+                        acc[item.fixture.id] = {};
+                    }
+                    if (!acc[item.fixture.id][item.bookmaker.id]) {
+                        acc[item.fixture.id][item.bookmaker.id] = {};
+                    }
+                     if (!acc[item.fixture.id][item.bookmaker.id][item.bet.id]) {
+                        acc[item.fixture.id][item.bookmaker.id][item.bet.id] = [];
+                    }
+                    acc[item.fixture.id][item.bookmaker.id][item.bet.id].push(item);
+                    return acc;
+                }, {});
+            }
+        }
+        return NextResponse.json(oddsData);
+    }
+
 
     const responseBodyText = await apiResponse.text();
 
@@ -50,7 +84,7 @@ export async function GET(
         { status: apiResponse.status }
       );
     }
-
+    
     const data = JSON.parse(responseBodyText);
     return NextResponse.json(data);
     

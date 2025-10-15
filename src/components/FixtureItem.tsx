@@ -9,7 +9,7 @@ import { CommentsButton } from '@/components/CommentsButton';
 import type { Fixture as FixtureType, MatchDetails } from '@/lib/types';
 import { useAdmin } from '@/firebase/provider';
 import { LiveMatchStatus } from './LiveMatchStatus';
-import { MatchPredictionPopover } from './MatchPredictionPopover';
+import { MatchOddsPopover } from './MatchOddsPopover';
 
 // Fixture Item Component
 export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
@@ -40,7 +40,7 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
          </div>
         </div>
          <div className="absolute bottom-1 left-1 flex items-center gap-1">
-            <MatchPredictionPopover fixtureId={fixture.fixture.id} />
+            <MatchOddsPopover fixtureId={fixture.fixture.id} />
             {hasCommentsFeature && (
                 <CommentsButton 
                   matchId={fixture.fixture.id} 
