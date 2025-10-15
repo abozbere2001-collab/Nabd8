@@ -379,10 +379,10 @@ const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lin
                              const subbedOutPlayer = subbedInEvent ? activeLineup.startXI.find(starter => starter.player.id === subbedInEvent.assist.id) : null;
 
                             return (
-                                <div key={p.player.id} className="flex items-center justify-between p-1.5 text-xs">
+                                <div key={p.player.id || p.player.name} className="flex items-center justify-between p-1.5 text-xs">
                                      <div className="flex-1 flex items-center gap-2">
                                         {subbedInEvent && subbedOutPlayer ? (
-                                            <div className="flex items-center gap-1 text-muted-foreground">
+                                            <div key={`${subbedInEvent.player.id}-${subbedOutPlayer.player.id}`} className="flex items-center gap-1 text-muted-foreground">
                                                  <ArrowUp className="h-3 w-3 text-green-500"/>
                                                   <span className="text-[10px]">({subbedInEvent.time.elapsed}')</span>
                                                  <ArrowDown className="h-3 w-3 text-red-500"/>
@@ -552,3 +552,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
