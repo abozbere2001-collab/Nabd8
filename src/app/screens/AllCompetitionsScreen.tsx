@@ -330,7 +330,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             <ScreenHeader 
                 title="كل البطولات" 
                 onBack={goBack} 
-                canGoBack={canGoBack} 
+                canGoBack={true} 
                 actions={
                   <div className="flex items-center gap-1">
                       <SearchSheet navigate={navigate}>

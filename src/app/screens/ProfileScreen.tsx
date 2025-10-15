@@ -80,7 +80,7 @@ export function ProfileScreen({ navigate, goBack, canGoBack, headerActions }: Sc
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="الملف الشخصي" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+      <ScreenHeader title="الملف الشخصي" onBack={goBack} canGoBack={true} actions={headerActions} />
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
           <Card>

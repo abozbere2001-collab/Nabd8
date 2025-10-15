@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { ScreenProps } from '@/app/page';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -106,6 +107,7 @@ export function AddEditNewsScreen({ goBack, canGoBack, article, isEditing }: Add
 
   return (
     <div className="flex h-full flex-col bg-background">
+      <ScreenHeader title={isEditing ? 'تعديل الخبر' : 'إضافة خبر جديد'} onBack={goBack} canGoBack={true} />
       <div className="flex-1 overflow-y-auto p-4">
         <Card>
           <CardContent className="space-y-6 pt-6">

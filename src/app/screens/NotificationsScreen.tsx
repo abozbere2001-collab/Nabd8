@@ -103,7 +103,7 @@ export function NotificationsScreen({ navigate, goBack, canGoBack, headerActions
   if (loading) {
     return (
       <div className="flex h-full flex-col bg-background">
-        <ScreenHeader title="الإشعارات" onBack={goBack} canGoBack={canGoBack} />
+        <ScreenHeader title="الإشعارات" onBack={goBack} canGoBack={true} />
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
@@ -113,7 +113,7 @@ export function NotificationsScreen({ navigate, goBack, canGoBack, headerActions
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="الإشعارات" onBack={goBack} canGoBack={canGoBack} actions={headerActions}/>
+      <ScreenHeader title="الإشعارات" onBack={goBack} canGoBack={true} actions={headerActions}/>
       <div className="flex-1 overflow-y-auto">
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">

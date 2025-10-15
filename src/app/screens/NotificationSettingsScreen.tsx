@@ -141,7 +141,7 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
   if (loading) {
     return (
       <div className="flex h-full flex-col bg-background">
-        <ScreenHeader title="إعدادات الإشعارات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+        <ScreenHeader title="إعدادات الإشعارات" onBack={goBack} canGoBack={true} actions={headerActions} />
          <div className="p-4 space-y-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="flex items-center gap-4 p-3">
@@ -157,7 +157,7 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="إعدادات الإشعارات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+      <ScreenHeader title="إعدادات الإشعارات" onBack={goBack} canGoBack={true} actions={headerActions} />
       
       <div className="flex-1 overflow-y-auto pt-4 space-y-6">
         <Card className="mx-4">

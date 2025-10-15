@@ -256,7 +256,7 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack, headerA
 
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title="اختيار مباريات التوقع" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+            <ScreenHeader title="اختيار مباريات التوقع" onBack={goBack} canGoBack={true} actions={headerActions} />
             <div className="border-b bg-card py-2">
                  <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
             </div>

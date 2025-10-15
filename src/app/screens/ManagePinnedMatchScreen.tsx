@@ -142,7 +142,7 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions, matc
     if (loading) {
         return (
              <div className="flex h-full flex-col bg-background">
-                <ScreenHeader title={isEditing ? "تعديل المباراة المثبتة" : "إضافة مباراة للتثبيت"} onBack={goBack} canGoBack={canGoBack} />
+                <ScreenHeader title={isEditing ? "تعديل المباراة المثبتة" : "إضافة مباراة للتثبيت"} onBack={goBack} canGoBack={true} />
                 <div className="flex-1 flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
@@ -152,7 +152,7 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions, matc
 
     return (
         <div className="flex h-full flex-col bg-background">
-        <ScreenHeader title={isEditing ? "تعديل المباراة المثبتة" : "إضافة مباراة للتثبيت"} onBack={goBack} canGoBack={canGoBack} actions={
+        <ScreenHeader title={isEditing ? "تعديل المباراة المثبتة" : "إضافة مباراة للتثبيت"} onBack={goBack} canGoBack={true} actions={
              isEditing && (
                 <AlertDialog open={isDeleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
                     <AlertDialogTrigger asChild>
