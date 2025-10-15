@@ -39,7 +39,9 @@ export function LoginScreen({ goBack }: ScreenProps) {
     setError(null);
     try {
       const user = await signInWithGoogle();
-      await handleNewUser(user, db);
+      if (user) {
+        await handleNewUser(user, db);
+      }
       // The onAuthStateChanged listener in the provider will handle app state change.
     } catch (e: any) {
       handleAuthError(e);
