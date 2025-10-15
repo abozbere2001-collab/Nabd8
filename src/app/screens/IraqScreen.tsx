@@ -14,7 +14,7 @@ import type { Fixture, Standing, AdminFavorite, ManualTopScorer, PinnedMatch } f
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
-import { Users, Search, Pin } from 'lucide-react';
+import { Users, Search, Pin, Edit } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { FixtureItem } from '@/components/FixtureItem';
@@ -50,6 +50,7 @@ function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onM
                  <p className="text-center text-xs text-muted-foreground mt-2">{match.competitionName}</p>
                  {isAdmin && (
                      <Button variant="ghost" size="sm" className="absolute top-1 left-1" onClick={onManage}>
+                         <Edit className="h-4 w-4 mr-1"/>
                          تعديل
                      </Button>
                  )}
@@ -250,35 +251,31 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [topScorers, setTopScorers] = useState<ManualTopScorer[]>([]);
   const { isAdmin } = useAdmin();
   const { db } = useFirestore();
-  const [pinnedMatch, setPinnedMatch] = useState<PinnedMatch | null>(null);
-  const [loadingPinnedMatch, setLoadingPinnedMatch] = useState(true);
+  const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
+  const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
 
 
   useEffect(() => {
     if (!db) {
-        setLoadingPinnedMatch(false);
+        setLoadingPinnedMatches(false);
         return;
     };
     
-    setLoadingPinnedMatch(true);
-    const pinnedMatchRef = doc(db, 'pinnedIraqiMatch', 'special');
-    const unsub = onSnapshot(pinnedMatchRef, (docSnap) => {
-        if (docSnap.exists()) {
-            setPinnedMatch(docSnap.data() as PinnedMatch);
-        } else {
-            setPinnedMatch(null);
-        }
-        setLoadingPinnedMatch(false);
+    setLoadingPinnedMatches(true);
+    const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
+    const q = query(pinnedMatchesRef);
+    const unsub = onSnapshot(q, (snapshot) => {
+        const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch));
+        setPinnedMatches(matches);
+        setLoadingPinnedMatches(false);
     }, (serverError) => {
-        // This is the crucial change. We now re-throw the actual server error
-        // as a FirestorePermissionError to get the full context in the dev overlay.
         const permissionError = new FirestorePermissionError({
-            path: pinnedMatchRef.path,
-            operation: 'get'
+            path: pinnedMatchesRef.path,
+            operation: 'list'
         });
         errorEmitter.emit('permission-error', permissionError);
-        setPinnedMatch(null);
-        setLoadingPinnedMatch(false);
+        setPinnedMatches([]);
+        setLoadingPinnedMatches(false);
     });
 
     return () => unsub();
@@ -356,18 +353,25 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         }
       />
       <div className="flex-1 overflow-y-auto px-4">
-        {loadingPinnedMatch ? (
+        {loadingPinnedMatches ? (
             <Skeleton className="h-28 w-full mb-4" />
         ) : (
-            <>
-              {isAdmin && (!pinnedMatch || !pinnedMatch.isEnabled) && (
-                  <Button className="w-full my-2" onClick={() => navigate('ManagePinnedMatch')}>
-                      <Pin className="ml-2 h-4 w-4" />
-                      إدارة المباراة المثبتة
-                  </Button>
-              )}
-              {pinnedMatch && <PinnedMatchCard match={pinnedMatch} onManage={() => navigate('ManagePinnedMatch')} isAdmin={isAdmin} />}
-            </>
+          <>
+            {pinnedMatches.map(match => (
+              <PinnedMatchCard 
+                key={match.id} 
+                match={match} 
+                onManage={() => navigate('ManagePinnedMatch', { matchId: match.id })} 
+                isAdmin={isAdmin} 
+              />
+            ))}
+            {isAdmin && (
+                <Button className="w-full my-2" onClick={() => navigate('ManagePinnedMatch', { matchId: null })}>
+                    <Pin className="ml-2 h-4 w-4" />
+                    إضافة مباراة للتثبيت
+                </Button>
+            )}
+          </>
         )}
 
         <Tabs defaultValue="our-league" className="w-full">
@@ -395,4 +399,3 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
- 

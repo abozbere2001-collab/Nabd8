@@ -9,9 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, Trash2, Power, PowerOff } from 'lucide-react';
+import { Loader2, Upload, Trash2 } from 'lucide-react';
 import type { PinnedMatch } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -29,7 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions }: ScreenProps) {
+export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions, matchId }: ScreenProps & { matchId?: string | null }) {
     const [match, setMatch] = useState<Partial<PinnedMatch>>({ isEnabled: true });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -39,28 +39,33 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions }: Sc
     const { toast } = useToast();
     const homeLogoInputRef = useRef<HTMLInputElement>(null);
     const awayLogoInputRef = useRef<HTMLInputElement>(null);
+
+    const isEditing = !!matchId;
     
     useEffect(() => {
         if (!db) {
-          // Keep loading if db is not available yet
           setLoading(true);
           return;
         }
-    
-        setLoading(true);
-        const docRef = doc(db, 'pinnedIraqiMatch', 'special');
-    
-        getDoc(docRef).then(docSnap => {
-            if (docSnap.exists()) {
-                setMatch(docSnap.data() as PinnedMatch);
-            }
-        }).catch(error => {
-            const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
-            errorEmitter.emit('permission-error', permissionError);
-        }).finally(() => {
+        if (isEditing) {
+            setLoading(true);
+            const docRef = doc(db, 'pinnedIraqiMatches', matchId);
+        
+            getDoc(docRef).then(docSnap => {
+                if (docSnap.exists()) {
+                    setMatch({ id: docSnap.id, ...docSnap.data() } as PinnedMatch);
+                }
+            }).catch(error => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
+                errorEmitter.emit('permission-error', permissionError);
+            }).finally(() => {
+                setLoading(false);
+            });
+        } else {
+            setMatch({ isEnabled: true });
             setLoading(false);
-        });
-    }, [db]);
+        }
+    }, [db, matchId, isEditing]);
 
 
     const handleInputChange = (field: keyof PinnedMatch, value: string | boolean) => {
@@ -82,9 +87,8 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions }: Sc
     const handleSave = async () => {
         if (!db) return;
         setSaving(true);
-        const docRef = doc(db, 'pinnedIraqiMatch', 'special');
         
-        const dataToSave: PinnedMatch = {
+        const dataToSave: Omit<PinnedMatch, 'id'> = {
             isEnabled: match.isEnabled ?? true,
             homeTeamName: match.homeTeamName || '',
             homeTeamLogo: match.homeTeamLogo || '',
@@ -95,22 +99,30 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions }: Sc
             matchTime: match.matchTime || '',
         };
 
-        setDoc(docRef, dataToSave)
+        const operation = isEditing 
+            ? setDoc(doc(db, 'pinnedIraqiMatches', matchId), dataToSave)
+            : addDoc(collection(db, 'pinnedIraqiMatches'), dataToSave);
+
+        operation
             .then(() => {
-                toast({ title: 'نجاح', description: 'تم حفظ بيانات المباراة المثبتة.' });
+                toast({ title: 'نجاح', description: isEditing ? 'تم تحديث المباراة المثبتة.' : 'تمت إضافة المباراة المثبتة.' });
                 goBack();
             })
             .catch(serverError => {
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: dataToSave });
+                const permissionError = new FirestorePermissionError({ 
+                    path: `pinnedIraqiMatches/${isEditing ? matchId : ''}`, 
+                    operation: isEditing ? 'update' : 'create', 
+                    requestResourceData: dataToSave 
+                });
                 errorEmitter.emit('permission-error', permissionError);
             })
             .finally(() => setSaving(false));
     };
 
     const handleDelete = async () => {
-        if (!db) return;
+        if (!db || !isEditing) return;
         setDeleting(true);
-        const docRef = doc(db, 'pinnedIraqiMatch', 'special');
+        const docRef = doc(db, 'pinnedIraqiMatches', matchId);
         deleteDoc(docRef)
          .then(() => {
                 toast({ title: 'نجاح', description: 'تم حذف المباراة المثبتة.' });
@@ -129,7 +141,7 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions }: Sc
     if (loading) {
         return (
              <div className="flex h-full flex-col bg-background">
-                <ScreenHeader title="إدارة المباراة المثبتة" onBack={goBack} canGoBack={canGoBack} />
+                <ScreenHeader title={isEditing ? "تعديل المباراة المثبتة" : "إضافة مباراة للتثبيت"} onBack={goBack} canGoBack={canGoBack} />
                 <div className="flex-1 flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
@@ -139,28 +151,30 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions }: Sc
 
     return (
         <div className="flex h-full flex-col bg-background">
-        <ScreenHeader title="إدارة المباراة المثبتة" onBack={goBack} canGoBack={canGoBack} actions={
-             <AlertDialog open={isDeleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
-                <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="icon">
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            سيؤدي هذا إلى حذف البطاقة بالكامل. يمكنك دائمًا إنشاء واحدة جديدة لاحقًا.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} disabled={deleting}>
-                            {deleting ? <Loader2 className="h-4 w-4 animate-spin"/> : 'حذف'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+        <ScreenHeader title={isEditing ? "تعديل المباراة المثبتة" : "إضافة مباراة للتثبيت"} onBack={goBack} canGoBack={canGoBack} actions={
+             isEditing && (
+                <AlertDialog open={isDeleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="icon">
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                سيؤدي هذا إلى حذف البطاقة بالكامل. لا يمكن التراجع عن هذا الإجراء.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+                                {deleting ? <Loader2 className="h-4 w-4 animate-spin"/> : 'حذف'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+             )
         } />
         <div className="flex-1 overflow-y-auto p-4">
             <Card>

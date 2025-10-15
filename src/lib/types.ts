@@ -281,6 +281,7 @@ export interface ManagedCompetition {
 }
 
 export interface PinnedMatch {
+    id?: string;
     isEnabled: boolean;
     homeTeamName: string;
     homeTeamLogo: string;
@@ -290,4 +291,3 @@ export interface PinnedMatch {
     matchDate: string;
     matchTime: string;
 }
-    

@@ -1,4 +1,5 @@
 
+
 {
   "entities": {
     "User": {
@@ -424,11 +425,11 @@
         }
       },
       {
-        "path": "/pinnedIraqiMatch/special",
+        "path": "/pinnedIraqiMatches/{matchId}",
         "definition": {
           "entityName": "PinnedMatch",
           "schema": { "type": "object", "properties": { "isEnabled": { "type": "boolean" }, "homeTeamName": { "type": "string" }, "homeTeamLogo": { "type": "string" }, "awayTeamName": { "type": "string" }, "awayTeamLogo": { "type": "string" }, "competitionName": { "type": "string" }, "matchDate": { "type": "string" }, "matchTime": { "type": "string" } } },
-          "description": "Stores the details of a single pinned Iraqi match, managed by an admin."
+          "description": "Stores the details of a pinned Iraqi match, managed by an admin."
         }
       }
     ],
