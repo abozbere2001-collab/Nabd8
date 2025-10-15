@@ -33,8 +33,41 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { CURRENT_SEASON } from '@/lib/constants';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 
 type RenameType = 'league' | 'team' | 'player';
+
+function SeasonSelector({ season, onSeasonChange, isAdmin }: { season: number, onSeasonChange: (newSeason: number) => void, isAdmin: boolean }) {
+    if (!isAdmin) {
+        return <p className="text-center text-xs text-muted-foreground pt-2 pb-1">جميع البيانات تخص موسم {season}</p>;
+    }
+
+    const seasons = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + 2 - i);
+
+    return (
+        <div className="flex items-center justify-center gap-2 px-4 pt-2 pb-1 text-xs text-muted-foreground">
+            <span>عرض بيانات موسم:</span>
+            <Select value={String(season)} onValueChange={(value) => onSeasonChange(Number(value))}>
+                <SelectTrigger className="w-[100px] h-7 text-xs">
+                    <SelectValue placeholder="اختر موسم" />
+                </SelectTrigger>
+                <SelectContent>
+                    {seasons.map(s => (
+                        <SelectItem key={s} value={String(s)}>{s}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+    );
+}
+
 
 export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo, headerActions }: ScreenProps & { title?: string, leagueId?: number, logo?: string, headerActions?: React.ReactNode }) {
   const { isAdmin } = useAdmin();
@@ -174,13 +207,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       setLoading(true);
       try {
         await fetchAllCustomNames();
-        setSeason(CURRENT_SEASON);
 
         const [fixturesRes, standingsRes, scorersRes, teamsRes] = await Promise.all([
-          fetch(`/api/football/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`),
-          fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
-          fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON}`),
-          fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`)
+          fetch(`/api/football/fixtures?league=${leagueId}&season=${season}`),
+          fetch(`/api/football/standings?league=${leagueId}&season=${season}`),
+          fetch(`/api/football/players/topscorers?league=${leagueId}&season=${season}`),
+          fetch(`/api/football/teams?league=${leagueId}&season=${season}`)
         ]);
 
         const fixturesData = await fixturesRes.json();
@@ -205,7 +237,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       }
     }
     fetchData();
-  }, [leagueId, initialTitle, fetchAllCustomNames]);
+  }, [leagueId, initialTitle, fetchAllCustomNames, season]);
 
   const handleFavorite = (type: 'league' | 'team' | 'player', item: any) => {
     if (!user || !db) return;
@@ -416,7 +448,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
        <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="matches" className="w-full">
            <div className="sticky top-0 bg-background z-10 border-b">
-             <p className="text-center text-xs text-muted-foreground pt-2 pb-2">جميع البيانات تخص موسم {season}</p>
+             <SeasonSelector season={season} onSeasonChange={setSeason} isAdmin={isAdmin} />
              <TabsList className="grid w-full grid-cols-4 rounded-none h-auto p-0 border-t">
               <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
               <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
