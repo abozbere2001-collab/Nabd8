@@ -23,7 +23,6 @@ import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: ScreenProps['navigate'] }) => {
   const fallbackImage = "https://media.api-sports.io/football/players/0.png";
   
-  // Updated logic: Check for photo/rating in the direct player object first, then fallback to nested structure.
   const playerInfo = player.player;
   const playerImage = playerInfo?.photo || fallbackImage;
   const playerNumber = playerInfo?.number ?? player?.statistics?.[0]?.games?.number;
@@ -301,7 +300,6 @@ const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lin
                     const updatePlayer = (p: PlayerWithStats): PlayerWithStats => {
                         const info = playerInfoMap.get(p.player.id);
                         if (info) {
-                            // Important: Merge new info with existing player object
                             return {
                                 ...p,
                                 player: {
@@ -409,14 +407,14 @@ const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lin
                             return (
                                 <div key={p.player.id || p.player.name} className="flex items-center justify-between p-1.5 text-xs">
                                      <div className="flex-1 flex items-center gap-2">
-                                        {subbedInEvent && subbedOutPlayer ? (
+                                        {subbedInEvent && subbedOutPlayer && (
                                             <div key={`${subbedInEvent.player.id}-${subbedOutPlayer.player.id}`} className="flex items-center gap-1 text-muted-foreground">
                                                  <ArrowUp className="h-3 w-3 text-green-500"/>
                                                   <span className="text-[10px]">({subbedInEvent.time.elapsed}')</span>
                                                  <ArrowDown className="h-3 w-3 text-red-500"/>
                                                  <span className="line-through">{subbedOutPlayer.player.name}</span>
                                             </div>
-                                        ) : null}
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-muted-foreground">{p.player.name}</span>
