@@ -14,7 +14,7 @@ import { useAdmin, useFirestore } from '@/firebase/provider';
 import { collection, onSnapshot, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import type { NewsArticle } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { ar, enUS } from 'date-fns/locale';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +31,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
+import { useTranslation } from '@/components/LanguageProvider';
 
 export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { isAdmin } = useAdmin();
@@ -39,6 +40,7 @@ export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { t, language } = useTranslation();
   
   useEffect(() => {
     if (!db) return;
@@ -66,7 +68,7 @@ export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const docRef = doc(db, 'news', articleId);
     deleteDoc(docRef)
         .then(() => {
-            toast({ title: "نجاح", description: "تم حذف الخبر بنجاح." });
+            toast({ title: t('delete_success_title'), description: t('delete_news_success_desc') });
         })
         .catch(serverError => {
             const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
@@ -79,7 +81,7 @@ export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader 
-        title="الأخبار" 
+        title={t('news')} 
         onBack={goBack} 
         canGoBack={canGoBack} 
         actions={
@@ -129,7 +131,7 @@ export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 </CardContent>
                 <CardFooter className="flex justify-between items-center">
                    <p className="text-xs text-muted-foreground">
-                    {article.timestamp ? formatDistanceToNow(article.timestamp.toDate(), { addSuffix: true, locale: ar }) : ''}
+                    {article.timestamp ? formatDistanceToNow(article.timestamp.toDate(), { addSuffix: true, locale: language === 'ar' ? ar : enUS }) : ''}
                   </p>
                   {isAdmin && (
                     <div className="flex gap-2">
@@ -141,14 +143,14 @@ export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                              <AlertDialogHeader>
-                               <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                               <AlertDialogTitle>{t('are_you_sure')}</AlertDialogTitle>
                                <AlertDialogDescription>
-                                 لا يمكن التراجع عن هذا الإجراء. سيتم حذف هذا الخبر بشكل نهائي.
+                                 {t('delete_news_confirm_desc')}
                                </AlertDialogDescription>
                              </AlertDialogHeader>
                              <AlertDialogFooter>
-                               <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                               <AlertDialogAction onClick={() => handleDelete(article.id!)}>حذف</AlertDialogAction>
+                               <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                               <AlertDialogAction onClick={() => handleDelete(article.id!)}>{t('delete')}</AlertDialogAction>
                              </AlertDialogFooter>
                           </AlertDialogContent>
                        </AlertDialog>
@@ -162,8 +164,8 @@ export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             ))
         ) : (
              <div className="text-center text-muted-foreground pt-10">
-                <p className="text-lg font-semibold">لا توجد أخبار حاليًا.</p>
-                {isAdmin && <p>انقر على زر الإضافة لبدء نشر الأخبار.</p>}
+                <p className="text-lg font-semibold">{t('no_news_yet_title')}</p>
+                {isAdmin && <p>{t('add_news_prompt')}</p>}
             </div>
         )}
       </div>

@@ -6,7 +6,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { ar, enUS } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { Loader2, Search, Star } from 'lucide-react';
@@ -23,6 +23,7 @@ import { GlobalPredictionsScreen } from './GlobalPredictionsScreen';
 import { FixtureItem } from '@/components/FixtureItem';
 import { isMatchLive } from '@/lib/matchStatus';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useTranslation } from '@/components/LanguageProvider';
 
 
 interface GroupedFixtures {
@@ -53,6 +54,7 @@ const FixturesList = ({
     commentedMatches: { [key: number]: MatchDetails },
     navigate: ScreenProps['navigate'],
 }) => {
+    const { t } = useTranslation();
     
     const { favoriteTeamMatches, otherFixtures } = useMemo(() => {
         if (activeTab !== 'my-results') {
@@ -99,8 +101,8 @@ const FixturesList = ({
     if (activeTab === 'my-results' && !hasAnyFavorites) {
         return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
-                <p className="font-bold text-lg">لم تقم بإضافة أي مفضلات</p>
-                <p className="text-sm">أضف فرقا أو بطولات لترى مبارياتها هنا.</p>
+                <p className="font-bold text-lg">{t('no_favorites_added_title')}</p>
+                <p className="text-sm">{t('no_favorites_added_desc')}</p>
             </div>
         );
     }
@@ -111,10 +113,10 @@ const FixturesList = ({
 
     if (noMatches) {
         const message = activeTab === 'live' 
-            ? "لا توجد مباريات مباشرة حاليًا." 
+            ? t('no_live_matches')
             : activeTab === 'my-results'
-            ? "لا توجد مباريات لمفضلاتك هذا اليوم"
-            : "لا توجد مباريات لهذا اليوم.";
+            ? t('no_favorite_matches_today')
+            : t('no_matches_today');
         return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
                 <p>{message}</p>
@@ -130,7 +132,7 @@ const FixturesList = ({
                  <div>
                     <div className="font-bold text-foreground py-2 px-3 rounded-md bg-card border flex items-center gap-2">
                         <Star className="h-5 w-5 text-yellow-400" />
-                        <span className="truncate">مباريات فرقك المفضلة</span>
+                        <span className="truncate">{t('your_favorite_teams_matches')}</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
                         {favoriteTeamMatches.map(f => (
@@ -178,14 +180,15 @@ const FixturesList = ({
 // Date Scroller
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
 
-const getDayLabel = (date: Date) => {
-    if (isToday(date)) return "اليوم";
-    if (isYesterday(date)) return "الأمس";
-    if (isTomorrow(date)) return "غداً";
-    return format(date, "EEE", { locale: ar });
+const getDayLabel = (date: Date, lang: string) => {
+    if (isToday(date)) return lang === 'ar' ? "اليوم" : "Today";
+    if (isYesterday(date)) return lang === 'ar' ? "الأمس" : "Yesterday";
+    if (isTomorrow(date)) return lang === 'ar' ? "غداً" : "Tomorrow";
+    return format(date, "EEE", { locale: lang === 'ar' ? ar : enUS });
 };
 
 const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: string, onDateSelect: (dateKey: string) => void}) => {
+    const { language } = useTranslation();
     const dates = useMemo(() => {
         const today = new Date();
         const days = [];
@@ -213,7 +216,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     }, [selectedDateKey]);
 
     return (
-        <div ref={scrollerRef} className="flex flex-row-reverse overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div ref={scrollerRef} className={cn("flex overflow-x-auto pb-1", language === 'ar' ? "flex-row-reverse" : "flex-row")} style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {dates.map(date => {
                 const dateKey = formatDateKey(date);
                 const isSelected = dateKey === selectedDateKey;
@@ -222,14 +225,15 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                         key={dateKey}
                         ref={isSelected ? selectedButtonRef : null}
                         className={cn(
-                            "relative flex flex-col items-center justify-center h-auto py-1 px-2 min-w-[40px] rounded-lg transition-colors ml-2",
+                            "relative flex flex-col items-center justify-center h-auto py-1 px-2 min-w-[40px] rounded-lg transition-colors",
+                            language === 'ar' ? 'ml-2' : 'mr-2',
                             "text-foreground/80 hover:text-primary",
                             isSelected && "text-primary"
                         )}
                         onClick={() => onDateSelect(dateKey)}
                         data-state={isSelected ? 'active' : 'inactive'}
                     >
-                        <span className="text-[10px] font-normal">{getDayLabel(date)}</span>
+                        <span className="text-[10px] font-normal">{getDayLabel(date, language)}</span>
                         <span className="font-semibold text-sm">{format(date, 'd')}</span>
                         <span className={cn(
                             "absolute bottom-0 h-0.5 w-3 rounded-full bg-primary transition-transform scale-x-0",
@@ -252,6 +256,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
   const [activeTab, setActiveTab] = useState<TabName>('my-results');
+  const { t } = useTranslation();
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
   
@@ -446,9 +451,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col min-h-0">
             <div className="flex flex-col border-b bg-card">
                  <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
-                     <TabsTrigger value="predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
-                     <TabsTrigger value="live" className='text-xs sm:text-sm'>مباشر</TabsTrigger>
-                     <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
+                     <TabsTrigger value="predictions" className='text-xs sm:text-sm'>{t('predictions')}</TabsTrigger>
+                     <TabsTrigger value="live" className='text-xs sm:text-sm'>{t('live')}</TabsTrigger>
+                     <TabsTrigger value="my-results" className='text-xs sm:text-sm'>{t('my_results')}</TabsTrigger>
                  </TabsList>
                  {activeTab === 'my-results' && (
                      <div className="py-2 px-2">
@@ -457,7 +462,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                  )}
                   {activeTab === 'live' && (
                     <div className="h-[53px] flex items-center justify-center">
-                        <p className="text-sm text-muted-foreground">يتم التحديث كل دقيقة</p>
+                        <p className="text-sm text-muted-foreground">{t('live_update_notice')}</p>
                     </div>
                  )}
             </div>

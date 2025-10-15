@@ -6,14 +6,8 @@ import type { ScreenKey } from '@/app/page';
 import { FootballIcon } from './icons/FootballIcon';
 import React, { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useTranslation } from './LanguageProvider';
 
-const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
-  { key: 'Matches', label: 'المباريات', icon: Shield },
-  { key: 'Competitions', label: 'اختياراتي', icon: Star },
-  { key: 'Iraq', label: 'العراق', icon: FootballIcon },
-  { key: 'News', label: 'أخبار', icon: Newspaper },
-  { key: 'Settings', label: 'المزيد', icon: MoreHorizontal },
-];
 
 const IRAQ_TOUR_KEY = 'goalstack_iraq_tour_seen';
 
@@ -24,6 +18,15 @@ interface BottomNavProps {
 
 export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
   const [showTour, setShowTour] = useState(false);
+  const { t } = useTranslation();
+
+  const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
+    { key: 'Matches', label: t('matches'), icon: Shield },
+    { key: 'Competitions', label: t('my_choices'), icon: Star },
+    { key: 'Iraq', label: t('iraq'), icon: FootballIcon },
+    { key: 'News', label: t('news'), icon: Newspaper },
+    { key: 'Settings', label: t('more'), icon: MoreHorizontal },
+  ];
 
   useEffect(() => {
     // This effect runs only on the client
@@ -82,7 +85,7 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
                   {NavButton}
                 </PopoverTrigger>
                 <PopoverContent side="top" align="center" className="w-auto p-2">
-                  <p className="text-sm font-semibold">كل ما يخص الكرة العراقية تجده هنا</p>
+                  <p className="text-sm font-semibold">{t('iraq_tour_tooltip')}</p>
                 </PopoverContent>
               </Popover>
             );

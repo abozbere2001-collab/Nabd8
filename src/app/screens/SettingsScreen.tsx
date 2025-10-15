@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -23,36 +24,37 @@ import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { useAuth, useAdmin } from '@/firebase/provider';
 import { Separator } from '@/components/ui/separator';
-
-const mainSettingsItems = [
-    { label: 'الملف الشخصي', icon: User, action: (navigate: ScreenProps['navigate']) => navigate('Profile') },
-    { label: 'كل البطولات', icon: Trophy, action: (navigate: ScreenProps['navigate']) => navigate('AllCompetitions') },
-    { label: 'إعدادات الإشعارات', icon: Bell, action: (navigate: ScreenProps['navigate']) => navigate('NotificationSettings')},
-    { label: 'الإعدادات العامة', icon: SettingsIcon, action: (navigate: ScreenProps['navigate']) => navigate('GeneralSettings')},
-];
-
-const legalSettingsItems = [
-    { label: 'سياسة الخصوصية', icon: FileBadge, action: (navigate: ScreenProps['navigate']) => navigate('PrivacyPolicy') },
-    { label: 'شروط الخدمة', icon: FileText, action: (navigate: ScreenProps['navigate']) => navigate('TermsOfService') },
-];
-
+import { useTranslation } from '@/components/LanguageProvider';
 
 export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   
+  const mainSettingsItems = [
+      { label: t('profile'), icon: User, action: (navigate: ScreenProps['navigate']) => navigate('Profile') },
+      { label: t('all_competitions'), icon: Trophy, action: (navigate: ScreenProps['navigate']) => navigate('AllCompetitions') },
+      { label: t('notification_settings'), icon: Bell, action: (navigate: ScreenProps['navigate']) => navigate('NotificationSettings')},
+      { label: t('general_settings'), icon: SettingsIcon, action: (navigate: ScreenProps['navigate']) => navigate('GeneralSettings')},
+  ];
+
+  const legalSettingsItems = [
+      { label: t('privacy_policy'), icon: FileBadge, action: (navigate: ScreenProps['navigate']) => navigate('PrivacyPolicy') },
+      { label: t('terms_of_service'), icon: FileText, action: (navigate: ScreenProps['navigate']) => navigate('TermsOfService') },
+  ];
+
   const handleSignOut = async () => {
     try {
       await firebaseSignOut();
       toast({
-        title: "تم تسجيل الخروج",
-        description: "نأمل رؤيتك مرة أخرى قريبا.",
+        title: t('signed_out_title'),
+        description: t('signed_out_desc'),
       });
       // The onAuthStateChanged listener in Home will handle navigation
     } catch (error) {
        toast({
         variant: 'destructive',
-        title: "فشل تسجيل الخروج",
-        description: "حدث خطأ أثناء تسجيل الخروج. يرجى المحاولة مرة أخرى.",
+        title: t('sign_out_failed_title'),
+        description: t('sign_out_failed_desc'),
       });
     }
   };
@@ -60,7 +62,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader 
-        title="المزيد" 
+        title={t('more')} 
         onBack={goBack} 
         canGoBack={canGoBack} 
         actions={
@@ -91,7 +93,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
 
         <div className="pt-4">
-            <p className="px-4 pb-2 text-sm font-semibold text-muted-foreground">قانوني</p>
+            <p className="px-4 pb-2 text-sm font-semibold text-muted-foreground">{t('legal')}</p>
             <div className="space-y-2">
                 {legalSettingsItems.map(item => (
                     <button key={item.label} onClick={() => item.action(navigate)} className="flex w-full items-center justify-between rounded-lg bg-card p-4 text-right transition-colors hover:bg-accent/50">
@@ -113,19 +115,19 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="w-full gap-2">
                   <LogOut className="h-5 w-5" />
-                  تسجيل الخروج
+                  {t('log_out')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                  <AlertDialogTitle>{t('are_you_sure')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    سيؤدي هذا الإجراء إلى تسجيل خروجك من حسابك.
+                    {t('log_out_confirm_desc')}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleSignOut}>متابعة</AlertDialogAction>
+                  <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleSignOut}>{t('continue')}</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
