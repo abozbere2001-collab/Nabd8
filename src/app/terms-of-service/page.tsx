@@ -9,7 +9,7 @@ export default function TermsOfServiceScreen({ navigate, goBack, canGoBack }: Sc
     const currentYear = new Date().getFullYear();
   return (
     <div className="flex flex-col h-full bg-background">
-      <ScreenHeader title="شروط الخدمة" onBack={goBack} canGoBack={canGoBack} />
+      <ScreenHeader title="شروط الخدمة" onBack={goBack} canGoBack={true} />
       <div className="flex-1 overflow-y-auto p-4">
         <Card>
           <CardHeader>

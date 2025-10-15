@@ -9,7 +9,7 @@ export default function PrivacyPolicyScreen({ navigate, goBack, canGoBack }: Scr
   const currentYear = new Date().getFullYear();
   return (
     <div className="flex flex-col h-full bg-background">
-      <ScreenHeader title="سياسة الخصوصية" onBack={goBack} canGoBack={canGoBack} />
+      <ScreenHeader title="سياسة الخصوصية" onBack={goBack} canGoBack={true} />
       <div className="flex-1 overflow-y-auto p-4">
         <Card>
           <CardHeader>
