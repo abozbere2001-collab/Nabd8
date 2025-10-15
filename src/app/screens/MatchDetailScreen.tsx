@@ -102,6 +102,11 @@ const ShotMap = ({ homeStats, awayStats }: { homeStats: any[], awayStats: any[] 
     const homeShotsOutside = findStat(homeStats, "Shots outsidebox");
     const awayShotsInside = findStat(awayStats, "Shots insidebox");
     const awayShotsOutside = findStat(awayStats, "Shots outsidebox");
+    
+    if ((homeShotsInside + homeShotsOutside + awayShotsInside + awayShotsOutside) === 0) {
+        return null; // Don't render if there are no shot stats
+    }
+
 
     return (
         <Card>
@@ -109,7 +114,7 @@ const ShotMap = ({ homeStats, awayStats }: { homeStats: any[], awayStats: any[] 
                 <CardTitle className="text-lg text-center">خريطة التسديدات</CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="relative w-full max-w-sm mx-auto aspect-[3/2] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50">
+                <div className="relative w-full max-w-sm mx-auto aspect-[3/2] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50" style={{backgroundImage: "url('/pitch-horizontal.svg')"}}>
                     {/* Home Team (Right side) */}
                     <div className="absolute right-[18%] top-1/2 -translate-y-1/2 text-center text-white">
                         <p className="font-bold text-2xl drop-shadow-lg">{homeShotsInside}</p>
@@ -342,7 +347,7 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
         const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
 
         return (
-             <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2">
+             <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
                 {sortedRows.map(row => (
                     <div key={row} className="flex justify-around items-center">
                         {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} />)}
@@ -603,4 +608,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
