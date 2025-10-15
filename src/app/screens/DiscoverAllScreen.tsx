@@ -137,3 +137,5 @@ export function DiscoverAllScreen({ navigate, goBack, canGoBack, itemType }: Dis
     </div>
   );
 }
+
+    

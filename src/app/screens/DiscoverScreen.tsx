@@ -1,14 +1,13 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search, Star } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
+import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, setDoc, deleteField, updateDoc, getDoc } from 'firebase/firestore';
 import type { Favorites } from '@/lib/types';
 import { POPULAR_TEAMS, POPULAR_LEAGUES } from '@/lib/popular-data';
@@ -22,7 +21,7 @@ type Item = { id: number; name: string; logo: string; };
 type ItemType = 'teams' | 'leagues';
 
 interface DiscoverScreenProps extends ScreenProps {
-    initialTab?: ItemType;
+    itemType: ItemType;
 }
 
 const PopularList = ({ items, itemType, favorites, onFavoriteToggle, onShowAll }: { items: Item[], itemType: ItemType, favorites: Favorites, onFavoriteToggle: (item: Item) => void, onShowAll: () => void }) => {
@@ -52,7 +51,7 @@ const PopularList = ({ items, itemType, favorites, onFavoriteToggle, onShowAll }
   );
 };
 
-export function DiscoverScreen({ navigate, goBack, canGoBack, initialTab = 'teams' }: DiscoverScreenProps) {
+export function DiscoverScreen({ navigate, goBack, canGoBack, itemType = 'teams' }: DiscoverScreenProps) {
   const { user } = useAuth();
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({ userId: '' });
@@ -75,7 +74,7 @@ export function DiscoverScreen({ navigate, goBack, canGoBack, initialTab = 'team
     fetchFavorites();
   }, [fetchFavorites]);
 
-  const handleFavorite = (item: Item, itemType: ItemType) => {
+  const handleFavorite = (item: Item) => {
     if (!user || !db) return;
     const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const fieldPath = `${itemType}.${item.id}`;
@@ -104,6 +103,8 @@ export function DiscoverScreen({ navigate, goBack, canGoBack, initialTab = 'team
     });
   };
 
+  const items = itemType === 'teams' ? POPULAR_TEAMS : POPULAR_LEAGUES;
+
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader
@@ -116,22 +117,17 @@ export function DiscoverScreen({ navigate, goBack, canGoBack, initialTab = 'team
           </SearchSheet>
         }
       />
-      <div className="flex-1 overflow-y-auto">
-        <Tabs defaultValue={initialTab} className="w-full">
-          <div className="sticky top-0 bg-background z-10 border-b">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="leagues">بطولات</TabsTrigger>
-              <TabsTrigger value="teams">فرق</TabsTrigger>
-            </TabsList>
-          </div>
-          <TabsContent value="teams" className="p-4 m-0">
-            <PopularList items={POPULAR_TEAMS} itemType="teams" favorites={favorites} onFavoriteToggle={(item) => handleFavorite(item, 'teams')} onShowAll={() => navigate('DiscoverAll', { itemType: 'teams'})} />
-          </TabsContent>
-          <TabsContent value="leagues" className="p-4 m-0">
-            <PopularList items={POPULAR_LEAGUES} itemType="leagues" favorites={favorites} onFavoriteToggle={(item) => handleFavorite(item, 'leagues')} onShowAll={() => navigate('DiscoverAll', { itemType: 'leagues'})} />
-          </TabsContent>
-        </Tabs>
+      <div className="flex-1 overflow-y-auto p-4">
+        <PopularList 
+            items={items} 
+            itemType={itemType} 
+            favorites={favorites} 
+            onFavoriteToggle={handleFavorite} 
+            onShowAll={() => navigate('DiscoverAll', { itemType })} 
+        />
       </div>
     </div>
   );
 }
+
+    
