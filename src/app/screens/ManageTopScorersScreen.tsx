@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -8,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, query, orderBy, onSnapshot, writeBatch, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, query, orderBy, onSnapshot, writeBatch, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Upload } from 'lucide-react';
 import type { ManualTopScorer } from '@/lib/types';
@@ -19,7 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 const NUM_SCORERS = 20;
 
 export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
-  const [scorers, setScorers] = useState<Omit<ManualTopScorer, 'rank'>[]>([]);
+  const [scorers, setScorers] = useState<Partial<Omit<ManualTopScorer, 'rank'>>[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { db } = useFirestore();
@@ -33,26 +32,26 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
     const q = query(scorersRef, orderBy('rank', 'asc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedScorers = new Map<number, Omit<ManualTopScorer, 'rank'>>();
-      snapshot.docs.forEach(doc => {
-        const data = doc.data() as ManualTopScorer;
-        if (data.rank && data.rank > 0 && data.rank <= NUM_SCORERS) {
-          const { rank, ...rest } = data;
-          fetchedScorers.set(rank, rest);
-        }
-      });
-      
-      const newScorersList = Array.from({ length: NUM_SCORERS }, (_, i) => {
-        const rank = i + 1;
-        return fetchedScorers.get(rank) || { playerName: '', teamName: '', goals: 0, playerPhoto: '' };
-      });
+        const fetchedScorers = new Map<number, Omit<ManualTopScorer, 'rank'>>();
+        snapshot.docs.forEach(doc => {
+            const data = doc.data() as ManualTopScorer;
+            if (data.rank && data.rank > 0 && data.rank <= NUM_SCORERS) {
+                const { rank, ...rest } = data;
+                fetchedScorers.set(rank, rest);
+            }
+        });
 
-      setScorers(newScorersList);
-      setLoading(false);
+        const newScorersList = Array.from({ length: NUM_SCORERS }, (_, i) => {
+            const rank = i + 1;
+            return fetchedScorers.get(rank) || { playerName: '', teamName: '', goals: 0, playerPhoto: '' };
+        });
+
+        setScorers(newScorersList);
+        setLoading(false);
     }, (error) => {
-      const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
-      errorEmitter.emit('permission-error', permissionError);
-      setLoading(false);
+        const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
+        errorEmitter.emit('permission-error', permissionError);
+        setLoading(false);
     });
 
     return () => unsubscribe();
@@ -92,13 +91,12 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
           const dataToSave: ManualTopScorer = {
             rank: rank,
             playerName: scorer.playerName.trim(),
-            teamName: scorer.teamName.trim(),
+            teamName: scorer.teamName?.trim() ?? '',
             goals: Number(scorer.goals) || 0,
             playerPhoto: scorer.playerPhoto || undefined
           };
           batch.set(docRef, dataToSave);
         } else {
-          // If the player name is empty, delete the document for that rank
           batch.delete(docRef);
         }
       });
@@ -107,7 +105,6 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
       toast({ title: 'نجاح', description: 'تم حفظ قائمة الهدافين.' });
       goBack();
     } catch (error) {
-       // This will now correctly report an error on a specific document if one occurs
        const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'write' });
        errorEmitter.emit('permission-error', permissionError);
        toast({
@@ -155,12 +152,12 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
               <div className="flex-1 space-y-2">
                 <Input
                   placeholder="اسم اللاعب"
-                  value={scorer.playerName}
+                  value={scorer.playerName || ''}
                   onChange={(e) => handleInputChange(index, 'playerName', e.target.value)}
                 />
                  <Input
                   placeholder="اسم الفريق"
-                  value={scorer.teamName}
+                  value={scorer.teamName || ''}
                   onChange={(e) => handleInputChange(index, 'teamName', e.target.value)}
                 />
               </div>
