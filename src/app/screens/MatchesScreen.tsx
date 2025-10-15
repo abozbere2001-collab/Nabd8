@@ -32,8 +32,6 @@ interface GroupedFixtures {
     }
 }
 
-const TOUR_STORAGE_KEY = 'goalstack_has_seen_tour';
-
 
 // Fixtures List Component
 const FixturesList = ({ 
@@ -266,35 +264,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [loadingLive, setLoadingLive] = useState(false);
   
   const [commentedMatches, setCommentedMatches] = useState<{ [key: number]: MatchDetails }>({});
-  
-  const [tourStep, setTourStep] = useState(0);
-  const [showTour, setShowTour] = useState(false);
-
-
-  useEffect(() => {
-    // Only show tour on this screen if it's visible and for a new user
-    if (isVisible) {
-      const hasSeenTour = localStorage.getItem(TOUR_STORAGE_KEY);
-      if (hasSeenTour !== 'true') {
-        // Start the tour after a short delay
-        const timer = setTimeout(() => {
-            setShowTour(true);
-            setTourStep(1);
-        }, 1500);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [isVisible]);
-
-  const handleNextTourStep = () => {
-    setTourStep(prev => prev + 1);
-  };
-
-  const handleFinishTour = () => {
-    setTourStep(0);
-    setShowTour(false);
-    localStorage.setItem(TOUR_STORAGE_KEY, 'true');
-  };
 
 
   useEffect(() => {
@@ -464,39 +433,21 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             canGoBack={false}
             onBack={() => {}} 
             actions={
-              <Popover open={showTour && tourStep === 2} onOpenChange={(open) => !open && handleFinishTour()}>
-                <PopoverTrigger asChild>
-                   <div className="flex items-center gap-2">
-                      <SearchSheet navigate={navigate}>
-                          <Button variant="ghost" size="icon">
-                              <Search className="h-5 w-5" />
-                          </Button>
-                      </SearchSheet>
-                      <ProfileButton />
-                  </div>
-                </PopoverTrigger>
-                 <PopoverContent align="end" className="w-64">
-                    <h3 className="font-bold mb-2">البحث والاكتشاف</h3>
-                    <p className="text-sm text-muted-foreground">اضغط هنا للبحث عن أي فريق أو بطولة، أو لاكتشاف الخيارات الأكثر شعبية.</p>
-                    <Button size="sm" className="w-full mt-4" onClick={handleFinishTour}>فهمت</Button>
-                </PopoverContent>
-              </Popover>
+               <div className="flex items-center gap-2">
+                  <SearchSheet navigate={navigate}>
+                      <Button variant="ghost" size="icon">
+                          <Search className="h-5 w-5" />
+                      </Button>
+                  </SearchSheet>
+                  <ProfileButton />
+              </div>
             }
         />
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col min-h-0">
             <div className="flex flex-col border-b bg-card">
                  <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
                      <TabsTrigger value="predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
-                      <Popover open={showTour && tourStep === 1} onOpenChange={(open) => !open && handleNextTourStep()}>
-                        <PopoverTrigger asChild>
-                            <TabsTrigger value="live" className='text-xs sm:text-sm'>مباشر</TabsTrigger>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-64">
-                            <h3 className="font-bold mb-2">المباريات المباشرة</h3>
-                            <p className="text-sm text-muted-foreground">من هنا يمكنك متابعة جميع المباريات التي تُلعب الآن لحظة بلحظة.</p>
-                            <Button size="sm" className="w-full mt-4" onClick={handleNextTourStep}>التالي</Button>
-                        </PopoverContent>
-                      </Popover>
+                     <TabsTrigger value="live" className='text-xs sm:text-sm'>مباشر</TabsTrigger>
                      <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
                  </TabsList>
                  {activeTab === 'my-results' && (

@@ -4,6 +4,8 @@ import { Star, Newspaper, MoreHorizontal, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ScreenKey } from '@/app/page';
 import { FootballIcon } from './icons/FootballIcon';
+import React, { useState, useEffect } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
   { key: 'Matches', label: 'المباريات', icon: Shield },
@@ -13,6 +15,7 @@ const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
   { key: 'Settings', label: 'المزيد', icon: MoreHorizontal },
 ];
 
+const IRAQ_TOUR_KEY = 'goalstack_iraq_tour_seen';
 
 interface BottomNavProps {
   activeScreen: ScreenKey;
@@ -20,7 +23,29 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
+  const [showTour, setShowTour] = useState(false);
+
+  useEffect(() => {
+    const hasSeenTour = localStorage.getItem(IRAQ_TOUR_KEY);
+    if (hasSeenTour !== 'true') {
+      const timer = setTimeout(() => {
+        setShowTour(true);
+      }, 1500); // Delay before showing the tour
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const handleTourOpenChange = (open: boolean) => {
+    if (!open) {
+      setShowTour(false);
+      localStorage.setItem(IRAQ_TOUR_KEY, 'true');
+    }
+  };
+  
   const handleNavigation = (key: ScreenKey) => {
+    if (showTour) {
+        handleTourOpenChange(false);
+    }
     if (navItems.some(item => item.key === key)) {
       onNavigate(key);
     }
@@ -31,8 +56,10 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
       <nav className="flex h-full items-center justify-around px-2 max-w-md mx-auto">
         {navItems.map(({ key, label, icon: Icon }) => {
           const isActive = activeScreen === key;
-          return (
-            <button
+          const isIraqTab = key === 'Iraq';
+
+          const NavButton = (
+             <button
               key={key}
               onClick={() => handleNavigation(key as ScreenKey)}
               className={cn(
@@ -44,6 +71,21 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
               <span>{label}</span>
             </button>
           );
+
+          if (isIraqTab) {
+            return (
+              <Popover key={key} open={showTour} onOpenChange={handleTourOpenChange}>
+                <PopoverTrigger asChild>
+                  {NavButton}
+                </PopoverTrigger>
+                <PopoverContent side="top" align="center" className="w-auto p-2">
+                  <p className="text-sm font-semibold">كل ما يخص الكرة العراقية تجده هنا</p>
+                </PopoverContent>
+              </Popover>
+            );
+          }
+
+          return NavButton;
         })}
       </nav>
     </div>
