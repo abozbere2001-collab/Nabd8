@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Star, Plus, Search, Loader2 } from 'lucide-react';
+import { Star, Plus, Search, Loader2, Users, Trophy, User } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +17,8 @@ import { ProfileButton } from '../AppContentWrapper';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 // --- MAIN SCREEN COMPONENT ---
 export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
@@ -58,11 +60,11 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                  errorEmitter.emit('permission-error', permissionError);
             });
         }
-        // Adding is handled via search, this component only shows/removes favorites
     }, [user, db, favorites]);
 
     const favoriteTeams = useMemo(() => favorites?.teams ? Object.values(favorites.teams) : [], [favorites]);
     const favoriteLeagues = useMemo(() => favorites?.leagues ? Object.values(favorites.leagues) : [], [favorites]);
+    const favoritePlayers = useMemo(() => favorites?.players ? Object.values(favorites.players) : [], [favorites]);
 
     if (loading) {
         return (
@@ -70,9 +72,8 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 <ScreenHeader title="اختياراتي" canGoBack={false} onBack={() => {}} />
                 <div className="p-4 space-y-4">
                     <Skeleton className="h-24 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-40 w-full" />
                 </div>
             </div>
         )
@@ -101,7 +102,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 {/* Favorite Teams Horizontal List */}
                 {favoriteTeams.length > 0 && (
                     <div>
-                        <h3 className="font-bold text-lg mb-2">الفرق المفضلة</h3>
                         <ScrollArea className="w-full whitespace-nowrap rounded-md">
                             <div className="flex w-max space-x-4 p-2">
                                 {favoriteTeams.map((team, index) => (
@@ -119,41 +119,83 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                     </div>
                 )}
                 
-                {/* Favorite Leagues List */}
-                <div>
-                     <h3 className="font-bold text-lg mb-2">البطولات المفضلة</h3>
-                     <div className="space-y-2">
-                        {favoriteLeagues.length > 0 ? (
-                            favoriteLeagues.map((comp, index) => 
-                                <Card key={`${comp.leagueId}-${index}`} className="p-0">
-                                    <div 
-                                        className="flex w-full items-center justify-between p-3 group cursor-pointer"
-                                    >
-                                        <div className="flex items-center gap-3 flex-1" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
-                                            <img src={comp.logo} alt={comp.name} className="h-8 w-8 object-contain" />
-                                            <span className="font-semibold">{comp.name}</span>
+                <Tabs defaultValue="competitions" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="players"><User className="ml-1 h-4 w-4"/>اللاعبين</TabsTrigger>
+                        <TabsTrigger value="teams"><Users className="ml-1 h-4 w-4"/>الفرق</TabsTrigger>
+                        <TabsTrigger value="competitions"><Trophy className="ml-1 h-4 w-4"/>البطولات</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="competitions" className="mt-4">
+                        <SearchSheet navigate={navigate}>
+                            <Button variant="outline" className="w-full h-12 border-dashed mb-4">
+                                <Plus className="ml-2 h-5 w-5"/>
+                                إضافة بطولة
+                            </Button>
+                        </SearchSheet>
+                        <div className="space-y-2">
+                            {favoriteLeagues.length > 0 ? (
+                                favoriteLeagues.map((comp, index) => 
+                                    <Card key={`${comp.leagueId}-${index}`} className="p-0">
+                                        <div className="flex w-full items-center justify-between p-3 group cursor-pointer">
+                                            <div className="flex items-center gap-3 flex-1" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
+                                                <img src={comp.logo} alt={comp.name} className="h-8 w-8 object-contain" />
+                                                <span className="font-semibold">{comp.name}</span>
+                                            </div>
+                                            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleFavoriteAction('league', { id: comp.leagueId })}>
+                                                <Star className="h-6 w-6 text-yellow-400 fill-current" />
+                                            </Button>
                                         </div>
-                                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleFavoriteAction('league', { id: comp.leagueId })}>
-                                            <Star className="h-6 w-6 text-yellow-400 fill-current" />
-                                        </Button>
-                                    </div>
-                                </Card>
-                            )
-                        ) : (
-                            <p className="text-muted-foreground text-center pt-4">لم تقم بإضافة بطولات مفضلة بعد.</p>
-                        )}
-                     </div>
-                </div>
+                                    </Card>
+                                )
+                            ) : (
+                                <p className="text-muted-foreground text-center pt-4">لم تقم بإضافة بطولات مفضلة بعد.</p>
+                            )}
+                        </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="teams" className="mt-4">
+                        <SearchSheet navigate={navigate}>
+                            <Button variant="outline" className="w-full h-12 border-dashed mb-4">
+                                <Plus className="ml-2 h-5 w-5"/>
+                                إضافة فريق
+                            </Button>
+                        </SearchSheet>
+                         <div className="space-y-2">
+                             {favoriteTeams.length > 0 ? (
+                                favoriteTeams.map((team, index) => 
+                                    <Card key={`${team.teamId}-${index}`} className="p-0">
+                                        <div className="flex w-full items-center justify-between p-3 group cursor-pointer">
+                                            <div className="flex items-center gap-3 flex-1" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarImage src={team.logo} />
+                                                    <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
+                                                </Avatar>
+                                                <span className="font-semibold">{team.name}</span>
+                                            </div>
+                                            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => handleFavoriteAction('team', { id: team.teamId })}>
+                                                <Star className="h-6 w-6 text-yellow-400 fill-current" />
+                                            </Button>
+                                        </div>
+                                    </Card>
+                                )
+                            ) : (
+                                <p className="text-muted-foreground text-center pt-4">لم تقم بإضافة فرق مفضلة بعد.</p>
+                            )}
+                        </div>
+                    </TabsContent>
 
-                 {/* Add More Button */}
-                 <SearchSheet navigate={navigate}>
-                    <Button variant="outline" className="w-full h-16 border-dashed">
-                        <Plus className="ml-2 h-5 w-5"/>
-                        إضافة فرق وبطولات أخرى
-                    </Button>
-                 </SearchSheet>
+                    <TabsContent value="players" className="mt-4">
+                         <SearchSheet navigate={navigate}>
+                            <Button variant="outline" className="w-full h-12 border-dashed mb-4">
+                                <Plus className="ml-2 h-5 w-5"/>
+                                إضافة لاعب
+                            </Button>
+                        </SearchSheet>
+                        <p className="text-muted-foreground text-center pt-4">قائمة اللاعبين المفضلين قيد التطوير.</p>
+                    </TabsContent>
+                </Tabs>
             </div>
-
         </div>
     );
 }
