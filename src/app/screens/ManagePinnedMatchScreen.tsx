@@ -39,12 +39,17 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions }: Sc
     const { toast } = useToast();
     const homeLogoInputRef = useRef<HTMLInputElement>(null);
     const awayLogoInputRef = useRef<HTMLInputElement>(null);
-
-    const docRef = db ? doc(db, 'pinnedIraqiMatch', 'special') : null;
     
     useEffect(() => {
-        if (!docRef) return;
+        if (!db) {
+          // Keep loading if db is not available yet
+          setLoading(true);
+          return;
+        }
+    
         setLoading(true);
+        const docRef = doc(db, 'pinnedIraqiMatch', 'special');
+    
         getDoc(docRef).then(docSnap => {
             if (docSnap.exists()) {
                 setMatch(docSnap.data() as PinnedMatch);
@@ -52,8 +57,10 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions }: Sc
         }).catch(error => {
             const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
             errorEmitter.emit('permission-error', permissionError);
-        }).finally(() => setLoading(false));
-    }, [docRef]);
+        }).finally(() => {
+            setLoading(false);
+        });
+    }, [db]);
 
 
     const handleInputChange = (field: keyof PinnedMatch, value: string | boolean) => {
@@ -73,8 +80,9 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions }: Sc
     };
     
     const handleSave = async () => {
-        if (!docRef) return;
+        if (!db) return;
         setSaving(true);
+        const docRef = doc(db, 'pinnedIraqiMatch', 'special');
         
         const dataToSave: PinnedMatch = {
             isEnabled: match.isEnabled ?? true,
@@ -100,8 +108,9 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions }: Sc
     };
 
     const handleDelete = async () => {
-        if (!docRef) return;
+        if (!db) return;
         setDeleting(true);
+        const docRef = doc(db, 'pinnedIraqiMatch', 'special');
         deleteDoc(docRef)
          .then(() => {
                 toast({ title: 'نجاح', description: 'تم حذف المباراة المثبتة.' });
