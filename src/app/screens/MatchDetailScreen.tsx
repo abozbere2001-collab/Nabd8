@@ -24,9 +24,11 @@ const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: S
   const fallbackImage = "https://media.api-sports.io/football/players/0.png";
   
   const playerInfo = player.player;
+  const playerStats = player.statistics?.[0];
+
   const playerImage = playerInfo?.photo || fallbackImage;
-  const playerNumber = playerInfo?.number ?? player?.statistics?.[0]?.games?.number;
-  const ratingValue = playerInfo?.rating ?? player?.statistics?.[0]?.games?.rating;
+  const playerNumber = playerInfo?.number ?? playerStats?.games?.number;
+  const ratingValue = playerStats?.games?.rating;
   
   const rating = ratingValue && !isNaN(parseFloat(ratingValue)) 
     ? parseFloat(ratingValue).toFixed(1) 
@@ -260,81 +262,12 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
     );
 }
 
-const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lineups: LineupData[] | null; events: MatchEvent[] | null; season: number; navigate: ScreenProps['navigate']; }) => {
-    const [lineups, setLineups] = useState(initialLineups);
-    
-    useEffect(() => {
-        if (!initialLineups || initialLineups.length < 2) {
-            return;
-        }
-
-        const allPlayerIds = initialLineups.flatMap(l => 
-            [...l.startXI, ...l.substitutes].map(p => p.player.id).filter(Boolean)
-        );
-
-        const fetchPlayerStats = async () => {
-            try {
-                const uniquePlayerIds = [...new Set(allPlayerIds)];
-                if (uniquePlayerIds.length === 0) return;
-
-                const BATCH_SIZE = 20;
-                const playerInfoMap = new Map<number, { photo: string, rating: string | null, number: number | null }>();
-
-                for (let i = 0; i < uniquePlayerIds.length; i += BATCH_SIZE) {
-                    const batchIds = uniquePlayerIds.slice(i, i + BATCH_SIZE);
-                    const res = await fetch(`/api/football/players?id=${batchIds.join('-')}&season=${season}`);
-                    const data = await res.json();
-                    
-                    if (data.response && data.response.length > 0) {
-                        data.response.forEach((playerInfo: any) => {
-                             playerInfoMap.set(playerInfo.player.id, {
-                                photo: playerInfo.player.photo,
-                                rating: playerInfo.statistics?.[0]?.games?.rating,
-                                number: playerInfo.player.number ?? playerInfo.statistics?.[0]?.games?.number,
-                            });
-                        });
-                    }
-                }
-                
-                const updatedLineups = initialLineups.map(lineup => {
-                    const updatePlayer = (p: PlayerWithStats): PlayerWithStats => {
-                        const info = playerInfoMap.get(p.player.id);
-                        if (info) {
-                            return {
-                                ...p,
-                                player: {
-                                    ...p.player,
-                                    photo: info.photo || p.player.photo,
-                                    rating: info.rating || p.player.rating,
-                                    number: info.number ?? p.player.number,
-                                }
-                            };
-                        }
-                        return p;
-                    };
-
-                    return {
-                        ...lineup,
-                        startXI: lineup.startXI.map(updatePlayer),
-                        substitutes: lineup.substitutes.map(updatePlayer)
-                    };
-                });
-                setLineups(updatedLineups);
-            } catch (error) {
-                console.error("Error fetching player stats for lineup:", error);
-                setLineups(initialLineups);
-            }
-        };
-        
-        fetchPlayerStats();
-        
-    }, [initialLineups, season]);
-
+const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate']; }) => {
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
     if (!lineups || lineups.length < 2) return <div className="flex justify-center p-8">{!lineups ? <Loader2 className="h-6 w-6 animate-spin" /> : <p className="text-center text-muted-foreground">التشكيلات غير متاحة حاليًا.</p>}</div>;
 
-    const home = lineups.find(l => l.team.id === initialLineups[0].team.id);
-    const away = lineups.find(l => l.team.id === initialLineups[1].team.id);
+    const home = lineups.find(l => l.team.id === lineups[0].team.id);
+    const away = lineups.find(l => l.team.id === lineups[1].team.id);
     
     if (!home || !away) return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
 
@@ -408,7 +341,7 @@ const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lin
                                 <div key={p.player.id || p.player.name} className="flex items-center justify-between p-1.5 text-xs">
                                      <div className="flex-1 flex items-center gap-2">
                                         {subbedInEvent && subbedOutPlayer && (
-                                            <div key={`${subbedInEvent.player.id}-${subbedOutPlayer.player.id}`} className="flex items-center gap-1 text-muted-foreground">
+                                            <div className="flex items-center gap-1 text-muted-foreground">
                                                  <ArrowUp className="h-3 w-3 text-green-500"/>
                                                   <span className="text-[10px]">({subbedInEvent.time.elapsed}')</span>
                                                  <ArrowDown className="h-3 w-3 text-red-500"/>
@@ -571,7 +504,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
-                    <TabsContent value="lineups" className="mt-4"><LineupsTab lineups={lineups} events={events} season={fixture.league.season} navigate={navigate} /></TabsContent>
+                    <TabsContent value="lineups" className="mt-4"><LineupsTab lineups={lineups} events={events} navigate={navigate} /></TabsContent>
                     <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} navigate={navigate} /></TabsContent>
                 </Tabs>
             </div>
