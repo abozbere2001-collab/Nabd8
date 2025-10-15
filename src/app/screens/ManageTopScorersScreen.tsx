@@ -37,7 +37,8 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
     if (!db) return;
     setLoading(true);
     const scorersRef = collection(db, 'iraqiLeagueTopScorers');
-    const q = query(scorersRef); // No ordering needed, we will sort by rank client-side
+    // Order by rank to ensure the list is displayed correctly
+    const q = query(scorersRef, orderBy('rank', 'asc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       let fetchedScorers: ManualTopScorer[] = [];
@@ -48,6 +49,7 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
       const newScorers = Array.from({ length: NUM_SCORERS }, (_, i) => {
         const rank = i + 1;
         const existingScorer = fetchedScorers.find(s => s.rank === rank);
+        // Return existing scorer data or a default empty object
         return existingScorer || { rank, playerName: '', teamName: '', goals: 0, playerPhoto: '' };
       });
 
@@ -65,7 +67,8 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
   const handleInputChange = (index: number, field: keyof Omit<ManualTopScorer, 'rank'>, value: string | number) => {
     setScorers(prevScorers => {
         const newScorers = [...prevScorers];
-        newScorers[index] = {...newScorers[index], [field]: value };
+        const updatedScorer = { ...newScorers[index], [field]: value };
+        newScorers[index] = updatedScorer;
         return newScorers;
     });
   };
@@ -91,12 +94,12 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
         const rank = index + 1;
         const docRef = doc(db, 'iraqiLeagueTopScorers', String(rank));
 
-        if (scorer.playerName.trim()) {
+        if (scorer.playerName && scorer.playerName.trim()) {
             const dataToSave: ManualTopScorer = {
                 rank: rank,
                 playerName: scorer.playerName.trim(),
                 teamName: scorer.teamName.trim(),
-                goals: scorer.goals || 0,
+                goals: Number(scorer.goals) || 0,
                 playerPhoto: scorer.playerPhoto || undefined
             };
             batch.set(docRef, dataToSave);
