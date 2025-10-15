@@ -40,6 +40,7 @@ interface FixtureApiResponse {
         home: { id: number; name: string; logo: string; };
         away: { id: number; name: string; logo: string; };
     };
+    fixture: any;
 }
 
 interface ProcessedOdds {

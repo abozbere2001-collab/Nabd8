@@ -13,11 +13,12 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown } from 'lucide-react';
+import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
+import { OddsTab } from '@/components/OddsTab';
 
 const PlayerCard = ({ player, navigate }: { player: PlayerType, navigate: ScreenProps['navigate'] }) => {
     const fallbackImage = "https://media.api-sports.io/football/players/0.png";
@@ -591,13 +592,15 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             <div className="flex-1 overflow-y-auto p-1">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} />
                 <Tabs defaultValue="lineups" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4 rounded-lg h-auto p-1 bg-card">
+                    <TabsList className="grid w-full grid-cols-5 rounded-lg h-auto p-1 bg-card">
                         <TabsTrigger value="details"><ShieldCheck className="w-4 h-4 ml-1" />تفاصيل</TabsTrigger>
+                        <TabsTrigger value="odds"><TrendingUp className="w-4 h-4 ml-1" />احتمالات</TabsTrigger>
                         <TabsTrigger value="events"><Clock className="w-4 h-4 ml-1" />مُجريات</TabsTrigger>
                         <TabsTrigger value="lineups"><Users className="w-4 h-4 ml-1" />التشكيل</TabsTrigger>
                         <TabsTrigger value="standings"><BarChart className="w-4 h-4 ml-1" />الترتيب</TabsTrigger>
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
+                    <TabsContent value="odds" className="mt-4"><OddsTab fixtureId={fixture.fixture.id} /></TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
                     <TabsContent value="lineups" className="mt-4">
                         <LineupsTab lineups={lineups} events={events} navigate={navigate} />
