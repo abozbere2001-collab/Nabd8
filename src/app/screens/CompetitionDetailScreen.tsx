@@ -8,6 +8,7 @@ import type { ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { Star, Pencil, Shield, Users, Trophy, BarChart2, Heart, Copy, Trash2, Loader2 } from 'lucide-react';
+import { Crown } from '@/components/icons/Crown';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -41,6 +42,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const { toast } = useToast();
 
   const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || '', leagues: {}, teams: {}, players: {} });
+  const [topItems, setTopItems] = useState<{ leagues: Set<number>, teams: Set<number> }>({ leagues: new Set(), teams: new Set() });
 
   const [loading, setLoading] = useState(true);
   const [displayTitle, setDisplayTitle] = useState(initialTitle);
@@ -85,6 +87,31 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         errorEmitter.emit('permission-error', permissionError);
     }
   }, [db]);
+  
+  useEffect(() => {
+    if (!db) return;
+
+    const unsubTopLeagues = onSnapshot(collection(db, "topCompetitions"), (snapshot) => {
+      const leagueIds = new Set(snapshot.docs.map(doc => Number(doc.id)));
+      setTopItems(prev => ({...prev, leagues: leagueIds}));
+    }, (error) => {
+        const permissionError = new FirestorePermissionError({ path: 'topCompetitions', operation: 'list' });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+
+    const unsubTopTeams = onSnapshot(collection(db, "topTeams"), (snapshot) => {
+        const teamIds = new Set(snapshot.docs.map(doc => Number(doc.id)));
+        setTopItems(prev => ({ ...prev, teams: teamIds }));
+    }, (error) => {
+        const permissionError = new FirestorePermissionError({ path: 'topTeams', operation: 'list' });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+
+    return () => {
+      unsubTopLeagues();
+      unsubTopTeams();
+    };
+  }, [db]);
 
   const getDisplayName = useCallback((type: 'team' | 'player', id: number, defaultName: string) => {
     const key = `${type}s` as 'teams' | 'players';
@@ -93,6 +120,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   
   const isFavorited = leagueId && favorites?.leagues?.[leagueId];
+  const isTopCompetition = leagueId && topItems.leagues.has(leagueId);
 
   const handleCopy = (url: string | null) => {
     if (!url) return;
@@ -216,6 +244,29 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     });
   };
   
+  const handleToggleTopItem = (type: 'league' | 'team', item: {id: number, name: string, logo: string}) => {
+      if (!isAdmin || !db) return;
+      
+      const collectionName = type === 'league' ? 'topCompetitions' : 'topTeams';
+      const docId = String(item.id);
+      const docRef = doc(db, collectionName, docId);
+
+      const isCurrentlyTop = topItems[type === 'league' ? 'leagues' : 'teams'].has(item.id);
+
+      const operation = isCurrentlyTop
+        ? deleteDoc(docRef)
+        : setDoc(docRef, item);
+      
+      operation.catch(serverError => {
+        const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: isCurrentlyTop ? 'delete' : 'create',
+            requestResourceData: isCurrentlyTop ? undefined : item,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
+  }
+
   const handleOpenRename = (type: RenameType, id: string | number, name: string) => {
     setRenameItem({ id, name, type });
     setRenameOpen(true);
@@ -324,6 +375,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+             <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleToggleTopItem('league', {id: leagueId, name: displayTitle || '', logo: logo || ''})}
+            >
+                <Crown className={cn("h-5 w-5", isTopCompetition ? "text-yellow-500 fill-current" : "text-muted-foreground")} />
+            </Button>
             <Button
                 variant="ghost"
                 size="icon"
@@ -400,10 +458,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {standings.map((s) => (
+                        {standings.map((s) => {
+                            const isTopTeam = topItems.teams.has(s.team.id);
+                            return (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
                                 <TableCell onClick={e => e.stopPropagation()}>
                                      <div className='flex items-center justify-start opacity-80'>
+                                        {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleToggleTopItem('team', s.team)}><Crown className={cn("h-4 w-4", isTopTeam ? "text-yellow-500 fill-current" : "text-muted-foreground")} /></Button>}
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('team', s.team.id, getDisplayName('team', s.team.id, s.team.name))}>
                                             <Pencil className="h-4 w-4 text-muted-foreground" />
                                         </Button>}
@@ -438,7 +499,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                     </div>
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        )})}
                     </TableBody>
                 </Table>
             ): <p className="pt-4 text-center text-muted-foreground">جدول الترتيب غير متاح حاليًا.</p>}
@@ -508,7 +569,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 </div>
             ) : teams.length > 0 ? (
                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
-                    {teams.map(({ team }) => (
+                    {teams.map(({ team }) => {
+                        const isTopTeam = topItems.teams.has(team.id);
+                        return (
                         <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
                             <div className='relative'>
                                 <Avatar className="h-16 w-16">
@@ -522,6 +585,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 {isAdmin && <span className="block text-xs text-muted-foreground">(ID: {team.id})</span>}
                             </span>
                             <div className="absolute top-1 left-1 flex opacity-80">
+                                {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleToggleTopItem('team', team);}}><Crown className={cn("h-4 w-4", isTopTeam ? "text-yellow-500 fill-current" : "text-muted-foreground")} /></Button>}
                                 {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, getDisplayName('team', team.id, team.name))}}>
                                     <Pencil className="h-4 w-4 text-muted-foreground" />
                                 </Button>}
@@ -533,7 +597,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 </Button>}
                             </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             ) : <p className="pt-4 text-center text-muted-foreground">قائمة الفرق غير متاحة حاليًا.</p>}
         </TabsContent>
