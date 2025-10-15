@@ -375,7 +375,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const isLoading = activeTab === 'live' ? loadingLive : loadingFixtures;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="flex h-full flex-col bg-background">
         <ScreenHeader 
             title="" 
             canGoBack={false}
@@ -391,31 +391,26 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
               </div>
             }
         />
-        <div className="flex flex-col border-b bg-card">
-             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-               <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
-                   <TabsTrigger value="predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
-                   <TabsTrigger value="live" className='text-xs sm:text-sm'>مباشر</TabsTrigger>
-                   <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
-               </TabsList>
-                <TabsContent value="my-results" className="mt-0">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col min-h-0">
+            <div className="flex flex-col border-b bg-card">
+                 <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
+                     <TabsTrigger value="predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
+                     <TabsTrigger value="live" className='text-xs sm:text-sm'>مباشر</TabsTrigger>
+                     <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
+                 </TabsList>
+                 {activeTab === 'my-results' && (
                      <div className="py-2 px-2">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                     </div>
-                </TabsContent>
-                 <TabsContent value="live" className="mt-0 h-[53px] flex items-center justify-center">
-                    <p className="text-sm text-muted-foreground">يتم التحديث كل دقيقة</p>
-                </TabsContent>
-                <TabsContent value="predictions" className="mt-0">
-                    {/* Date scroller for predictions is handled inside the component */}
-                </TabsContent>
-             </Tabs>
+                 )}
+                  {activeTab === 'live' && (
+                    <div className="h-[53px] flex items-center justify-center">
+                        <p className="text-sm text-muted-foreground">يتم التحديث كل دقيقة</p>
+                    </div>
+                 )}
+            </div>
 
-        </div>
-        <div className="flex-1 overflow-y-auto p-1 space-y-4">
-            {activeTab === 'predictions' ? (
-                <GlobalPredictionsScreen navigate={navigate} goBack={goBack} canGoBack={canGoBack} />
-            ) : (
+            <TabsContent value="my-results" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0">
                 <FixturesList 
                     fixtures={currentFixtures}
                     loading={isLoading}
@@ -426,8 +421,23 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     commentedMatches={commentedMatches}
                     navigate={navigate}
                 />
-            )}
-        </div>
+            </TabsContent>
+            <TabsContent value="live" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0">
+                 <FixturesList 
+                    fixtures={currentFixtures}
+                    loading={isLoading}
+                    activeTab={activeTab}
+                    favoritedLeagueIds={favoritedLeagueIds}
+                    favoritedTeamIds={favoritedTeamIds}
+                    hasAnyFavorites={hasAnyFavorites}
+                    commentedMatches={commentedMatches}
+                    navigate={navigate}
+                />
+            </TabsContent>
+            <TabsContent value="predictions" className="flex-1 overflow-y-auto p-0 mt-0">
+                <GlobalPredictionsScreen navigate={navigate} goBack={goBack} canGoBack={canGoBack} />
+            </TabsContent>
+        </Tabs>
     </div>
   );
 }
