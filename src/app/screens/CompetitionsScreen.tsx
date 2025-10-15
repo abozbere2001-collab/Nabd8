@@ -3,21 +3,21 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Star, Plus, Search, Loader2, Users, Trophy, User } from 'lucide-react';
+import { Star, Plus, Search, Users, Trophy, User as PlayerIcon } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
+import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import type { Favorites, ManagedCompetition as ManagedCompetitionType } from '@/lib/types';
+import type { Favorites } from '@/lib/types';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from '@/lib/utils';
 
 
 // --- MAIN SCREEN COMPONENT ---
@@ -45,173 +45,122 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         return () => unsubscribe();
     }, [user, db]);
 
-    const handleFavoriteAction = useCallback(async (type: 'league' | 'team' | 'player', item: any) => {
-        if (!user || !db || !favorites) return;
-        
-        const favRef = doc(db, 'favorites', user.uid);
-        const itemPath = `${type}s`;
-        const fieldPath = `${itemPath}.${item.id}`;
-        
-        const isFavorited = !!(favorites as any)?.[itemPath]?.[item.id];
-
-        if (isFavorited) {
-            updateDoc(favRef, { [fieldPath]: deleteField() }).catch(serverError => {
-                 const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update' });
-                 errorEmitter.emit('permission-error', permissionError);
-            });
-        }
-    }, [user, db, favorites]);
-
     const favoriteTeams = useMemo(() => favorites?.teams ? Object.values(favorites.teams) : [], [favorites]);
     const favoriteLeagues = useMemo(() => favorites?.leagues ? Object.values(favorites.leagues) : [], [favorites]);
     const favoritePlayers = useMemo(() => favorites?.players ? Object.values(favorites.players) : [], [favorites]);
 
-    if (loading) {
-        return (
-             <div className="flex h-full flex-col bg-background">
-                <ScreenHeader title="اختياراتي" canGoBack={false} onBack={() => {}} />
-                <div className="p-4 space-y-4">
-                    <Skeleton className="h-24 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-40 w-full" />
+    const AddChoiceCard = () => (
+        <SearchSheet navigate={navigate}>
+            <div className="flex flex-col items-center justify-center gap-2 text-center p-2 rounded-2xl border-2 border-dashed border-muted-foreground/50 h-full w-full cursor-pointer hover:bg-accent/50 transition-colors">
+                <div className="flex items-center justify-center h-10 w-10 bg-primary/10 rounded-full">
+                    <Plus className="h-6 w-6 text-primary" />
                 </div>
+                <span className="text-xs font-medium text-muted-foreground">أضف اختياراتك</span>
             </div>
-        )
-    }
+        </SearchSheet>
+    );
 
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader 
-                title="اختياراتي" 
+             <ScreenHeader 
+                title="" 
                 onBack={goBack} 
                 canGoBack={canGoBack} 
-                actions={
-                  <div className="flex items-center gap-1">
-                      <SearchSheet navigate={navigate}>
-                          <Button variant="ghost" size="icon">
-                              <Search className="h-5 w-5" />
-                          </Button>
-                      </SearchSheet>
-                      <ProfileButton/>
-                  </div>
-                }
             />
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
-
-                {/* Favorite Teams Horizontal List */}
-                {favoriteTeams.length > 0 && (
-                    <div>
-                        <ScrollArea className="w-full whitespace-nowrap rounded-md">
-                            <div className="flex w-max space-x-4 p-2">
-                                {favoriteTeams.map((team, index) => (
-                                    <div key={`${team.teamId}-${index}`} className="flex flex-col items-center gap-2 w-20 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
-                                        <Avatar className="h-12 w-12 border-2 border-primary/20">
+            <Tabs defaultValue="my-choices" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 bg-transparent px-4">
+                    <TabsTrigger value="notifications" disabled>إشعارات</TabsTrigger>
+                    <TabsTrigger value="my-choices">اختياراتي</TabsTrigger>
+                </TabsList>
+                <TabsContent value="my-choices" className="mt-4">
+                     <div className="space-y-6">
+                        {/* Favorite Teams Horizontal List */}
+                        <ScrollArea className="w-full whitespace-nowrap">
+                            <div className="flex w-max space-x-4 px-4">
+                                {favoriteTeams.map((team) => (
+                                    <div key={team.teamId} className="relative flex flex-col items-center gap-2 w-20 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
+                                        <Avatar className="h-14 w-14 border-2 border-border">
                                             <AvatarImage src={team.logo} />
                                             <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
                                         </Avatar>
-                                        <span className="text-xs font-semibold truncate w-full">{team.name}</span>
+                                        <span className="text-xs font-medium truncate w-full">{team.name}</span>
+                                        <Star className="absolute top-0 right-0 h-4 w-4 text-yellow-400 fill-current" />
                                     </div>
                                 ))}
+                                <div className="flex flex-col items-center gap-2 w-20 h-[84px] text-center">
+                                     <SearchSheet navigate={navigate}>
+                                        <div className="flex flex-col items-center justify-center h-14 w-14 bg-card rounded-full cursor-pointer hover:bg-accent/50 transition-colors">
+                                            <Plus className="h-6 w-6 text-primary" />
+                                        </div>
+                                     </SearchSheet>
+                                      <span className="text-xs font-medium truncate w-full text-primary">أضف</span>
+                                </div>
                             </div>
-                            <ScrollBar orientation="horizontal" />
+                            <ScrollBar orientation="horizontal" className="h-1.5" />
                         </ScrollArea>
-                    </div>
-                )}
-                
-                <Tabs defaultValue="competitions" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="players"><User className="ml-1 h-4 w-4"/>اللاعبين</TabsTrigger>
-                        <TabsTrigger value="teams"><Users className="ml-1 h-4 w-4"/>الفرق</TabsTrigger>
-                        <TabsTrigger value="competitions"><Trophy className="ml-1 h-4 w-4"/>البطولات</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="competitions" className="mt-4">
-                        <SearchSheet navigate={navigate}>
-                            <Button variant="outline" className="w-full h-12 border-dashed mb-4">
-                                <Plus className="ml-2 h-5 w-5"/>
-                                إضافة بطولة
-                            </Button>
-                        </SearchSheet>
-                        <div className="grid grid-cols-2 gap-4">
-                            {favoriteLeagues.length > 0 ? (
-                                favoriteLeagues.map((comp, index) => 
-                                    <Card 
-                                        key={`${comp.leagueId}-${index}`} 
-                                        className="relative p-0 group cursor-pointer"
-                                        onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
-                                    >
-                                        <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                                            <img src={comp.logo} alt={comp.name} className="h-16 w-16 object-contain mb-2" />
-                                            <span className="font-semibold text-sm leading-tight">{comp.name}</span>
-                                        </CardContent>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            className="absolute top-1 right-1 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" 
-                                            onClick={(e) => {e.stopPropagation(); handleFavoriteAction('league', { id: comp.leagueId })}}
-                                        >
-                                            <Star className="h-5 w-5 text-yellow-400 fill-current" />
-                                        </Button>
-                                    </Card>
-                                )
-                            ) : (
-                                <div className="col-span-2 text-muted-foreground text-center pt-4">لم تقم بإضافة بطولات مفضلة بعد.</div>
-                            )}
-                        </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="teams" className="mt-4">
-                        <SearchSheet navigate={navigate}>
-                            <Button variant="outline" className="w-full h-12 border-dashed mb-4">
-                                <Plus className="ml-2 h-5 w-5"/>
-                                إضافة فريق
-                            </Button>
-                        </SearchSheet>
-                         <div className="grid grid-cols-2 gap-4">
-                             {favoriteTeams.length > 0 ? (
-                                favoriteTeams.map((team, index) => 
-                                    <Card 
-                                        key={`${team.teamId}-${index}`}
-                                        className="relative p-0 group cursor-pointer"
-                                        onClick={() => navigate('TeamDetails', { teamId: team.teamId })}
-                                    >
-                                        <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                                            <Avatar className="h-16 w-16 mb-2">
+
+                        {/* Inner Tabs for Teams, Competitions, Players */}
+                        <Tabs defaultValue="teams" className="w-full px-4">
+                            <TabsList className="grid w-full grid-cols-3">
+                                <TabsTrigger value="players"><PlayerIcon className="ml-1 h-4 w-4"/>اللاعبين</TabsTrigger>
+                                <TabsTrigger value="competitions"><Trophy className="ml-1 h-4 w-4"/>منافسات</TabsTrigger>
+                                <TabsTrigger value="teams"><Users className="ml-1 h-4 w-4"/>فرق</TabsTrigger>
+                            </TabsList>
+                            
+                            <TabsContent value="teams" className="mt-4">
+                                <div className="grid grid-cols-4 gap-4">
+                                    {favoriteTeams.map((team) => 
+                                        <div key={team.teamId} className="relative flex flex-col items-center gap-2 text-center p-2 rounded-2xl cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
+                                            <Avatar className="h-12 w-12 border-2 border-border">
                                                 <AvatarImage src={team.logo} />
                                                 <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
                                             </Avatar>
-                                            <span className="font-semibold text-sm leading-tight">{team.name}</span>
-                                        </CardContent>
-                                         <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            className="absolute top-1 right-1 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" 
-                                            onClick={(e) => { e.stopPropagation(); handleFavoriteAction('team', { id: team.teamId })}}
-                                        >
-                                            <Star className="h-5 w-5 text-yellow-400 fill-current" />
-                                        </Button>
-                                    </Card>
-                                )
-                            ) : (
-                                <div className="col-span-2 text-muted-foreground text-center pt-4">لم تقم بإضافة فرق مفضلة بعد.</div>
-                            )}
-                        </div>
-                    </TabsContent>
+                                            <span className="text-[11px] font-medium truncate w-full">{team.name}</span>
+                                            <Star className="absolute top-1 right-1 h-3 w-3 text-yellow-400 fill-current" />
+                                        </div>
+                                    )}
+                                    <div className="h-[76px] w-full">
+                                        <AddChoiceCard />
+                                    </div>
+                                </div>
+                            </TabsContent>
+                            
+                            <TabsContent value="competitions" className="mt-4">
+                                <div className="grid grid-cols-4 gap-4">
+                                    {favoriteLeagues.map((comp) => 
+                                        <div key={comp.leagueId} className="relative flex flex-col items-center gap-2 text-center p-2 rounded-2xl cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
+                                            <Avatar className="h-12 w-12 border-2 border-border">
+                                                <AvatarImage src={comp.logo} />
+                                                <AvatarFallback>{comp.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            <span className="text-[11px] font-medium truncate w-full">{comp.name}</span>
+                                            <Star className="absolute top-1 right-1 h-3 w-3 text-yellow-400 fill-current" />
+                                        </div>
+                                    )}
+                                     <div className="h-[76px] w-full">
+                                        <AddChoiceCard />
+                                    </div>
+                                </div>
+                            </TabsContent>
 
-                    <TabsContent value="players" className="mt-4">
-                         <SearchSheet navigate={navigate}>
-                            <Button variant="outline" className="w-full h-12 border-dashed mb-4">
-                                <Plus className="ml-2 h-5 w-5"/>
-                                إضافة لاعب
-                            </Button>
-                        </SearchSheet>
-                        <p className="text-muted-foreground text-center pt-4">قائمة اللاعبين المفضلين قيد التطوير.</p>
-                    </TabsContent>
-                </Tabs>
-            </div>
+                            <TabsContent value="players" className="mt-4">
+                                <div className="grid grid-cols-4 gap-4">
+                                    {/* Placeholder for players */}
+                                     <div className="h-[76px] w-full col-span-4">
+                                        <p className="text-muted-foreground text-center pt-4">قائمة اللاعبين المفضلين قيد التطوير.</p>
+                                     </div>
+                                     <div className="h-[76px] w-full">
+                                        <AddChoiceCard />
+                                    </div>
+                                </div>
+                            </TabsContent>
+                        </Tabs>
+                    </div>
+                </TabsContent>
+                 <TabsContent value="notifications" className="mt-4">
+                    <p className="text-center text-muted-foreground p-8">صفحة الإشعارات قيد التطوير.</p>
+                 </TabsContent>
+            </Tabs>
         </div>
     );
 }
-
-    

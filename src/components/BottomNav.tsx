@@ -1,14 +1,14 @@
+
 "use client";
-import { Goal, Trophy, Map, Newspaper, MoreHorizontal } from 'lucide-react';
+import { Star, Newspaper, BarChart2, Tv } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ScreenKey } from '@/app/page';
 
 const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
-  { key: 'Matches', label: 'المباريات', icon: Goal },
-  { key: 'Competitions', label: 'اختياراتي', icon: Trophy },
-  { key: 'Iraq', label: 'العراق', icon: Map },
-  { key: 'News', label: 'الأخبار', icon: Newspaper },
-  { key: 'Settings', label: 'المزيد', icon: MoreHorizontal },
+  { key: 'Matches', label: 'جديد', icon: Tv },
+  { key: 'Competitions', label: 'اختياراتي', icon: Star },
+  { key: 'News', label: 'أخبار', icon: Newspaper },
+  { key: 'GlobalPredictions', label: 'نتائج', icon: BarChart2 },
 ];
 
 
@@ -24,7 +24,8 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
     }
   };
   
-  const isMainTabActive = navItems.some(item => item.key === activeScreen);
+  const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'News', 'GlobalPredictions', 'Settings', 'Iraq'];
+  const isMainTabActive = mainTabs.includes(activeScreen);
 
   if (!isMainTabActive) return null;
 
