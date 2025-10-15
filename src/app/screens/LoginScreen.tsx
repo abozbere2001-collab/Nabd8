@@ -19,16 +19,19 @@ export function LoginScreen({ goBack }: ScreenProps) {
 
   const handleAuthError = (e: any) => {
     console.error("Login Error:", e);
-    // User-friendly error messages based on error codes
-    if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
-        setError('تم إلغاء عملية تسجيل الدخول.');
-    } else if (e.code === 'auth/unauthorized-domain' || e.code === 'auth/operation-not-allowed') {
-        setError('النطاق غير مصرح به. يرجى التأكد من إضافة نطاق التطبيق إلى قائمة النطاقات المصرح بها في إعدادات Firebase Authentication.');
+    
+    let errorMessage = e.message || 'حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.';
+
+    if (e.code === 'auth/unauthorized-domain') {
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : 'your-development-domain.com';
+        errorMessage = `النطاق غير مصرح به. يرجى إضافة النطاق التالي إلى قائمة النطاقات المصرح بها في إعدادات Firebase Authentication: ${hostname}`;
+    } else if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+        errorMessage = 'تم إلغاء عملية تسجيل الدخول.';
     } else if (e.code === 'auth/account-exists-with-different-credential') {
-        setError('يوجد حساب بنفس البريد الإلكتروني ولكن بطريقة تسجيل دخول مختلفة.');
-    } else {
-        setError(e.message || 'حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+        errorMessage = 'يوجد حساب بنفس البريد الإلكتروني ولكن بطريقة تسجيل دخول مختلفة.';
     }
+    
+    setError(errorMessage);
   }
 
   const handleGoogleLogin = async () => {
