@@ -131,7 +131,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   useEffect(() => {
     if (!user || !db) return;
-    const favDocRef = doc(db, 'favorites', user.uid);
+    const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const unsub = onSnapshot(favDocRef, (doc) => {
         setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {}, teams: {}, players: {} });
     }, (error) => {
@@ -206,7 +206,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   const handleFavorite = (type: 'league' | 'team' | 'player', item: any) => {
     if (!user || !db) return;
-    const favRef = doc(db, 'favorites', user.uid);
+    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
     
     let fieldPath = '';
     let isFavoritedCurrent = false;
@@ -608,5 +608,3 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
-
-    

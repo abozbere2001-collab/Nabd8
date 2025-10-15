@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenKey, ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
@@ -60,7 +60,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
 
   const fetchFavorites = useCallback(async () => {
     if (!user || !db) return;
-    const docRef = doc(db, 'favorites', user.uid);
+    const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
     getDoc(docRef).then(docSnap => {
         if (docSnap.exists()) {
             setFavorites(docSnap.data() as Favorites);
@@ -86,13 +86,10 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
   
   const fetchAllCustomNames = useCallback(async () => {
     if (!db) return;
-    const leaguesCollection = collection(db, 'leagueCustomizations');
-    const teamsCollection = collection(db, 'teamCustomizations');
-    
     try {
         const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
-            getDocs(leaguesCollection),
-            getDocs(teamsCollection)
+            getDocs(collection(db, 'leagueCustomizations')),
+            getDocs(collection(db, 'teamCustomizations'))
         ]);
         
         const leagueNames = new Map<number, string>();
@@ -140,58 +137,72 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
             leaguesData.response.forEach((r: LeagueResult) => resultsMap.set(`league-${r.league.id}`, { ...r, type: 'league' }));
         }
 
-        // 2. Search Firestore for custom names
+        // 2. Search Firestore for custom names (starts with logic)
         if (db) {
-            const teamCustomQuery = query(collection(db, "teamCustomizations"), where("customName", ">=", queryTerm), where("customName", "<=", queryTerm + '\uf8ff'), limit(10));
-            const leagueCustomQuery = query(collection(db, "leagueCustomizations"), where("customName", ">=", queryTerm), where("customName", "<=", queryTerm + '\uf8ff'), limit(10));
+            const teamCustomQuery = query(
+                collection(db, "teamCustomizations"), 
+                orderBy("customName"),
+                where("customName", ">=", queryTerm), 
+                where("customName", "<=", queryTerm + '\uf8ff'), 
+                limit(10)
+            );
+            const leagueCustomQuery = query(
+                collection(db, "leagueCustomizations"), 
+                orderBy("customName"),
+                where("customName", ">=", queryTerm), 
+                where("customName", "<=", queryTerm + '\uf8ff'), 
+                limit(10)
+            );
 
-            const [teamCustomSnap, leagueCustomSnap] = await Promise.all([
-                getDocs(teamCustomQuery),
-                getDocs(leagueCustomQuery),
-            ]);
-            
-            const firestoreTeamIds: string[] = [];
-            teamCustomSnap.forEach(doc => firestoreTeamIds.push(doc.id));
-            
-            const firestoreLeagueIds: string[] = [];
-            leagueCustomSnap.forEach(doc => firestoreLeagueIds.push(doc.id));
+            try {
+                const [teamCustomSnap, leagueCustomSnap] = await Promise.all([
+                    getDocs(teamCustomQuery),
+                    getDocs(leagueCustomQuery),
+                ]);
+                
+                const firestoreTeamIds: string[] = [];
+                teamCustomSnap.forEach(doc => firestoreTeamIds.push(doc.id));
+                
+                const firestoreLeagueIds: string[] = [];
+                leagueCustomSnap.forEach(doc => firestoreLeagueIds.push(doc.id));
 
 
-            const teamPromises = firestoreTeamIds.map(async teamId => {
-                if (!resultsMap.has(`team-${teamId}`)) {
-                    const res = await fetch(`/api/football/teams?id=${teamId}`);
-                    const data = await res.json();
-                    if (data.response?.[0]) {
-                        resultsMap.set(`team-${teamId}`, { ...data.response[0], type: 'team' });
+                const teamPromises = firestoreTeamIds.map(async teamId => {
+                    if (!resultsMap.has(`team-${teamId}`)) {
+                        const res = await fetch(`/api/football/teams?id=${teamId}`);
+                        const data = await res.json();
+                        if (data.response?.[0]) {
+                            resultsMap.set(`team-${teamId}`, { ...data.response[0], type: 'team' });
+                        }
                     }
-                }
-            });
+                });
 
-            const leaguePromises = firestoreLeagueIds.map(async leagueId => {
-                if (!resultsMap.has(`league-${leagueId}`)) {
-                    const res = await fetch(`/api/football/leagues?id=${leagueId}`);
-                    const data = await res.json();
-                    if (data.response?.[0]) {
-                        resultsMap.set(`league-${leagueId}`, { ...data.response[0], type: 'league' });
+                const leaguePromises = firestoreLeagueIds.map(async leagueId => {
+                    if (!resultsMap.has(`league-${leagueId}`)) {
+                        const res = await fetch(`/api/football/leagues?id=${leagueId}`);
+                        const data = await res.json();
+                        if (data.response?.[0]) {
+                            resultsMap.set(`league-${leagueId}`, { ...data.response[0], type: 'league' });
+                        }
                     }
-                }
-            });
+                });
 
-            await Promise.all([...teamPromises, ...leaguePromises]);
+                await Promise.all([...teamPromises, ...leaguePromises]);
+            } catch (error) {
+                // This might fail if rules are not set, but we can continue.
+                console.warn("Could not search custom names in Firestore, might be a permissions issue.", error);
+            }
         }
       
       setResults(Array.from(resultsMap.values()));
     } catch (error) {
-      const permissionError = new FirestorePermissionError({
-        path: 'teamCustomizations/leagueCustomizations',
-        operation: 'list'
-      });
-      errorEmitter.emit('permission-error', permissionError);
+      console.error("API Search Error: ", error);
+      toast({variant: 'destructive', title: 'خطأ في البحث', description: 'فشل الاتصال بالخادم.'});
       setResults([]);
     } finally {
       setLoading(false);
     }
-  }, [db]);
+  }, [db, toast]);
 
   useEffect(() => {
     if (isOpen) {
@@ -204,7 +215,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     setRenameOpen(true);
   };
 
-  const handleSaveRename = async (newName: string) => {
+  const handleSaveRename = (newName: string) => {
     if (!renameItem || !db) return;
     const { id, type } = renameItem;
     let collectionName = type === 'league' ? 'leagueCustomizations' : 'teamCustomizations';
@@ -227,7 +238,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
     setIsNoteOpen(true);
   }
 
-  const handleSaveNote = async (note: string) => {
+  const handleSaveNote = (note: string) => {
     if (!noteTeam || !db) return;
     const docRef = doc(db, "adminFavorites", String(noteTeam.id));
     const data = {
@@ -247,9 +258,9 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
         });
   }
 
-  const handleFavorite = async (type: 'team' | 'league', item: any) => {
+  const handleFavorite = (type: 'team' | 'league', item: any) => {
     if (!user || !db) return;
-    const favRef = doc(db, 'favorites', user.uid);
+    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const itemPath = type === 'team' ? 'teams' : 'leagues';
     const fieldPath = `${itemPath}.${item.id}`;
     const isFavorited = !!favorites?.[itemPath]?.[item.id];

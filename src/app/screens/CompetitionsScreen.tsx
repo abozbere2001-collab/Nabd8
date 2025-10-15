@@ -65,7 +65,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         };
         setLoading(true);
         fetchAllCustomNames();
-        const docRef = doc(db, 'favorites', user.uid);
+        const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const unsubscribe = onSnapshot(docRef, (doc) => {
             const favs = (doc.data() as Favorites) || { userId: user.uid, leagues: {}, teams: {}, players: {} };
             setFavorites(favs);
@@ -218,5 +218,3 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
-
-    

@@ -137,7 +137,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     useEffect(() => {
         if (!user || !db) return;
-        const docRef = doc(db, 'favorites', user.uid);
+        const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const unsubscribe = onSnapshot(docRef, (doc) => {
             setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {}, teams: {}, players: {} });
         }, (error) => {
@@ -196,7 +196,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const handleFavorite = useCallback(async (item: ManagedCompetitionType) => {
         if (!user || !db) return;
         
-        const favRef = doc(db, 'favorites', user.uid);
+        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const itemId = item.leagueId;
         const fieldPath = `leagues.${itemId}`;
         const isFavorited = !!favorites?.leagues?.[itemId];

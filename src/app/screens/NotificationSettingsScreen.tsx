@@ -51,7 +51,7 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
       return;
     }
     fetchAllCustomNames();
-    const favsRef = doc(db, 'favorites', user.uid);
+    const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const unsubscribe = onSnapshot(favsRef, (docSnap) => {
       if (docSnap.exists()) {
         setFavorites(docSnap.data() as Favorites);
@@ -98,7 +98,7 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
     
     const newStatus = !currentStatus;
 
-    const docRef = doc(db, 'favorites', user.uid);
+    const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const updateData = { [fieldPath]: newStatus };
     
     // Set document if it doesn't exist, otherwise update.
