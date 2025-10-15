@@ -67,9 +67,22 @@ const countryToContinent: { [key: string]: string } = {
     "Brazil": "South America", "Argentina": "South America", "Colombia": "South America", "Chile": "South America",
     "Uruguay": "South America", "Peru": "South America", "Ecuador": "South America", "Paraguay": "South America",
     "Venezuela": "South America", "Bolivia": "South America",
-    "New-Zealand": "Oceania", "Fiji": "Oceania"
+    "New-Zealand": "Oceania", "Fiji": "Oceania",
+    "Other": "Other"
 };
-const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "North America", "Oceania"];
+
+const defaultContinentTranslations: { [key: string]: string } = {
+  "World": "العالم",
+  "Europe": "أوروبا",
+  "Asia": "آسيا",
+  "Africa": "أفريقيا",
+  "South America": "أمريكا الجنوبية",
+  "North America": "أمريكا الشمالية",
+  "Oceania": "أوقيانوسيا",
+  "Other": "أخرى"
+};
+
+const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "North America", "Oceania", "Other"];
 const WORLD_LEAGUES_KEYWORDS = ["world", "uefa", "champions league", "europa", "copa libertadores", "copa sudamericana", "caf champions", "afc champions", "conmebol", "concacaf"];
 
 
@@ -89,7 +102,20 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const getName = useCallback((type: 'league' | 'country' | 'continent', id: string | number, defaultName: string) => {
         const key = `${type}s` as keyof typeof customNames;
         const map = customNames[key] as Map<string|number, string>;
-        return map?.get(id) || defaultName;
+        
+        // Prioritize custom name from Firestore
+        const customName = map?.get(id);
+        if (customName) {
+            return customName;
+        }
+
+        // Fallback to hardcoded translations for continents
+        if (type === 'continent' && defaultContinentTranslations[defaultName]) {
+            return defaultContinentTranslations[defaultName];
+        }
+
+        // Return the original default name if no translation found
+        return defaultName;
     }, [customNames]);
 
     useEffect(() => {
@@ -107,8 +133,10 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const fetchAllCustomNames = useCallback(async () => {
         if (!db) return;
         try {
-            const [leaguesSnapshot] = await Promise.all([
+            const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
                 getDocs(collection(db, 'leagueCustomizations')),
+                getDocs(collection(db, 'countryCustomizations')),
+                getDocs(collection(db, 'continentCustomizations')),
             ]);
             
             const names = {
@@ -118,12 +146,14 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             };
 
             leaguesSnapshot.forEach(doc => names.leagues.set(Number(doc.id), doc.data().customName));
+            countriesSnapshot.forEach(doc => names.countries.set(doc.id, doc.data().customName));
+            continentsSnapshot.forEach(doc => names.continents.set(doc.id, doc.data().customName));
             
             setCustomNames(names);
 
         } catch (error) {
-            const permissionError = new FirestorePermissionError({ path: 'customizations collections', operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
+            // This might fail for regular users if rules are strict. This is acceptable.
+            console.warn("Could not fetch custom names. This is expected for non-admin users.", error);
         }
     }, [db]);
 
@@ -401,3 +431,5 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
+    
