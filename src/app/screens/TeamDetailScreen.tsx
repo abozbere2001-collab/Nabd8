@@ -160,7 +160,6 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
         const fetchData = async () => {
             setLoading(true);
             try {
-                // Fetch fixtures and stats in parallel
                 const [fixturesRes, statsRes] = await Promise.all([
                     fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`),
                     fetch(`/api/football/teams/statistics?team=${teamId}&season=${CURRENT_SEASON}`)
@@ -172,8 +171,7 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                 const currentFixtures = fixturesData.response || [];
                 setFixtures(currentFixtures);
                 setStats(statsData.response);
-                
-                // Try to get leagueId from fixtures if stats fail, or from stats if they succeed
+
                 const leagueId = currentFixtures[0]?.league?.id || statsData?.response?.league?.id;
 
                 if (leagueId) {
@@ -243,10 +241,10 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                 ) : <p className="text-center text-muted-foreground p-8">جدول الترتيب غير متاح.</p>}
             </TabsContent>
             <TabsContent value="stats" className="mt-4">
-                {stats && stats.league ? (
+                 {stats && stats.league ? (
                     <Card>
                         <CardHeader>
-                            <CardTitle>إحصائيات موسم {stats.league?.season || CURRENT_SEASON}</CardTitle>
+                            <CardTitle>إحصائيات موسم {stats.league.season || CURRENT_SEASON}</CardTitle>
                         </CardHeader>
                         <CardContent>
                              <div className="grid grid-cols-2 gap-4 text-center">
@@ -380,3 +378,5 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
+
+    
