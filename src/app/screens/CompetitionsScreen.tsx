@@ -124,8 +124,8 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                      <h3 className="font-bold text-lg mb-2">البطولات المفضلة</h3>
                      <div className="space-y-2">
                         {favoriteLeagues.length > 0 ? (
-                            favoriteLeagues.map(comp => 
-                                <Card key={comp.leagueId} className="p-0">
+                            favoriteLeagues.map((comp, index) => 
+                                <Card key={`${comp.leagueId}-${index}`} className="p-0">
                                     <div 
                                         className="flex w-full items-center justify-between p-3 group cursor-pointer"
                                     >
