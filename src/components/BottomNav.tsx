@@ -1,11 +1,11 @@
 
 "use client";
-import { Star, Newspaper, BarChart2, Tv, MoreHorizontal } from 'lucide-react';
+import { Star, Newspaper, BarChart2, Tv, MoreHorizontal, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ScreenKey } from '@/app/page';
 
 const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
-  { key: 'Matches', label: 'جديد', icon: Tv },
+  { key: 'Matches', label: 'المباريات', icon: Shield },
   { key: 'Competitions', label: 'اختياراتي', icon: Star },
   { key: 'News', label: 'أخبار', icon: Newspaper },
   { key: 'Settings', label: 'المزيد', icon: MoreHorizontal },
@@ -52,5 +52,3 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
     </div>
   );
 }
-
-    

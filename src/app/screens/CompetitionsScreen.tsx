@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Star, Plus, Search, Users, Trophy, User as PlayerIcon } from 'lucide-react';
+import { Star, Plus, Users, Trophy, User as PlayerIcon, Search } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAuth, useFirestore } from '@/firebase/provider';
@@ -15,7 +15,6 @@ import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 
@@ -66,15 +65,27 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 title="" 
                 onBack={goBack} 
                 canGoBack={canGoBack} 
-                actions={<ProfileButton />}
+                actions={
+                  <div className="flex items-center gap-1">
+                      <SearchSheet navigate={navigate}>
+                          <Button variant="ghost" size="icon">
+                              <Search className="h-5 w-5" />
+                          </Button>
+                      </SearchSheet>
+                      <ProfileButton />
+                  </div>
+                }
             />
-            <Tabs defaultValue="my-choices" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 bg-transparent px-4">
-                    <TabsTrigger value="notifications" disabled>إشعارات</TabsTrigger>
-                    <TabsTrigger value="my-choices">اختياراتي</TabsTrigger>
-                </TabsList>
-                <TabsContent value="my-choices" className="mt-4">
-                     <div className="space-y-6">
+            <div className="flex-1 flex flex-col min-h-0">
+                <Tabs defaultValue="my-choices" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 bg-transparent px-4">
+                        <TabsTrigger value="notifications" disabled>إشعارات</TabsTrigger>
+                        <TabsTrigger value="my-choices">اختياراتي</TabsTrigger>
+                    </TabsList>
+                </Tabs>
+                
+                <div className="flex-1 overflow-y-auto">
+                     <div className="space-y-6 py-4">
                         {/* Favorite Teams Horizontal List */}
                         <ScrollArea className="w-full whitespace-nowrap">
                             <div className="flex w-max space-x-4 px-4">
@@ -97,7 +108,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                       <span className="text-xs font-medium truncate w-full text-primary">أضف</span>
                                 </div>
                             </div>
-                            <ScrollBar orientation="horizontal" className="h-1.5" />
+                            <ScrollBar orientation="horizontal" className="h-1.5 mt-2" />
                         </ScrollArea>
 
                         {/* Inner Tabs for Teams, Competitions, Players */}
@@ -156,13 +167,8 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                             </TabsContent>
                         </Tabs>
                     </div>
-                </TabsContent>
-                 <TabsContent value="notifications" className="mt-4">
-                    <p className="text-center text-muted-foreground p-8">صفحة الإشعارات قيد التطوير.</p>
-                 </TabsContent>
-            </Tabs>
+                </div>
+            </div>
         </div>
     );
 }
-
-    
