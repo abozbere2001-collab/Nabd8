@@ -22,16 +22,14 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>('ar');
-  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     const storedLanguage = localStorage.getItem('goalstack_language') as Language;
-    if (storedLanguage && ['ar', 'en'].includes(storedLanguage)) {
-      setLanguageState(storedLanguage);
-      document.documentElement.lang = storedLanguage;
-      document.documentElement.dir = storedLanguage === 'ar' ? 'rtl' : 'ltr';
-    }
-    setIsMounted(true);
+    const resolvedLanguage = storedLanguage && ['ar', 'en'].includes(storedLanguage) ? storedLanguage : 'ar';
+    
+    setLanguageState(resolvedLanguage);
+    document.documentElement.lang = resolvedLanguage;
+    document.documentElement.dir = resolvedLanguage === 'ar' ? 'rtl' : 'ltr';
   }, []);
 
   const setLanguage = (lang: Language) => {
@@ -45,10 +43,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       const langDict = translations[language] as Record<string, string>;
       return langDict[key] || key;
   }, [language]);
-
-  if (!isMounted) {
-    return null; // or a loading spinner
-  }
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t }}>

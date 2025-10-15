@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { FirebaseClientProvider, useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
 import { AppContentWrapper } from './AppContentWrapper';
 import { AdProvider } from '@/components/AdProvider';
 import { LoginScreen } from './screens/LoginScreen';
@@ -124,8 +124,6 @@ const AppFlow = () => {
 
 export default function Home() {
   return (
-    <FirebaseClientProvider>
-        <AppFlow />
-    </FirebaseClientProvider>
+    <AppFlow />
   );
 }

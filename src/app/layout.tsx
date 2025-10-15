@@ -4,6 +4,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from '@/components/theme-provider';
 import { Tajawal, Cairo } from 'next/font/google';
+import { FirebaseClientProvider } from '@/firebase';
 import { LanguageProvider } from '@/components/LanguageProvider';
 
 const tajawal = Tajawal({
@@ -30,20 +31,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <LanguageProvider>
-        <html>
-            <body className={`${tajawal.variable} ${cairo.variable} font-body antialiased`}>
-                <ThemeProvider
-                    attribute="class"
-                    defaultTheme="dark"
-                    enableSystem
-                    disableTransitionOnChange
-                >
-                    {children}
-                    <Toaster />
-                </ThemeProvider>
-            </body>
-        </html>
-    </LanguageProvider>
+    <html lang="ar" dir="rtl">
+        <body className={`${tajawal.variable} ${cairo.variable} font-body antialiased`}>
+            <ThemeProvider
+                attribute="class"
+                defaultTheme="dark"
+                enableSystem
+                disableTransitionOnChange
+            >
+              <FirebaseClientProvider>
+                <LanguageProvider>
+                  {children}
+                </LanguageProvider>
+              </FirebaseClientProvider>
+              <Toaster />
+            </ThemeProvider>
+        </body>
+    </html>
   );
 }
