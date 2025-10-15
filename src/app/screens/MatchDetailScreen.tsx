@@ -409,38 +409,6 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
 
 // --- Main Screen Component ---
 
-const mergePlayerData = (lineups: LineupData[], players: { player: PlayerType, statistics: any[] }[]): LineupData[] => {
-    if (!players || players.length === 0) return lineups;
-
-    const playersMap = new Map(players.map(p => [p.player.id, p]));
-
-    return lineups.map(team => ({
-        ...team,
-        startXI: team.startXI.map(p => {
-            const extraData = p.player.id ? playersMap.get(p.player.id) : null;
-            return {
-                ...p,
-                player: {
-                    ...p.player,
-                    photo: extraData?.player.photo || p.player.photo,
-                    rating: extraData?.statistics?.[0]?.games?.rating || p.player.rating || null,
-                }
-            };
-        }),
-        substitutes: team.substitutes.map(p => {
-            const extraData = p.player.id ? playersMap.get(p.player.id) : null;
-            return {
-                ...p,
-                player: {
-                    ...p.player,
-                    photo: extraData?.player.photo || p.player.photo,
-                    rating: extraData?.statistics?.[0]?.games?.rating || p.player.rating || null,
-                }
-            };
-        })
-    }));
-};
-
 export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixture: initialFixture }: ScreenProps & { fixtureId: number, fixture?: Fixture }) {
     const [fixture, setFixture] = useState<Fixture | null>(initialFixture || null);
     const [lineups, setLineups] = useState<LineupData[] | null>(null);
@@ -448,6 +416,40 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [statistics, setStatistics] = useState<MatchStatistics[] | null>(null);
     const [standings, setStandings] = useState<Standing[] | null>(null);
     const [loading, setLoading] = useState(!initialFixture);
+
+    const mergePlayerData = useCallback((lineups: LineupData[], players: { player: PlayerType, statistics: any[] }[]): LineupData[] => {
+        if (!players || players.length === 0) return lineups;
+    
+        const playersMap = new Map(players.map(p => [p.player.id, p]));
+    
+        return lineups.map(team => ({
+            ...team,
+            startXI: team.startXI.map(p => {
+                if (!p.player.id) return p;
+                const extraData = playersMap.get(p.player.id);
+                return {
+                    ...p,
+                    player: {
+                        ...p.player,
+                        photo: extraData?.player.photo || p.player.photo,
+                        rating: extraData?.statistics?.[0]?.games?.rating || p.player.rating || null,
+                    }
+                };
+            }),
+            substitutes: team.substitutes.map(p => {
+                 if (!p.player.id) return p;
+                const extraData = playersMap.get(p.player.id);
+                return {
+                    ...p,
+                    player: {
+                        ...p.player,
+                        photo: extraData?.player.photo || p.player.photo,
+                        rating: extraData?.statistics?.[0]?.games?.rating || p.player.rating || null,
+                    }
+                };
+            })
+        }));
+    }, []);
 
     const fetchData = useCallback(async (isInitialLoad: boolean) => {
         if (!fixtureId) return;
@@ -484,9 +486,13 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 const uniquePlayerIds = [...new Set(allPlayerIds)];
 
                 if (uniquePlayerIds.length > 0) {
-                    const playersRes = await fetch(`/api/football/players?id=${uniquePlayerIds.join('-')}&season=${currentSeason}`);
-                    const playersData = await playersRes.json();
-                    const enrichedLineups = mergePlayerData(initialLineups, playersData.response || []);
+                    const playerPromises = uniquePlayerIds.map(id => 
+                        fetch(`/api/football/players?id=${id}&season=${currentSeason}`).then(res => res.json())
+                    );
+                    const playerResults = await Promise.all(playerPromises);
+                    const playersData = playerResults.flatMap(result => result.response || []);
+                    
+                    const enrichedLineups = mergePlayerData(initialLineups, playersData);
                     setLineups(enrichedLineups);
                 } else {
                     setLineups(initialLineups);
@@ -500,7 +506,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         } finally {
             if (isInitialLoad) setLoading(false);
         }
-    }, [fixtureId]);
+    }, [fixtureId, mergePlayerData]);
 
     useEffect(() => {
         fetchData(true);
@@ -548,5 +554,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
-    
