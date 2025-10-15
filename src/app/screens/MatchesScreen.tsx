@@ -10,7 +10,7 @@ import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -53,27 +53,30 @@ const FixturesList = ({
     navigate: ScreenProps['navigate'],
 }) => {
     
-    const filteredFixtures = useMemo(() => {
-        if (activeTab === 'live') {
-            return fixtures; // Live tab shows all fetched live fixtures
+    const { favoriteTeamMatches, otherFixtures } = useMemo(() => {
+        if (activeTab !== 'my-results') {
+            return { favoriteTeamMatches: [], otherFixtures: fixtures };
         }
+        
+        const favoriteTeamMatches: FixtureType[] = [];
+        const otherFixtures: FixtureType[] = [];
 
-        let fixturesToFilter = fixtures;
-        
-        if (activeTab === 'my-results'){
-             return fixturesToFilter.filter(f => 
-                favoritedTeamIds.includes(f.teams.home.id) ||
-                favoritedTeamIds.includes(f.teams.away.id) ||
-                favoritedLeagueIds.includes(f.league.id)
-            );
-        }
-        
-        return fixturesToFilter;
+        fixtures.forEach(f => {
+            if (favoritedTeamIds.includes(f.teams.home.id) || favoritedTeamIds.includes(f.teams.away.id)) {
+                favoriteTeamMatches.push(f);
+            } else if (favoritedLeagueIds.includes(f.league.id)) {
+                 otherFixtures.push(f);
+            }
+        });
+
+        return { favoriteTeamMatches, otherFixtures };
 
     }, [fixtures, activeTab, favoritedTeamIds, favoritedLeagueIds]);
 
-    const groupedFixtures = useMemo(() => {
-        return filteredFixtures.reduce((acc, fixture) => {
+
+    const groupedOtherFixtures = useMemo(() => {
+        const fixturesToGroup = activeTab === 'my-results' ? otherFixtures : fixtures;
+        return fixturesToGroup.reduce((acc, fixture) => {
             const leagueName = fixture.league.name;
             if (!acc[leagueName]) {
                 acc[leagueName] = { league: fixture.league, fixtures: [] };
@@ -81,7 +84,8 @@ const FixturesList = ({
             acc[leagueName].fixtures.push(fixture);
             return acc;
         }, {} as GroupedFixtures);
-    }, [filteredFixtures]);
+    }, [activeTab, otherFixtures, fixtures]);
+
 
     if (loading) {
         return (
@@ -100,17 +104,15 @@ const FixturesList = ({
         );
     }
     
-    if (fixtures.length > 0 && filteredFixtures.length === 0 && activeTab === 'my-results') {
-       return (
-            <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
-                <p className="font-bold text-lg">لا توجد مباريات لمفضلاتك هذا اليوم</p>
-            </div>
-        );
-    }
+    const noMatches = activeTab === 'my-results' 
+        ? favoriteTeamMatches.length === 0 && Object.keys(groupedOtherFixtures).length === 0
+        : fixtures.length === 0;
 
-    if (Object.keys(groupedFixtures).length === 0) {
+    if (noMatches) {
         const message = activeTab === 'live' 
             ? "لا توجد مباريات مباشرة حاليًا." 
+            : activeTab === 'my-results'
+            ? "لا توجد مباريات لمفضلاتك هذا اليوم"
             : "لا توجد مباريات لهذا اليوم.";
         return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
@@ -119,23 +121,31 @@ const FixturesList = ({
         );
     }
     
-    const sortedLeagues = Object.keys(groupedFixtures).sort((a,b) => {
-        const leagueA = groupedFixtures[a];
-        const leagueB = groupedFixtures[b];
-        
-        const aIsFavorite = leagueA.fixtures.some(f => favoritedTeamIds.includes(f.teams.home.id) || favoritedTeamIds.includes(f.teams.away.id)) || favoritedLeagueIds.includes(leagueA.league.id);
-        const bIsFavorite = leagueB.fixtures.some(f => favoritedTeamIds.includes(f.teams.home.id) || favoritedTeamIds.includes(f.teams.away.id)) || favoritedLeagueIds.includes(leagueB.league.id);
-
-        if (aIsFavorite && !bIsFavorite) return -1;
-        if (!aIsFavorite && bIsFavorite) return 1;
-        
-        return a.localeCompare(b);
-    });
+    const sortedLeagues = Object.keys(groupedOtherFixtures).sort((a,b) => a.localeCompare(b));
 
     return (
         <div className="space-y-4">
+            {activeTab === 'my-results' && favoriteTeamMatches.length > 0 && (
+                 <div>
+                    <div className="font-bold text-foreground py-2 px-3 rounded-md bg-card border flex items-center gap-2">
+                        <Star className="h-5 w-5 text-yellow-400" />
+                        <span className="truncate">مباريات فرقك المفضلة</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
+                        {favoriteTeamMatches.map(f => (
+                            <FixtureItem 
+                                key={f.fixture.id} 
+                                fixture={f} 
+                                navigate={navigate}
+                                commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled} 
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {sortedLeagues.map(leagueName => {
-                const { league, fixtures } = groupedFixtures[leagueName];
+                const { league, fixtures: leagueFixtures } = groupedOtherFixtures[leagueName];
                 return (
                     <div key={`${league.id}-${league.name}`}>
                         <div 
@@ -148,7 +158,7 @@ const FixturesList = ({
                             <span className="truncate">{leagueName}</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
-                            {fixtures.map(f => (
+                            {leagueFixtures.map(f => (
                                 <FixtureItem 
                                     key={f.fixture.id} 
                                     fixture={f} 
@@ -393,8 +403,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                     </div>
                 </TabsContent>
-                <TabsContent value="live" className="mt-0">
-                     {/* No DateScroller for live tab */}
+                 <TabsContent value="live" className="mt-0 h-[53px] flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">يتم التحديث كل دقيقة</p>
                 </TabsContent>
                 <TabsContent value="predictions" className="mt-0">
                     {/* Date scroller for predictions is handled inside the component */}
