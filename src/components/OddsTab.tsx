@@ -6,6 +6,7 @@ import { Loader2, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from './ui/skeleton';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
 
 // --- TYPE DEFINITIONS ---
 interface OddValue {
@@ -27,61 +28,38 @@ interface Bookmaker {
 
 interface OddsApiResponse {
     fixture: { id: number; };
+    teams: {
+        home: { id: number; name: string; logo: string; };
+        away: { id: number; name: string; logo: string; };
+    };
     league: any;
     update: string;
     bookmakers: Bookmaker[];
 }
 
 interface OddsHistoryItem {
-    bookmaker: { id: number; name: string };
-    bet: { id: number; name: string };
     values: OddValue[];
     update: string;
 }
 
-// --- TRANSLATION MAP ---
-const betNameTranslations: { [key: string]: string } = {
-    "Match Winner": "الفائز في المباراة",
-    "Double Chance": "فرصة مزدوجة",
-    "Both Teams to Score": "كلا الفريقين يسجلان",
-    "Total - Over/Under": "المجموع - أعلى/أقل",
-    "First Half Winner": "فائز الشوط الأول",
-    "Second Half Winner": "فائز الشوط الثاني",
-    "Goals Over/Under (First Half)": "أهداف الشوط الأول - أعلى/أقل",
-    "Exact Score": "النتيجة الصحيحة",
-    "Handicap Result": "نتيجة الهانديكاب",
-};
-
-const valueTranslations: { [key: string]: string } = {
-    "Home": "فريق 1",
-    "Draw": "تعادل",
-    "Away": "فريق 2",
-    "Yes": "نعم",
-    "No": "لا",
-    "Over": "أعلى",
-    "Under": "أقل",
-    "Home/Draw": "فريق 1 أو تعادل",
-    "Home/Away": "فريق 1 أو فريق 2",
-    "Draw/Away": "تعادل أو فريق 2",
-};
-
-const translate = (text: string, type: 'bet' | 'value'): string => {
-    if (type === 'bet') {
-        return betNameTranslations[text] || text;
-    }
-    // For values like "Over 2.5", "Under 1.5"
-    if (text.startsWith("Over") || text.startsWith("Under")) {
-        const parts = text.split(" ");
-        const translatedPrefix = valueTranslations[parts[0]] || parts[0];
-        return `${translatedPrefix} ${parts.slice(1).join(" ")}`;
-    }
-    return valueTranslations[text] || text;
-};
+interface ProcessedOdds {
+    home: number;
+    draw: number;
+    away: number;
+    homeChange: number;
+    drawChange: number;
+    awayChange: number;
+    homeTeamName: string;
+    awayTeamName: string;
+    homeTeamLogo: string;
+    awayTeamLogo: string;
+}
 
 
 // --- HELPER COMPONENTS ---
-const OddsChangeIndicator = ({ change }: { change: number | null }) => {
-    if (change === null || change === 0) return <span className="w-6"></span>;
+const OddsChangeIndicator = ({ change }: { change: number }) => {
+    if (change === 0) return null;
+
     const isUp = change > 0;
     const color = isUp ? "text-green-500" : "text-red-500";
     const Icon = isUp ? ArrowUp : ArrowDown;
@@ -89,101 +67,142 @@ const OddsChangeIndicator = ({ change }: { change: number | null }) => {
     return (
         <span className={cn("flex items-center font-mono text-xs", color)}>
             <Icon className="h-3 w-3" />
+            {Math.abs(change).toFixed(2)}
         </span>
     );
 };
 
-const BetRow = ({ values, history }: { values: OddValue[], history: OddsHistoryItem[] }) => {
-    const getChange = (valueName: string, currentOdd: string): number | null => {
-        const relevantHistory = history.filter(h => h.values.some(v => v.value === valueName)).sort((a,b) => new Date(b.update).getTime() - new Date(a.update).getTime());
-        if (relevantHistory.length < 2) return null;
-
-        const previousOddStr = relevantHistory[1].values.find(v => v.value === valueName)?.odd;
-        if (!previousOddStr) return null;
-
-        const current = parseFloat(currentOdd);
-        const previous = parseFloat(previousOddStr);
-
-        if (isNaN(current) || isNaN(previous)) return null;
-
-        return current - previous;
-    }
-
-    return (
-        <div className="grid grid-cols-3 gap-2 text-center">
-            {values.map(v => (
-                 <div key={v.value} className="flex flex-col items-center justify-center p-2 bg-background rounded-md">
-                     <span className="text-xs text-muted-foreground">{translate(v.value, 'value')}</span>
-                     <div className="flex items-center gap-1">
-                        <span className="font-bold text-lg">{v.odd}</span>
-                        <OddsChangeIndicator change={getChange(v.value, v.odd)} />
-                     </div>
-                 </div>
-            ))}
-        </div>
-    )
-}
-
 // --- MAIN TAB COMPONENT ---
 export function OddsTab({ fixtureId }: { fixtureId: number }) {
-    const [bookmaker, setBookmaker] = useState<Bookmaker | null>(null);
-    const [oddsHistory, setOddsHistory] = useState<Record<number, Record<number, OddsHistoryItem[]>>>({});
+    const [odds, setOdds] = useState<ProcessedOdds | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         let isMounted = true;
         setLoading(true);
 
-        fetch(`/api/football/odds?fixture=${fixtureId}`)
-            .then(res => {
-                if (!res.ok) throw new Error('Failed to fetch odds data');
-                return res.json();
-            })
-            .then(data => {
-                if (!isMounted) return;
-                const oddsResponse: OddsApiResponse | undefined = data.response?.[0];
-                const oneXBet = oddsResponse?.bookmakers?.find(b => b.name === '1xBet');
+        Promise.all([
+            fetch(`/api/football/odds?fixture=${fixtureId}`),
+            fetch(`/api/football/fixtures?id=${fixtureId}`)
+        ])
+        .then(async ([oddsRes, fixtureRes]) => {
+            if (!oddsRes.ok || !fixtureRes.ok) {
+                throw new Error('Failed to fetch match data');
+            }
+            const oddsData = await oddsRes.json();
+            const fixtureData = await fixtureRes.json();
+            return { oddsData, fixtureData };
+        })
+        .then(({ oddsData, fixtureData }) => {
+            if (!isMounted) return;
+
+            const oddsResponse: OddsApiResponse | undefined = oddsData.response?.[0];
+            const fixtureInfo = fixtureData.response?.[0];
+            const bookmaker = oddsResponse?.bookmakers?.find((b: Bookmaker) => b.id === 8); // Bet365
+            const matchWinnerBet = bookmaker?.bets.find((b: Bet) => b.id === 1);
+
+            if (matchWinnerBet && oddsResponse.update && fixtureInfo) {
+                const oddsHistory: OddsHistoryItem[] = oddsData.odds_history?.[fixtureId]?.[bookmaker?.id]?.[1] || [];
                 
-                setBookmaker(oneXBet || null);
-                setOddsHistory(data.odds_history?.[fixtureId] || {});
-            })
-            .catch(err => {
-                console.error("Error fetching odds:", err);
-                setBookmaker(null);
-            })
-            .finally(() => {
-                if (isMounted) setLoading(false);
-            });
+                const currentOdds: { [key: string]: number } = {};
+                matchWinnerBet.values.forEach((v: OddValue) => {
+                   const key = v.value.toLowerCase().replace(' ', '');
+                   currentOdds[key] = parseFloat(v.odd);
+                });
+
+                const previousOdds: { [key: string]: number } = {};
+                if(oddsHistory.length > 1) {
+                    const prev = oddsHistory[1]; // Second to last entry is the previous odd
+                    prev.values.forEach((v: OddValue) => {
+                        const key = v.value.toLowerCase().replace(' ', '');
+                        previousOdds[key] = parseFloat(v.odd);
+                    });
+                } else {
+                     previousOdds.home = currentOdds.home;
+                     previousOdds.draw = currentOdds.draw;
+                     previousOdds.away = currentOdds.away;
+                }
+
+                setOdds({
+                    home: currentOdds.home,
+                    draw: currentOdds.draw,
+                    away: currentOdds.away,
+                    homeChange: currentOdds.home - previousOdds.home,
+                    drawChange: currentOdds.draw - previousOdds.draw,
+                    awayChange: currentOdds.away - previousOdds.away,
+                    homeTeamName: fixtureInfo.teams.home.name,
+                    awayTeamName: fixtureInfo.teams.away.name,
+                    homeTeamLogo: fixtureInfo.teams.home.logo,
+                    awayTeamLogo: fixtureInfo.teams.away.logo,
+                });
+            } else {
+                setOdds(null);
+            }
+        })
+        .catch(err => {
+            console.error("Error fetching odds:", err);
+            if (isMounted) setOdds(null);
+        })
+        .finally(() => {
+            if (isMounted) setLoading(false);
+        });
 
         return () => { isMounted = false; };
     }, [fixtureId]);
 
+
     if (loading) {
         return (
-            <div className="space-y-4">
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-32 w-full" />
-            </div>
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-6 w-3/4 mx-auto" />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                </CardContent>
+            </Card>
         );
     }
 
-    if (!bookmaker || bookmaker.bets.length === 0) {
-        return <p className="text-center text-muted-foreground p-8">لا توجد احتمالات متاحة لهذه المباراة من 1xBet.</p>;
+    if (!odds) {
+        return <p className="text-center text-muted-foreground p-8">لا توجد احتمالات متاحة لهذه المباراة.</p>;
     }
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-xl text-center font-bold">احتمالات 1xBet</CardTitle>
+                <CardTitle className="text-xl text-center font-bold">احتمالات فوز المباراة (1xBet)</CardTitle>
             </CardHeader>
-            <CardContent className="p-2 space-y-4">
-                 {bookmaker.bets.map(bet => (
-                     <div key={bet.id} className="p-3 border rounded-lg bg-card-foreground/5">
-                         <h4 className="font-semibold text-center mb-3">{translate(bet.name, 'bet')}</h4>
-                         <BetRow values={bet.values} history={oddsHistory[bookmaker.id]?.[bet.id] || []} />
-                     </div>
-                 ))}
+            <CardContent className="space-y-3">
+                <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-card-foreground/5 border">
+                    <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6"><AvatarImage src={odds.homeTeamLogo} /></Avatar>
+                        <span className="font-semibold">{odds.homeTeamName}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold text-lg">{odds.home.toFixed(2)}</span>
+                        <OddsChangeIndicator change={odds.homeChange} />
+                    </div>
+                </div>
+                <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-card-foreground/5 border">
+                     <span className="font-semibold">تعادل</span>
+                     <div className="flex items-center gap-2">
+                        <span className="font-bold text-lg">{odds.draw.toFixed(2)}</span>
+                        <OddsChangeIndicator change={odds.drawChange} />
+                    </div>
+                </div>
+                <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-card-foreground/5 border">
+                    <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6"><AvatarImage src={odds.awayTeamLogo} /></Avatar>
+                        <span className="font-semibold">{odds.awayTeamName}</span>
+                    </div>
+                     <div className="flex items-center gap-2">
+                        <span className="font-bold text-lg">{odds.away.toFixed(2)}</span>
+                        <OddsChangeIndicator change={odds.awayChange} />
+                    </div>
+                </div>
             </CardContent>
         </Card>
     );
