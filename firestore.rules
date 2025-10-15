@@ -1,278 +1,239 @@
 /**
- * @fileoverview Firestore Security Rules for Goal Stack application.
+ * @file Firebase Security Rules for Goal Stack application.
  *
  * Core Philosophy:
- * This ruleset prioritizes a secure, role-based access control model.
- * User data is strictly controlled by the owning user, while admin-managed
- * data is publicly readable but only modifiable by designated administrators.
- * The existence of an admin document signifies admin privileges.
+ * This ruleset enforces a hybrid security model, combining public read access for shared entities (competitions, teams, matches, news) with strict user-ownership for user-specific data (user profiles, favorites). Administrative privileges are determined by the existence of an admin document.
  *
  * Data Structure:
- * - /users/{userId}: User profile information, accessible only by the user.
- * - /competitions/{competitionId}, /teams/{teamId}, /matches/{matchId}, /news/{newsId}:
- *   Publicly readable data, modifiable only by admins.
- * - /admins/{adminId}: Admin user data; its existence confers admin privileges.
- * - /users/{userId}/favorites: User's favorite teams and competitions, accessible only by the user.
- * - /topCompetitions/{competitionId}, /topTeams/{teamId}: Admin-curated top competitions and teams.
- * - /leagueCustomizations/{leagueId}, /teamCustomizations/{teamId}, /playerCustomizations/{playerId}, /continentCustomizations/{continentId}, /countryCustomizations/{countryId}: Admin-managed customizations.
- * - /pinnedIraqiMatch/special: Details of a pinned Iraqi match, managed by an admin.
+ * - User data is stored under `/users/{userId}`.
+ * - Shared entities like competitions, teams, matches and news reside in top-level collections (`/competitions/{competitionId}`, `/teams/{teamId}`, `/matches/{matchId}`, `/news/{newsId}`).
+ * - User favorites are stored in a subcollection `/users/{userId}/favorites`.
+ * - Admin data (presence determines authorization level) is under `/admins/{adminId}`.
+ * - Customization data (custom names) is stored under collections with specific entity types such as: `/leagueCustomizations/{leagueId}`, `/teamCustomizations/{teamId}`, `/playerCustomizations/{playerId}`, `/continentCustomizations/{continentId}`, and `/countryCustomizations/{countryId}`
+ * - Pinned Iraqi Match data is stored at `/pinnedIraqiMatch/special`
  *
  * Key Security Decisions:
- * - User data is strictly private and only accessible to the owning user.
- * - Admins are identified by the existence of a document in the `/admins` collection.
- * - Public data (competitions, teams, matches, news) is readable by anyone.
- * - No user listing is allowed for any collection.
+ * - Public read access is granted to competitions, teams, matches, and news.
+ * - Only the authenticated user can manage their own profile and favorites.
+ * - Administrative access is required to create, update, and delete competitions, teams, news, and admin documents themselves.
+ * - Listing of admin documents is forbidden.
+ * - The rules do not enforce strict schema validation in this prototype phase, but enforce key authorization and relational integrity checks.
  *
  * Denormalization for Authorization:
- * - Admin status is determined by the presence of an admin document, avoiding the need for complex role lookups.
+ * - Admin status is determined by the presence of a document under `/admins/{adminId}`. This avoids the need to store admin status within user profiles and simplifies admin role checks in rules.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile information. Only the user can read/write their own profile.
+     * @description Controls access to user profile information.
      * @path /users/{userId}
-     * @allow (create) - User with ID 'user123' creates their profile: request.auth.uid == 'user123'
-     * @allow (get,update,delete) - User with ID 'user123' reads, updates, or deletes their profile: request.auth.uid == 'user123'
-     * @deny (create,update,delete) - User with ID 'user456' attempts to create, update, or delete the profile of user 'user123': request.auth.uid != 'user123'
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) If the authenticated user's ID matches the userId path parameter.
+     * @allow (get, list, update, delete) If the authenticated user's ID matches the userId path parameter.
+     * @deny (create, get, list, update, delete) If the authenticated user's ID does not match the userId path parameter.
+     * @principle Enforces user-ownership for user profiles.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
+      function isSignedIn() {
+        return request.auth != null;
       }
-      allow get: if isOwner(userId);
-      allow list: if false;
+
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isOwner(userId) && resource != null;
+      allow get, list, update, delete: if isOwner(userId);
     }
 
     /**
-     * @description Controls access to competition data. Publicly readable, but only admins can create/update/delete.
+     * @description Controls access to competition data.
      * @path /competitions/{competitionId}
-     * @allow (get,list) - Any user can read competition data.
-     * @allow (create,update,delete) - An admin creates/updates/deletes a competition: exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @deny (create,update,delete) - A non-admin attempts to create/update/delete a competition: !exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @principle Restricts write access to admins.
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Only admins can create, update, or delete competitions.
+     * @deny (create, update, delete) Non-admins cannot create, update, or delete competitions.
+     * @principle Public read access with admin-only writes.
      */
     match /competitions/{competitionId} {
-      function isAdmin() {
-        return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-      }
       allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow create, update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     /**
-     * @description Controls access to team data. Publicly readable, but only admins can create/update/delete.
+     * @description Controls access to team data.
      * @path /teams/{teamId}
-     * @allow (get,list) - Any user can read team data.
-     * @allow (create,update,delete) - An admin creates/updates/deletes a team: exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @deny (create,update,delete) - A non-admin attempts to create/update/delete a team: !exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @principle Restricts write access to admins.
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Only admins can create, update, or delete teams.
+     * @deny (create, update, delete) Non-admins cannot create, update, or delete teams.
+     * @principle Public read access with admin-only writes.
      */
     match /teams/{teamId} {
-      function isAdmin() {
-        return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-      }
       allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow create, update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     /**
-     * @description Controls access to match data. Publicly readable.
+     * @description Controls access to match data.
      * @path /matches/{matchId}
-     * @allow (get,list) - Any user can read match data.
-     * @deny (create,update,delete) - No one can create/update/delete match data.
-     * @principle Allows public read access.
+     * @allow (get, list) Public read access.
+     * @deny (create, update, delete) No one can create, update, or delete matches.
+     * @principle Public read access with no writes allowed.
      */
     match /matches/{matchId} {
       allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to news articles. Publicly readable, but only admins can create/update/delete.
+     * @description Controls access to news articles.
      * @path /news/{newsId}
-     * @allow (get,list) - Any user can read news articles.
-     * @allow (create,update,delete) - An admin creates/updates/deletes a news article: exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @deny (create,update,delete) - A non-admin attempts to create/update/delete a news article: !exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @principle Restricts write access to admins.
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Only admins can create, update, or delete news articles.
+     * @deny (create, update, delete) Non-admins cannot create, update, or delete news articles.
+     * @principle Public read access with admin-only writes.
      */
     match /news/{newsId} {
-      function isAdmin() {
-        return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-      }
       allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow create, update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     /**
-     * @description Controls access to admin user data. Only admins can create/update/delete other admins. Normal users can't read.
+     * @description Controls access to admin user data.
      * @path /admins/{adminId}
-     * @allow (create,update,delete) - An admin creates/updates/deletes another admin: exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @deny (get,list) - Normal users cannot read admin data.
-     * @deny (create,update,delete) - A non-admin attempts to create/update/delete admin data: !exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @principle Restricts access to admin data and actions.
+     * @deny get, list: Admins cannot be listed or read directly. Existence is checked in rules.
+     * @allow create: if request.auth.uid == adminId && !exists(/databases/$(database)/documents/admins/$(adminId));
+     * @allow update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+     * @principle Admin-only management with no listing.
      */
     match /admins/{adminId} {
-      function isAdmin() {
-        return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-      }
       allow get, list: if false;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow create: if request.auth.uid == adminId && !exists(/databases/$(database)/documents/admins/$(adminId));
+      allow update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && resource != null;
     }
 
     /**
-     * @description Controls access to user's favorite teams and competitions. Only the user can read/write their own favorites.
+     * @description Controls access to user's favorite teams and competitions.
      * @path /users/{userId}/favorites
-     * @allow (create) - User with ID 'user123' creates their favorites: request.auth.uid == 'user123'
-     * @allow (get,update,delete) - User with ID 'user123' reads, updates, or deletes their favorites: request.auth.uid == 'user123'
-     * @deny (create,update,delete) - User with ID 'user456' attempts to create, update, or delete the favorites of user 'user123': request.auth.uid != 'user123'
-     * @principle Enforces document ownership for user favorites.
+     * @allow (create, get, list, update, delete) If the authenticated user's ID matches the userId path parameter.
+     * @deny (create, get, list, update, delete) If the authenticated user's ID does not match the userId path parameter.
+     * @principle Enforces user-ownership for user favorites.
      */
     match /users/{userId}/favorites {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
+      function isSignedIn() {
+        return request.auth != null;
       }
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
+
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && resource != null;
-      allow delete: if isOwner(userId) && resource != null;
+      allow get, list, update, delete: if isOwner(userId);
     }
-	/**
-     * @description Controls access to top competition data. Publicly readable, but only admins can create/update/delete.
+	
+    /**
+     * @description Controls access to top competition data (marked by admins).
      * @path /topCompetitions/{competitionId}
-     * @allow (get,list) - Any user can read top competition data.
-     * @allow (create,update,delete) - An admin creates/updates/deletes a top competition: exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @deny (create,update,delete) - A non-admin attempts to create/update/delete a top competition: !exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @principle Restricts write access to admins.
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Only admins can create, update, or delete top competitions.
+     * @deny (create, update, delete) Non-admins cannot create, update, or delete top competitions.
+     * @principle Public read access with admin-only writes.
      */
     match /topCompetitions/{competitionId} {
-      function isAdmin() {
-        return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-      }
       allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow create, update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    /**
-     * @description Controls access to top team data. Publicly readable, but only admins can create/update/delete.
-     * @path /topTeams/{teamId}
-     * @allow (get,list) - Any user can read top team data.
-     * @allow (create,update,delete) - An admin creates/updates/deletes a top team: exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @deny (create,update,delete) - A non-admin attempts to create/update/delete a top team: !exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-     * @principle Restricts write access to admins.
-     */
+     /**
+      * @description Controls access to top teams data (marked by admins).
+      * @path /topTeams/{teamId}
+      * @allow (get, list) Public read access.
+      * @allow (create, update, delete) Only admins can create, update, or delete top teams.
+      * @deny (create, update, delete) Non-admins cannot create, update, or delete top teams.
+      * @principle Public read access with admin-only writes.
+      */
     match /topTeams/{teamId} {
-      function isAdmin() {
-        return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-      }
       allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow create, update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     /**
-     * @description Stores custom names for leagues set by admins.
+     * @description Controls access to league customizations data.
      * @path /leagueCustomizations/{leagueId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Only admins can create, update, or delete league customizations.
+     * @deny (create, update, delete) Non-admins cannot create, update, or delete league customizations.
+     * @principle Public read access with admin-only writes.
      */
     match /leagueCustomizations/{leagueId} {
-        function isAdmin() {
-          return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-        }
         allow get, list: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin() && resource != null;
-        allow delete: if isAdmin() && resource != null;
+        allow create, update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     /**
-     * @description Stores custom names for teams set by admins.
+     * @description Controls access to team customizations data.
      * @path /teamCustomizations/{teamId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Only admins can create, update, or delete team customizations.
+     * @deny (create, update, delete) Non-admins cannot create, update, or delete team customizations.
+     * @principle Public read access with admin-only writes.
      */
     match /teamCustomizations/{teamId} {
-        function isAdmin() {
-          return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-        }
         allow get, list: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin() && resource != null;
-        allow delete: if isAdmin() && resource != null;
+        allow create, update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     /**
-     * @description Stores custom names for players set by admins.
+     * @description Controls access to player customizations data.
      * @path /playerCustomizations/{playerId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Only admins can create, update, or delete player customizations.
+     * @deny (create, update, delete) Non-admins cannot create, update, or delete player customizations.
+     * @principle Public read access with admin-only writes.
      */
     match /playerCustomizations/{playerId} {
-        function isAdmin() {
-          return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-        }
         allow get, list: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin() && resource != null;
-        allow delete: if isAdmin() && resource != null;
+        allow create, update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     /**
-     * @description Stores custom names for continents set by admins.
+     * @description Controls access to continent customizations data.
      * @path /continentCustomizations/{continentId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Only admins can create, update, or delete continent customizations.
+     * @deny (create, update, delete) Non-admins cannot create, update, or delete continent customizations.
+     * @principle Public read access with admin-only writes.
      */
     match /continentCustomizations/{continentId} {
-        function isAdmin() {
-          return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-        }
         allow get, list: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin() && resource != null;
-        allow delete: if isAdmin() && resource != null;
+        allow create, update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     /**
-     * @description Stores custom names for countries set by admins.
+     * @description Controls access to country customizations data.
      * @path /countryCustomizations/{countryId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Only admins can create, update, or delete country customizations.
+     * @deny (create, update, delete) Non-admins cannot create, update, or delete country customizations.
+     * @principle Public read access with admin-only writes.
      */
     match /countryCustomizations/{countryId} {
-        function isAdmin() {
-          return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-        }
         allow get, list: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin() && resource != null;
-        allow delete: if isAdmin() && resource != null;
+        allow create, update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     /**
-     * @description Stores the details of a single pinned Iraqi match, managed by an admin.
+     * @description Controls access to pinned Iraqi match data.
      * @path /pinnedIraqiMatch/special
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Only admins can create, update, or delete pinned Iraqi match data.
+     * @deny (create, update, delete) Non-admins cannot create, update, or delete pinned Iraqi match data.
+     * @principle Public read access with admin-only writes.
      */
     match /pinnedIraqiMatch/special {
-        function isAdmin() {
-          return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-        }
-        allow get: if true;
-        allow list: if false;
-        allow create: if isAdmin();
-        allow update: if isAdmin() && resource != null;
-        allow delete: if isAdmin() && resource != null;
+        allow get, list: if true;
+        allow create, update, delete: if exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
-
   }
 }

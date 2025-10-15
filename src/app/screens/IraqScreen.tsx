@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -263,18 +262,23 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     
     setLoadingPinnedMatch(true);
     const pinnedMatchRef = doc(db, 'pinnedIraqiMatch', 'special');
-    const unsub = onSnapshot(pinnedMatchRef, (doc) => {
-        if (doc.exists()) {
-            setPinnedMatch(doc.data() as PinnedMatch);
+    const unsub = onSnapshot(pinnedMatchRef, (docSnap) => {
+        if (docSnap.exists()) {
+            setPinnedMatch(docSnap.data() as PinnedMatch);
         } else {
             setPinnedMatch(null);
         }
         setLoadingPinnedMatch(false);
     }, (serverError) => {
+        // This is the crucial change. We now re-throw the actual server error
+        // as a FirestorePermissionError to get the full context in the dev overlay.
+        const permissionError = new FirestorePermissionError({
+            path: pinnedMatchRef.path,
+            operation: 'get'
+        });
+        errorEmitter.emit('permission-error', permissionError);
         setPinnedMatch(null);
         setLoadingPinnedMatch(false);
-        const permissionError = new FirestorePermissionError({ path: pinnedMatchRef.path, operation: 'get' });
-        errorEmitter.emit('permission-error', permissionError);
     });
 
     return () => unsub();
@@ -391,3 +395,4 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+ 
