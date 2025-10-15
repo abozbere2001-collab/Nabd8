@@ -172,7 +172,9 @@ export function AppContentWrapper() {
         }
         // If on a non-main tab and at the root, go back to the default tab
         if (!mainTabs.includes(prevState.activeTab)) {
-            return { ...prevState, activeTab: 'Matches' };
+            const newStacks = {...prevState.stacks};
+            // delete newStacks[prevState.activeTab]; // Clean up the temporary stack
+            return { ...prevState, activeTab: 'Matches', stacks: newStacks };
         }
         return prevState;
     });
@@ -182,40 +184,22 @@ export function AppContentWrapper() {
     const newKey = `${screen}-${Date.now()}`;
     const newItem = { key: newKey, screen, props };
 
-    if (mainTabs.includes(screen)) {
-        setNavigationState(prevState => {
-            const newStack = prevState.stacks[screen] ? [newItem, ...prevState.stacks[screen].slice(1)] : [newItem];
-            return {
-                ...prevState,
-                activeTab: screen,
-                stacks: {
-                    ...prevState.stacks,
-                    [screen]: [newItem] // Reset stack on main tab switch
-                }
-            };
-        });
-    } else {
-        setNavigationState(prevState => {
-            let activeTab = prevState.activeTab;
-            // If we are navigating to a screen that is not a main tab, and its stack doesn't exist, create it.
-            if (!prevState.stacks[screen]) {
-                const newStacks = {...prevState.stacks};
-                newStacks[screen] = [newItem];
-                return {
-                    activeTab: screen as ScreenKey,
-                    stacks: newStacks
-                }
-            }
-             // Push to the current tab's stack
-            return {
-                ...prevState,
-                stacks: {
-                    ...prevState.stacks,
-                    [prevState.activeTab]: [...prevState.stacks[prevState.activeTab], newItem],
-                }
-            };
-        });
-    }
+    setNavigationState(prevState => {
+        let activeTab = prevState.activeTab;
+        const newStacks = { ...prevState.stacks };
+
+        if (mainTabs.includes(screen)) {
+            // If navigating to a main tab, switch active tab and reset its stack
+            activeTab = screen;
+            newStacks[screen] = [newItem];
+        } else {
+            // If navigating to a detail screen, push it onto the current active stack
+            const currentStack = newStacks[activeTab] || [];
+            newStacks[activeTab] = [...currentStack, newItem];
+        }
+
+        return { activeTab, stacks: newStacks };
+    });
   }, []);
   
   useEffect(() => {
@@ -236,37 +220,35 @@ export function AppContentWrapper() {
         <main className="h-screen w-screen bg-background flex flex-col">
         <div className="relative flex-1 flex flex-col overflow-hidden">
             {Object.entries(navigationState.stacks).map(([tabKey, stack]) => {
-            const currentStackItem = stack[stack.length - 1];
-            if (!currentStackItem) return null;
+                if (stack.length === 0) return null;
+                const isActiveTab = navigationState.activeTab === tabKey;
             
-            const isActiveTab = navigationState.activeTab === tabKey;
-            const ScreenComponent = screenConfig[currentStackItem.screen]?.component;
+                return (
+                    <div key={tabKey} className={cn("absolute inset-0 flex flex-col", isActiveTab ? "z-10" : "-z-10")}>
+                        {stack.map((stackItem, index) => {
+                            const isVisible = isActiveTab && index === stack.length - 1;
+                            const Component = screenConfig[stackItem.screen]?.component;
+                            if (!Component) return null;
+                            
+                            const screenProps = {
+                                ...stackItem.props,
+                                navigate,
+                                goBack,
+                                // Correctly determine canGoBack based on the specific stack for this screen
+                                canGoBack: stack.length > 1,
+                                isVisible, // Pass isVisible prop
+                            };
 
-            if (!ScreenComponent) return null;
-
-            return (
-                <div key={tabKey} className={cn("absolute inset-0 flex flex-col", isActiveTab ? "z-10" : "-z-10")}>
-                    {stack.map((stackItem, index) => {
-                        const isVisible = index === stack.length - 1;
-                        const Component = screenConfig[stackItem.screen]?.component;
-                        if (!Component) return null;
-                        
-                        const screenProps = {
-                            ...stackItem.props,
-                            navigate,
-                            goBack,
-                            canGoBack: stack.length > 1,
-                            isVisible, // Pass isVisible prop
-                        };
-
-                        return (
-                            <div key={stackItem.key} className={cn("absolute inset-0 flex flex-col", isVisible ? "z-10" : "-z-10")}>
-                            <Component {...screenProps} />
-                            </div>
-                        )
-                    })}
-                </div>
-            )
+                            return (
+                                <div key={stackItem.key} className={cn("absolute inset-0 flex flex-col transition-transform duration-300", 
+                                    isVisible ? "z-10 transform-none" : "z-0 -translate-x-full"
+                                )}>
+                                    <Component {...screenProps} />
+                                </div>
+                            )
+                        })}
+                    </div>
+                )
             })}
         </div>
         
