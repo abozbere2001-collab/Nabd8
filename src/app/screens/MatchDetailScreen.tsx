@@ -30,7 +30,6 @@ const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: S
   const playerImage = playerInfo?.photo || fallbackImage;
   const playerNumber = playerInfo?.number ?? playerStats?.games?.number;
   
-  // Use the rating from the statistics object if available, otherwise fallback to the one on the player object itself
   const ratingValue = playerStats?.games?.rating ?? playerInfo?.rating;
   
   const rating = ratingValue && !isNaN(parseFloat(ratingValue)) 
@@ -265,17 +264,18 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
     );
 }
 
-const LineupsTab = ({ initialLineups, events, navigate }: { initialLineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate']; }) => {
+const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate']; season: number }) => {
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
     const [lineups, setLineups] = useState<LineupData[] | null>(initialLineups);
     const [loading, setLoading] = useState(!initialLineups);
 
     useEffect(() => {
-        setLineups(initialLineups);
         if (initialLineups) {
+            setLineups(initialLineups);
             setLoading(false);
         }
     }, [initialLineups]);
+    
 
     if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     if (!lineups || lineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
@@ -311,19 +311,18 @@ const LineupsTab = ({ initialLineups, events, navigate }: { initialLineups: Line
             });
         });
         
-        // Goalkeeper is usually row 1, we want it at the bottom.
         const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
 
         return (
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2">
                 {sortedRows.map(row => (
                     <div key={row} className="flex justify-around items-center">
-                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id} player={p} navigate={navigate} />)}
+                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p} navigate={navigate} />)}
                     </div>
                 ))}
                  {ungriddedPlayers.length > 0 && (
                     <div className="flex justify-around items-center">
-                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id} player={p} navigate={navigate}/>)}
+                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p} navigate={navigate}/>)}
                     </div>
                 )}
             </div>
@@ -451,7 +450,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         }
 
         try {
-            // Fetch fixture first to get league and season info
             const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
             const fixtureData = await fixtureRes.json();
             const currentFixture = fixtureData.response?.[0];
@@ -530,11 +528,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
-                    <TabsContent value="lineups" className="mt-4"><LineupsTab initialLineups={lineups} events={events} navigate={navigate} /></TabsContent>
+                    <TabsContent value="lineups" className="mt-4"><LineupsTab initialLineups={lineups} events={events} navigate={navigate} season={fixture.league.season || CURRENT_SEASON} /></TabsContent>
                     <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} navigate={navigate} /></TabsContent>
                 </Tabs>
             </div>
         </div>
     );
 }
-
