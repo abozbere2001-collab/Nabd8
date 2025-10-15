@@ -26,16 +26,20 @@ interface Bookmaker {
     bets: Bet[];
 }
 
-interface OddsData {
-    fixture: { 
+interface OddsApiResponse {
+    fixture: {
         id: number;
     };
-    teams: {
-        home: { name: string; logo: string; };
-        away: { name: string; logo: string; };
-    };
-    bookmakers: Bookmaker[];
+    league: any;
     update: string;
+    bookmakers: Bookmaker[];
+}
+
+interface FixtureApiResponse {
+    teams: {
+        home: { id: number; name: string; logo: string; };
+        away: { id: number; name: string; logo: string; };
+    };
 }
 
 interface ProcessedOdds {
@@ -75,52 +79,66 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
         if (!isOpen || odds || loading) return;
 
         setLoading(true);
-        fetch(`/api/football/odds?fixture=${fixtureId}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.response && data.response.length > 0) {
-                    const fixtureData = data.response[0];
-                    const bookmaker = fixtureData.bookmakers.find((b: Bookmaker) => b.id === 8); // Bet365
-                    const matchWinnerBet = bookmaker?.bets.find((b: Bet) => b.id === 1);
+        Promise.all([
+            fetch(`/api/football/odds?fixture=${fixtureId}`),
+            fetch(`/api/football/fixtures?id=${fixtureId}`)
+        ])
+        .then(async ([oddsRes, fixtureRes]) => {
+            if (!oddsRes.ok || !fixtureRes.ok) {
+                throw new Error('Failed to fetch match data');
+            }
+            const oddsData = await oddsRes.json();
+            const fixtureData = await fixtureRes.json();
+            return { oddsData, fixtureData };
+        })
+        .then(({ oddsData, fixtureData }) => {
+            const oddsResponse: OddsApiResponse | undefined = oddsData.response?.[0];
+            const fixtureResponse: FixtureApiResponse | undefined = fixtureData.response?.[0];
+            
+            if (oddsResponse && fixtureResponse) {
+                const bookmaker = oddsResponse.bookmakers.find((b: Bookmaker) => b.id === 8); // Bet365
+                const matchWinnerBet = bookmaker?.bets.find((b: Bet) => b.id === 1);
+                
+                if (matchWinnerBet && oddsResponse.update) {
+                    const oddsHistory = oddsData.odds_history?.[fixtureId]?.[bookmaker?.id]?.[1] || [];
                     
-                    if (matchWinnerBet && fixtureData.update) {
-                        const oddsHistory = data.odds_history?.[fixtureId]?.[bookmaker?.id]?.[1] || [];
-                        
-                        const currentOdds: { [key: string]: number } = {};
-                        matchWinnerBet.values.forEach((v: OddValue) => {
-                           currentOdds[v.value.toLowerCase()] = parseFloat(v.odd);
+                    const currentOdds: { [key: string]: number } = {};
+                    matchWinnerBet.values.forEach((v: OddValue) => {
+                       const key = v.value.toLowerCase().replace(' ', '');
+                       currentOdds[key] = parseFloat(v.odd);
+                    });
+                    
+                    const previousOdds: { [key: string]: number } = {};
+                    if(oddsHistory.length > 1) {
+                        const prev = oddsHistory[1]; // second to last
+                        prev.values.forEach((v: OddValue) => {
+                            const key = v.value.toLowerCase().replace(' ', '');
+                            previousOdds[key] = parseFloat(v.odd);
                         });
-
-                        const previousOdds: { [key: string]: number } = {};
-                        if(oddsHistory.length > 1) {
-                            const prev = oddsHistory[1]; // second to last
-                            prev.values.forEach((v: OddValue) => {
-                                previousOdds[v.value.toLowerCase()] = parseFloat(v.odd);
-                            });
-                        } else {
-                            // If no history, changes are 0
-                             previousOdds.home = currentOdds.home;
-                             previousOdds.draw = currentOdds.draw;
-                             previousOdds.away = currentOdds.away;
-                        }
-
-                        setOdds({
-                            home: currentOdds.home,
-                            draw: currentOdds.draw,
-                            away: currentOdds.away,
-                            homeChange: currentOdds.home - (previousOdds.home || currentOdds.home),
-                            drawChange: currentOdds.draw - (previousOdds.draw || currentOdds.draw),
-                            awayChange: currentOdds.away - (previousOdds.away || currentOdds.away),
-                            homeTeamName: fixtureData.teams.home.name,
-                            awayTeamName: fixtureData.teams.away.name,
-                            homeTeamLogo: fixtureData.teams.home.logo,
-                            awayTeamLogo: fixtureData.teams.away.logo,
-                        });
+                    } else {
+                        // If no history, changes are 0
+                         previousOdds.home = currentOdds.home;
+                         previousOdds.draw = currentOdds.draw;
+                         previousOdds.away = currentOdds.away;
                     }
+
+                    setOdds({
+                        home: currentOdds.home,
+                        draw: currentOdds.draw,
+                        away: currentOdds.away,
+                        homeChange: currentOdds.home - (previousOdds.home || currentOdds.home),
+                        drawChange: currentOdds.draw - (previousOdds.draw || currentOdds.draw),
+                        awayChange: currentOdds.away - (previousOdds.away || currentOdds.away),
+                        homeTeamName: fixtureResponse.teams.home.name,
+                        awayTeamName: fixtureResponse.teams.away.name,
+                        homeTeamLogo: fixtureResponse.teams.home.logo,
+                        awayTeamLogo: fixtureResponse.teams.away.logo,
+                    });
                 }
-            })
-            .catch(console.error)
-            .finally(() => setLoading(false));
+            }
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false));
 
     }, [isOpen, fixtureId, odds, loading]);
 
