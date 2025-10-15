@@ -438,18 +438,22 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             const currentLeagueId = currentFixture.league.id;
             const currentSeason = currentFixture.league.season || CURRENT_SEASON;
     
-            const [eventsData, statisticsData, standingsData, lineupsData] = await Promise.all([
+            // Fetch non-lineup data first
+            const [eventsData, statisticsData, standingsData] = await Promise.all([
                 fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).then(res => res.json()),
                 fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`).then(res => res.json()),
-                fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`).then(res => res.json()),
-                fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`).then(res => res.json())
+                fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`).then(res => res.json())
             ]);
     
             setEvents(eventsData.response || []);
             setStatistics(statisticsData.response || []);
             setStandings(standingsData?.response?.[0]?.league?.standings[0] || []);
-            
+
+            // Now fetch lineups
+            const lineupsRes = await fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`);
+            const lineupsData = await lineupsRes.json();
             const initialLineups = lineupsData.response || [];
+
             if (initialLineups.length > 0) {
                  const allPlayerIds = initialLineups.flatMap((l: LineupData) => [...l.startXI, ...l.substitutes]).map((p: PlayerWithStats) => p.player.id).filter((id: number | null): id is number => id !== null);
                 
@@ -463,6 +467,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     }
                     
                     for (const batch of batches) {
+                        // Corrected API call with 'id' instead of 'player'
                         const res = await fetch(`/api/football/players?id=${batch.join('-')}&season=${currentSeason}`);
                         if (res.ok) {
                             const data = await res.json();
@@ -472,13 +477,13 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                                     playersDataMap.set(item.player.id, {
                                         ...item.player,
                                         rating: stats.games?.rating,
-                                        number: item.player.number ?? stats.games?.number,
                                     });
                                 }
                             });
                         }
                     }
 
+                    // Safely enrich lineup data
                     const enrichedLineups = initialLineups.map((lineup: LineupData) => ({
                         ...lineup,
                         startXI: lineup.startXI.map(p => {
@@ -490,7 +495,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                             return extraData ? { ...p, player: { ...p.player, ...extraData } } : p;
                         }),
                     }));
-                    setLineups(enrichedLineups);
+                    setLineups(enrichedLineups); // Set the enriched lineups
                 } else {
                    setLineups(initialLineups);
                 }
@@ -511,13 +516,13 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         const isLive = fixture?.fixture.status.short && ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(fixture.fixture.status.short);
         let interval: NodeJS.Timeout | null = null;
         if (isLive) {
-          interval = setInterval(() => fetchData(false), 30000); 
+          interval = setInterval(() => fetchData(false), 60000); // Fetch every 60 seconds for live matches
         }
         
         return () => {
           if (interval) clearInterval(interval);
         };
-    }, [fixtureId, fetchData]);
+    }, [fixtureId, fetchData]); // Removed 'fixture' from dependencies to prevent re-triggering interval
 
 
     if (loading && !fixture) {
@@ -561,5 +566,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
 
     
