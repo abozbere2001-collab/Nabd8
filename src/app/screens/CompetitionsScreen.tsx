@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Star, Plus, Users, Trophy, User as PlayerIcon, Search, Bell, BellOff } from 'lucide-react';
+import { Star, Plus, Users, Trophy, User as PlayerIcon, Search, Bell } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAuth, useFirestore } from '@/firebase/provider';
@@ -137,8 +137,8 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                      <div className="space-y-6 py-4">
                         <ScrollArea className="w-full whitespace-nowrap">
                             <div className="flex w-max space-x-4 px-4">
-                                {favoriteTeams.map((team) => (
-                                    <div key={team.teamId} className="relative flex flex-col items-center gap-2 w-20 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
+                                {favoriteTeams.map((team, index) => (
+                                    <div key={`${team.teamId}-${index}`} className="relative flex flex-col items-center gap-2 w-20 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
                                         <Avatar className="h-14 w-14 border-2 border-border">
                                             <AvatarImage src={team.logo} />
                                             <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
@@ -160,7 +160,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                         </ScrollArea>
 
                         <Tabs defaultValue="teams" className="w-full px-4">
-                            <TabsList className="grid w-full grid-cols-3">
+                             <TabsList className="grid w-full grid-cols-3 bg-card text-card-foreground">
                                 <TabsTrigger value="players"><PlayerIcon className="ml-1 h-4 w-4"/>اللاعبين</TabsTrigger>
                                 <TabsTrigger value="competitions"><Trophy className="ml-1 h-4 w-4"/>منافسات</TabsTrigger>
                                 <TabsTrigger value="teams"><Users className="ml-1 h-4 w-4"/>فرق</TabsTrigger>

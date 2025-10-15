@@ -159,10 +159,10 @@ export function NotificationsScreen({ navigate, goBack, canGoBack, headerActions
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="إشعارات المفضلة" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
-        <Tabs defaultValue="my-choices" className="w-full">
+      <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+        <Tabs defaultValue="notifications" className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-transparent px-4">
-                <TabsTrigger value="notifications">إعدادات الإشعارات</TabsTrigger>
+                <TabsTrigger value="notifications">إشعارات</TabsTrigger>
                 <TabsTrigger value="my-choices" onClick={() => navigate('Competitions')}>اختياراتي</TabsTrigger>
             </TabsList>
         </Tabs>
