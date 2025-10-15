@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -277,7 +276,6 @@ const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lin
                 const uniquePlayerIds = [...new Set(allPlayerIds)];
                 if (uniquePlayerIds.length === 0) return;
 
-                // API-FOOTBALL player endpoint supports batching up to 20 IDs
                 const BATCH_SIZE = 20;
                 const playerInfoMap = new Map<number, { photo: string, rating: string | null, number: number | null }>();
 
