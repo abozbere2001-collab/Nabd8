@@ -104,8 +104,8 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                         <h3 className="font-bold text-lg mb-2">الفرق المفضلة</h3>
                         <ScrollArea className="w-full whitespace-nowrap rounded-md">
                             <div className="flex w-max space-x-4 p-2">
-                                {favoriteTeams.map(team => (
-                                    <div key={team.teamId} className="flex flex-col items-center gap-2 w-20 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
+                                {favoriteTeams.map((team, index) => (
+                                    <div key={`${team.teamId}-${index}`} className="flex flex-col items-center gap-2 w-20 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
                                         <Avatar className="h-12 w-12 border-2 border-primary/20">
                                             <AvatarImage src={team.logo} />
                                             <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
