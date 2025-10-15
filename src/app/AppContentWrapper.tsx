@@ -28,6 +28,8 @@ import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { NotificationSettingsScreen } from './screens/NotificationSettingsScreen';
 import { GeneralSettingsScreen } from './screens/GeneralSettingsScreen';
+import PrivacyPolicyScreen from './privacy-policy/page';
+import TermsOfServiceScreen from './terms-of-service/page';
 import type { ScreenKey } from './page';
 
 import { useAd, SplashScreenAd, BannerAd } from '@/components/AdProvider';
@@ -73,6 +75,8 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   SignUp: { component: LoginScreen },
   NotificationSettings: { component: NotificationSettingsScreen },
   GeneralSettings: { component: GeneralSettingsScreen },
+  PrivacyPolicy: { component: PrivacyPolicyScreen },
+  TermsOfService: { component: TermsOfServiceScreen },
 };
 
 
@@ -249,5 +253,3 @@ export function AppContentWrapper() {
     </main>
   );
 }
-
-    
