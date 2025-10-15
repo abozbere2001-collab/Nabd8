@@ -212,7 +212,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   return (
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetTrigger asChild onClick={(e) => { e.stopPropagation(); setIsOpen(true) }}>{children}</SheetTrigger>
-      <SheetContent side="bottom" className="flex flex-col h-[85vh] rounded-t-2xl">
+      <SheetContent side="bottom" className="flex flex-col h-[90vh] top-0 rounded-t-none">
         <SheetHeader>
           <SheetTitle>اكتشف</SheetTitle>
         </SheetHeader>
@@ -232,5 +232,3 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
-
-    
