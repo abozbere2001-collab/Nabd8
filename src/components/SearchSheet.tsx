@@ -189,11 +189,8 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
 
                 await Promise.all([...teamPromises, ...leaguePromises]);
             } catch (error) {
-                const permissionError = new FirestorePermissionError({
-                    path: 'teamCustomizations/leagueCustomizations',
-                    operation: 'list'
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                // This might fail if rules are not set, but we can continue.
+                console.warn("Could not search custom names in Firestore, might be a permissions issue.", error);
             }
         }
       

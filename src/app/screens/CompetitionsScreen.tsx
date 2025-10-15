@@ -107,10 +107,8 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     const fetchAllCustomNames = useCallback(async () => {
         if (!db) return;
         try {
-            const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
+            const [leaguesSnapshot] = await Promise.all([
                 getDocs(collection(db, 'leagueCustomizations')),
-                getDocs(collection(db, 'countryCustomizations')),
-                getDocs(collection(db, 'continentCustomizations')),
             ]);
             
             const names = {
@@ -120,8 +118,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             };
 
             leaguesSnapshot.forEach(doc => names.leagues.set(Number(doc.id), doc.data().customName));
-            countriesSnapshot.forEach(doc => names.countries.set(doc.id, doc.data().customName));
-            continentsSnapshot.forEach(doc => names.continents.set(doc.id, doc.data().customName));
             
             setCustomNames(names);
 
