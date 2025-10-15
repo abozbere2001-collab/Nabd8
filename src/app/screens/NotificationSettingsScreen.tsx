@@ -9,10 +9,12 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import type { ScreenProps } from '@/app/page';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { collection, doc, onSnapshot, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, doc, onSnapshot, updateDoc, getDocs, setDoc } from 'firebase/firestore';
 import type { Favorites } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Newspaper, MessageSquare } from 'lucide-react';
 
 export function NotificationSettingsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
   const { user } = useAuth();
@@ -54,7 +56,15 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
       if (docSnap.exists()) {
         setFavorites(docSnap.data() as Favorites);
       } else {
-        setFavorites({ userId: user.uid });
+        // Ensure favorites object exists with defaults
+        const defaultFavs: Favorites = { 
+            userId: user.uid,
+            leagues: {},
+            teams: {},
+            players: {},
+            notificationsEnabled: { news: true, comments: true }
+        };
+        setFavorites(defaultFavs);
       }
       setLoading(false);
     }, (error) => {
@@ -72,41 +82,31 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
     return map?.get(id) || defaultName;
   }, [customNames]);
 
-  const handleToggleNotification = (type: 'leagues' | 'teams', itemId: number) => {
+  const handleToggleNotification = (type: 'leagues' | 'general', itemId: number | string) => {
     if (!user || !db || !favorites) return;
 
-    const currentStatus = favorites[type]?.[itemId]?.notificationsEnabled ?? true;
+    let fieldPath: string;
+    let currentStatus: boolean;
+
+    if (type === 'leagues') {
+        fieldPath = `leagues.${itemId}.notificationsEnabled`;
+        currentStatus = favorites.leagues?.[itemId as number]?.notificationsEnabled ?? true;
+    } else { // general notifications like news, comments
+        fieldPath = `notificationsEnabled.${itemId}`;
+        currentStatus = favorites.notificationsEnabled?.[itemId as 'news' | 'comments'] ?? true;
+    }
+    
     const newStatus = !currentStatus;
 
-    // Optimistically update UI
-    setFavorites(prev => {
-        if (!prev) return null;
-        const newFavs = { ...prev };
-        if (newFavs[type] && newFavs[type]?.[itemId]) {
-             newFavs[type]![itemId].notificationsEnabled = newStatus;
-        }
-        return newFavs;
-    });
-
     const docRef = doc(db, 'favorites', user.uid);
-    const fieldPath = `${type}.${itemId}.notificationsEnabled`;
     const updateData = { [fieldPath]: newStatus };
     
-    updateDoc(docRef, updateData).catch(serverError => {
+    // Set document if it doesn't exist, otherwise update.
+    setDoc(docRef, updateData, { merge: true }).catch(serverError => {
       const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: updateData });
       errorEmitter.emit('permission-error', permissionError);
-      // Revert optimistic update on error
-      setFavorites(favorites);
     });
   };
-
-  const favoriteTeams = useMemo(() => {
-    if (!favorites?.teams) return [];
-    return Object.values(favorites.teams).map(team => ({
-      ...team,
-      name: getDisplayName('team', team.teamId, team.name)
-    }));
-  }, [favorites, getDisplayName]);
 
   const favoriteLeagues = useMemo(() => {
     if (!favorites?.leagues) return [];
@@ -116,16 +116,15 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
     }));
   }, [favorites, getDisplayName]);
 
-  const NotificationControlItem = ({ item, type }: { item: any, type: 'leagues' | 'teams' }) => {
-    const isTeam = type === 'teams';
-    const id = isTeam ? item.teamId : item.leagueId;
+  const NotificationControlItem = ({ item, type }: { item: any, type: 'leagues' }) => {
+    const id = item.leagueId;
     const isEnabled = favorites?.[type]?.[id]?.notificationsEnabled ?? true;
 
     return (
-        <div className="flex items-center justify-between p-3 border-b">
+        <div key={id} className="flex items-center justify-between p-3 border-b last:border-b-0">
             <div className="flex items-center gap-3">
                 <Avatar className="h-8 w-8">
-                    <AvatarImage src={item.logo} alt={item.name} className={isTeam ? '' : 'object-contain p-1'} />
+                    <AvatarImage src={item.logo} alt={item.name} className={'object-contain p-1'} />
                     <AvatarFallback>{item.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <Label htmlFor={`notif-${id}`} className="font-semibold cursor-pointer">{item.name}</Label>
@@ -160,28 +159,46 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader title="إعدادات الإشعارات" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
       
-      <div className="flex-1 overflow-y-auto pt-4">
-         {(favoriteLeagues.length === 0 && favoriteTeams.length === 0) ? (
-            <p className="text-center text-muted-foreground pt-16">أضف فرقا وبطولات إلى مفضلتك للتحكم في إشعاراتها.</p>
+      <div className="flex-1 overflow-y-auto pt-4 space-y-6">
+        <Card className="mx-4">
+            <CardHeader><CardTitle>الإشعارات العامة</CardTitle></CardHeader>
+            <CardContent className="divide-y p-0">
+                 <div className="flex items-center justify-between p-3">
+                    <div className="flex items-center gap-3">
+                        <Newspaper className="h-6 w-6 text-primary" />
+                        <Label htmlFor="notif-news" className="font-semibold cursor-pointer">إشعارات الأخبار</Label>
+                    </div>
+                    <Switch
+                        id="notif-news"
+                        checked={favorites?.notificationsEnabled?.news ?? true}
+                        onCheckedChange={() => handleToggleNotification('general', 'news')}
+                    />
+                </div>
+                 <div className="flex items-center justify-between p-3">
+                    <div className="flex items-center gap-3">
+                        <MessageSquare className="h-6 w-6 text-primary" />
+                        <Label htmlFor="notif-comments" className="font-semibold cursor-pointer">إشعارات التفاعلات</Label>
+                    </div>
+                    <Switch
+                        id="notif-comments"
+                        checked={favorites?.notificationsEnabled?.comments ?? true}
+                        onCheckedChange={() => handleToggleNotification('general', 'comments')}
+                    />
+                </div>
+            </CardContent>
+        </Card>
+
+         {favoriteLeagues.length === 0 ? (
+            <p className="text-center text-muted-foreground pt-10 px-4">أضف بطولات إلى مفضلتك للتحكم في إشعاراتها بشكل منفصل.</p>
          ) : (
-            <>
-              {favoriteLeagues.length > 0 && (
-                <div className="px-4 mb-6">
-                  <h3 className="font-bold text-lg mb-2">البطولات</h3>
-                  <div className="rounded-lg border">
-                    {favoriteLeagues.map((league) => <NotificationControlItem key={league.leagueId} item={league} type="leagues"/>)}
-                  </div>
-                </div>
-              )}
-              {favoriteTeams.length > 0 && (
-                 <div className="px-4 mb-6">
-                  <h3 className="font-bold text-lg mb-2">الفرق</h3>
-                   <div className="rounded-lg border">
-                    {favoriteTeams.map((team) => <NotificationControlItem key={team.teamId} item={team} type="teams"/>)}
-                  </div>
-                </div>
-              )}
-            </>
+            <Card className="mx-4">
+                <CardHeader><CardTitle>إشعارات البطولات المفضلة</CardTitle></CardHeader>
+                <CardContent className="p-0">
+                    <div className="rounded-lg border">
+                        {favoriteLeagues.map((league) => <NotificationControlItem key={league.leagueId} item={league} type="leagues"/>)}
+                    </div>
+                </CardContent>
+            </Card>
          )}
       </div>
     </div>
