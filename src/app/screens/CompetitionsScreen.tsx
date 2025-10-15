@@ -103,7 +103,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 <div className="flex items-center justify-center h-10 w-10 bg-primary/10 rounded-full">
                     <Plus className="h-6 w-6 text-primary" />
                 </div>
-                <span className="text-xs font-medium text-muted-foreground">أضف</span>
             </div>
         </SearchSheet>
     );
@@ -137,6 +136,14 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                      <div className="space-y-6 py-4">
                         <ScrollArea className="w-full whitespace-nowrap">
                             <div className="flex w-max space-x-4 px-4 flex-row-reverse">
+                                 <div className="flex flex-col items-center gap-2 w-20 h-[84px] text-center">
+                                     <SearchSheet navigate={navigate}>
+                                        <div className="flex flex-col items-center justify-center h-14 w-14 bg-card rounded-full cursor-pointer hover:bg-accent/50 transition-colors">
+                                            <Plus className="h-6 w-6 text-primary" />
+                                        </div>
+                                     </SearchSheet>
+                                      <span className="text-xs font-medium truncate w-full text-primary">أضف</span>
+                                </div>
                                 {favoriteTeams.map((team, index) => (
                                     <div key={`${team.teamId}-${index}`} className="relative flex flex-col items-center gap-2 w-20 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
                                         <Avatar className="h-14 w-14 border-2 border-border">
@@ -147,14 +154,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                         <Star className="absolute top-0 right-0 h-4 w-4 text-yellow-400 fill-current" />
                                     </div>
                                 ))}
-                                <div className="flex flex-col items-center gap-2 w-20 h-[84px] text-center">
-                                     <SearchSheet navigate={navigate}>
-                                        <div className="flex flex-col items-center justify-center h-14 w-14 bg-card rounded-full cursor-pointer hover:bg-accent/50 transition-colors">
-                                            <Plus className="h-6 w-6 text-primary" />
-                                        </div>
-                                     </SearchSheet>
-                                      <span className="text-xs font-medium truncate w-full text-primary">أضف</span>
-                                </div>
                             </div>
                             <ScrollBar orientation="horizontal" className="h-1.5 mt-2" />
                         </ScrollArea>
@@ -195,7 +194,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                                 <AvatarImage src={comp.logo} className="object-contain" />
                                                 <AvatarFallback>{comp.name.charAt(0)}</AvatarFallback>
                                             </Avatar>
-                                            <span className="text-[11px] font-medium truncate w-full">{comp.name}</span>
+                                             <span className="text-[11px] font-medium truncate w-full">{comp.name}</span>
                                             <Star className="absolute top-1 right-1 h-3 w-3 text-yellow-400 fill-current" />
                                         </div>
                                     )}
@@ -219,3 +218,5 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
+
+    
