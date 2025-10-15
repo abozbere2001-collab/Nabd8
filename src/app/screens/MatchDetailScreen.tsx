@@ -259,84 +259,9 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
     );
 }
 
-const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate']; season: number }) => {
-    const [lineups, setLineups] = useState<LineupData[] | null>(initialLineups);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchPlayerDetails = async () => {
-            if (!initialLineups || initialLineups.length === 0) {
-                setLoading(false);
-                return;
-            }
-
-            setLoading(true);
-            try {
-                const allPlayerIds = initialLineups.flatMap(l => [...l.startXI, ...l.substitutes]).map(p => p.player.id).filter(id => id);
-                if (allPlayerIds.length === 0) {
-                    setLineups(initialLineups);
-                    setLoading(false);
-                    return;
-                }
-                
-                const uniquePlayerIds = [...new Set(allPlayerIds)];
-                const playersDataMap = new Map<number, { player: PlayerType, statistics: any[] }>();
-
-                // Fetch in batches of 20
-                for (let i = 0; i < uniquePlayerIds.length; i += 20) {
-                    const batchIds = uniquePlayerIds.slice(i, i + 20);
-                    const res = await fetch(`/api/football/players?id=${batchIds.join('-')}&season=${season}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        (data.response || []).forEach((item: { player: PlayerType, statistics: any[] }) => {
-                            playersDataMap.set(item.player.id, item);
-                        });
-                    } else {
-                        console.error(`Failed to fetch player batch ${i/20 + 1}`);
-                    }
-                }
-                
-                const updatedLineups = initialLineups.map(lineup => {
-                    const updatePlayerList = (list: PlayerWithStats[]) => list.map(p => {
-                        const detailedData = playersDataMap.get(p.player.id);
-                        if (detailedData) {
-                            // Smart merge: keep original grid, merge new data
-                            return {
-                                ...p,
-                                player: { ...p.player, ...detailedData.player }, 
-                                statistics: detailedData.statistics,
-                            };
-                        }
-                        return p;
-                    });
-
-                    return {
-                        ...lineup,
-                        startXI: updatePlayerList(lineup.startXI),
-                        substitutes: updatePlayerList(lineup.substitutes),
-                    };
-                });
-                
-                setLineups(updatedLineups);
-
-            } catch (error) {
-                console.error('Error fetching player details:', error);
-                setLineups(initialLineups); // Fallback to initial data
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchPlayerDetails();
-    }, [initialLineups, season]);
-
-
+const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'] }) => {
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
-    if (loading) {
-        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    }
-    
     if (!lineups || lineups.length < 2) {
         return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     }
@@ -500,10 +425,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
          if (!fixtureId) return;
         if (isInitialLoad) {
             setLoading(true);
-            setLineups(null);
-            setEvents(null);
-            setStatistics(null);
-            setStandings(null);
         }
 
         try {
@@ -519,24 +440,66 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             const currentLeagueId = currentFixture.league.id;
             const currentSeason = currentFixture.league.season || CURRENT_SEASON;
             
-            const endpoints = [
-                `fixtures/lineups?fixture=${fixtureId}`,
-                `fixtures/events?fixture=${fixtureId}`,
-                `fixtures/statistics?fixture=${fixtureId}`,
-                `standings?league=${currentLeagueId}&season=${currentSeason}`
-            ];
+            // Initial fetch for essential data
+            const [lineupsData, eventsData, statisticsData, standingsData] = await Promise.all([
+                fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`).then(res => res.json()),
+                fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).then(res => res.json()),
+                fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`).then(res => res.json()),
+                fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`).then(res => res.json())
+            ]);
 
-            const responses = await Promise.all(
-                endpoints.map(endpoint => fetch(`/api/football/${endpoint}`).then(res => res.json()))
-            );
+            setEvents(eventsData.response || []);
+            setStatistics(statisticsData.response || []);
+            if (standingsData?.response?.[0]?.league?.standings[0]) {
+                setStandings(standingsData.response[0].league.standings[0]);
+            }
             
-            const [lineupsData, eventsData, statisticsData, standingsData] = responses;
+            // Set initial lineups, then enrich them
+            const initialLineups = lineupsData.response || [];
+            setLineups(initialLineups);
 
-            if (lineupsData.response) setLineups(lineupsData.response);
-            if (eventsData.response) setEvents(eventsData.response);
-            if (statisticsData.response) setStatistics(statisticsData.response);
-            if (standingsData?.response?.[0]?.league?.standings[0]) setStandings(standingsData.response[0].league.standings[0]);
+            if (isInitialLoad && initialLineups.length > 0) {
+                 const allPlayerIds = initialLineups.flatMap((l: LineupData) => [...l.startXI, ...l.substitutes]).map((p: PlayerWithStats) => p.player.id).filter((id: number | null) => id);
+                if (allPlayerIds.length > 0) {
+                    const uniquePlayerIds = [...new Set(allPlayerIds)];
+                    const playersDataMap = new Map<number, { player: PlayerType, statistics: any[] }>();
 
+                    const batches = [];
+                    for (let i = 0; i < uniquePlayerIds.length; i += 20) {
+                        batches.push(uniquePlayerIds.slice(i, i + 20));
+                    }
+                    
+                    for (const batch of batches) {
+                         const res = await fetch(`/api/football/players?id=${batch.join('-')}&season=${currentSeason}`);
+                         if (res.ok) {
+                            const data = await res.json();
+                            (data.response || []).forEach((item: { player: PlayerType, statistics: any[] }) => {
+                                playersDataMap.set(item.player.id, item);
+                            });
+                         }
+                    }
+
+                    const enrichedLineups = initialLineups.map((lineup: LineupData) => {
+                        const enrich = (list: PlayerWithStats[]) => list.map(p => {
+                            const details = playersDataMap.get(p.player.id);
+                            if (details) {
+                                return {
+                                    ...p,
+                                    player: { ...p.player, ...details.player },
+                                    statistics: details.statistics,
+                                };
+                            }
+                            return p;
+                        });
+                        return {
+                            ...lineup,
+                            startXI: enrich(lineup.startXI),
+                            substitutes: enrich(lineup.substitutes),
+                        };
+                    });
+                    setLineups(enrichedLineups);
+                }
+            }
         } catch (error) {
             console.error("Failed to fetch match details:", error);
         } finally {
@@ -585,10 +548,14 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
-                    <TabsContent value="lineups" className="mt-4"><LineupsTab initialLineups={lineups} events={events} navigate={navigate} season={fixture.league.season || CURRENT_SEASON} /></TabsContent>
+                    <TabsContent value="lineups" className="mt-4">
+                        {lineups ? <LineupsTab lineups={lineups} events={events} navigate={navigate} /> : <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>}
+                    </TabsContent>
                     <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} navigate={navigate} /></TabsContent>
                 </Tabs>
             </div>
         </div>
     );
 }
+
+    
