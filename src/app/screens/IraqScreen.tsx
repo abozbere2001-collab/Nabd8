@@ -8,19 +8,31 @@ import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { collection, getDocs, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, doc, query, orderBy, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { useFirestore, useAdmin } from '@/firebase/provider';
 import type { Fixture, Standing, AdminFavorite, ManualTopScorer, PinnedMatch } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
-import { Users, Search, Pin, Edit } from 'lucide-react';
+import { Users, Search, Pin, Edit, Trash2, Loader2 } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { FixtureItem } from '@/components/FixtureItem';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { Card, CardContent } from '@/components/ui/card';
 import { useTranslation } from '@/components/LanguageProvider';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
 const IRAQI_LEAGUE_ID = 542;
 
@@ -187,32 +199,49 @@ function OurLeagueTab({
     );
 }
 
-function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
+function OurBallTab({ navigate, isAdmin }: { navigate: ScreenProps['navigate'], isAdmin: boolean }) {
     const [teams, setTeams] = useState<AdminFavorite[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<number | null>(null);
     const { db } = useFirestore();
+    const { toast } = useToast();
 
     useEffect(() => {
         if (!db) return;
-        const fetchAdminFavorites = async () => {
-            setLoading(true);
-            const favsRef = collection(db, 'adminFavorites');
-            try {
-                const snapshot = await getDocs(favsRef);
-                const fetchedTeams: AdminFavorite[] = [];
-                snapshot.forEach((doc) => {
-                    fetchedTeams.push(doc.data() as AdminFavorite);
-                });
-                setTeams(fetchedTeams);
-            } catch (error) {
-                const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'list' });
-                errorEmitter.emit('permission-error', permissionError);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchAdminFavorites();
+        setLoading(true);
+        const favsRef = collection(db, 'adminFavorites');
+        const unsubscribe = onSnapshot(favsRef, (snapshot) => {
+            const fetchedTeams: AdminFavorite[] = [];
+            snapshot.forEach((doc) => {
+                fetchedTeams.push(doc.data() as AdminFavorite);
+            });
+            setTeams(fetchedTeams);
+            setLoading(false);
+        }, (error) => {
+            const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
+            setLoading(false);
+        });
+        return () => unsubscribe();
     }, [db]);
+
+    const handleDelete = (teamId: number) => {
+        if (!db || !isAdmin) return;
+        setDeletingId(teamId);
+        const docRef = doc(db, 'adminFavorites', String(teamId));
+        deleteDoc(docRef)
+            .then(() => {
+                toast({ title: 'نجاح', description: 'تم حذف الفريق من قائمة كرتنا.' });
+            })
+            .catch(error => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
+                errorEmitter.emit('permission-error', permissionError);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الفريق.' });
+            })
+            .finally(() => {
+                setDeletingId(null);
+            });
+    };
 
     if (loading) {
         return (
@@ -229,8 +258,8 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     return (
         <div className="space-y-3 pt-4">
             {teams.map(team => (
-                <div key={team.teamId} onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: team.teamId, teamName: team.name })} className="p-3 rounded-lg border bg-card cursor-pointer">
-                    <div className="flex items-center gap-3">
+                <div key={team.teamId} className="p-3 rounded-lg border bg-card flex items-center gap-3">
+                    <div onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: team.teamId, teamName: team.name })} className="flex-1 flex items-center gap-3 cursor-pointer">
                         <Avatar className="h-10 w-10">
                             <AvatarImage src={team.logo} alt={team.name} />
                             <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
@@ -240,6 +269,29 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
                             <p className="text-xs text-muted-foreground">{team.note}</p>
                         </div>
                     </div>
+                     {isAdmin && (
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" disabled={deletingId === team.teamId} onClick={(e) => e.stopPropagation()}>
+                                    {deletingId === team.teamId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        سيتم حذف فريق "{team.name}" من قائمة "كرتنا". لا يمكن التراجع عن هذا الإجراء.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(team.teamId)} className="bg-destructive hover:bg-destructive/90">
+                                        حذف
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    )}
                 </div>
             ))}
         </div>
@@ -395,7 +447,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             />
           </TabsContent>
           <TabsContent value="our-ball" className="pt-0">
-             <OurBallTab navigate={navigate} />
+             <OurBallTab navigate={navigate} isAdmin={isAdmin} />
           </TabsContent>
         </Tabs>
       </div>
