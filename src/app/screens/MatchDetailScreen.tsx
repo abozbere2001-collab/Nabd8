@@ -45,12 +45,10 @@ const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: S
   return (
     <div className="relative flex flex-col items-center cursor-pointer" onClick={() => playerInfo.id && navigate('PlayerDetails', { playerId: playerInfo.id })}>
       <div className="relative w-12 h-12">
-        <img 
-          src={playerImage} 
-          alt={playerInfo?.name || "Player"} 
-          className="rounded-full w-12 h-12 object-cover border-2 border-white/50" 
-          onError={(e) => (e.currentTarget.src = fallbackImage)} 
-        />
+        <Avatar className="rounded-full w-12 h-12 object-cover border-2 border-white/50">
+          <AvatarImage src={playerImage} alt={playerInfo?.name || "Player"} />
+          <AvatarFallback>{playerInfo?.name?.charAt(0) || 'P'}</AvatarFallback>
+        </Avatar>
         {playerNumber && (
           <div className="absolute -top-1 -left-1 bg-gray-800 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background">
             {playerNumber}
@@ -435,9 +433,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     
             if (!currentFixture) throw new Error("Fixture not found");
             
-            if (!fixture || JSON.stringify(fixture) !== JSON.stringify(currentFixture)) {
-                 setFixture(currentFixture);
-            }
+            setFixture(currentFixture);
     
             const currentLeagueId = currentFixture.league.id;
             const currentSeason = currentFixture.league.season || CURRENT_SEASON;
@@ -507,7 +503,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         } finally {
             if (isInitialLoad) setLoading(false);
         }
-    }, [fixtureId, fixture]);
+    }, [fixtureId]);
 
     useEffect(() => {
         fetchData(true); // Initial fetch
@@ -521,7 +517,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         return () => {
           if (interval) clearInterval(interval);
         };
-    }, [fixtureId, fetchData, fixture]);
+    }, [fixtureId, fetchData]);
 
 
     if (loading && !fixture) {
@@ -565,7 +561,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
-    
 
     
