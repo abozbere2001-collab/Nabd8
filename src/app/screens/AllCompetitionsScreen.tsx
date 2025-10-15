@@ -72,14 +72,28 @@ const countryToContinent: { [key: string]: string } = {
 };
 
 const defaultContinentTranslations: { [key: string]: string } = {
-  "World": "العالم",
-  "Europe": "أوروبا",
-  "Asia": "آسيا",
-  "Africa": "أفريقيا",
-  "South America": "أمريكا الجنوبية",
-  "North America": "أمريكا الشمالية",
-  "Oceania": "أوقيانوسيا",
-  "Other": "أخرى"
+  "World": "العالم", "Europe": "أوروبا", "Asia": "آسيا", "Africa": "أفريقيا", 
+  "South America": "أمريكا الجنوبية", "North America": "أمريكا الشمالية", 
+  "Oceania": "أوقيانوسيا", "Other": "أخرى"
+};
+
+const defaultCountryTranslations: { [key: string]: string } = {
+    "England": "إنجلترا", "Spain": "إسبانيا", "Germany": "ألمانيا", "Italy": "إيطاليا", "France": "فرنسا",
+    "Netherlands": "هولندا", "Portugal": "البرتغال", "Belgium": "بلجيكا", "Russia": "روسيا", "Turkey": "تركيا",
+    "Greece": "اليونان", "Switzerland": "سويسرا", "Austria": "النمسا", "Denmark": "الدنمارك", "Scotland": "اسكتلندا",
+    "Sweden": "السويد", "Norway": "النرويج", "Poland": "بولندا", "Ukraine": "أوكرانيا", "Czech-Republic": "التشيك",
+    "Croatia": "كرواتيا", "Romania": "رومانيا", "Serbia": "صربيا", "Hungary": "المجر", "Finland": "فنلندا",
+    "Ireland": "أيرلندا", "Northern-Ireland": "أيرلندا الشمالية", "Wales": "ويلز", "Iceland": "أيسلندا",
+    "Saudi-Arabia": "السعودية", "Japan": "اليابان", "South-Korea": "كوريا الجنوبية", "China": "الصين", "Qatar": "قطر",
+    "UAE": "الإمارات", "Iran": "إيران", "Iraq": "العراق", "Uzbekistan": "أوزبكستان", "Australia": "أستراليا",
+    "Jordan": "الأردن", "Syria": "سوريا", "Lebanon": "لبنان", "Oman": "عمان", "Kuwait": "الكويت", "Bahrain": "البحرين",
+    "India": "الهند", "Palestine": "فلسطين",
+    "Egypt": "مصر", "Morocco": "المغرب", "Tunisia": "تونس", "Algeria": "الجزائر", "Nigeria": "نيجيريا",
+    "Senegal": "السنغال", "Ghana": "غانا", "Ivory-Coast": "ساحل العاج", "Cameroon": "الكاميرون", "South-Africa": "جنوب أفريقيا",
+    "Sudan": "السودان", "Libya": "ليبيا",
+    "USA": "أمريكا", "Mexico": "المكسيك", "Canada": "كندا", "Costa-Rica": "كوستاريكا",
+    "Brazil": "البرازيل", "Argentina": "الأرجنتين", "Colombia": "كولومبيا", "Chile": "تشيلي",
+    "Uruguay": "أوروغواي", "Peru": "بيرو", "Ecuador": "الإكوادور", "Paraguay": "باراغواي", "Venezuela": "فنزويلا", "Bolivia": "بوليفيا"
 };
 
 const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "North America", "Oceania", "Other"];
@@ -108,10 +122,13 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         if (customName) {
             return customName;
         }
-
-        // Fallback to hardcoded translations for continents
+        
+        // Fallback to hardcoded translations
         if (type === 'continent' && defaultContinentTranslations[defaultName]) {
             return defaultContinentTranslations[defaultName];
+        }
+        if (type === 'country' && defaultCountryTranslations[defaultName]) {
+            return defaultCountryTranslations[defaultName];
         }
 
         // Return the original default name if no translation found
@@ -152,7 +169,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             setCustomNames(names);
 
         } catch (error) {
-            // This might fail for regular users if rules are strict. This is acceptable.
             console.warn("Could not fetch custom names. This is expected for non-admin users.", error);
         }
     }, [db]);
@@ -431,5 +447,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
-
-    
