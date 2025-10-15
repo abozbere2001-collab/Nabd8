@@ -154,7 +154,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
     if (loading) {
         return (
             <div className="flex h-full flex-col bg-background">
-                <ScreenHeader title={`اختيار بطل ${leagueName}`} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+                <ScreenHeader title={`اختيار بطل ${leagueName}`} onBack={goBack} canGoBack={true} />
                 <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
             </div>
         );
@@ -162,7 +162,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
     
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title={`توقع بطل ${leagueName}`} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+            <ScreenHeader title={`توقع بطل ${leagueName}`} onBack={goBack} canGoBack={true} />
             <div className='p-4 text-center text-sm text-muted-foreground border-b'>
                 <p>اختر الفريق البطل بالضغط على أيقونة الكأس. ثم اضغط على أي فريق لاختيار الهداف من لاعبيه.</p>
             </div>

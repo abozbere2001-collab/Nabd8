@@ -5,57 +5,58 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '@/firebase/provider';
 import { Button } from './ui/button';
 import { GoalStackLogo } from './icons/GoalStackLogo';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // --- Ad Context ---
 interface AdContextType {
   showSplashAd: boolean;
   showBannerAd: boolean;
   setSplashAdShown: () => void;
+  dismissBannerAd: () => void;
 }
 
 const AdContext = createContext<AdContextType | undefined>(undefined);
 
-const SESSION_COUNT_KEY = 'goalstack_session_count';
+const SPLASH_AD_SEEN_KEY = 'goalstack_splash_ad_seen'; // Use localStorage for persistence
+const BANNER_AD_DISMISSED_KEY = 'goalstack_banner_ad_dismissed_session'; // Use sessionStorage for session-only dismissal
 
 export const AdProvider = ({ children }: { children: React.ReactNode }) => {
   const { isProUser } = useAuth();
-  const [splashAdShownThisSession, setSplashAdShownThisSession] = useState(
-    () => sessionStorage.getItem('splashAdShown') === 'true'
-  );
-  const [sessionCount, setSessionCount] = useState(0);
-
-  useEffect(() => {
-    // Only track sessions and show ads for non-pro users.
-    if (isProUser) {
-      setSessionCount(0); // Reset count if user becomes pro
-      return;
-    };
-    const count = parseInt(sessionStorage.getItem(SESSION_COUNT_KEY) || '0', 10);
-    // Only increment on the first render of a session
-    if (count === 0 && sessionCount === 0) {
-        const newCount = 1;
-        sessionStorage.setItem(SESSION_COUNT_KEY, newCount.toString());
-        setSessionCount(newCount);
-    } else {
-        setSessionCount(count);
-    }
-  }, [isProUser, sessionCount]);
   
+  // Splash ad state (persistent)
+  const [splashAdSeen, setSplashAdSeen] = useState(() => {
+    if (typeof window === 'undefined') return true; // Don't show on server
+    return localStorage.getItem(SPLASH_AD_SEEN_KEY) === 'true';
+  });
+
+  // Banner ad state (session-based)
+  const [bannerAdDismissed, setBannerAdDismissed] = useState(() => {
+    if (typeof window === 'undefined') return true; // Don't show on server
+    return sessionStorage.getItem(BANNER_AD_DISMISSED_KEY) === 'true';
+  });
+
   const setSplashAdShown = () => {
-      setSplashAdShownThisSession(true);
-      sessionStorage.setItem('splashAdShown', 'true');
+    setSplashAdSeen(true);
+    localStorage.setItem(SPLASH_AD_SEEN_KEY, 'true');
   }
 
-  // Show splash ad on the first visit of a session for non-pro users.
-  const showSplashAd = !isProUser && !splashAdShownThisSession;
+  const dismissBannerAd = () => {
+    setBannerAdDismissed(true);
+    sessionStorage.setItem(BANNER_AD_DISMISSED_KEY, 'true');
+  }
+
+  // Show splash ad only for non-pro users who have never seen it before
+  const showSplashAd = !isProUser && !splashAdSeen;
   
-  // Show banner ad for non-pro users.
-  const showBannerAd = !isProUser;
+  // Show banner ad for non-pro users if it hasn't been dismissed this session
+  const showBannerAd = !isProUser && !bannerAdDismissed;
 
   const value = {
     showSplashAd,
     showBannerAd,
     setSplashAdShown,
+    dismissBannerAd,
   };
 
   return <AdContext.Provider value={value}>{children}</AdContext.Provider>;
@@ -109,9 +110,18 @@ export const SplashScreenAd = () => {
 
 
 export const BannerAd = () => {
+    const { dismissBannerAd } = useAd();
     return (
         <div className="relative w-full h-16 bg-card border-t flex items-center justify-center text-muted-foreground text-sm z-20">
             <p>منطقة الإعلان (Banner Ad)</p>
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute top-1 right-1 h-7 w-7"
+                onClick={dismissBannerAd}
+            >
+                <X className="h-4 w-4" />
+            </Button>
         </div>
     )
 }

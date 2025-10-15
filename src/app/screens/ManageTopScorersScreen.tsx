@@ -132,7 +132,7 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
   if(loading) {
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title="إدارة الهدافين" onBack={goBack} canGoBack={true} actions={headerActions} />
+            <ScreenHeader title="إدارة الهدافين" onBack={goBack} canGoBack={true} />
             <div className="flex justify-center items-center flex-1">
                 <Loader2 className="h-8 w-8 animate-spin" />
             </div>
@@ -142,7 +142,7 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="إدارة الهدافين" onBack={goBack} canGoBack={true} actions={headerActions} />
+      <ScreenHeader title="إدارة الهدافين" onBack={goBack} canGoBack={true} />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {scorers.map((scorer, index) => (
           <Card key={index}>

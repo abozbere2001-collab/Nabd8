@@ -24,7 +24,7 @@ export function SeasonPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title="توقعات الموسم" onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+            <ScreenHeader title="توقعات الموسم" onBack={goBack} canGoBack={true} />
             <div className="flex-1 overflow-y-auto p-4">
                 <div className="grid grid-cols-2 gap-4">
                     {leagues.map(league => (

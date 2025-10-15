@@ -181,7 +181,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
     if (loading) {
         return (
             <div className="flex h-full flex-col bg-background">
-                <ScreenHeader title={`اختيار هداف من ${teamName}`} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+                <ScreenHeader title={`اختيار هداف من ${teamName}`} onBack={goBack} canGoBack={true} />
                 <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
             </div>
         );
@@ -189,7 +189,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
 
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title={`اختيار هداف من ${teamName}`} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+            <ScreenHeader title={`اختيار هداف من ${teamName}`} onBack={goBack} canGoBack={true} />
              <div className='p-4 text-center text-sm text-muted-foreground border-b'>
                 <p>اختر الهداف المتوقع للدوري بالضغط على أيقونة الكرة.</p>
             </div>
