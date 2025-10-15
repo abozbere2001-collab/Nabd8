@@ -27,7 +27,13 @@ interface Bookmaker {
 }
 
 interface OddsData {
-    fixture: { id: number; };
+    fixture: { 
+        id: number;
+        teams: {
+            home: { name: string; logo: string; };
+            away: { name: string; logo: string; };
+        }
+    };
     bookmakers: Bookmaker[];
     update: string;
 }
@@ -105,10 +111,10 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
                             homeChange: currentOdds.home - (previousOdds.home || currentOdds.home),
                             drawChange: currentOdds.draw - (previousOdds.draw || currentOdds.draw),
                             awayChange: currentOdds.away - (previousOdds.away || currentOdds.away),
-                            homeTeamName: fixtureData.teams.home.name,
-                            awayTeamName: fixtureData.teams.away.name,
-                            homeTeamLogo: fixtureData.teams.home.logo,
-                            awayTeamLogo: fixtureData.teams.away.logo,
+                            homeTeamName: fixtureData.fixture.teams.home.name,
+                            awayTeamName: fixtureData.fixture.teams.away.name,
+                            homeTeamLogo: fixtureData.fixture.teams.home.logo,
+                            awayTeamLogo: fixtureData.fixture.teams.away.logo,
                         });
                     }
                 }
