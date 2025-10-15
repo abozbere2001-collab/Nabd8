@@ -2,11 +2,12 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from './ui/skeleton';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
 
 // --- TYPE DEFINITIONS ---
 interface OddValue {
@@ -37,40 +38,16 @@ interface OddsApiResponse {
     bookmakers: Bookmaker[];
 }
 
-interface OddsHistoryItem {
-    values: OddValue[];
-    update: string;
-}
-
 interface ProcessedOdds {
     home: number;
     draw: number;
     away: number;
-    homeChange: number;
-    drawChange: number;
-    awayChange: number;
     homeTeamName: string;
     awayTeamName: string;
     homeTeamLogo: string;
     awayTeamLogo: string;
 }
 
-
-// --- HELPER COMPONENTS ---
-const OddsChangeIndicator = ({ change }: { change: number }) => {
-    if (change === 0) return null;
-
-    const isUp = change > 0;
-    const color = isUp ? "text-green-500" : "text-red-500";
-    const Icon = isUp ? ArrowUp : ArrowDown;
-
-    return (
-        <span className={cn("flex items-center font-mono text-xs", color)}>
-            <Icon className="h-3 w-3" />
-            {Math.abs(change).toFixed(2)}
-        </span>
-    );
-};
 
 // --- MAIN TAB COMPONENT ---
 export function OddsTab({ fixtureId }: { fixtureId: number }) {
@@ -102,34 +79,16 @@ export function OddsTab({ fixtureId }: { fixtureId: number }) {
             const matchWinnerBet = bookmaker?.bets.find((b: Bet) => b.id === 1);
 
             if (matchWinnerBet && oddsResponse.update && fixtureInfo) {
-                const oddsHistory: OddsHistoryItem[] = oddsData.odds_history?.[fixtureId]?.[bookmaker?.id]?.[1] || [];
-                
                 const currentOdds: { [key: string]: number } = {};
                 matchWinnerBet.values.forEach((v: OddValue) => {
                    const key = v.value.toLowerCase().replace(' ', '');
                    currentOdds[key] = parseFloat(v.odd);
                 });
-
-                const previousOdds: { [key: string]: number } = {};
-                if(oddsHistory.length > 1) {
-                    const prev = oddsHistory[1]; // Second to last entry is the previous odd
-                    prev.values.forEach((v: OddValue) => {
-                        const key = v.value.toLowerCase().replace(' ', '');
-                        previousOdds[key] = parseFloat(v.odd);
-                    });
-                } else {
-                     previousOdds.home = currentOdds.home;
-                     previousOdds.draw = currentOdds.draw;
-                     previousOdds.away = currentOdds.away;
-                }
-
+                
                 setOdds({
                     home: currentOdds.home,
                     draw: currentOdds.draw,
                     away: currentOdds.away,
-                    homeChange: currentOdds.home - previousOdds.home,
-                    drawChange: currentOdds.draw - previousOdds.draw,
-                    awayChange: currentOdds.away - previousOdds.away,
                     homeTeamName: fixtureInfo.teams.home.name,
                     awayTeamName: fixtureInfo.teams.away.name,
                     homeTeamLogo: fixtureInfo.teams.home.logo,
@@ -159,8 +118,7 @@ export function OddsTab({ fixtureId }: { fixtureId: number }) {
                 </CardHeader>
                 <CardContent className="space-y-3">
                     <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-4 w-full" />
                 </CardContent>
             </Card>
         );
@@ -170,39 +128,53 @@ export function OddsTab({ fixtureId }: { fixtureId: number }) {
         return <p className="text-center text-muted-foreground p-8">لا توجد احتمالات متاحة لهذه المباراة.</p>;
     }
 
+    const probHome = (1 / odds.home) * 100;
+    const probDraw = (1 / odds.draw) * 100;
+    const probAway = (1 / odds.away) * 100;
+    const totalProb = probHome + probDraw + probAway;
+
+    const percentHome = (probHome / totalProb) * 100;
+    const percentDraw = (probDraw / totalProb) * 100;
+    const percentAway = (probAway / totalProb) * 100;
+
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="text-xl text-center font-bold">احتمالات فوز المباراة (1xBet)</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-                <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-card-foreground/5 border">
+            <CardContent className="space-y-4">
+                 <div className="flex justify-between items-center text-sm p-3">
                     <div className="flex items-center gap-2">
                         <Avatar className="h-6 w-6"><AvatarImage src={odds.homeTeamLogo} /></Avatar>
                         <span className="font-semibold">{odds.homeTeamName}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="font-bold text-lg">{odds.home.toFixed(2)}</span>
-                        <OddsChangeIndicator change={odds.homeChange} />
+                        <span className="font-bold text-lg">{percentHome.toFixed(0)}%</span>
                     </div>
                 </div>
-                <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-card-foreground/5 border">
+                 <div className="flex justify-between items-center text-sm p-3">
                      <span className="font-semibold">تعادل</span>
                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-lg">{odds.draw.toFixed(2)}</span>
-                        <OddsChangeIndicator change={odds.drawChange} />
+                        <span className="font-bold text-lg">{percentDraw.toFixed(0)}%</span>
                     </div>
                 </div>
-                <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-card-foreground/5 border">
+                <div className="flex justify-between items-center text-sm p-3">
                     <div className="flex items-center gap-2">
                         <Avatar className="h-6 w-6"><AvatarImage src={odds.awayTeamLogo} /></Avatar>
                         <span className="font-semibold">{odds.awayTeamName}</span>
                     </div>
                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-lg">{odds.away.toFixed(2)}</span>
-                        <OddsChangeIndicator change={odds.awayChange} />
+                        <span className="font-bold text-lg">{percentAway.toFixed(0)}%</span>
                     </div>
                 </div>
+
+                <div className="flex w-full h-3 rounded-full overflow-hidden" dir="ltr">
+                    <div style={{ width: `${percentHome}%` }} className="bg-primary h-full transition-all duration-500"></div>
+                    <div style={{ width: `${percentDraw}%` }} className="bg-gray-400 h-full transition-all duration-500"></div>
+                    <div style={{ width: `${percentAway}%` }} className="bg-accent h-full transition-all duration-500"></div>
+                </div>
+
             </CardContent>
         </Card>
     );
