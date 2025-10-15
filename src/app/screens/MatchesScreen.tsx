@@ -253,6 +253,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [activeTab, setActiveTab] = useState<TabName>('my-results');
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
+  
+  const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string> }>({ leagues: new Map(), teams: new Map() });
 
   const [fixturesCache, setFixturesCache] = useState<Cache<FixtureType[]>>({});
   const [loadingFixtures, setLoadingFixtures] = useState(true);
@@ -297,6 +299,54 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     });
     return () => unsubscribe();
   }, [db]);
+  
+  const fetchAllCustomNames = useCallback(async () => {
+    if (!db) return;
+    try {
+      const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+        getDocs(collection(db, 'leagueCustomizations')),
+        getDocs(collection(db, 'teamCustomizations'))
+      ]);
+
+      const leagueNames = new Map<number, string>();
+      leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+
+      const teamNames = new Map<number, string>();
+      teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+
+      setCustomNames({ leagues: leagueNames, teams: teamNames });
+    } catch (error) {
+      console.warn("Could not fetch custom names, this is expected for non-admins", error);
+    }
+  }, [db]);
+
+  useEffect(() => {
+    fetchAllCustomNames();
+  }, [fetchAllCustomNames]);
+
+  
+  const applyCustomNames = useCallback((fixtures: FixtureType[]): FixtureType[] => {
+    if (customNames.leagues.size === 0 && customNames.teams.size === 0) {
+      return fixtures;
+    }
+    return fixtures.map(fixture => ({
+      ...fixture,
+      league: {
+        ...fixture.league,
+        name: customNames.leagues.get(fixture.league.id) || fixture.league.name
+      },
+      teams: {
+        home: {
+          ...fixture.teams.home,
+          name: customNames.teams.get(fixture.teams.home.id) || fixture.teams.home.name
+        },
+        away: {
+          ...fixture.teams.away,
+          name: customNames.teams.get(fixture.teams.away.id) || fixture.teams.away.name
+        }
+      }
+    }));
+  }, [customNames]);
   
   const fetchFixturesForDate = useCallback(async (dateKey: string) => {
     if (fixturesCache[dateKey]) {
@@ -371,7 +421,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
     
-  const currentFixtures = activeTab === 'live' ? liveFixtures : (fixturesCache[selectedDateKey] || []);
+  const rawFixtures = activeTab === 'live' ? liveFixtures : (fixturesCache[selectedDateKey] || []);
+  const currentFixtures = useMemo(() => applyCustomNames(rawFixtures), [rawFixtures, applyCustomNames]);
   const isLoading = activeTab === 'live' ? loadingLive : loadingFixtures;
 
   return (
