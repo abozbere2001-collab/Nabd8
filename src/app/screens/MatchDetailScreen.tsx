@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats } from '@/lib/types';
+import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
@@ -260,14 +260,87 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
 }
 
 const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate']; season: number }) => {
+    const [lineupsWithDetails, setLineupsWithDetails] = useState<LineupData[] | null>(initialLineups);
+    const [loadingDetails, setLoadingDetails] = useState(true);
+
+    useEffect(() => {
+        const fetchPlayerDetails = async () => {
+            if (!initialLineups || initialLineups.length === 0) {
+                setLoadingDetails(false);
+                return;
+            }
+
+            setLoadingDetails(true);
+            try {
+                const allPlayers = initialLineups.flatMap(l => [...l.startXI, ...l.substitutes]);
+                const playerIds = allPlayers.map(p => p.player.id).filter(id => id);
+
+                if (playerIds.length === 0) {
+                    setLineupsWithDetails(initialLineups);
+                    setLoadingDetails(false);
+                    return;
+                }
+                
+                const playersDataMap = new Map<number, { player: PlayerType, statistics: any[] }>();
+
+                // Fetch players in batches of 20
+                for (let i = 0; i < playerIds.length; i += 20) {
+                    const batchIds = playerIds.slice(i, i + 20);
+                    const res = await fetch(`/api/football/players?id=${batchIds.join('-')}&season=${season}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        (data.response || []).forEach((item: { player: PlayerType, statistics: any[] }) => {
+                            playersDataMap.set(item.player.id, item);
+                        });
+                    }
+                }
+                
+                const updatedLineups = initialLineups.map(lineup => {
+                    const updatePlayerList = (list: PlayerWithStats[]) => list.map(p => {
+                        const detailedData = playersDataMap.get(p.player.id);
+                        if (detailedData) {
+                            return {
+                                ...p,
+                                player: { ...p.player, ...detailedData.player }, // Merge to keep grid
+                                statistics: detailedData.statistics,
+                            };
+                        }
+                        return p;
+                    });
+
+                    return {
+                        ...lineup,
+                        startXI: updatePlayerList(lineup.startXI),
+                        substitutes: updatePlayerList(lineup.substitutes),
+                    };
+                });
+                
+                setLineupsWithDetails(updatedLineups);
+
+            } catch (error) {
+                console.error('Error fetching player details for lineups:', error);
+                setLineupsWithDetails(initialLineups); // Fallback to initial data
+            } finally {
+                setLoadingDetails(false);
+            }
+        };
+
+        fetchPlayerDetails();
+    }, [initialLineups, season]);
+
+
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
-    if (!initialLineups || initialLineups.length < 2) {
+    if (loadingDetails) {
+        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    }
+    
+    if (!lineupsWithDetails || lineupsWithDetails.length < 2) {
         return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     }
 
-    const home = initialLineups[0];
-    const away = initialLineups[1];
+    const home = lineupsWithDetails[0];
+    const away = lineupsWithDetails[1];
     
     if (!home || !away) return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
 
@@ -383,11 +456,11 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead className="text-center">نقاط</TableHead>
-                    <TableHead className="text-center">ف/ت/خ</TableHead>
-                    <TableHead className="text-center">لعب</TableHead>
-                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
                     <TableHead className="w-[40px]">#</TableHead>
+                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                    <TableHead className="text-center">لعب</TableHead>
+                    <TableHead className="text-center">ف/ت/خ</TableHead>
+                    <TableHead className="text-center">نقاط</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -395,16 +468,16 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
                     const isRelevantTeam = s.team.id === fixture.teams.home.id || s.team.id === fixture.teams.away.id;
                     return (
                         <TableRow key={s.team.id} className={cn(isRelevantTeam && "bg-primary/10", "cursor-pointer")} onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                            <TableCell className="text-center font-bold">{s.points}</TableCell>
-                            <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
-                            <TableCell className="text-center">{s.all.played}</TableCell>
+                            <TableCell className="font-bold">{s.rank}</TableCell>
                             <TableCell className="font-medium">
                                 <div className="flex items-center gap-2 justify-end">
                                     <span className="truncate">{s.team.name}</span>
                                     <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
                                 </div>
                             </TableCell>
-                            <TableCell className="font-bold">{s.rank}</TableCell>
+                            <TableCell className="text-center">{s.all.played}</TableCell>
+                            <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
+                            <TableCell className="text-center font-bold">{s.points}</TableCell>
                         </TableRow>
                     );
                 })}
@@ -517,5 +590,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
-    
