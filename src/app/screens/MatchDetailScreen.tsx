@@ -29,7 +29,7 @@ const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: S
   const playerImage = playerInfo?.photo || fallbackImage;
   const playerNumber = playerInfo?.number ?? playerStats?.games?.number;
   
-  const ratingValue = playerStats?.games?.rating ?? playerInfo?.rating;
+  const ratingValue = playerInfo?.rating ?? playerStats?.games?.rating;
   
   const rating = ratingValue && !isNaN(parseFloat(ratingValue)) 
     ? parseFloat(ratingValue).toFixed(1) 
@@ -266,8 +266,8 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
         return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     }
 
-    const home = lineups[0];
-    const away = lineups[1];
+    const home = lineups.find(l => l.team.id === lineups[0].team.id);
+    const away = lineups.find(l => l.team.id !== lineups[0].team.id);
     
     if (!home || !away) return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
 
@@ -440,71 +440,76 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             const currentLeagueId = currentFixture.league.id;
             const currentSeason = currentFixture.league.season || CURRENT_SEASON;
             
-            const [lineupsData, eventsData, statisticsData, standingsData] = await Promise.all([
-                fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`).then(res => res.json()),
+            // Fetch non-player data
+            const [eventsData, statisticsData, standingsData] = await Promise.all([
                 fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).then(res => res.json()),
                 fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`).then(res => res.json()),
                 fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`).then(res => res.json())
             ]);
-
+            
             setEvents(eventsData.response || []);
             setStatistics(statisticsData.response || []);
             if (standingsData?.response?.[0]?.league?.standings[0]) {
                 setStandings(standingsData.response[0].league.standings[0]);
             }
-            
-            const initialLineups = lineupsData.response || [];
-            
-            if (isInitialLoad && initialLineups.length > 0) {
-                 const allPlayerIds = initialLineups.flatMap((l: LineupData) => [...l.startXI, ...l.substitutes]).map((p: PlayerWithStats) => p.player.id).filter((id: number | null): id is number => id !== null);
-                if (allPlayerIds.length > 0) {
-                    const uniquePlayerIds = [...new Set(allPlayerIds)];
-                    const playersDataMap = new Map<number, { player: PlayerType, statistics: any[] }>();
 
-                    const batches: number[][] = [];
-                    for (let i = 0; i < uniquePlayerIds.length; i += 20) {
-                        batches.push(uniquePlayerIds.slice(i, i + 20));
-                    }
+            // Fetch lineups and enrich with player data
+            if (isInitialLoad || lineups === null) {
+                const lineupsRes = await fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`);
+                const lineupsData = await lineupsRes.json();
+                const initialLineups = lineupsData.response || [];
+
+                if (initialLineups.length > 0) {
+                    const allPlayerIds = initialLineups.flatMap((l: LineupData) => [...l.startXI, ...l.substitutes]).map((p: PlayerWithStats) => p.player.id).filter((id: number | null): id is number => id !== null);
                     
-                    for (const batch of batches) {
-                         const res = await fetch(`/api/football/players?id=${batch.join('-')}&season=${currentSeason}`);
-                         if (res.ok) {
-                            const data = await res.json();
-                            (data.response || []).forEach((item: { player: PlayerType, statistics: any[] }) => {
-                                if (item.player) {
-                                  playersDataMap.set(item.player.id, item);
-                                }
-                            });
-                         }
-                    }
+                    if (allPlayerIds.length > 0) {
+                        const uniquePlayerIds = [...new Set(allPlayerIds)];
+                        const playersDataMap = new Map<number, PlayerType>();
 
-                    const enrichedLineups = initialLineups.map((lineup: LineupData) => {
-                        const enrich = (list: PlayerWithStats[]) => list.map(p => {
-                            const details = playersDataMap.get(p.player.id);
-                            if (details) {
-                                return {
-                                    ...p,
-                                    player: { ...p.player, ...details.player },
-                                    statistics: details.statistics,
-                                };
+                        const batches: number[][] = [];
+                        for (let i = 0; i < uniquePlayerIds.length; i += 20) {
+                            batches.push(uniquePlayerIds.slice(i, i + 20));
+                        }
+                        
+                        for (const batch of batches) {
+                            try {
+                                const res = await fetch(`/api/football/players?id=${batch.join('-')}&season=${currentSeason}`);
+                                if (res.ok) {
+                                    const data = await res.json();
+                                    (data.response || []).forEach((item: { player: PlayerType, statistics: any[] }) => {
+                                        if (item.player) {
+                                            const stats = item.statistics?.[0] || {};
+                                            playersDataMap.set(item.player.id, {
+                                                ...item.player,
+                                                rating: stats.games?.rating,
+                                                number: item.player.number ?? stats.games?.number,
+                                            });
+                                        }
+                                    });
+                                }
+                            } catch (e) {
+                                console.error("Failed to fetch player batch", e);
                             }
-                            return p;
-                        });
-                        return {
+                        }
+
+                        const enrichedLineups = initialLineups.map((lineup: LineupData) => ({
                             ...lineup,
-                            startXI: enrich(lineup.startXI),
-                            substitutes: enrich(lineup.substitutes),
-                        };
-                    });
-                    setLineups(enrichedLineups);
+                            startXI: lineup.startXI.map(p => ({
+                                ...p,
+                                player: { ...p.player, ...(playersDataMap.get(p.player.id) || {}) },
+                            })),
+                            substitutes: lineup.substitutes.map(p => ({
+                                ...p,
+                                player: { ...p.player, ...(playersDataMap.get(p.player.id) || {}) },
+                            })),
+                        }));
+                        setLineups(enrichedLineups);
+                    } else {
+                       setLineups(initialLineups);
+                    }
                 } else {
-                   setLineups(initialLineups);
+                     setLineups(initialLineups);
                 }
-            } else if (!isInitialLoad) {
-                // For subsequent fetches, just update lineups without enrichment if it's already done
-                if(lineups === null) setLineups(initialLineups)
-            } else {
-                 setLineups(initialLineups);
             }
         } catch (error) {
             console.error("Failed to fetch match details:", error);
@@ -513,7 +518,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 setLoading(false);
             }
         }
-    }, [fixtureId, lineups]);
+    }, [fixtureId, lineups]); // Add lineups to dependencies
 
     useEffect(() => {
         const isLive = fixture?.fixture.status.short && ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(fixture.fixture.status.short);
@@ -528,7 +533,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         return () => {
           if (interval) clearInterval(interval);
         };
-    }, [fixtureId]);
+    }, [fixtureId]); // Only run on fixtureId change
 
 
     if (loading && !fixture) {

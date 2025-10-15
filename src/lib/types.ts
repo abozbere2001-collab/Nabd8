@@ -1,6 +1,7 @@
 
 
 
+
 // This file contains all the type definitions for the data used in the app.
 
 // --- API Football Types ---
@@ -61,11 +62,12 @@ export interface Player {
   position: string; // Keep as string for flexibility
   photo: string;
   grid?: string | null;
+  rating?: string | null;
 }
 
 
 export interface PlayerWithStats {
-  player: Player & { rating?: string | null };
+  player: Player;
   statistics: {
     games: {
       minutes: number | null;
