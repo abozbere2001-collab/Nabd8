@@ -5,6 +5,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { BottomNav } from '@/components/BottomNav';
 import { MatchesScreen } from './screens/MatchesScreen';
 import { CompetitionsScreen } from './screens/CompetitionsScreen';
+import { AllCompetitionsScreen } from './screens/AllCompetitionsScreen';
 import { IraqScreen } from './screens/IraqScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
@@ -45,6 +46,7 @@ import { cn } from '@/lib/utils';
 const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
   Competitions: { component: CompetitionsScreen },
+  AllCompetitions: { component: AllCompetitionsScreen },
   Iraq: { component: IraqScreen },
   News: { component: NewsScreen },
   Settings: { component: SettingsScreen },
@@ -237,5 +239,3 @@ export function AppContentWrapper() {
     </main>
   );
 }
-
-    
