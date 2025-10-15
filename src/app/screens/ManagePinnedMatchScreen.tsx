@@ -47,7 +47,7 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions, matc
           setLoading(true);
           return;
         }
-        if (isEditing) {
+        if (isEditing && matchId) {
             setLoading(true);
             const docRef = doc(db, 'pinnedIraqiMatches', matchId);
         
@@ -62,6 +62,7 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions, matc
                 setLoading(false);
             });
         } else {
+            // This is 'create' mode
             setMatch({ isEnabled: true });
             setLoading(false);
         }
@@ -99,7 +100,7 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions, matc
             matchTime: match.matchTime || '',
         };
 
-        const operation = isEditing 
+        const operation = isEditing && matchId
             ? setDoc(doc(db, 'pinnedIraqiMatches', matchId), dataToSave)
             : addDoc(collection(db, 'pinnedIraqiMatches'), dataToSave);
 
@@ -120,7 +121,7 @@ export function ManagePinnedMatchScreen({ goBack, canGoBack, headerActions, matc
     };
 
     const handleDelete = async () => {
-        if (!db || !isEditing) return;
+        if (!db || !isEditing || !matchId) return;
         setDeleting(true);
         const docRef = doc(db, 'pinnedIraqiMatches', matchId);
         deleteDoc(docRef)
