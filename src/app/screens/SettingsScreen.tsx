@@ -27,7 +27,7 @@ const settingsItems = [
     { label: 'الملف الشخصي', icon: User, action: (navigate: ScreenProps['navigate']) => navigate('Profile') },
     { label: 'كل البطولات', icon: Trophy, action: (navigate: ScreenProps['navigate']) => navigate('AllCompetitions') },
     { label: 'إعدادات الإشعارات', icon: Bell, action: (navigate: ScreenProps['navigate']) => navigate('NotificationSettings')},
-    { label: 'الإعدادات العامة', icon: SettingsIcon, action: (navigate: ScreenProps['navigate']) => { /* Navigate to a new GeneralSettingsScreen */ }},
+    { label: 'الإعدادات العامة', icon: SettingsIcon, action: (navigate: ScreenProps['navigate']) => navigate('GeneralSettings')},
 ];
 
 

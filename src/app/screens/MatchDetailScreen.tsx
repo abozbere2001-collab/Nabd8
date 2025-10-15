@@ -104,10 +104,13 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
       { label: "الاستحواذ", type: "Ball Possession", isProgress: true },
       { label: "التسديدات", type: "Total Shots" },
       { label: "تسديدات على المرمى", type: "Shots on Goal" },
+      { label: "تسديدات خارج المرمى", type: "Shots off Goal" },
+      { label: "تسديدات محجوبة", type: "Blocked Shots" },
       { label: "الأخطاء", type: "Fouls" },
       { label: "البطاقات الصفراء", type: "Yellow Cards" },
       { label: "البطاقات الحمراء", type: "Red Cards" },
       { label: "الركنيات", type: "Corner Kicks" },
+      { label: "التسلل", type: "Offsides" },
     ];
 
     return (
