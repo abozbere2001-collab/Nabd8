@@ -40,7 +40,7 @@ export function LoginScreen({ goBack }: ScreenProps) {
       if(user) {
         await handleNewUser(user, db);
       }
-      // The onAuthStateChanged listener in the provider will handle navigation
+      // The onAuthStateChanged listener in the provider will handle app state change.
     } catch (e: any) {
       handleAuthError(e);
     } finally {
