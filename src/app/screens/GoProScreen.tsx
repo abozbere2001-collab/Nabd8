@@ -47,7 +47,7 @@ export function GoProScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="الترقية إلى برو" onBack={goBack} canGoBack={true} />
+      <ScreenHeader title="الترقية إلى برو" onBack={goBack} canGoBack={canGoBack} />
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <div className="text-center space-y-2">
             <Gem className="mx-auto h-12 w-12 text-yellow-400" />

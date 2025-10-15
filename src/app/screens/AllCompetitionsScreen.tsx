@@ -15,7 +15,6 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import type { Favorites, ManagedCompetition as ManagedCompetitionType } from '@/lib/types';
 import { SearchSheet } from '@/components/SearchSheet';
-import { ProfileButton } from '../AppContentWrapper';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -330,7 +329,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             <ScreenHeader 
                 title="كل البطولات" 
                 onBack={goBack} 
-                canGoBack={true} 
+                canGoBack={canGoBack} 
                 actions={
                   <div className="flex items-center gap-1">
                       <SearchSheet navigate={navigate}>

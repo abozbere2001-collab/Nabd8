@@ -84,7 +84,7 @@ const FixtureGroup = ({ title, groupedFixtures, navigate, titleClassName }: { ti
 
 
 // --- Main Screen Component ---
-export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, teamName, headerActions }: ScreenProps & { teamId: number; teamName: string; headerActions?: React.ReactNode }) {
+export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, teamName }: ScreenProps & { teamId: number; teamName: string; }) {
     const [categorizedFixtures, setCategorizedFixtures] = useState<CategorizedFixtures | null>(null);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
@@ -143,7 +143,7 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
 
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title={teamName} onBack={goBack} canGoBack={canGoBack} actions={headerActions} />
+            <ScreenHeader title={teamName} onBack={goBack} canGoBack={canGoBack} />
             <div className="flex-1 overflow-y-auto p-2">
                 {loading ? (
                     <div className="flex items-center justify-center h-64">

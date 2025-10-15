@@ -71,7 +71,7 @@ function SeasonSelector({ season, onSeasonChange, isAdmin }: { season: number, o
 }
 
 
-export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo, headerActions }: ScreenProps & { title?: string, leagueId?: number, logo?: string, headerActions?: React.ReactNode }) {
+export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo }: ScreenProps & { title?: string, leagueId?: number, logo?: string }) {
   const { isAdmin } = useAdmin();
   const { user } = useAuth();
   const { db } = useFirestore();
