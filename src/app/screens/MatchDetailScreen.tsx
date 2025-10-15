@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
@@ -91,6 +91,49 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
     );
 };
 
+const ShotMap = ({ homeStats, awayStats }: { homeStats: any[], awayStats: any[] }) => {
+    const findStat = (stats: any[], type: string): number => {
+        const value = stats.find(s => s.type === type)?.value;
+        if (typeof value === 'string') return parseInt(value, 10) || 0;
+        return value || 0;
+    };
+
+    const homeShotsInside = findStat(homeStats, "Shots insidebox");
+    const homeShotsOutside = findStat(homeStats, "Shots outsidebox");
+    const awayShotsInside = findStat(awayStats, "Shots insidebox");
+    const awayShotsOutside = findStat(awayStats, "Shots outsidebox");
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-lg text-center">خريطة التسديدات</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="relative w-full max-w-sm mx-auto aspect-[3/2] bg-green-700 bg-[url('/pitch.svg')] bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50">
+                    {/* Home Team (Right side) */}
+                    <div className="absolute right-[18%] top-1/2 -translate-y-1/2 text-center text-white">
+                        <p className="font-bold text-2xl drop-shadow-lg">{homeShotsInside}</p>
+                        <p className="text-xs">داخل المنطقة</p>
+                    </div>
+                     <div className="absolute right-[40%] top-1/2 -translate-y-1/2 text-center text-white">
+                        <p className="font-bold text-2xl drop-shadow-lg">{homeShotsOutside}</p>
+                         <p className="text-xs">خارج المنطقة</p>
+                    </div>
+
+                    {/* Away Team (Left side) */}
+                     <div className="absolute left-[18%] top-1/2 -translate-y-1/2 text-center text-white">
+                        <p className="font-bold text-2xl drop-shadow-lg">{awayShotsInside}</p>
+                         <p className="text-xs">داخل المنطقة</p>
+                    </div>
+                    <div className="absolute left-[40%] top-1/2 -translate-y-1/2 text-center text-white">
+                        <p className="font-bold text-2xl drop-shadow-lg">{awayShotsOutside}</p>
+                        <p className="text-xs">خارج المنطقة</p>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
 
 const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statistics: MatchStatistics[] | null }) => {
     if (!fixture) return <Skeleton className="h-40 w-full" />;
@@ -105,7 +148,7 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
       { label: "التسديدات", type: "Total Shots" },
       { label: "تسديدات على المرمى", type: "Shots on Goal" },
       { label: "تسديدات خارج المرمى", type: "Shots off Goal" },
-      { label: "تسديدات محجوبة", type: "Blocked Shots" },
+      { label: "تسديدات محجوبة", type: "Blocked Shots"},
       { label: "الأخطاء", type: "Fouls" },
       { label: "البطاقات الصفراء", type: "Yellow Cards" },
       { label: "البطاقات الحمراء", type: "Red Cards" },
@@ -115,6 +158,9 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
 
     return (
         <div className="space-y-4">
+             {statistics && statistics.length > 0 && (
+                <ShotMap homeStats={homeStats} awayStats={awayStats} />
+            )}
             <Card>
                 <CardContent className="p-4 text-sm">
                     <div className="flex justify-between py-2 border-b">
@@ -557,3 +603,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+

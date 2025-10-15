@@ -318,16 +318,16 @@ const PredictionsInfoDialog = () => (
 );
 
 
-const UserPredictionSummary = ({ userId }: { userId: string }) => {
+const UserPredictionSummary = ({ userScore }: { userScore: UserScore | null }) => {
     const { db } = useFirestore();
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [userPredictions, setUserPredictions] = useState<SeasonPrediction[]>([]);
     const [teams, setTeams] = useState<Map<number, Team>>(new Map());
     const [players, setPlayers] = useState<Map<number, Player>>(new Map());
-    const [userScore, setUserScore] = useState<UserScore | null>(null);
     const [loading, setLoading] = useState(true);
     const [customNames, setCustomNames] = useState<{ teams: Map<number, string>, players: Map<number, string> }>({ teams: new Map(), players: new Map() });
-
+    
+    const userId = userScore?.userId;
 
     const leagueOrder = [PREMIER_LEAGUE_ID, LALIGA_ID, SERIE_A_ID, BUNDESLIGA_ID, CHAMPIONS_LEAGUE_ID];
     
@@ -337,7 +337,10 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
     }, [customNames]);
 
     useEffect(() => {
-        if (!db || !userId) return;
+        if (!db || !userId) {
+            setLoading(false);
+            return;
+        }
     
         const fetchInitialData = async () => {
             setLoading(true);
@@ -348,9 +351,8 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
 
                 const predictionCollectionName = isOwnProfile ? "seasonPredictions" : "publicSeasonPredictions";
                 
-                const [predsSnapshot, scoreDoc, userDoc, teamsCustomSnap, playersCustomSnap] = await Promise.all([
+                const [predsSnapshot, userDoc, teamsCustomSnap, playersCustomSnap] = await Promise.all([
                     getDocs(query(collection(db, predictionCollectionName), where("userId", "==", userId), where("season", "==", CURRENT_SEASON))),
-                    getDoc(doc(db, 'leaderboard', userId)),
                     getDoc(doc(db, 'users', userId)),
                     getDocs(collection(db, 'teamCustomizations')),
                     getDocs(collection(db, 'playerCustomizations'))
@@ -370,10 +372,6 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
     
                 const predictions = predsSnapshot.docs.map(doc => doc.data() as SeasonPrediction);
                 setUserPredictions(predictions);
-    
-                if (scoreDoc.exists()) {
-                    setUserScore(scoreDoc.data() as UserScore);
-                }
     
                 const teamIds = new Set<number>();
                 const playerIds = new Set<number>();
@@ -467,7 +465,7 @@ const UserPredictionSummary = ({ userId }: { userId: string }) => {
              {/* User Info Section */}
             <div className="flex flex-col items-center justify-center space-y-2 pr-4 border-r-2 border-dashed border-border">
               <Avatar className="h-16 w-16 border-2 border-primary">
-                <AvatarImage src={userProfile?.photoURL} />
+                <AvatarImage src={userProfile?.photoURL || userScore.userPhoto} />
                 <AvatarFallback>{userScore.userName.charAt(0)}</AvatarFallback>
               </Avatar>
               <div className="text-center">
@@ -787,6 +785,10 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         });
     }, [user, db]);
     
+    const currentUserScore = useMemo(() => {
+        if (!user || leaderboard.length === 0) return null;
+        return leaderboard.find(score => score.userId === user.uid) || null;
+    }, [user, leaderboard]);
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -796,7 +798,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                        <AlertDialogHeader>
                             <AlertDialogTitle>بطاقة توقعات {selectedUser?.userName}</AlertDialogTitle>
                        </AlertDialogHeader>
-                        {selectedUser && <UserPredictionSummary userId={selectedUser.userId} />}
+                        {selectedUser && <UserPredictionSummary userScore={selectedUser} />}
                          <AlertDialogFooter>
                            <AlertDialogCancel asChild>
                               <Button variant="outline" onClick={() => setSelectedUser(null)}>إغلاق</Button>
@@ -862,7 +864,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                 </CardContent>
                             </Card>
                          )}
-                         {user && <UserPredictionSummary userId={user.uid} />}
+                         {user && <UserPredictionSummary userScore={currentUserScore} />}
                          <Card>
                             <Table>
                                 <TableHeader>
@@ -937,4 +939,3 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     );
 }
 
-    
