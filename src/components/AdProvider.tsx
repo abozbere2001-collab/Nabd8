@@ -87,7 +87,7 @@ export const SplashScreenAd = () => {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
        <GoalStackLogo className="h-24 w-24 mb-4" />
-       <h2 className="text-xl font-bold">مرحباً بك في Goal Stack</h2>
+       <h2 className="text-xl font-bold">مرحباً بك في نبض الملاعب</h2>
        <p className="text-muted-foreground">تجربتك الكروية تبدأ الآن</p>
        
        <div className="absolute bottom-10">

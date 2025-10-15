@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -96,10 +95,9 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                     >
                         <span className="text-xs font-normal">{getDayLabel(date)}</span>
                         <span className="font-bold text-sm">{format(date, 'd')}</span>
-                        <span className={cn(
-                            "absolute bottom-0 h-0.5 w-4 rounded-full bg-primary transition-transform scale-x-0",
-                            isSelected && "scale-x-100"
-                        )} />
+                        {isSelected && (
+                            <span className="absolute bottom-0 h-0.5 w-4 rounded-full bg-primary transition-transform" />
+                        )}
                     </button>
                 )
             })}
@@ -811,7 +809,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 </AlertDialog>
                 <Tabs defaultValue="predictions" className="w-full">
                     <div className="sticky top-0 bg-background z-10 border-b">
-                       <TabsList className="grid w-full grid-cols-3">
+                       <TabsList className="grid w-full grid-cols-3 bg-card text-card-foreground">
                            <TabsTrigger value="prizes">{t('prizes')}</TabsTrigger>
                            <TabsTrigger value="leaderboard">{t('standings')}</TabsTrigger>
                            <TabsTrigger value="predictions">{t('voting')}</TabsTrigger>

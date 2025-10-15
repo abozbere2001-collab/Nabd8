@@ -69,12 +69,15 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
               key={key}
               onClick={() => handleNavigation(key as ScreenKey)}
               className={cn(
-                'flex h-full flex-col items-center justify-center gap-1 px-2 text-center text-xs font-medium outline-none transition-colors w-[60px]',
+                'relative flex h-full flex-col items-center justify-center gap-1 px-2 text-center text-xs font-medium outline-none transition-colors w-[60px]',
                 isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <Icon className="h-6 w-6" />
               <span>{label}</span>
+              {isActive && (
+                <div className="absolute bottom-1 h-1 w-6 rounded-full bg-primary" />
+              )}
             </button>
           );
 

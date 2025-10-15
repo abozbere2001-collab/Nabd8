@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from '@/components/theme-provider';
 import { Tajawal, Cairo } from 'next/font/google';
 import { FirebaseClientProvider } from '@/firebase';
-import { LanguageProvider } from '@/components/LanguageProvider';
 
 const tajawal = Tajawal({
   subsets: ['arabic'],
@@ -20,8 +19,8 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: 'Goal Stack',
-  description: 'Your world of football, in one stack.',
+  title: 'نبض الملاعب',
+  description: 'عالم كرة القدم بين يديك',
   manifest: '/manifest.json',
 };
 
@@ -40,9 +39,7 @@ export default function RootLayout({
                 disableTransitionOnChange
             >
               <FirebaseClientProvider>
-                <LanguageProvider>
-                  {children}
-                </LanguageProvider>
+                {children}
               </FirebaseClientProvider>
               <Toaster />
             </ThemeProvider>

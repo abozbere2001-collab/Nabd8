@@ -63,7 +63,7 @@ export function LoginScreen({ goBack }: ScreenProps) {
         )}
         
         <GoalStackLogo className="h-24 w-24 mb-8" />
-        <h1 className="text-2xl font-bold mb-2">مرحباً بك في Goal Stack</h1>
+        <h1 className="text-2xl font-bold mb-2">مرحباً بك في نبض الملاعب</h1>
         <p className="text-muted-foreground mb-8">سجل دخولك باستخدام جوجل للمتابعة.</p>
         
         <div className="w-full max-w-xs space-y-4">
