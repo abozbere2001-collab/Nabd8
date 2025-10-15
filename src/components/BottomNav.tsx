@@ -1,6 +1,6 @@
 
 "use client";
-import { Star, Newspaper, MoreHorizontal, Shield } from 'lucide-react';
+import { Star, Newspaper, MoreHorizontal, Shield, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ScreenKey } from '@/app/page';
 import { FootballIcon } from './icons/FootballIcon';
@@ -25,7 +25,7 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
     { key: 'Competitions', label: t('my_choices'), icon: Star },
     { key: 'Iraq', label: t('iraq'), icon: FootballIcon },
     { key: 'News', label: t('news'), icon: Newspaper },
-    { key: 'Settings', label: t('more'), icon: MoreHorizontal },
+    { key: 'Notifications', label: t('notifications'), icon: Bell },
   ];
 
   useEffect(() => {

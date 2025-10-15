@@ -103,7 +103,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     return (
         <div className="flex h-full flex-col bg-background">
              <ScreenHeader 
-                title="" 
+                title={t('my_choices')} 
                 onBack={goBack} 
                 canGoBack={canGoBack} 
                 actions={
@@ -118,13 +118,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 }
             />
             <div className="flex-1 flex flex-col min-h-0">
-                <Tabs defaultValue="my-choices" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 bg-transparent px-4">
-                        <TabsTrigger value="notifications" onClick={() => navigate('Notifications')}>{t('notifications')}</TabsTrigger>
-                        <TabsTrigger value="my-choices">{t('my_choices')}</TabsTrigger>
-                    </TabsList>
-                </Tabs>
-                
                 <div className="flex-1 overflow-y-auto">
                      <div className="space-y-6 py-4">
                         <ScrollArea className="w-full whitespace-nowrap">

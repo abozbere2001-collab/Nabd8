@@ -48,6 +48,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User as UserIcon } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
 import { cn } from '@/lib/utils';
+import { LanguageProvider } from '@/components/LanguageProvider';
 
 const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
@@ -82,7 +83,7 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
 };
 
 
-const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
+const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Notifications'];
 
 type StackItem = {
   key: string;
@@ -149,7 +150,7 @@ export function AppContentWrapper() {
         'Competitions': [{ key: 'Competitions-0', screen: 'Competitions' }],
         'Iraq': [{ key: 'Iraq-0', screen: 'Iraq' }],
         'News': [{ key: 'News-0', screen: 'News' }],
-        'Settings': [{ key: 'Settings-0', screen: 'Settings' }],
+        'Notifications': [{ key: 'Notifications-0', screen: 'Notifications' }],
     },
   });
 
@@ -167,6 +168,10 @@ export function AppContentWrapper() {
                 }
             };
         }
+        // If on a non-main tab and at the root, go back to the default tab
+        if (!mainTabs.includes(prevState.activeTab)) {
+            return { ...prevState, activeTab: 'Matches' };
+        }
         return prevState;
     });
   }, []);
@@ -176,25 +181,38 @@ export function AppContentWrapper() {
     const newItem = { key: newKey, screen, props };
 
     if (mainTabs.includes(screen)) {
-        // Switch to a main tab
-        setNavigationState(prevState => ({
-            ...prevState,
-            activeTab: screen,
-            // Reset stack to root when switching to a main tab
-            stacks: {
-              ...prevState.stacks,
-              [screen]: [newItem]
-            }
-        }));
+        setNavigationState(prevState => {
+            const newStack = prevState.stacks[screen] ? [newItem, ...prevState.stacks[screen].slice(1)] : [newItem];
+            return {
+                ...prevState,
+                activeTab: screen,
+                stacks: {
+                    ...prevState.stacks,
+                    [screen]: [newItem] // Reset stack on main tab switch
+                }
+            };
+        });
     } else {
-        // Push to the current tab's stack
-        setNavigationState(prevState => ({
-            ...prevState,
-            stacks: {
-                ...prevState.stacks,
-                [prevState.activeTab]: [...prevState.stacks[prevState.activeTab], newItem],
+        setNavigationState(prevState => {
+            let activeTab = prevState.activeTab;
+            // If we are navigating to a screen that is not a main tab, and its stack doesn't exist, create it.
+            if (!prevState.stacks[screen]) {
+                const newStacks = {...prevState.stacks};
+                newStacks[screen] = [newItem];
+                return {
+                    activeTab: screen as ScreenKey,
+                    stacks: newStacks
+                }
             }
-        }));
+             // Push to the current tab's stack
+            return {
+                ...prevState,
+                stacks: {
+                    ...prevState.stacks,
+                    [prevState.activeTab]: [...prevState.stacks[prevState.activeTab], newItem],
+                }
+            };
+        });
     }
   }, []);
   
@@ -212,46 +230,47 @@ export function AppContentWrapper() {
   const activeStackItem = activeStack[activeStack.length - 1];
 
   return (
-    <main className="h-screen w-screen bg-background flex flex-col">
-      <div className="relative flex-1 flex flex-col overflow-hidden">
-        {Object.entries(navigationState.stacks).map(([tabKey, stack]) => {
-          const currentStackItem = stack[stack.length - 1];
-          if (!currentStackItem) return null;
-          
-          const isActiveTab = navigationState.activeTab === tabKey;
-          const ScreenComponent = screenConfig[currentStackItem.screen]?.component;
+    <LanguageProvider>
+        <main className="h-screen w-screen bg-background flex flex-col">
+        <div className="relative flex-1 flex flex-col overflow-hidden">
+            {Object.entries(navigationState.stacks).map(([tabKey, stack]) => {
+            const currentStackItem = stack[stack.length - 1];
+            if (!currentStackItem) return null;
+            
+            const isActiveTab = navigationState.activeTab === tabKey;
+            const ScreenComponent = screenConfig[currentStackItem.screen]?.component;
 
-          if (!ScreenComponent) return null;
+            if (!ScreenComponent) return null;
 
-          // By using CSS to hide/show, we keep the component mounted and preserve its state
-          return (
-            <div key={tabKey} className={cn("absolute inset-0 flex flex-col", isActiveTab ? "z-10" : "-z-10")}>
-                {stack.map((stackItem, index) => {
-                    const isVisible = index === stack.length - 1;
-                    const Component = screenConfig[stackItem.screen]?.component;
-                    if (!Component) return null;
-                    
-                    const screenProps = {
-                        ...stackItem.props,
-                        navigate,
-                        goBack,
-                        canGoBack: stack.length > 1,
-                        isVisible, // Pass isVisible prop
-                    };
+            return (
+                <div key={tabKey} className={cn("absolute inset-0 flex flex-col", isActiveTab ? "z-10" : "-z-10")}>
+                    {stack.map((stackItem, index) => {
+                        const isVisible = index === stack.length - 1;
+                        const Component = screenConfig[stackItem.screen]?.component;
+                        if (!Component) return null;
+                        
+                        const screenProps = {
+                            ...stackItem.props,
+                            navigate,
+                            goBack,
+                            canGoBack: stack.length > 1,
+                            isVisible, // Pass isVisible prop
+                        };
 
-                    return (
-                        <div key={stackItem.key} className={cn("absolute inset-0 flex flex-col", isVisible ? "z-10" : "-z-10")}>
-                           <Component {...screenProps} />
-                        </div>
-                    )
-                })}
-            </div>
-          )
-        })}
-      </div>
-      
-      {showBannerAd && <BannerAd />}
-      <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => navigate(screen)} />
-    </main>
+                        return (
+                            <div key={stackItem.key} className={cn("absolute inset-0 flex flex-col", isVisible ? "z-10" : "-z-10")}>
+                            <Component {...screenProps} />
+                            </div>
+                        )
+                    })}
+                </div>
+            )
+            })}
+        </div>
+        
+        {showBannerAd && <BannerAd />}
+        {mainTabs.includes(navigationState.activeTab) && <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => navigate(screen)} />}
+        </main>
+    </LanguageProvider>
   );
 }
