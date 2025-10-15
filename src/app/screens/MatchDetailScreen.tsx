@@ -440,7 +440,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             const currentLeagueId = currentFixture.league.id;
             const currentSeason = currentFixture.league.season || CURRENT_SEASON;
             
-            // Initial fetch for essential data
             const [lineupsData, eventsData, statisticsData, standingsData] = await Promise.all([
                 fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`).then(res => res.json()),
                 fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).then(res => res.json()),
@@ -454,17 +453,15 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 setStandings(standingsData.response[0].league.standings[0]);
             }
             
-            // Set initial lineups, then enrich them
             const initialLineups = lineupsData.response || [];
-            setLineups(initialLineups);
-
+            
             if (isInitialLoad && initialLineups.length > 0) {
-                 const allPlayerIds = initialLineups.flatMap((l: LineupData) => [...l.startXI, ...l.substitutes]).map((p: PlayerWithStats) => p.player.id).filter((id: number | null) => id);
+                 const allPlayerIds = initialLineups.flatMap((l: LineupData) => [...l.startXI, ...l.substitutes]).map((p: PlayerWithStats) => p.player.id).filter((id: number | null): id is number => id !== null);
                 if (allPlayerIds.length > 0) {
                     const uniquePlayerIds = [...new Set(allPlayerIds)];
                     const playersDataMap = new Map<number, { player: PlayerType, statistics: any[] }>();
 
-                    const batches = [];
+                    const batches: number[][] = [];
                     for (let i = 0; i < uniquePlayerIds.length; i += 20) {
                         batches.push(uniquePlayerIds.slice(i, i + 20));
                     }
@@ -474,7 +471,9 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                          if (res.ok) {
                             const data = await res.json();
                             (data.response || []).forEach((item: { player: PlayerType, statistics: any[] }) => {
-                                playersDataMap.set(item.player.id, item);
+                                if (item.player) {
+                                  playersDataMap.set(item.player.id, item);
+                                }
                             });
                          }
                     }
@@ -498,7 +497,14 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                         };
                     });
                     setLineups(enrichedLineups);
+                } else {
+                   setLineups(initialLineups);
                 }
+            } else if (!isInitialLoad) {
+                // For subsequent fetches, just update lineups without enrichment if it's already done
+                if(lineups === null) setLineups(initialLineups)
+            } else {
+                 setLineups(initialLineups);
             }
         } catch (error) {
             console.error("Failed to fetch match details:", error);
@@ -507,13 +513,22 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 setLoading(false);
             }
         }
-    }, [fixtureId]);
+    }, [fixtureId, lineups]);
 
     useEffect(() => {
-        fetchData(true); 
-        const interval = setInterval(() => fetchData(false), 30000); 
-        return () => clearInterval(interval);
-    }, [fetchData]);
+        const isLive = fixture?.fixture.status.short && ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(fixture.fixture.status.short);
+        
+        fetchData(true); // Initial fetch
+        
+        let interval: NodeJS.Timeout | null = null;
+        if (isLive) {
+          interval = setInterval(() => fetchData(false), 30000); 
+        }
+        
+        return () => {
+          if (interval) clearInterval(interval);
+        };
+    }, [fixtureId]);
 
 
     if (loading && !fixture) {
