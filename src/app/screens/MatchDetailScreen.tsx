@@ -260,38 +260,39 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
 }
 
 const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate']; season: number }) => {
-    const [lineupsWithDetails, setLineupsWithDetails] = useState<LineupData[] | null>(initialLineups);
-    const [loadingDetails, setLoadingDetails] = useState(true);
+    const [lineups, setLineups] = useState<LineupData[] | null>(initialLineups);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchPlayerDetails = async () => {
             if (!initialLineups || initialLineups.length === 0) {
-                setLoadingDetails(false);
+                setLoading(false);
                 return;
             }
 
-            setLoadingDetails(true);
+            setLoading(true);
             try {
-                const allPlayers = initialLineups.flatMap(l => [...l.startXI, ...l.substitutes]);
-                const playerIds = allPlayers.map(p => p.player.id).filter(id => id);
-
-                if (playerIds.length === 0) {
-                    setLineupsWithDetails(initialLineups);
-                    setLoadingDetails(false);
+                const allPlayerIds = initialLineups.flatMap(l => [...l.startXI, ...l.substitutes]).map(p => p.player.id).filter(id => id);
+                if (allPlayerIds.length === 0) {
+                    setLineups(initialLineups);
+                    setLoading(false);
                     return;
                 }
                 
+                const uniquePlayerIds = [...new Set(allPlayerIds)];
                 const playersDataMap = new Map<number, { player: PlayerType, statistics: any[] }>();
 
-                // Fetch players in batches of 20
-                for (let i = 0; i < playerIds.length; i += 20) {
-                    const batchIds = playerIds.slice(i, i + 20);
+                // Fetch in batches of 20
+                for (let i = 0; i < uniquePlayerIds.length; i += 20) {
+                    const batchIds = uniquePlayerIds.slice(i, i + 20);
                     const res = await fetch(`/api/football/players?id=${batchIds.join('-')}&season=${season}`);
                     if (res.ok) {
                         const data = await res.json();
                         (data.response || []).forEach((item: { player: PlayerType, statistics: any[] }) => {
                             playersDataMap.set(item.player.id, item);
                         });
+                    } else {
+                        console.error(`Failed to fetch player batch ${i/20 + 1}`);
                     }
                 }
                 
@@ -299,9 +300,10 @@ const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineu
                     const updatePlayerList = (list: PlayerWithStats[]) => list.map(p => {
                         const detailedData = playersDataMap.get(p.player.id);
                         if (detailedData) {
+                            // Smart merge: keep original grid, merge new data
                             return {
                                 ...p,
-                                player: { ...p.player, ...detailedData.player }, // Merge to keep grid
+                                player: { ...p.player, ...detailedData.player }, 
                                 statistics: detailedData.statistics,
                             };
                         }
@@ -315,13 +317,13 @@ const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineu
                     };
                 });
                 
-                setLineupsWithDetails(updatedLineups);
+                setLineups(updatedLineups);
 
             } catch (error) {
-                console.error('Error fetching player details for lineups:', error);
-                setLineupsWithDetails(initialLineups); // Fallback to initial data
+                console.error('Error fetching player details:', error);
+                setLineups(initialLineups); // Fallback to initial data
             } finally {
-                setLoadingDetails(false);
+                setLoading(false);
             }
         };
 
@@ -331,16 +333,16 @@ const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineu
 
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
-    if (loadingDetails) {
+    if (loading) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
     
-    if (!lineupsWithDetails || lineupsWithDetails.length < 2) {
+    if (!lineups || lineups.length < 2) {
         return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     }
 
-    const home = lineupsWithDetails[0];
-    const away = lineupsWithDetails[1];
+    const home = lineups[0];
+    const away = lineups[1];
     
     if (!home || !away) return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
 
