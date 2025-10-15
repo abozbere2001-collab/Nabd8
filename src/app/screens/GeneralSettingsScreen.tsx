@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Sun, Moon, Laptop, Gem, UserCog, Languages, Crown } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 import { useAuth, useAdmin } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -92,14 +91,13 @@ export function GeneralSettingsScreen({ navigate, goBack, canGoBack, headerActio
                 </div>
             </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div className="flex items-center space-x-3 space-x-reverse">
-                <Gem className="text-primary h-5 w-5" />
-                <Label htmlFor="pro-mode" className="font-bold">{t('pro_version')}</Label>
-              </div>
-              <Switch id="pro-mode" checked={isProUser} onCheckedChange={(checked) => setProUser(checked)} />
-            </div>
-             {!isAdmin && (
+             {!isProUser && (
+                <Button onClick={() => navigate('GoPro')} className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:opacity-90">
+                    <Gem className="ml-2 h-4 w-4" />
+                    الترقية إلى النسخة الإحترافية
+                </Button>
+            )}
+             {isAdmin && (
                 <Button onClick={handleMakeAdmin} className="w-full">
                     <Crown className="ml-2 h-4 w-4" />
                     {t('upgrade_to_admin')}

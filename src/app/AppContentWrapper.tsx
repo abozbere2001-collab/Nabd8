@@ -31,6 +31,7 @@ import { GeneralSettingsScreen } from './screens/GeneralSettingsScreen';
 import PrivacyPolicyScreen from './privacy-policy/page';
 import TermsOfServiceScreen from './terms-of-service/page';
 import { WelcomeScreen } from './screens/WelcomeScreen';
+import { GoProScreen } from './screens/GoProScreen';
 import type { ScreenKey } from './page';
 
 import { useAd, SplashScreenAd, BannerAd } from '@/components/AdProvider';
@@ -80,6 +81,7 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   PrivacyPolicy: { component: PrivacyPolicyScreen },
   TermsOfService: { component: TermsOfServiceScreen },
   Welcome: { component: WelcomeScreen },
+  GoPro: { component: GoProScreen },
 };
 
 
