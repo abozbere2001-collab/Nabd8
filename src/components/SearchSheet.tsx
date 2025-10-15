@@ -60,7 +60,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
 
   const fetchFavorites = useCallback(async () => {
     if (!user || !db) return;
-    const docRef = doc(db, 'favorites', user.uid);
+    const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
     getDoc(docRef).then(docSnap => {
         if (docSnap.exists()) {
             setFavorites(docSnap.data() as Favorites);
@@ -260,7 +260,7 @@ export function SearchSheet({ children, navigate }: { children: React.ReactNode,
 
   const handleFavorite = (type: 'team' | 'league', item: any) => {
     if (!user || !db) return;
-    const favRef = doc(db, 'favorites', user.uid);
+    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const itemPath = type === 'team' ? 'teams' : 'leagues';
     const fieldPath = `${itemPath}.${item.id}`;
     const isFavorited = !!favorites?.[itemPath]?.[item.id];

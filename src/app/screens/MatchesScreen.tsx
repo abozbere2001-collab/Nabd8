@@ -248,7 +248,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         setFavorites({userId: ''});
         return;
     }
-    const docRef = doc(db, 'favorites', user.uid);
+    const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const unsubscribe = onSnapshot(docRef, (doc) => {
         setFavorites(doc.data() as Favorites || {userId: user.uid});
     }, (error) => {
@@ -384,4 +384,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-
