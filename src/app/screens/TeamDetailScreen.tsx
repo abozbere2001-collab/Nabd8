@@ -160,23 +160,28 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
         const fetchData = async () => {
             setLoading(true);
             try {
-                const statsRes = await fetch(`/api/football/teams/statistics?team=${teamId}&season=${CURRENT_SEASON}`);
+                // Fetch fixtures and stats in parallel
+                const [fixturesRes, statsRes] = await Promise.all([
+                    fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`),
+                    fetch(`/api/football/teams/statistics?team=${teamId}&season=${CURRENT_SEASON}`)
+                ]);
+
+                const fixturesData = await fixturesRes.json();
                 const statsData = await statsRes.json();
-                const leagueId = statsData?.response?.league?.id;
+
+                const currentFixtures = fixturesData.response || [];
+                setFixtures(currentFixtures);
+                setStats(statsData.response);
+                
+                // Try to get leagueId from fixtures if stats fail, or from stats if they succeed
+                const leagueId = currentFixtures[0]?.league?.id || statsData?.response?.league?.id;
 
                 if (leagueId) {
-                    const [fixturesRes, standingsRes] = await Promise.all([
-                        fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`),
-                        fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`)
-                    ]);
-
-                    const fixturesData = await fixturesRes.json();
+                    const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`);
                     const standingsData = await standingsRes.json();
-
-                    setFixtures(fixturesData.response || []);
                     setStandings(standingsData.response?.[0]?.league?.standings?.[0] || []);
                 }
-                 setStats(statsData.response);
+
             } catch (error) {
                 console.error("Error fetching team details tabs:", error);
             } finally {
@@ -238,7 +243,7 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                 ) : <p className="text-center text-muted-foreground p-8">جدول الترتيب غير متاح.</p>}
             </TabsContent>
             <TabsContent value="stats" className="mt-4">
-                {stats ? (
+                {stats && stats.league ? (
                     <Card>
                         <CardHeader>
                             <CardTitle>إحصائيات موسم {stats.league?.season || CURRENT_SEASON}</CardTitle>
@@ -375,5 +380,3 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
-
-    
