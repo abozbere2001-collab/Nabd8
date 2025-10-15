@@ -269,11 +269,12 @@ const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineu
     const [loading, setLoading] = useState(!initialLineups);
     
     // We only need to enrich the initial lineups, so we can do this once.
-    const [enrichedLineups, setEnrichedLineups] = useState<LineupData[] | null>(initialLineups);
+    const [enrichedLineups, setEnrichedLineups] = useState<LineupData[] | null>(null);
 
     useEffect(() => {
         if (!initialLineups || initialLineups.length < 2) {
             setLoading(false);
+            setEnrichedLineups(initialLineups)
             return;
         }
 
@@ -288,15 +289,20 @@ const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineu
             }
             
             try {
-                // Fetch all player stats in one go
-                const playerStatsRes = await fetch(`/api/football/players?id=${allPlayerIds.join('-')}&season=${season}`);
-                const playerStatsData = await playerStatsRes.json();
-                
+                // Fetch all player stats in batches of 20
+                const BATCH_SIZE = 20;
                 const playerStatsMap = new Map<number, any>();
-                if (playerStatsData.response) {
-                    playerStatsData.response.forEach((p: any) => {
-                        playerStatsMap.set(p.player.id, p);
-                    });
+                
+                for (let i = 0; i < allPlayerIds.length; i += BATCH_SIZE) {
+                    const batchIds = allPlayerIds.slice(i, i + BATCH_SIZE);
+                    const playerStatsRes = await fetch(`/api/football/players?id=${batchIds.join('-')}&season=${season}`);
+                    const playerStatsData = await playerStatsRes.json();
+                    
+                    if (playerStatsData.response) {
+                        playerStatsData.response.forEach((p: any) => {
+                            playerStatsMap.set(p.player.id, p);
+                        });
+                    }
                 }
                 
                 // Create new lineup data with enriched player info
@@ -304,9 +310,13 @@ const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineu
                     const enrichPlayerList = (list: PlayerWithStats[]) => list.map(playerWrapper => {
                         const extraStats = playerStatsMap.get(playerWrapper.player.id);
                         if (extraStats) {
-                            return {
+                            // Smart merge: Combine the original player object with the new data
+                             return {
                                 ...playerWrapper,
-                                player: { ...playerWrapper.player, ...extraStats.player },
+                                player: {
+                                    ...playerWrapper.player,
+                                    ...extraStats.player, // This will add/overwrite photo, etc.
+                                },
                                 statistics: extraStats.statistics,
                             };
                         }
@@ -331,8 +341,6 @@ const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineu
         };
 
         enrichLineups();
-        // We only want to run this once when the initial data is available.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialLineups, season]);
     
 
