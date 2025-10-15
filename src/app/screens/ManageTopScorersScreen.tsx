@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -18,9 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 const NUM_SCORERS = 20;
 
 export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
-  const [scorers, setScorers] = useState<Omit<ManualTopScorer, 'rank'>[]>(
-    Array.from({ length: NUM_SCORERS }, () => ({ playerName: '', teamName: '', goals: 0, playerPhoto: '' }))
-  );
+  const [scorers, setScorers] = useState<Omit<ManualTopScorer, 'rank'>[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { db } = useFirestore();
@@ -86,13 +85,11 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
       const batch = writeBatch(db);
       const scorersRef = collection(db, 'iraqiLeagueTopScorers');
       
-      // Delete all existing documents to start fresh
       const oldDocsSnapshot = await getDocs(scorersRef);
       oldDocsSnapshot.forEach(doc => {
         batch.delete(doc.ref);
       });
 
-      // Set new documents
       scorers.forEach((scorer, index) => {
         if (scorer.playerName && scorer.playerName.trim()) {
           const rank = index + 1;
@@ -112,7 +109,7 @@ export function ManageTopScorersScreen({ navigate, goBack, canGoBack, headerActi
       toast({ title: 'نجاح', description: 'تم حفظ قائمة الهدافين.' });
       goBack();
     } catch (error) {
-       const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers collection', operation: 'write' });
+       const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'write' });
        errorEmitter.emit('permission-error', permissionError);
        toast({
         variant: "destructive",
