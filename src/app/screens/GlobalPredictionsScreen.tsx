@@ -16,6 +16,7 @@ import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
 import type { Fixture, UserScore, Prediction, DailyGlobalPredictions, UserProfile, Team, SeasonPrediction, Player } from '@/lib/types';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, where, getDocs, limit, startAfter, type DocumentData, type QueryDocumentSnapshot, writeBatch } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useDebounce } from '@/hooks/use-debounce';
