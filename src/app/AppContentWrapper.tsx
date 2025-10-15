@@ -25,6 +25,7 @@ import { AddEditNewsScreen } from './screens/AddEditNewsScreen';
 import { ManageTopScorersScreen } from './screens/ManageTopScorersScreen';
 import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { LoginScreen } from './screens/LoginScreen';
+import { NotificationSettingsScreen } from './screens/NotificationSettingsScreen';
 import type { ScreenKey } from './page';
 
 import { useAd, SplashScreenAd, BannerAd } from '@/components/AdProvider';
@@ -67,6 +68,7 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   MatchDetails: { component: MatchDetailScreen },
   Login: { component: LoginScreen },
   SignUp: { component: LoginScreen },
+  NotificationSettings: { component: NotificationSettingsScreen },
 };
 
 
