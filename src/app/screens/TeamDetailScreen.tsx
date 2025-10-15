@@ -1,15 +1,14 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { Loader2, Pencil, Star } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Loader2, Pencil } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,8 +18,9 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Team, Player, Fixture, Standing, TeamStatistics } from '@/lib/types';
-import { CURRENT_SEASON, PREVIOUS_SEASON } from '@/lib/constants';
+import { CURRENT_SEASON } from '@/lib/constants';
 import { FixtureItem } from '@/components/FixtureItem';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface TeamData {
     team: Team;
@@ -51,7 +51,7 @@ const TeamHeader = ({ team, venue }: { team: Team, venue: TeamData['venue'] }) =
     </Card>
 );
 
-const PlayersTab = ({ teamId, navigate }: { teamId: number, navigate: ScreenProps['navigate'] }) => {
+const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: ScreenProps['navigate'] }) => {
     const [players, setPlayers] = useState<Player[]>([]);
     const [loading, setLoading] = useState(true);
     const { isAdmin } = useAdmin();
@@ -160,7 +160,6 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
         const fetchData = async () => {
             setLoading(true);
             try {
-                // Fetch stats first to get league ID
                 const statsRes = await fetch(`/api/football/teams/statistics?team=${teamId}&season=${CURRENT_SEASON}`);
                 const statsData = await statsRes.json();
                 const leagueId = statsData?.response?.league?.id;
@@ -295,7 +294,6 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
                     const teamInfo = data.response[0];
                     setTeamData(teamInfo);
                     const name = teamInfo.team.name;
-                    // Check for a custom name in Firestore
                     if (db) {
                         const customNameDocRef = doc(db, "teamCustomizations", String(teamId));
                         try {
@@ -311,7 +309,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
                                 operation: 'get',
                             });
                             errorEmitter.emit('permission-error', permissionError);
-                            setDisplayTitle(name); // fallback to original name
+                            setDisplayTitle(name);
                         }
                     } else {
                          setDisplayTitle(name);
@@ -370,10 +368,12 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
             <TeamDetailsTabs teamId={teamId} navigate={navigate} />
           </TabsContent>
           <TabsContent value="players" className="mt-4">
-            <PlayersTab teamId={teamId} navigate={navigate} />
+            <TeamPlayersTab teamId={teamId} navigate={navigate} />
           </TabsContent>
         </Tabs>
       </div>
     </div>
   );
 }
+
+    

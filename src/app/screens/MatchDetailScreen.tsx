@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
+import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
@@ -20,7 +20,6 @@ import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
 
-// --- PlayerCard Component ---
 const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: ScreenProps['navigate'] }) => {
   const fallbackImage = "https://media.api-sports.io/football/players/0.png";
   
@@ -73,8 +72,6 @@ const PlayerCard = ({ player, navigate }: { player: PlayerWithStats, navigate: S
 };
 
 
-// --- Reusable Components ---
-
 const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
     return (
         <Card className="mb-4 bg-card/80 backdrop-blur-sm">
@@ -104,8 +101,6 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
     );
 };
 
-
-// --- Tabs ---
 
 const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statistics: MatchStatistics[] | null }) => {
     if (!fixture) return <Skeleton className="h-40 w-full" />;
@@ -266,89 +261,13 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
 
 const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate']; season: number }) => {
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
-    const [loading, setLoading] = useState(!initialLineups);
-    
-    // We only need to enrich the initial lineups, so we can do this once.
-    const [enrichedLineups, setEnrichedLineups] = useState<LineupData[] | null>(null);
 
-    useEffect(() => {
-        if (!initialLineups || initialLineups.length < 2) {
-            setLoading(false);
-            setEnrichedLineups(initialLineups)
-            return;
-        }
+    if (!initialLineups || initialLineups.length < 2) {
+        return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
+    }
 
-        const enrichLineups = async () => {
-            setLoading(true);
-            const allPlayerIds = initialLineups.flatMap(l => [...l.startXI, ...l.substitutes]).map(p => p.player.id).filter(id => id);
-
-            if (allPlayerIds.length === 0) {
-                setEnrichedLineups(initialLineups);
-                setLoading(false);
-                return;
-            }
-            
-            try {
-                // Fetch all player stats in batches of 20
-                const BATCH_SIZE = 20;
-                const playerStatsMap = new Map<number, any>();
-                
-                for (let i = 0; i < allPlayerIds.length; i += BATCH_SIZE) {
-                    const batchIds = allPlayerIds.slice(i, i + BATCH_SIZE);
-                    const playerStatsRes = await fetch(`/api/football/players?id=${batchIds.join('-')}&season=${season}`);
-                    const playerStatsData = await playerStatsRes.json();
-                    
-                    if (playerStatsData.response) {
-                        playerStatsData.response.forEach((p: any) => {
-                            playerStatsMap.set(p.player.id, p);
-                        });
-                    }
-                }
-                
-                // Create new lineup data with enriched player info
-                const newEnrichedLineups = initialLineups.map(lineup => {
-                    const enrichPlayerList = (list: PlayerWithStats[]) => list.map(playerWrapper => {
-                        const extraStats = playerStatsMap.get(playerWrapper.player.id);
-                        if (extraStats) {
-                            // Smart merge: Combine the original player object with the new data
-                             return {
-                                ...playerWrapper,
-                                player: {
-                                    ...playerWrapper.player,
-                                    ...extraStats.player, // This will add/overwrite photo, etc.
-                                },
-                                statistics: extraStats.statistics,
-                            };
-                        }
-                        return playerWrapper;
-                    });
-
-                    return {
-                        ...lineup,
-                        startXI: enrichPlayerList(lineup.startXI),
-                        substitutes: enrichPlayerList(lineup.substitutes),
-                    };
-                });
-                
-                setEnrichedLineups(newEnrichedLineups);
-
-            } catch (error) {
-                console.error("Error enriching lineups:", error);
-                setEnrichedLineups(initialLineups); // Fallback to initial data on error
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        enrichLineups();
-    }, [initialLineups, season]);
-    
-
-    if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    if (!enrichedLineups || enrichedLineups.length < 2) return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
-
-    const home = enrichedLineups.find(l => l.team.id === enrichedLineups[0].team.id);
-    const away = enrichedLineups.find(l => l.team.id === enrichedLineups[1].team.id);
+    const home = initialLineups[0];
+    const away = initialLineups[1];
     
     if (!home || !away) return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
 
@@ -368,7 +287,6 @@ const LineupsTab = ({ initialLineups, events, navigate, season }: { initialLineu
             }
         });
 
-        // Sort columns within each row
         Object.keys(formationGrid).forEach(rowKey => {
             const row = Number(rowKey);
             formationGrid[row].sort((a, b) => {
@@ -495,9 +413,6 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
     );
 };
 
-
-// --- Main Screen ---
-
 export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixture: initialFixture }: ScreenProps & { fixtureId: number, fixture?: Fixture }) {
     const [fixture, setFixture] = useState<Fixture | null>(initialFixture || null);
     const [lineups, setLineups] = useState<LineupData[] | null>(null);
@@ -602,3 +517,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
