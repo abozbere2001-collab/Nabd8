@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Star, Plus, Users, Trophy, User as PlayerIcon, Search, Bell } from 'lucide-react';
+import { Star, Plus, Users, Trophy, User as PlayerIcon, Search } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAuth, useFirestore } from '@/firebase/provider';
@@ -171,7 +171,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                         <AddChoiceCard />
                                     </div>
                                     {favoriteTeams.map((team, index) => 
-                                        <div key={`${team.teamId}-${index}`} className="relative flex flex-col items-center justify-center gap-2 text-center p-2 rounded-2xl cursor-pointer h-[76px]" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
+                                        <div key={`${team.teamId}-${index}`} className="relative flex flex-col items-center justify-start gap-1 text-center cursor-pointer h-[76px]" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
                                             <Avatar className="h-12 w-12 border-2 border-border">
                                                 <AvatarImage src={team.logo} />
                                                 <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
@@ -189,7 +189,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                         <AddChoiceCard />
                                     </div>
                                     {favoriteLeagues.map((comp, index) => 
-                                        <div key={`${comp.leagueId}-${index}`} className="relative flex flex-col items-center justify-center gap-2 text-center p-2 rounded-2xl cursor-pointer h-[76px]" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
+                                        <div key={`${comp.leagueId}-${index}`} className="relative flex flex-col items-center justify-start gap-1 text-center cursor-pointer h-[76px]" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
                                             <Avatar className="h-12 w-12 border-2 border-border p-1">
                                                 <AvatarImage src={comp.logo} className="object-contain" />
                                                 <AvatarFallback>{comp.name.charAt(0)}</AvatarFallback>
