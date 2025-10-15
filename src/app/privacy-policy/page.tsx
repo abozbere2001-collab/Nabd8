@@ -6,6 +6,7 @@ import { ScreenProps } from "@/app/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function PrivacyPolicyScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+  const currentYear = new Date().getFullYear();
   return (
     <div className="flex flex-col h-full bg-background">
       <ScreenHeader title="سياسة الخصوصية" onBack={goBack} canGoBack={canGoBack} />
@@ -16,7 +17,7 @@ export default function PrivacyPolicyScreen({ navigate, goBack, canGoBack }: Scr
           </CardHeader>
           <CardContent className="space-y-4 text-muted-foreground leading-relaxed">
             <p className="font-bold">
-              تاريخ آخر تحديث: 25 يوليو 2024
+              تاريخ آخر تحديث: أكتوبر {currentYear}
             </p>
             <p>
               نحن في Goal Stack ("نحن"، "التطبيق") نأخذ خصوصيتك على محمل الجد. توضح سياسة الخصوصية هذه كيفية جمعنا واستخدامنا وحماية معلوماتك الشخصية عند استخدامك لتطبيقنا وخدماتنا.

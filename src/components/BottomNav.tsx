@@ -26,16 +26,18 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
   const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
+    // This effect runs only on the client
     const hasSeenTour = localStorage.getItem(IRAQ_TOUR_KEY);
     if (hasSeenTour !== 'true') {
       const timer = setTimeout(() => {
         setShowTour(true);
-      }, 1500); // Delay before showing the tour
+      }, 1500); // Delay before showing the tour popover
       return () => clearTimeout(timer);
     }
   }, []);
 
   const handleTourOpenChange = (open: boolean) => {
+    // This is called when the popover tries to close (e.g., by clicking outside)
     if (!open) {
       setShowTour(false);
       localStorage.setItem(IRAQ_TOUR_KEY, 'true');
@@ -44,6 +46,7 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
   
   const handleNavigation = (key: ScreenKey) => {
     if (showTour) {
+        // If the tour is showing, interacting with the nav should hide it.
         handleTourOpenChange(false);
     }
     if (navItems.some(item => item.key === key)) {

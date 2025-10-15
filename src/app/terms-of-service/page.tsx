@@ -6,6 +6,7 @@ import { ScreenProps } from "@/app/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function TermsOfServiceScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+    const currentYear = new Date().getFullYear();
   return (
     <div className="flex flex-col h-full bg-background">
       <ScreenHeader title="شروط الخدمة" onBack={goBack} canGoBack={canGoBack} />
@@ -16,7 +17,7 @@ export default function TermsOfServiceScreen({ navigate, goBack, canGoBack }: Sc
           </CardHeader>
           <CardContent className="space-y-4 text-muted-foreground leading-relaxed">
             <p className="font-bold">
-              مرحبًا بك في Goal Stack. باستخدامك لتطبيقنا ("الخدمة")، فإنك توافق على الالتزام بشروط وأحكام الخدمة هذه ("الشروط").
+              مرحبًا بك في Goal Stack. باستخدامك لتطبيقنا ("الخدمة")، فإنك توافق على الالتزام بشروط وأحكام الخدمة هذه ("الشروط"). آخر تحديث: أكتوبر {currentYear}.
             </p>
 
             <h3 className="font-bold text-lg text-foreground pt-4">1. قبول الشروط</h3>
