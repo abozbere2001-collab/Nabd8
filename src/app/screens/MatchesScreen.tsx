@@ -54,6 +54,10 @@ const FixturesList = ({
 }) => {
     
     const filteredFixtures = useMemo(() => {
+        if (activeTab === 'live') {
+            return fixtures; // Live tab shows all fetched live fixtures
+        }
+
         let fixturesToFilter = fixtures;
         
         if (activeTab === 'my-results'){
@@ -105,9 +109,12 @@ const FixturesList = ({
     }
 
     if (Object.keys(groupedFixtures).length === 0) {
+        const message = activeTab === 'live' 
+            ? "لا توجد مباريات مباشرة حاليًا." 
+            : "لا توجد مباريات لهذا اليوم.";
         return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
-                <p>لا توجد مباريات لهذا اليوم.</p>
+                <p>{message}</p>
             </div>
         );
     }
@@ -224,7 +231,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     );
 }
 
-type TabName = 'all-matches' | 'my-results' | 'predictions';
+type TabName = 'my-results' | 'live' | 'predictions';
 type Cache<T> = { [date: string]: T };
 
 // Main Screen Component
@@ -239,6 +246,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   const [fixturesCache, setFixturesCache] = useState<Cache<FixtureType[]>>({});
   const [loadingFixtures, setLoadingFixtures] = useState(true);
+  
+  const [liveFixtures, setLiveFixtures] = useState<FixtureType[]>([]);
+  const [loadingLive, setLoadingLive] = useState(false);
   
   const [commentedMatches, setCommentedMatches] = useState<{ [key: number]: MatchDetails }>({});
 
@@ -303,10 +313,38 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     }
   }, [fixturesCache]);
 
+  const fetchLiveFixtures = useCallback(async () => {
+    setLoadingLive(true);
+    const url = `/api/football/fixtures?live=all`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error('Failed to fetch live fixtures');
+        }
+        const data = await response.json();
+        setLiveFixtures(data.response || []);
+    } catch (error) {
+        console.error(`Failed to fetch live fixtures:`, error);
+        setLiveFixtures([]);
+    } finally {
+        setLoadingLive(false);
+    }
+  }, []);
+
   
   useEffect(() => {
-    fetchFixturesForDate(selectedDateKey);
-  }, [selectedDateKey, fetchFixturesForDate]);
+    if(activeTab === 'my-results') {
+        fetchFixturesForDate(selectedDateKey);
+    }
+  }, [selectedDateKey, fetchFixturesForDate, activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'live') {
+        fetchLiveFixtures(); // Fetch immediately
+        const interval = setInterval(fetchLiveFixtures, 60000); // And every minute
+        return () => clearInterval(interval);
+    }
+  }, [activeTab, fetchLiveFixtures]);
 
 
   const handleDateChange = (dateKey: string) => {
@@ -323,7 +361,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
     
-  const currentFixtures = fixturesCache[selectedDateKey] || [];
+  const currentFixtures = activeTab === 'live' ? liveFixtures : (fixturesCache[selectedDateKey] || []);
+  const isLoading = activeTab === 'live' ? loadingLive : loadingFixtures;
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -346,7 +385,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
              <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
                <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
                    <TabsTrigger value="predictions" className='text-xs sm:text-sm'>التوقعات</TabsTrigger>
-                   <TabsTrigger value="all-matches" className='text-xs sm:text-sm'>كل المباريات</TabsTrigger>
+                   <TabsTrigger value="live" className='text-xs sm:text-sm'>مباشر</TabsTrigger>
                    <TabsTrigger value="my-results" className='text-xs sm:text-sm'>نتائجي</TabsTrigger>
                </TabsList>
                 <TabsContent value="my-results" className="mt-0">
@@ -354,10 +393,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                     </div>
                 </TabsContent>
-                <TabsContent value="all-matches" className="mt-0">
-                     <div className="py-2 px-2">
-                        <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
-                    </div>
+                <TabsContent value="live" className="mt-0">
+                     {/* No DateScroller for live tab */}
                 </TabsContent>
                 <TabsContent value="predictions" className="mt-0">
                     {/* Date scroller for predictions is handled inside the component */}
@@ -371,7 +408,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             ) : (
                 <FixturesList 
                     fixtures={currentFixtures}
-                    loading={loadingFixtures}
+                    loading={isLoading}
                     activeTab={activeTab}
                     favoritedLeagueIds={favoritedLeagueIds}
                     favoritedTeamIds={favoritedTeamIds}
@@ -384,3 +421,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    
