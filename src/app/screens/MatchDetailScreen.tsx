@@ -23,6 +23,7 @@ import { OddsTab } from '@/components/OddsTab';
 import { useTranslation } from '@/components/LanguageProvider';
 
 const PlayerCard = ({ player, navigate }: { player: PlayerType, navigate: ScreenProps['navigate'] }) => {
+    const { t } = useTranslation();
     const fallbackImage = "https://media.api-sports.io/football/players/0.png";
     const playerImage = player.photo || fallbackImage;
 
@@ -59,7 +60,7 @@ const PlayerCard = ({ player, navigate }: { player: PlayerType, navigate: Screen
                     </div>
                 )}
             </div>
-            <span className="mt-1 text-[11px] font-semibold text-center truncate w-16">{player?.name || "غير معروف"}</span>
+            <span className="mt-1 text-[11px] font-semibold text-center truncate w-16">{player?.name || t('unknown')}</span>
         </div>
     );
 };
@@ -95,6 +96,7 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
 };
 
 const ShotMap = ({ homeStats, awayStats }: { homeStats: any[], awayStats: any[] }) => {
+    const { t } = useTranslation();
     const findStat = (stats: any[], type: string): number => {
         const value = stats.find(s => s.type === type)?.value;
         if (typeof value === 'string') return parseInt(value, 10) || 0;
@@ -114,28 +116,28 @@ const ShotMap = ({ homeStats, awayStats }: { homeStats: any[], awayStats: any[] 
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-lg text-center">خريطة التسديدات</CardTitle>
+                <CardTitle className="text-lg text-center">{t('shot_map')}</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="relative w-full max-w-sm mx-auto aspect-[3/2] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50" style={{backgroundImage: "url('/pitch-horizontal.svg')"}}>
                     {/* Home Team (Right side) */}
                     <div className="absolute right-[18%] top-1/2 -translate-y-1/2 text-center text-white">
                         <p className="font-bold text-2xl drop-shadow-lg">{homeShotsInside}</p>
-                        <p className="text-xs">داخل المنطقة</p>
+                        <p className="text-xs">{t('inside_box')}</p>
                     </div>
                      <div className="absolute right-[40%] top-1/2 -translate-y-1/2 text-center text-white">
                         <p className="font-bold text-2xl drop-shadow-lg">{homeShotsOutside}</p>
-                         <p className="text-xs">خارج المنطقة</p>
+                         <p className="text-xs">{t('outside_box')}</p>
                     </div>
 
                     {/* Away Team (Left side) */}
                      <div className="absolute left-[18%] top-1/2 -translate-y-1/2 text-center text-white">
                         <p className="font-bold text-2xl drop-shadow-lg">{awayShotsInside}</p>
-                         <p className="text-xs">داخل المنطقة</p>
+                         <p className="text-xs">{t('inside_box')}</p>
                     </div>
                     <div className="absolute left-[40%] top-1/2 -translate-y-1/2 text-center text-white">
                         <p className="font-bold text-2xl drop-shadow-lg">{awayShotsOutside}</p>
-                        <p className="text-xs">خارج المنطقة</p>
+                        <p className="text-xs">{t('outside_box')}</p>
                     </div>
                 </div>
             </CardContent>
@@ -144,6 +146,7 @@ const ShotMap = ({ homeStats, awayStats }: { homeStats: any[], awayStats: any[] 
 }
 
 const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statistics: MatchStatistics[] | null }) => {
+    const { t } = useTranslation();
     if (!fixture) return <Skeleton className="h-40 w-full" />;
 
     const homeStats = statistics?.find(s => s.team.id === fixture.teams.home.id)?.statistics || [];
@@ -152,16 +155,16 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
     const findStat = (stats: any[], type: string) => stats.find(s => s.type === type)?.value ?? '0';
 
     const statMapping: { label: string; type: string; isProgress?: boolean }[] = [
-      { label: "الاستحواذ", type: "Ball Possession", isProgress: true },
-      { label: "التسديدات", type: "Total Shots" },
-      { label: "تسديدات على المرمى", type: "Shots on Goal" },
-      { label: "تسديدات خارج المرمى", type: "Shots off Goal" },
-      { label: "تسديدات محجوبة", type: "Blocked Shots"},
-      { label: "الأخطاء", type: "Fouls" },
-      { label: "البطاقات الصفراء", type: "Yellow Cards" },
-      { label: "البطاقات الحمراء", type: "Red Cards" },
-      { label: "الركنيات", type: "Corner Kicks" },
-      { label: "التسلل", type: "Offsides" },
+      { label: t('possession'), type: "Ball Possession", isProgress: true },
+      { label: t('total_shots'), type: "Total Shots" },
+      { label: t('shots_on_goal'), type: "Shots on Goal" },
+      { label: t('shots_off_goal'), type: "Shots off Goal" },
+      { label: t('blocked_shots'), type: "Blocked Shots"},
+      { label: t('fouls'), type: "Fouls" },
+      { label: t('yellow_cards'), type: "Yellow Cards" },
+      { label: t('red_cards'), type: "Red Cards" },
+      { label: t('corner_kicks'), type: "Corner Kicks" },
+      { label: t('offsides'), type: "Offsides" },
     ];
 
     return (
@@ -172,15 +175,15 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
             <Card>
                 <CardContent className="p-4 text-sm">
                     <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">الملعب</span>
-                        <span className="font-semibold">{fixture.fixture.venue.name || 'غير محدد'}</span>
+                        <span className="text-muted-foreground">{t('stadium')}</span>
+                        <span className="font-semibold">{fixture.fixture.venue.name || t('not_specified')}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">الجولة</span>
+                        <span className="text-muted-foreground">{t('round')}</span>
                         <span className="font-semibold">{fixture.league.round}</span>
                     </div>
                     <div className="flex justify-between py-2">
-                        <span className="text-muted-foreground">الحالة</span>
+                        <span className="text-muted-foreground">{t('status')}</span>
                         <span className="font-semibold">{fixture.fixture.status.long}</span>
                     </div>
                 </CardContent>
@@ -188,7 +191,7 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
 
             <Card>
                 <CardContent className="p-4 space-y-4">
-                    <h3 className="font-bold text-center">إحصائيات المباراة</h3>
+                    <h3 className="font-bold text-center">{t('match_stats')}</h3>
                     {statistics === null ? (
                         <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
                     ) : statistics.length > 0 ? (
@@ -222,7 +225,7 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                             )
                         })
                     ) : (
-                       <p className="text-center text-muted-foreground p-4">الإحصائيات غير متاحة لهذه المباراة.</p>
+                       <p className="text-center text-muted-foreground p-4">{t('stats_not_available')}</p>
                     )}
                 </CardContent>
             </Card>
@@ -232,6 +235,7 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
 
 
 const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: MatchEvent[] | null, homeTeamId: number, highlightsOnly: boolean }) => {
+    const { t } = useTranslation();
     if (!events) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     
     const filteredEvents = useMemo(() => {
@@ -240,7 +244,7 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
     }, [events, highlightsOnly]);
 
     if (filteredEvents.length === 0) {
-        const message = highlightsOnly ? "لا توجد أهداف أو بطاقات حمراء." : "لا توجد أحداث رئيسية في المباراة بعد.";
+        const message = highlightsOnly ? t('no_goals_or_red_cards') : t('no_major_events_yet');
         return <p className="text-center text-muted-foreground p-8">{message}</p>;
     }
 
@@ -270,7 +274,7 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                     <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
                                         <p className="font-semibold">{event.player.name}</p>
                                         {event.type === 'subst' && event.assist.name ? (
-                                            <p className="text-xs text-muted-foreground">تبديل بـ {event.assist.name}</p>
+                                            <p className="text-xs text-muted-foreground">{t('substitution_for')} {event.assist.name}</p>
                                         ) : (
                                             <p className="text-xs text-muted-foreground">{event.detail}</p>
                                         )}
@@ -308,6 +312,7 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
 }
 
 const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'] }) => {
+    const { t } = useTranslation();
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
     if (lineups === null) {
@@ -315,13 +320,13 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
     }
     
     if (lineups.length < 2) {
-        return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
+        return <p className="text-center text-muted-foreground p-8">{t('lineups_not_available')}</p>;
     }
 
     const home = lineups.find(l => l.team.id === lineups[0].team.id);
     const away = lineups.find(l => l.team.id !== lineups[0].team.id);
     
-    if (!home || !away) return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
+    if (!home || !away) return <p className="text-center text-muted-foreground p-8">{t('lineups_incomplete')}</p>;
 
     const activeLineup = activeTeamTab === 'home' ? home : away;
 
@@ -375,13 +380,13 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
                 </TabsList>
             </Tabs>
             
-            <div className="font-bold text-center text-muted-foreground text-sm">التشكيلة: {activeLineup.formation}</div>
+            <div className="font-bold text-center text-muted-foreground text-sm">{t('formation')}: {activeLineup.formation}</div>
             
             {renderPitch(activeLineup)}
             
             <Card>
                 <CardContent className="p-2">
-                    <h3 className="font-bold text-center p-2 text-sm">الاحتياط والتبديلات</h3>
+                    <h3 className="font-bold text-center p-2 text-sm">{t('substitutes_and_changes')}</h3>
                      <div className="grid grid-cols-1 divide-y">
                         {activeLineup.substitutes.map(p => {
                              const subbedInEvent = events?.find(e => e.type === 'subst' && e.player.id === p.player.id);
@@ -412,7 +417,7 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
 
             <Card>
                 <CardContent className="p-3 text-center">
-                    <h3 className="font-bold text-sm mb-2">المدرب</h3>
+                    <h3 className="font-bold text-sm mb-2">{t('coach')}</h3>
                     <div className="flex flex-col items-center gap-1">
                         <Avatar className="h-12 w-12">
                             <AvatarImage src={activeLineup.coach.photo} />
@@ -428,18 +433,19 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
 
 
 const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] | null, fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
+    const { t } = useTranslation();
     if (!standings) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    if (standings.length === 0) return <p className="text-center text-muted-foreground p-8">جدول الترتيب غير متاح لهذه البطولة.</p>;
+    if (standings.length === 0) return <p className="text-center text-muted-foreground p-8">{t('standings_not_available')}</p>;
     
     return (
         <Table>
             <TableHeader>
                 <TableRow>
                     <TableHead className="w-[40px]">#</TableHead>
-                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
-                    <TableHead className="text-center">لعب</TableHead>
-                    <TableHead className="text-center">ف/ت/خ</TableHead>
-                    <TableHead className="text-center">نقاط</TableHead>
+                    <TableHead className="w-1/2 text-right">{t('team')}</TableHead>
+                    <TableHead className="text-center">{t('played_short')}</TableHead>
+                    <TableHead className="text-center">{t('w_d_l')}</TableHead>
+                    <TableHead className="text-center">{t('points')}</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -575,7 +581,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     if (loading && !fixture) {
         return (
             <div className="flex h-full flex-col bg-background">
-                <ScreenHeader title="تفاصيل المباراة" onBack={goBack} canGoBack={canGoBack} />
+                <ScreenHeader title={t('match_details_title')} onBack={goBack} canGoBack={canGoBack} />
                 <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
             </div>
         );
@@ -584,8 +590,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     if (!fixture) {
          return (
             <div className="flex h-full flex-col bg-background">
-                <ScreenHeader title="خطأ" onBack={goBack} canGoBack={canGoBack} />
-                <p className="text-center p-8">لم يتم العثور على تفاصيل المباراة.</p>
+                <ScreenHeader title={t('error_title')} onBack={goBack} canGoBack={canGoBack} />
+                <p className="text-center p-8">{t('match_not_found')}</p>
             </div>
         );
     }
