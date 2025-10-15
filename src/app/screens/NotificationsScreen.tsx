@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Heart, MessageSquare, CornerDownRight, Newspaper, Goal } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, limit } from 'firebase/firestore';
 import type { Notification } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -44,7 +44,7 @@ export function NotificationsScreen({ navigate, goBack, canGoBack, headerActions
     }
 
     const notifsRef = collection(db, 'users', user.uid, 'notifications');
-    const q = query(notifsRef, orderBy('timestamp', 'desc'));
+    const q = query(notifsRef, orderBy('timestamp', 'desc'), limit(50));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));

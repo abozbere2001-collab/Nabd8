@@ -18,7 +18,7 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
     return (
       <div 
         key={fixture.fixture.id} 
-        className="rounded-lg bg-card border text-sm transition-all duration-300 flex flex-col justify-between"
+        className="relative rounded-lg bg-card border text-sm transition-all duration-300 flex flex-col justify-between"
       >
         <div 
             className="flex-1 p-2 cursor-pointer"
@@ -39,7 +39,7 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
          </div>
         </div>
          {hasCommentsFeature && (
-            <div className="mt-1 pt-1 border-t border-border/50 px-2 pb-1">
+            <div className="absolute bottom-1 left-1">
                 <CommentsButton 
                   matchId={fixture.fixture.id} 
                   navigate={navigate} 

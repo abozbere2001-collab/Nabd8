@@ -343,7 +343,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title={displayTitle || ''} onBack={goBack} canGoBack={canGoBack} actions={headerActions} secondaryActions={secondaryActions} />
+      <ScreenHeader title={displayTitle || ''} onBack={goBack} canGoBack={canGoBack} actions={secondaryActions} />
       {renameItem && <RenameDialog 
           isOpen={isRenameOpen}
           onOpenChange={setRenameOpen}

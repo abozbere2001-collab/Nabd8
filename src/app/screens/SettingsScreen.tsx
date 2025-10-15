@@ -121,7 +121,7 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       />
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         
-        {!isAdmin && (
+        {isAdmin && (
              <Button onClick={makeAdmin} className="w-full bg-amber-600 hover:bg-amber-700">
                 (للتجربة) ترقية إلى مدير
             </Button>

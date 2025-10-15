@@ -263,48 +263,51 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
 const LineupsTab = ({ lineups: initialLineups, events, season, navigate }: { lineups: LineupData[] | null; events: MatchEvent[] | null; season: number; navigate: ScreenProps['navigate']; }) => {
     const [lineups, setLineups] = useState(initialLineups);
     
-    // This must be at the top level
     useEffect(() => {
         if (!initialLineups || initialLineups.length < 2) {
             return;
         }
 
         const allPlayerIds = initialLineups.flatMap(l => 
-            [...l.startXI, ...l.substitutes].map(p => p.player.id)
+            [...l.startXI, ...l.substitutes].map(p => p.player.id).filter(Boolean)
         );
 
         const fetchPlayerStats = async () => {
             try {
                 const uniquePlayerIds = [...new Set(allPlayerIds)];
-                 const playerStatsPromises = uniquePlayerIds.map(id => 
-                    fetch(`/api/football/players?id=${id}&season=${season}`).then(res => res.json())
-                );
-                
-                const playerStatsResponses = await Promise.all(playerStatsPromises);
+                if (uniquePlayerIds.length === 0) return;
 
-                const playerRatingsMap = new Map<number, { photo: string, rating: string | null, number: number | null }>();
-                playerStatsResponses.forEach(res => {
-                    if (res.response && res.response.length > 0) {
-                        const playerInfo = res.response[0];
-                        playerRatingsMap.set(playerInfo.player.id, {
-                            photo: playerInfo.player.photo,
-                            rating: playerInfo.statistics?.[0]?.games?.rating,
-                            number: playerInfo.player.number ?? playerInfo.statistics?.[0]?.games?.number,
+                // API-FOOTBALL player endpoint supports batching up to 20 IDs
+                const BATCH_SIZE = 20;
+                const playerInfoMap = new Map<number, { photo: string, rating: string | null, number: number | null }>();
+
+                for (let i = 0; i < uniquePlayerIds.length; i += BATCH_SIZE) {
+                    const batchIds = uniquePlayerIds.slice(i, i + BATCH_SIZE);
+                    const res = await fetch(`/api/football/players?id=${batchIds.join('-')}&season=${season}`);
+                    const data = await res.json();
+                    
+                    if (data.response && data.response.length > 0) {
+                        data.response.forEach((playerInfo: any) => {
+                             playerInfoMap.set(playerInfo.player.id, {
+                                photo: playerInfo.player.photo,
+                                rating: playerInfo.statistics?.[0]?.games?.rating,
+                                number: playerInfo.player.number ?? playerInfo.statistics?.[0]?.games?.number,
+                            });
                         });
                     }
-                });
-
+                }
+                
                 const updatedLineups = initialLineups.map(lineup => {
                     const updatePlayer = (p: PlayerWithStats): PlayerWithStats => {
-                        const stats = playerRatingsMap.get(p.player.id);
-                        if (stats) {
+                        const info = playerInfoMap.get(p.player.id);
+                        if (info) {
                             return {
                                 ...p,
                                 player: {
                                     ...p.player,
-                                    photo: stats.photo || p.player.photo,
-                                    rating: stats.rating || p.player.rating,
-                                    number: stats.number ?? p.player.number,
+                                    photo: info.photo || p.player.photo,
+                                    rating: info.rating || p.player.rating,
+                                    number: info.number ?? p.player.number,
                                 }
                             };
                         }

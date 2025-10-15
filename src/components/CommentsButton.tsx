@@ -110,17 +110,16 @@ export function CommentsButton({ matchId, navigate, commentsEnabled, size = "def
       return (
          <AlertDialog open={isDeactivateAlertOpen} onOpenChange={setDeactivateAlertOpen}>
             <Button 
-              variant="outline" 
-              className="w-full"
-              size={size}
+              variant="ghost" 
+              size="icon"
+              className="h-7 w-7"
               onClick={handleClick}
               onMouseDown={handleTouchStart}
               onMouseUp={handleTouchEnd}
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              <span className={cn(size === 'sm' && "text-xs")}>عرض التعليقات (اضغط مطولاً)</span>
+              <MessageSquare className="h-4 w-4 text-primary" />
             </Button>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -142,18 +141,17 @@ export function CommentsButton({ matchId, navigate, commentsEnabled, size = "def
     }
     return (
       <Button 
-        variant="secondary" 
-        className="w-full" 
-        size={size}
+        variant="ghost" 
+        size="icon"
+        className="h-7 w-7"
         onClick={handleActivateComments}
         disabled={isProcessing}
       >
         {isProcessing ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
-            <MessageSquarePlus className="h-4 w-4 mr-2" />
+            <MessageSquarePlus className="h-4 w-4" />
         )}
-        <span className={cn(size === 'sm' && "text-xs")}>تفعيل التعليقات</span>
       </Button>
     );
   }
@@ -163,12 +161,11 @@ export function CommentsButton({ matchId, navigate, commentsEnabled, size = "def
     return (
       <Button 
         variant="ghost" 
-        className="w-full"
-        size={size}
+        size="icon"
+        className="h-7 w-7"
         onClick={(e) => { e.stopPropagation(); navigate('Comments', { matchId })}}
       >
-        <MessageSquare className="h-4 w-4 mr-2" />
-        <span className={cn(size === 'sm' && "text-xs")}>التعليقات</span>
+        <MessageSquare className="h-4 w-4" />
       </Button>
     );
   }
