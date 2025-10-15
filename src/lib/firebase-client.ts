@@ -68,7 +68,7 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
 }
 
 
-export const signInWithGoogle = async (): Promise<User | null> => {
+export const signInWithGoogle = async (): Promise<User> => {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
     return result.user;
