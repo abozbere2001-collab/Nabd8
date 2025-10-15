@@ -1,4 +1,5 @@
 
+
 // This file contains all the type definitions for the data used in the app.
 
 // --- API Football Types ---
@@ -49,6 +50,7 @@ export interface Team {
   id: number;
   name: string;
   logo: string;
+  national?: boolean;
 }
 
 export interface Player {
@@ -157,6 +159,7 @@ export interface Favorites {
     name: string;
     logo: string;
     teamId: number;
+    type?: 'Club' | 'National';
     notificationsEnabled?: boolean;
   } };
   players?: { [key: number]: any };
@@ -230,6 +233,7 @@ export interface UserProfile {
   email: string;
   photoURL: string;
   isProUser?: boolean;
+  isAnonymous?: boolean;
 }
 
 export interface GlobalPredictionMatch {

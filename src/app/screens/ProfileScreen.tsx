@@ -75,6 +75,8 @@ export function ProfileScreen({ navigate, goBack, canGoBack, headerActions }: Sc
       setSaving(false);
     }
   };
+  
+  const isAnonymousUser = user?.isAnonymous;
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -105,7 +107,7 @@ export function ProfileScreen({ navigate, goBack, canGoBack, headerActions }: Sc
                 <AvatarFallback>{profile.displayName?.charAt(0)}</AvatarFallback>
               </Avatar>
               <CardTitle>{profile.displayName}</CardTitle>
-              <CardDescription>{profile.email}</CardDescription>
+              <CardDescription>{isAnonymousUser ? 'حساب زائر' : profile.email}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -115,9 +117,11 @@ export function ProfileScreen({ navigate, goBack, canGoBack, headerActions }: Sc
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="اختر اسمًا يظهر للمستخدمين الآخرين"
+                  disabled={isAnonymousUser}
                 />
+                 {isAnonymousUser && <p className="text-xs text-muted-foreground">لا يمكن للزوار تغيير اسم العرض. قم بإنشاء حساب دائم.</p>}
               </div>
-              <Button onClick={handleSave} disabled={saving || loading || displayName === profile.displayName} className="w-full">
+              <Button onClick={handleSave} disabled={saving || loading || displayName === profile.displayName || isAnonymousUser} className="w-full">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ التغييرات'}
               </Button>
             </CardContent>

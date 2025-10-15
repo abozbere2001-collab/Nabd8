@@ -6,6 +6,7 @@ import {
   signOut as firebaseSignOut, 
   onAuthStateChanged as firebaseOnAuthStateChanged,
   signInWithPopup,
+  signInAnonymously as firebaseSignInAnonymously,
   updateProfile,
   type User, 
 } from "firebase/auth";
@@ -22,7 +23,7 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
     try {
         const userDoc = await getDoc(userRef);
         if (!userDoc.exists()) {
-            const displayName = user.displayName || "مستخدم جديد";
+            const displayName = user.displayName || `زائر_${user.uid.substring(0, 5)}`;
             const photoURL = user.photoURL || '';
 
             const userProfileData: UserProfile = {
@@ -30,6 +31,7 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
                 email: user.email!,
                 photoURL: photoURL,
                 isProUser: false,
+                isAnonymous: user.isAnonymous,
             };
             await setDoc(userRef, userProfileData)
               .catch((serverError) => {
@@ -73,6 +75,11 @@ export const signInWithGoogle = async (): Promise<User> => {
     const result = await signInWithPopup(auth, provider);
     return result.user;
 };
+
+export const signInAnonymously = async (): Promise<User> => {
+    const result = await firebaseSignInAnonymously(auth);
+    return result.user;
+}
 
 
 export const signOut = (): Promise<void> => {

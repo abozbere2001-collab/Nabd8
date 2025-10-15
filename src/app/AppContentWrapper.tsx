@@ -30,6 +30,7 @@ import { NotificationSettingsScreen } from './screens/NotificationSettingsScreen
 import { GeneralSettingsScreen } from './screens/GeneralSettingsScreen';
 import PrivacyPolicyScreen from './privacy-policy/page';
 import TermsOfServiceScreen from './terms-of-service/page';
+import { WelcomeScreen } from './screens/WelcomeScreen';
 import type { ScreenKey } from './page';
 
 import { useAd, SplashScreenAd, BannerAd } from '@/components/AdProvider';
@@ -77,6 +78,7 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   GeneralSettings: { component: GeneralSettingsScreen },
   PrivacyPolicy: { component: PrivacyPolicyScreen },
   TermsOfService: { component: TermsOfServiceScreen },
+  Welcome: { component: WelcomeScreen },
 };
 
 
@@ -102,7 +104,7 @@ export const ProfileButton = () => {
     };
 
 
-    if (!user) return null;
+    if (!user || user.isAnonymous) return null;
 
     return (
         <DropdownMenu>
