@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Star, Plus, Users, Trophy, User as PlayerIcon, Search } from 'lucide-react';
+import { Star, Plus, Users, Trophy, User as PlayerIcon, Search, Bell, BellOff } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAuth, useFirestore } from '@/firebase/provider';
@@ -17,14 +17,16 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
-
+import { useToast } from '@/hooks/use-toast';
 
 // --- MAIN SCREEN COMPONENT ---
 export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user } = useAuth();
     const { db } = useFirestore();
+    const { toast } = useToast();
     const [favorites, setFavorites] = useState<Favorites | null>(null);
     const [loading, setLoading] = useState(true);
+    const [notificationPrefs, setNotificationPrefs] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         if (!user || !db) {
@@ -34,7 +36,18 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         setLoading(true);
         const docRef = doc(db, 'favorites', user.uid);
         const unsubscribe = onSnapshot(docRef, (doc) => {
-            setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {}, teams: {}, players: {} });
+            const favs = (doc.data() as Favorites) || { userId: user.uid, leagues: {}, teams: {}, players: {} };
+            setFavorites(favs);
+            
+            // Initialize notification preferences from favorites
+            const initialPrefs: Record<string, boolean> = {};
+            if (favs.leagues) {
+                Object.values(favs.leagues).forEach(league => {
+                    initialPrefs[league.leagueId] = league.notificationsEnabled ?? true; // Default to true if not set
+                });
+            }
+            setNotificationPrefs(initialPrefs);
+
             setLoading(false);
         }, (error) => {
             const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
@@ -43,6 +56,19 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         });
         return () => unsubscribe();
     }, [user, db]);
+
+    const handleToggleNotification = (leagueId: number) => {
+        const currentStatus = notificationPrefs[leagueId] ?? true;
+        const newStatus = !currentStatus;
+        setNotificationPrefs(prev => ({...prev, [leagueId]: newStatus}));
+        
+        // Here you would typically update this preference in Firestore
+        // For example: updateDoc(doc(db, 'favorites', user.uid), { [`leagues.${leagueId}.notificationsEnabled`]: newStatus });
+        toast({
+            title: newStatus ? 'تم تفعيل الإشعارات' : 'تم إلغاء تفعيل الإشعارات',
+            description: `لهذه البطولة.`,
+        });
+    };
 
     const favoriteTeams = useMemo(() => favorites?.teams ? Object.values(favorites.teams) : [], [favorites]);
     const favoriteLeagues = useMemo(() => favorites?.leagues ? Object.values(favorites.leagues) : [], [favorites]);
@@ -54,7 +80,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 <div className="flex items-center justify-center h-10 w-10 bg-primary/10 rounded-full">
                     <Plus className="h-6 w-6 text-primary" />
                 </div>
-                <span className="text-xs font-medium text-muted-foreground">أضف اختياراتك</span>
+                <span className="text-xs font-medium text-muted-foreground">أضف</span>
             </div>
         </SearchSheet>
     );
@@ -86,7 +112,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 
                 <div className="flex-1 overflow-y-auto">
                      <div className="space-y-6 py-4">
-                        {/* Favorite Teams Horizontal List */}
                         <ScrollArea className="w-full whitespace-nowrap">
                             <div className="flex w-max space-x-4 px-4">
                                 {favoriteTeams.map((team) => (
@@ -111,7 +136,6 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                             <ScrollBar orientation="horizontal" className="h-1.5 mt-2" />
                         </ScrollArea>
 
-                        {/* Inner Tabs for Teams, Competitions, Players */}
                         <Tabs defaultValue="teams" className="w-full px-4">
                             <TabsList className="grid w-full grid-cols-3">
                                 <TabsTrigger value="players"><PlayerIcon className="ml-1 h-4 w-4"/>اللاعبين</TabsTrigger>
@@ -121,8 +145,11 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                             
                             <TabsContent value="teams" className="mt-4">
                                 <div className="grid grid-cols-4 gap-4">
+                                    <div className="h-[76px] w-full">
+                                        <AddChoiceCard />
+                                    </div>
                                     {favoriteTeams.map((team, index) => 
-                                        <div key={`${team.teamId}-${index}`} className="relative flex flex-col items-center gap-2 text-center p-2 rounded-2xl cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
+                                        <div key={`${team.teamId}-${index}`} className="relative flex flex-col items-center justify-center gap-2 text-center p-2 rounded-2xl cursor-pointer h-[76px]" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
                                             <Avatar className="h-12 w-12 border-2 border-border">
                                                 <AvatarImage src={team.logo} />
                                                 <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
@@ -131,38 +158,46 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                             <Star className="absolute top-1 right-1 h-3 w-3 text-yellow-400 fill-current" />
                                         </div>
                                     )}
-                                    <div className="h-[76px] w-full">
-                                        <AddChoiceCard />
-                                    </div>
                                 </div>
                             </TabsContent>
                             
                             <TabsContent value="competitions" className="mt-4">
                                 <div className="grid grid-cols-4 gap-4">
+                                    <div className="h-[76px] w-full">
+                                        <AddChoiceCard />
+                                    </div>
                                     {favoriteLeagues.map((comp, index) => 
-                                        <div key={`${comp.leagueId}-${index}`} className="relative flex flex-col items-center gap-2 text-center p-2 rounded-2xl cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
+                                        <div key={`${comp.leagueId}-${index}`} className="relative flex flex-col items-center justify-center gap-2 text-center p-2 rounded-2xl cursor-pointer h-[76px]" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
                                             <Avatar className="h-12 w-12 border-2 border-border p-1">
                                                 <AvatarImage src={comp.logo} className="object-contain" />
                                                 <AvatarFallback>{comp.name.charAt(0)}</AvatarFallback>
                                             </Avatar>
                                             <span className="text-[11px] font-medium truncate w-full">{comp.name}</span>
                                             <Star className="absolute top-1 right-1 h-3 w-3 text-yellow-400 fill-current" />
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="absolute top-0 left-0 h-7 w-7"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleToggleNotification(comp.leagueId);
+                                                }}
+                                            >
+                                                {notificationPrefs[comp.leagueId] ?? true ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
+                                            </Button>
                                         </div>
                                     )}
-                                     <div className="h-[76px] w-full">
-                                        <AddChoiceCard />
-                                    </div>
                                 </div>
                             </TabsContent>
 
                             <TabsContent value="players" className="mt-4">
                                 <div className="grid grid-cols-4 gap-4">
-                                     <div className="h-[76px] w-full col-span-4">
-                                        <p className="text-muted-foreground text-center pt-4">قائمة اللاعبين المفضلين قيد التطوير.</p>
-                                     </div>
                                      <div className="h-[76px] w-full">
                                         <AddChoiceCard />
                                     </div>
+                                     <div className="h-[76px] w-full col-span-3 flex items-center justify-center">
+                                        <p className="text-muted-foreground text-center text-sm">قائمة اللاعبين المفضلين قيد التطوير.</p>
+                                     </div>
                                 </div>
                             </TabsContent>
                         </Tabs>
