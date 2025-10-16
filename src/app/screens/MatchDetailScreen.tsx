@@ -482,40 +482,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [loading, setLoading] = useState(!initialFixture);
     const { t } = useTranslation();
 
-    const mergePlayerData = useCallback((lineups: LineupData[], players: { player: PlayerType, statistics: any[] }[]): LineupData[] => {
-        if (!players || players.length === 0) return lineups;
-    
-        const playersMap = new Map(players.map(p => [p.player.id, p]));
-    
-        return lineups.map(team => ({
-            ...team,
-            startXI: team.startXI.map(p => {
-                if (!p.player.id) return p;
-                const extraData = playersMap.get(p.player.id);
-                return {
-                    ...p,
-                    player: {
-                        ...p.player,
-                        photo: extraData?.player.photo || p.player.photo,
-                        rating: extraData?.statistics?.[0]?.games?.rating || p.player.rating || null,
-                    }
-                };
-            }),
-            substitutes: team.substitutes.map(p => {
-                 if (!p.player.id) return p;
-                const extraData = playersMap.get(p.player.id);
-                return {
-                    ...p,
-                    player: {
-                        ...p.player,
-                        photo: extraData?.player.photo || p.player.photo,
-                        rating: extraData?.statistics?.[0]?.games?.rating || p.player.rating || null,
-                    }
-                };
-            })
-        }));
-    }, []);
-
     const fetchData = useCallback(async (isInitialLoad: boolean) => {
         if (!fixtureId) return;
         if (isInitialLoad) setLoading(true);
@@ -541,37 +507,14 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             setEvents(eventsData.response || []);
             setStatistics(statisticsData.response || []);
             setStandings(standingsData?.response?.[0]?.league?.standings[0] || []);
-            
-            const initialLineups = lineupsData.response || [];
-            if (initialLineups.length > 0) {
-                const allPlayerIds = initialLineups.flatMap((l: LineupData) => 
-                    [...l.startXI, ...l.substitutes]
-                ).map((p: PlayerWithStats) => p.player.id).filter(Boolean);
-
-                const uniquePlayerIds = [...new Set(allPlayerIds)];
-
-                if (uniquePlayerIds.length > 0) {
-                    const playerPromises = uniquePlayerIds.map(id => 
-                        fetch(`/api/football/players?id=${id}&season=${currentSeason}`).then(res => res.json())
-                    );
-                    const playerResults = await Promise.all(playerPromises);
-                    const playersData = playerResults.flatMap(result => result.response || []);
-                    
-                    const enrichedLineups = mergePlayerData(initialLineups, playersData);
-                    setLineups(enrichedLineups);
-                } else {
-                    setLineups(initialLineups);
-                }
-            } else {
-                setLineups([]);
-            }
+            setLineups(lineupsData.response || []);
     
         } catch (error) {
             console.error("Failed to fetch match details:", error);
         } finally {
             if (isInitialLoad) setLoading(false);
         }
-    }, [fixtureId, mergePlayerData]);
+    }, [fixtureId]);
 
     useEffect(() => {
         fetchData(true);
@@ -621,3 +564,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
