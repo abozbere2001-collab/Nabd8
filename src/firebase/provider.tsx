@@ -10,6 +10,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { handleNewUser } from '@/lib/firebase-client';
 import { FirestorePermissionError } from './errors';
 import { errorEmitter } from './error-emitter';
+import { useUser } from './auth/use-user';
 
 interface FirebaseContextProps {
   firebaseApp: FirebaseApp | null;
@@ -23,7 +24,7 @@ interface FirebaseContextProps {
   isLoading: boolean;
 }
 
-const FirebaseContext = createContext<FirebaseContextProps | undefined>(undefined);
+export const FirebaseContext = createContext<FirebaseContextProps | undefined>(undefined);
 
 export const FirebaseProvider = ({
   children,
@@ -210,11 +211,3 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | 
   
   return memoized;
 }
-
-export const useUser = (): { user: User | null; isUserLoading: boolean } => {
-  const context = useContext(FirebaseContext);
-  if (context === undefined) {
-    return { user: null, isUserLoading: true };
-  }
-  return { user: context.user, isUserLoading: context.isLoading };
-};

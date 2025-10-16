@@ -35,7 +35,7 @@ import { GoProScreen } from './screens/GoProScreen';
 import type { ScreenKey } from './page';
 
 import { useAd, SplashScreenAd, BannerAd } from '@/components/AdProvider';
-import { useUser } from '@/firebase/provider';
+import { useUser } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
