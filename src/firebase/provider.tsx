@@ -10,7 +10,6 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { handleNewUser } from '@/lib/firebase-client';
 import { FirestorePermissionError } from './errors';
 import { errorEmitter } from './error-emitter';
-import { useUser } from './auth/use-user';
 
 interface FirebaseContextProps {
   firebaseApp: FirebaseApp | null;
