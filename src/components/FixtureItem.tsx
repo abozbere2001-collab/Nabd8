@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -25,20 +24,20 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, cus
             className="flex-1 p-2 cursor-pointer"
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
-         <div className="flex-1 flex items-center justify-between gap-1">
-            {/* Home Team - Now on the right for RTL */}
-            <div className="flex items-center gap-2 flex-1 justify-end truncate">
+         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+            {/* Home Team (Right) */}
+            <div className="flex items-center gap-2 justify-end truncate">
                 <span className="font-semibold text-[10px] truncate">{fixture.teams.home.name}</span>
                 <Avatar className={'h-4 w-4'}><AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} /></Avatar>
             </div>
 
-            {/* Match Status */}
+            {/* Match Status (Center) */}
             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
                 <LiveMatchStatus fixture={fixture} customStatus={customStatus} />
             </div>
 
-            {/* Away Team - Now on the left for RTL */}
-            <div className="flex items-center gap-2 flex-1 truncate">
+            {/* Away Team (Left) */}
+            <div className="flex items-center gap-2 justify-start truncate">
                 <Avatar className={'h-4 w-4'}><AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} /></Avatar>
                 <span className="font-semibold text-[10px] truncate">{fixture.teams.away.name}</span>
             </div>
@@ -59,5 +58,3 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, cus
     );
 });
 FixtureItem.displayName = 'FixtureItem';
-
-    

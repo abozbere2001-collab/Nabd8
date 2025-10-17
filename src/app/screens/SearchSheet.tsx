@@ -393,6 +393,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         });
         errorEmitter.emit('permission-error', permissionError);
     }
+    setRenameItem(null);
   };
   
   const popularItems = itemType === 'teams' ? POPULAR_TEAMS : POPULAR_LEAGUES;
@@ -461,16 +462,11 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
           <RenameDialog 
             isOpen={!!renameItem}
             onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-            currentName={renameItem.name}
-            currentNote={renameItem.note}
+            item={renameItem}
             onSave={handleSaveRename}
-            itemType={renameItem.type === 'team' ? 'الفريق' : 'البطولة'}
-            hasNoteField={renameItem.type === 'team'}
           />
         )}
       </SheetContent>
     </Sheet>
   );
 }
-
-    
