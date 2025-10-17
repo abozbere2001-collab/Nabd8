@@ -25,21 +25,22 @@ export async function GET(
                     'x-rapidapi-key': API_FOOTBALL_KEY,
                  },
                  next: { revalidate: 3600 } // Cache player data for 1 hour
-            }).then(res => {
+            }).then(async res => {
+                const json = await res.json();
                 if (!res.ok) {
-                    // Even if one fails, we don't want to throw, we want Promise.allSettled to handle it
-                    return res.json().then(err => ({ status: 'rejected', reason: err }));
+                    return { status: 'rejected', reason: json };
                 }
-                return res.json().then(data => ({ status: 'fulfilled', value: data }));
+                return { status: 'fulfilled', value: json };
             });
         });
 
         try {
             // Using allSettled to ensure all requests complete, even if some fail
             const results = await Promise.allSettled(promises);
+            
             const successfulResponses = results
                 .filter(result => result.status === 'fulfilled' && result.value.status === 'fulfilled')
-                // @ts-ignore
+                // @ts-ignore - This is the key fix: correctly extract the nested response data
                 .flatMap(result => result.value.value.response);
             
             return NextResponse.json({ response: successfulResponses });

@@ -480,21 +480,21 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: PlayerTyp
     const playersMap = new Map(playersData.map(p => [p.player.id, p]));
 
     const updatePlayerInList = (playerList: PlayerWithStats[]): PlayerWithStats[] => {
-        return playerList.map(p => {
-            if (!p.player.id) return p;
-            const extraData = playersMap.get(p.player.id);
-            
+        return playerList.map(pWithStats => {
             // Start with the original player data from the lineup
-            let mergedPlayer: PlayerType = { ...p.player };
-
-            // If extra data is found, merge it carefully
-            if (extraData) {
-                mergedPlayer.photo = extraData.player?.photo || mergedPlayer.photo;
-                mergedPlayer.rating = extraData.statistics?.[0]?.games?.rating || mergedPlayer.rating;
+            let mergedPlayer: PlayerType = { ...pWithStats.player };
+            
+            if (mergedPlayer.id) {
+                const extraData = playersMap.get(mergedPlayer.id);
+                if (extraData) {
+                    // Overwrite with more detailed info if available
+                    mergedPlayer.photo = extraData.player?.photo || mergedPlayer.photo;
+                    mergedPlayer.rating = extraData.statistics?.[0]?.games?.rating || mergedPlayer.rating;
+                }
             }
             
             return {
-                ...p,
+                ...pWithStats,
                 player: mergedPlayer,
             };
         });
