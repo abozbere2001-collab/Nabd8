@@ -241,7 +241,7 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                     <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
                                         <p className="font-semibold">{event.player.name}</p>
                                         {event.type === 'subst' && event.assist.name ? (
-                                            <p className="text-xs text-muted-foreground">{t('substitution_for')} {event.assist.name}</p>
+                                             <p className="text-xs text-muted-foreground">{t('substitution_for')} {event.assist.name}</p>
                                         ) : (
                                             <p className="text-xs text-muted-foreground">{event.detail}</p>
                                         )}
@@ -355,7 +355,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             
             <div className="bg-background">
                 <h3 className="text-center text-base font-bold mb-2">{t('substitutes_and_changes')}</h3>
-                <div className="bg-card/50 space-y-2 mb-4 rounded-lg p-2">
+                <div className="bg-card/50 space-y-2 mb-4 rounded-lg p-2" style={{backgroundColor: '#000000'}}>
                     {substitutionEvents.map((event, index) => {
                         const playerOut = event.player;
                         const playerIn = event.assist;
@@ -363,19 +363,19 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                         return (
                              <div key={index} className="p-2">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
-                                        <ArrowUp className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-red-500">
+                                        <ArrowDown className="h-4 w-4" />
                                         <div className="flex flex-col items-start">
-                                            <span className="truncate">{playerIn.name}</span>
+                                            <span className="truncate">{playerOut.name}</span>
                                         </div>
                                     </div>
 
                                     <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
 
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
-                                        <ArrowDown className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-green-500">
+                                        <ArrowUp className="h-4 w-4" />
                                         <div className="flex flex-col items-end">
-                                            <span className="truncate">{playerOut.name}</span>
+                                            <span className="truncate">{playerIn.name}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -519,7 +519,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string } | null>(null);
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> }>({});
 
-    const applyCustomNamesToFixture = useCallback((fixtureToUpdate: Fixture, names: { [key: string]: Map<number, string> }) => {
+    const applyCustomNamesToFixture = useCallback((fixtureToUpdate: Fixture | null, names: { [key: string]: Map<number, string> }) => {
         if (!fixtureToUpdate) return null;
         return {
             ...fixtureToUpdate,
@@ -539,29 +539,11 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         if (isInitialLoad) setLoading(true);
 
         try {
-            let fetchedCustomNames: { [key: string]: Map<number, string> } = {};
-            if (db) {
-                const [teamsSnapshot, leaguesSnapshot] = await Promise.all([
-                    getDocs(collection(db, 'teamCustomizations')),
-                    getDocs(collection(db, 'leagueCustomizations'))
-                ]);
-                const teamNames = new Map();
-                teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-                const leagueNames = new Map();
-                leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
-                fetchedCustomNames = { team: teamNames, league: leagueNames };
-                setCustomNames(fetchedCustomNames);
-            }
-    
-            if (isInitialLoad) {
+             if (isInitialLoad && !fixture) {
                  const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
                  const fixtureData = await fixtureRes.json();
-                 let currentFixture = fixtureData.response?.[0];
+                 const currentFixture = fixtureData.response?.[0];
                  if (!currentFixture) throw new Error("Fixture not found");
-                 
-                 if (Object.keys(fetchedCustomNames).length > 0) {
-                     currentFixture = applyCustomNamesToFixture(currentFixture, fetchedCustomNames);
-                 }
                  setFixture(currentFixture);
             }
            
@@ -591,7 +573,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
 
             setLineups(finalLineups);
             
-            setFixture(prevFixture => {
+             setFixture(prevFixture => {
                 if (!prevFixture) return null;
                 const matchSeason = prevFixture.league?.season || CURRENT_SEASON;
                 const currentLeagueId = prevFixture.league.id;
@@ -603,7 +585,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                              setStandings(standingsData?.response?.[0]?.league?.standings[0] || []);
                         });
                 }
-                return applyCustomNamesToFixture(prevFixture, fetchedCustomNames);
+                return prevFixture;
             });
     
         } catch (error) {
@@ -611,12 +593,42 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         } finally {
             if (isInitialLoad) setLoading(false);
         }
-    }, [fixtureId, db, applyCustomNamesToFixture]);
-
+    }, [fixtureId, fixture]);
+    
+    // Fetch initial data
     useEffect(() => {
         fetchData(true);
-    }, [fetchData]);
+    }, [fixtureId]); // Only run on initial load based on fixtureId
     
+    // Apply custom names when they are fetched or fixture data changes
+    useEffect(() => {
+        const fetchAndApplyNames = async () => {
+             if (!db || !fixture) return;
+
+             try {
+                const [teamsSnapshot, leaguesSnapshot] = await Promise.all([
+                    getDocs(collection(db, 'teamCustomizations')),
+                    getDocs(collection(db, 'leagueCustomizations'))
+                ]);
+                const teamNames = new Map();
+                teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+                const leagueNames = new Map();
+                leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+                
+                const fetchedCustomNames = { team: teamNames, league: leagueNames };
+                setCustomNames(fetchedCustomNames);
+
+                setFixture(currentFixture => applyCustomNamesToFixture(currentFixture, fetchedCustomNames));
+
+            } catch (e) {
+                console.error("Error fetching custom names:", e);
+            }
+        };
+
+        fetchAndApplyNames();
+    }, [db, fixture?.fixture.id, applyCustomNamesToFixture]);
+
+
     useEffect(() => {
         if (!db || !fixtureId) return;
         const unsub = onSnapshot(doc(db, "matchCustomizations", String(fixtureId)), (doc) => {

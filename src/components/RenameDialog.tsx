@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -40,21 +41,18 @@ export function RenameDialog({
   const [newNote, setNewNote] = useState('');
 
   useEffect(() => {
-    if (isOpen && item) {
+    if (item) {
       setNewName(item.name || '');
       setNewNote(item.note || '');
-    } else {
-      setNewName('');
-      setNewNote('');
     }
-  }, [isOpen, item]);
+  }, [item]);
 
   const handleSave = () => {
     if (item) {
        // For matchStatus, it's okay to save an empty string to clear it
       if (item.type === 'matchStatus') {
-        onSave(item.type, item.id, newName.trim(), undefined);
-      } else if (newName.trim()) {
+        onSave(item.type, item.id, newName, undefined);
+      } else {
         onSave(item.type, item.id, newName.trim(), item.type === 'team' ? newNote.trim() : undefined);
       }
       onOpenChange(false);

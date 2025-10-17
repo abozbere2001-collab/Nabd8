@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -43,6 +44,7 @@ const FixturesList = ({
     favoritedLeagueIds,
     favoritedTeamIds,
     commentedMatches,
+    customStatuses,
     navigate,
 }: { 
     fixtures: FixtureType[], 
@@ -52,6 +54,7 @@ const FixturesList = ({
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
     commentedMatches: { [key: number]: MatchDetails },
+    customStatuses: { [key: number]: string | null },
     navigate: ScreenProps['navigate'],
 }) => {
     const { t } = useTranslation();
@@ -140,7 +143,8 @@ const FixturesList = ({
                                 key={f.fixture.id} 
                                 fixture={f} 
                                 navigate={navigate}
-                                commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled} 
+                                commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled}
+                                customStatus={customStatuses[f.fixture.id]}
                             />
                         ))}
                     </div>
@@ -167,6 +171,7 @@ const FixturesList = ({
                                     fixture={f} 
                                     navigate={navigate}
                                     commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled} 
+                                    customStatus={customStatuses[f.fixture.id]}
                                 />
                             ))}
                         </div>
@@ -261,6 +266,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
   
   const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string> }>({ leagues: new Map(), teams: new Map() });
+  const [customStatuses, setCustomStatuses] = useState<{ [key: number]: string | null }>({});
 
   const [fixturesCache, setFixturesCache] = useState<Cache<FixtureType[]>>({});
   const [loadingFixtures, setLoadingFixtures] = useState(true);
@@ -301,6 +307,22 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         setCommentedMatches(matches);
     }, (error) => {
         const permissionError = new FirestorePermissionError({ path: 'matches', operation: 'list' });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+    return () => unsubscribe();
+  }, [db]);
+
+  useEffect(() => {
+    if (!db) return;
+    const customizationsRef = collection(db, 'matchCustomizations');
+    const unsubscribe = onSnapshot(customizationsRef, (snapshot) => {
+        const statuses: { [key: number]: string | null } = {};
+        snapshot.forEach(doc => {
+            statuses[Number(doc.id)] = doc.data().customStatus || null;
+        });
+        setCustomStatuses(statuses);
+    }, (error) => {
+        const permissionError = new FirestorePermissionError({ path: 'matchCustomizations', operation: 'list' });
         errorEmitter.emit('permission-error', permissionError);
     });
     return () => unsubscribe();
@@ -476,6 +498,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
                     commentedMatches={commentedMatches}
+                    customStatuses={customStatuses}
                     navigate={navigate}
                 />
             </TabsContent>
@@ -488,6 +511,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
                     commentedMatches={commentedMatches}
+                    customStatuses={customStatuses}
                     navigate={navigate}
                 />
             </TabsContent>
