@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
@@ -170,6 +170,30 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     }
   }, [isOpen, fetchFavorites, fetchAllCustomNames]);
 
+ const applyCustomNamesToResults = useCallback((results: SearchResult[]): SearchResult[] => {
+    return results.map(result => {
+        if (result.type === 'team') {
+            return {
+                ...result,
+                team: {
+                    ...result.team,
+                    name: getDisplayName('team', result.team.id, result.team.name),
+                }
+            };
+        } else if (result.type === 'league') {
+            return {
+                ...result,
+                league: {
+                    ...result.league,
+                    name: getDisplayName('league', result.league.id, result.league.name),
+                }
+            };
+        }
+        return result;
+    });
+  }, [getDisplayName]);
+
+
   const handleSearch = useCallback(async (query: string) => {
     const trimmedQuery = query.trim();
     if (!trimmedQuery || trimmedQuery.length < 2) {
@@ -182,27 +206,30 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     try {
         // 1. Client-side search for custom names (Arabic search)
         const normalizedQuery = normalizeArabic(trimmedQuery);
-        const matchedTeamIds: string[] = [];
+        const matchedTeamIds: number[] = [];
         customNames.teams.forEach((name, id) => {
             if (normalizeArabic(name).includes(normalizedQuery)) {
-                matchedTeamIds.push(String(id));
+                matchedTeamIds.push(id);
             }
         });
         
-        const matchedLeagueIds: string[] = [];
+        const matchedLeagueIds: number[] = [];
         customNames.leagues.forEach((name, id) => {
             if (normalizeArabic(name).includes(normalizedQuery)) {
-                matchedLeagueIds.push(String(id));
+                matchedLeagueIds.push(id);
             }
         });
         
-        const fetchAndSet = async (id: string, type: 'team' | 'league') => {
+        const fetchAndSet = async (id: number, type: 'team' | 'league') => {
           if (!resultsMap.has(`${type}-${id}`)) {
             const endpoint = type === 'team' ? 'teams' : 'leagues';
             const res = await fetch(`/api/football/${endpoint}?id=${id}`);
             if (res.ok) {
                 const data = await res.json();
-                if (data.response?.[0]) resultsMap.set(`${type}-${id}`, { ...data.response[0], type });
+                if (data.response?.[0]) {
+                  const result = { ...data.response[0], type };
+                  resultsMap.set(`${type}-${id}`, result);
+                }
             }
           }
         };
@@ -238,7 +265,10 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             });
         }
       
-      setSearchResults(Array.from(resultsMap.values()));
+      const allResults = Array.from(resultsMap.values());
+      const localizedResults = applyCustomNamesToResults(allResults);
+      setSearchResults(localizedResults);
+
     } catch (error) {
       console.error("API Search Error: ", error);
       toast({variant: 'destructive', title: 'خطأ في البحث', description: 'فشل الاتصال بالخادم.'});
@@ -246,7 +276,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     } finally {
       setLoading(false);
     }
-  }, [customNames.teams, customNames.leagues, toast]);
+  }, [customNames.teams, customNames.leagues, toast, applyCustomNamesToResults]);
 
 
   useEffect(() => {
@@ -379,9 +409,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
       return searchResults.length > 0 ? (
         searchResults.map(result => {
           const item = result.type === 'team' ? result.team : result.league;
-          const displayName = getDisplayName(result.type, item.id, item.name);
           const isFavorited = !!favorites?.[result.type]?.[item.id];
-          return <ItemRow key={`${result.type}-${item.id}`} item={{...item, name: displayName}} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, result.type)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(result.type, item.id, displayName)} onAddNote={() => handleOpenNote(item as TeamResult['team'])} />;
+          return <ItemRow key={`${result.type}-${item.id}`} item={item} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, result.type)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(result.type, item.id, item.name)} onAddNote={() => handleOpenNote(item as TeamResult['team'])} />;
         })
       ) : <p className="text-muted-foreground text-center pt-8">لا توجد نتائج بحث.</p>;
     }
@@ -393,7 +422,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
           const isFavorited = !!favorites?.[itemType]?.[item.id];
           const displayName = getDisplayName(itemType.slice(0,-1) as 'team' | 'league' , item.id, item.name);
           const resultType = itemType === 'teams' ? 'team' : 'league';
-          const result = { [resultType]: item, type: resultType } as SearchResult;
+          const result = { [resultType]: { ...item, name: displayName }, type: resultType } as SearchResult;
 
           return <ItemRow key={item.id} item={{...item, name: displayName}} itemType={itemType} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, itemType)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(resultType, item.id, displayName)} onAddNote={() => handleOpenNote(item as TeamResult['team'])} />;
         })}
