@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -8,6 +7,7 @@ import { ar, enUS } from 'date-fns/locale';
 import type { Fixture as FixtureType } from '@/lib/types';
 import { isMatchLive } from '@/lib/matchStatus';
 import { useTranslation } from './LanguageProvider';
+import { cn } from '@/lib/utils';
 
 const getRelativeDay = (date: Date, lang: string) => {
     const locale = lang === 'ar' ? ar : enUS;
@@ -30,11 +30,14 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
         let interval: NodeJS.Timeout | null = null;
         if (live && status.elapsed !== null) {
             const initialSeconds = status.elapsed * 60;
-            setElapsedSeconds(initialSeconds);
-            
+            // Add a slight delay before starting the timer to sync with potential API lag
+            const timerStart = Date.now() - (initialSeconds * 1000);
+
             interval = setInterval(() => {
-                setElapsedSeconds(prev => (prev !== null ? prev + 1 : 0));
+                const seconds = Math.floor((Date.now() - timerStart) / 1000);
+                setElapsedSeconds(seconds);
             }, 1000);
+
         } else {
              setElapsedSeconds(null);
         }
@@ -45,7 +48,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
     }, [status.short, status.elapsed, live]);
 
     const formatTime = (totalSeconds: number | null) => {
-        if (totalSeconds === null) return null;
+        if (totalSeconds === null) return status.elapsed;
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
@@ -63,10 +66,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
 
 
     const renderStatus = () => {
-         if (customStatus) {
-            return { main: customStatus, sub: null, isLive: false };
-        }
-
+        // Priority 1: If match is live or finished, show the score and real status.
         if (live) {
             return {
                 main: `${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`,
@@ -81,7 +81,13 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
                 isLive: false
             };
         }
-        // Not started yet
+
+        // Priority 2: If match has not started, check for a custom admin status.
+        if (customStatus) {
+            return { main: customStatus, sub: null, isLive: false };
+        }
+
+        // Priority 3: If no custom status and not started, show the time and relative day.
         return {
             main: format(fixtureDate, "HH:mm"),
             sub: getRelativeDay(fixtureDate, language),
@@ -109,7 +115,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
         <>
             <div className={cn("font-bold", isLive ? "text-xl" : "text-base")}>{main}</div>
             {sub && (
-                 <div className={cn("text-xs mt-1", isLive ? "text-red-500 font-bold animate-pulse" : "text-muted-foreground")}>
+                 <div className={cn("text-[10px] mt-1", isLive ? "text-red-500 font-bold animate-pulse" : "text-muted-foreground")}>
                     {sub}
                 </div>
             )}
