@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Check, Gem } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/components/LanguageProvider';
 
 const proFeatures = [
     "تجربة خالية من الإعلانات تمامًا",
@@ -35,6 +36,7 @@ const subscriptionPlans = [
 
 export function GoProScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const handleSubscribe = (planName: string) => {
     // This is where you would later integrate with a payment provider like Stripe or RevenueCat.
@@ -47,7 +49,7 @@ export function GoProScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="الترقية إلى برو" onBack={goBack} canGoBack={canGoBack} />
+      <ScreenHeader title={t('pro_version')} onBack={goBack} canGoBack={canGoBack} />
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <div className="text-center space-y-2">
             <Gem className="mx-auto h-12 w-12 text-yellow-400" />

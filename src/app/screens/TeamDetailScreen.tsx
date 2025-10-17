@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -58,9 +57,10 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
     const [loading, setLoading] = useState(true);
     const { isAdmin } = useAdmin();
     const { toast } = useToast();
+    const { t } = useTranslation();
     const { db } = useFirestore();
     const [customNames, setCustomNames] = useState<Map<number, string>>(new Map());
-    const [renameItem, setRenameItem] = useState<{ id: number, name: string } | null>(null);
+    const [renameItem, setRenameItem] = useState<{ id: number, name: string, originalName: string } | null>(null);
 
     const getDisplayName = useCallback((id: number, defaultName: string) => {
         return customNames.get(id) || defaultName;
@@ -103,20 +103,24 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
 
     const handleSaveRename = (newName: string) => {
         if (!renameItem || !db) return;
-        const { id } = renameItem;
+        const { id, name, originalName } = renameItem;
         const docRef = doc(db, 'playerCustomizations', String(id));
-        const data = { customName: newName };
-        setDoc(docRef, data).then(() => {
-            fetchCustomNames();
-            toast({ title: "نجاح", description: "تم تحديث اسم اللاعب." });
-        }).catch(serverError => {
-            const permissionError = new FirestorePermissionError({
-                path: docRef.path,
-                operation: 'create',
-                requestResourceData: data
+        
+        if (newName && newName !== originalName) {
+            const data = { customName: newName };
+            setDoc(docRef, data).then(() => {
+                fetchCustomNames();
+                toast({ title: t('success_title'), description: "تم تحديث اسم اللاعب." });
+            }).catch(serverError => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'create',
+                    requestResourceData: data
+                });
+                errorEmitter.emit('permission-error', permissionError);
             });
-            errorEmitter.emit('permission-error', permissionError);
-        });
+        }
+         setRenameItem(null);
     };
 
 
@@ -126,7 +130,7 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
     
     return (
         <div className="space-y-2">
-            {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={(isOpen) => !isOpen && setRenameItem(null)} currentName={renameItem.name} onSave={handleSaveRename} itemType="اللاعب" />}
+            {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={(isOpen) => !isOpen && setRenameItem(null)} item={renameItem} onSave={handleSaveRename} />}
             {players.map(player => (
                 <Card key={player.id} className="p-2">
                     <div className="flex items-center gap-3">
@@ -141,7 +145,7 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
                             </div>
                         </div>
                         {isAdmin && (
-                            <Button variant="ghost" size="icon" onClick={() => setRenameItem({ id: player.id, name: getDisplayName(player.id, player.name) })}>
+                            <Button variant="ghost" size="icon" onClick={() => setRenameItem({ id: player.id, name: getDisplayName(player.id, player.name), originalName: player.name })}>
                                 <Pencil className="h-4 w-4" />
                             </Button>
                         )}
@@ -264,12 +268,12 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="w-[40px]">#</TableHead>
-                                <TableHead>الفريق</TableHead>
-                                <TableHead className="text-center">لعب</TableHead>
-                                <TableHead className="text-center">ف</TableHead>
-                                <TableHead className="text-center">ت</TableHead>
-                                <TableHead className="text-center">خ</TableHead>
-                                <TableHead className="text-center">نقاط</TableHead>
+                                <TableHead>{t('team')}</TableHead>
+                                <TableHead className="text-center">{t('played_short')}</TableHead>
+                                <TableHead className="text-center">{t('win_short')}</TableHead>
+                                <TableHead className="text-center">{t('draw_short')}</TableHead>
+                                <TableHead className="text-center">{t('loss_short')}</TableHead>
+                                <TableHead className="text-center">{t('points')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -291,7 +295,7 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                             ))}
                         </TableBody>
                     </Table>
-                ) : <p className="text-center text-muted-foreground p-8">جدول الترتيب غير متاح.</p>}
+                ) : <p className="text-center text-muted-foreground p-8">{t('standings_not_available')}</p>}
             </TabsContent>
             <TabsContent value="stats" className="mt-4">
                  {stats && stats.league ? (
@@ -303,28 +307,28 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                              <div className="grid grid-cols-2 gap-4 text-center">
                                  <div className="p-4 bg-card-foreground/5 rounded-lg">
                                     <p className="font-bold text-2xl">{stats.fixtures?.played?.total || 0}</p>
-                                    <p className="text-sm text-muted-foreground">مباريات</p>
+                                    <p className="text-sm text-muted-foreground">{t('matches')}</p>
                                  </div>
                                   <div className="p-4 bg-card-foreground/5 rounded-lg">
                                     <p className="font-bold text-2xl">{stats.fixtures?.wins?.total || 0}</p>
-                                    <p className="text-sm text-muted-foreground">فوز</p>
+                                    <p className="text-sm text-muted-foreground">{t('win_short')}</p>
                                  </div>
                                   <div className="p-4 bg-card-foreground/5 rounded-lg">
                                     <p className="font-bold text-2xl">{stats.fixtures?.draws?.total || 0}</p>
-                                    <p className="text-sm text-muted-foreground">تعادل</p>
+                                    <p className="text-sm text-muted-foreground">{t('draw_short')}</p>
                                  </div>
                                   <div className="p-4 bg-card-foreground/5 rounded-lg">
                                     <p className="font-bold text-2xl">{stats.fixtures?.loses?.total || 0}</p>
-                                    <p className="text-sm text-muted-foreground">خسارة</p>
+                                    <p className="text-sm text-muted-foreground">{t('loss_short')}</p>
                                  </div>
                                   <div className="p-4 bg-card-foreground/5 rounded-lg col-span-2">
                                     <p className="font-bold text-2xl">{stats.goals?.for?.total?.total || 0}</p>
-                                    <p className="text-sm text-muted-foreground">الأهداف المسجلة</p>
+                                    <p className="text-sm text-muted-foreground">{t('goals')}</p>
                                  </div>
                              </div>
                         </CardContent>
                     </Card>
-                ) : <p className="text-center text-muted-foreground p-8">الإحصائيات غير متاحة.</p>}
+                ) : <p className="text-center text-muted-foreground p-8">{t('stats_not_available')}</p>}
             </TabsContent>
         </Tabs>
     );
@@ -333,7 +337,7 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
 
 export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: ScreenProps & { teamId: number }) {
   const { db } = useFirestore();
-  const [displayTitle, setDisplayTitle] = useState("الفريق");
+  const [displayTitle, setDisplayTitle] = useState<string | undefined>(undefined);
   const [teamData, setTeamData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
   const { t } = useTranslation();
@@ -385,7 +389,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   if(loading) {
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title="جاري التحميل..." onBack={goBack} canGoBack={canGoBack} />
+            <ScreenHeader title={t('loading')} onBack={goBack} canGoBack={canGoBack} />
             <div className="p-4 space-y-4">
                 <Skeleton className="h-48 w-full" />
                 <Skeleton className="h-10 w-full" />
@@ -398,8 +402,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   if(!teamData) {
      return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title="خطأ" onBack={goBack} canGoBack={canGoBack} />
-            <p className="text-center p-8">لم يتم العثور على بيانات الفريق.</p>
+            <ScreenHeader title={t('error_title')} onBack={goBack} canGoBack={canGoBack} />
+            <p className="text-center p-8">{t('team_not_found')}</p>
         </div>
     );
   }
@@ -412,7 +416,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
         canGoBack={canGoBack} 
       />
       <div className="flex-1 overflow-y-auto p-1">
-        <TeamHeader team={{...teamData.team, name: displayTitle}} venue={teamData.venue} />
+        <TeamHeader team={{...teamData.team, name: displayTitle || teamData.team.name}} venue={teamData.venue} />
          <Tabs defaultValue="details" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="details">{t('details')}</TabsTrigger>
@@ -429,5 +433,3 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
-
-    
