@@ -501,25 +501,28 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
         return lineups;
     }
 
-    const playersMap = new Map(playersData.map(p => [p.player.id, p]));
+    const playersMap = new Map<number, { player: Player, statistics: any[] }>();
+    playersData.forEach(p => {
+        if (p.player.id) {
+            playersMap.set(p.player.id, p);
+        }
+    });
 
     const updatePlayerInList = (playerList: PlayerWithStats[]): PlayerWithStats[] => {
         return playerList.map(pWithStats => {
             const lineupPlayer = pWithStats.player;
             if (lineupPlayer.id && playersMap.has(lineupPlayer.id)) {
                 const detailedPlayerInfo = playersMap.get(lineupPlayer.id)!;
-                // Correctly extract rating from the new data structure
                 const rating = detailedPlayerInfo.statistics?.[0]?.games?.rating;
                 
                 const mergedPlayer: PlayerType = {
                     ...lineupPlayer,
                     name: detailedPlayerInfo.player.name || lineupPlayer.name,
                     photo: detailedPlayerInfo.player.photo || lineupPlayer.photo,
-                    rating: rating || lineupPlayer.rating, // Use the new rating
+                    rating: rating || lineupPlayer.rating,
                 };
                 return { ...pWithStats, player: mergedPlayer };
             }
-            // If no detailed info found, return the original player data from lineup
             return pWithStats;
         });
     };
@@ -686,4 +689,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     );
 }
 
+    
     
