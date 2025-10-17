@@ -11,11 +11,11 @@ import { LiveMatchStatus } from './LiveMatchStatus';
 
 const HomeTeamDisplay = ({ team }: { team: FixtureType['teams']['home'] }) => (
     <div className="flex items-center gap-2 justify-end truncate">
+        <span className="font-semibold text-xs truncate text-right">{team.name}</span>
         <Avatar className={'h-6 w-6'}>
             <AvatarImage src={team.logo} alt={team.name} />
              <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
         </Avatar>
-        <span className="font-semibold text-xs truncate text-right">{team.name}</span>
     </div>
 );
 
