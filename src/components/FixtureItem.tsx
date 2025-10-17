@@ -11,7 +11,7 @@ import { LiveMatchStatus } from './LiveMatchStatus';
 
 const HomeTeamDisplay = ({ team }: { team: FixtureType['teams']['home'] }) => (
     <div className="flex items-center gap-2 justify-end truncate">
-        <span className="font-semibold text-xs truncate">{team.name}</span>
+        <span className="font-semibold text-xs truncate text-right">{team.name}</span>
         <Avatar className={'h-6 w-6'}>
             <AvatarImage src={team.logo} alt={team.name} />
              <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
@@ -25,7 +25,7 @@ const AwayTeamDisplay = ({ team }: { team: FixtureType['teams']['away'] }) => (
             <AvatarImage src={team.logo} alt={team.name} />
             <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
         </Avatar>
-        <span className="font-semibold text-xs truncate">{team.name}</span>
+        <span className="font-semibold text-xs truncate text-left">{team.name}</span>
     </div>
 );
 
@@ -42,7 +42,7 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, cus
             className="flex-1 p-2 cursor-pointer"
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
-         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1" dir="ltr">
             <HomeTeamDisplay team={fixture.teams.home} />
             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
                 <LiveMatchStatus fixture={fixture} customStatus={customStatus} />
