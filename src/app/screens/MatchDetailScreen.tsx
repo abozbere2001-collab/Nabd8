@@ -88,9 +88,9 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
                 <div className="flex justify-between items-center text-xs text-muted-foreground mb-3">
                     <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('CompetitionDetails', { leagueId: fixture.league.id })}>
                         <Avatar className="h-5 w-5"><AvatarImage src={fixture.league.logo} /></Avatar>
-                        <span>{fixture.league.name}</span>
+                        <span className="text-[11px]">{fixture.league.name}</span>
                     </div>
-                    <span>{format(new Date(fixture.fixture.date), 'd MMMM yyyy', { locale: ar })}</span>
+                    <span className="text-[11px]">{format(new Date(fixture.fixture.date), 'd MMMM yyyy', { locale: ar })}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
@@ -171,18 +171,18 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                                             <span className="text-muted-foreground">{stat.label}</span>
                                             <span className='text-left'>{awayValueRaw}</span>
                                         </div>
-                                        <div className="flex items-center gap-1" dir="ltr">
-                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-l-full" className="rounded-l-full"/>
-                                            <Progress value={awayVal} indicatorClassName="bg-accent rounded-r-full" className="rounded-r-full"/>
+                                        <div className="flex items-center gap-1" dir="rtl">
+                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-r-full" className="rounded-r-full"/>
+                                            <Progress value={awayVal} indicatorClassName="bg-accent rounded-l-full" className="rounded-l-full"/>
                                         </div>
                                     </div>
                                 )
                             }
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
-                                    <span className='text-right'>{homeValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
                                     <span className='text-left'>{awayValueRaw}</span>
+                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
+                                    <span className='text-right'>{homeValueRaw}</span>
                                 </div>
                             )
                         })
@@ -352,47 +352,43 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             {renderPitch(activeLineup)}
             
             <div className="bg-transparent">
-                {substitutionEvents.length > 0 && (
-                    <div className="space-y-2 mb-4">
-                         <h3 className="text-center text-base font-bold">{t('substitutes_and_changes')}</h3>
-                         <div className="space-y-1">
-                            {substitutionEvents.map((event, index) => {
-                                const playerIn = event.player;
-                                const playerOut = event.assist;
-                                
-                                const playerInDetails = activeLineup.substitutes.find(p => p.player.id === playerIn.id)?.player;
-                                const playerOutDetails = activeLineup.startXI.find(starter => starter.player.id === playerOut.id)?.player;
-        
-                                const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
-                                const playerOutRating = playerOutDetails?.rating && !isNaN(parseFloat(playerOutDetails.rating)) ? parseFloat(playerOutDetails.rating).toFixed(1) : null;
-        
-                                return (
-                                    <Card key={index} className="p-2 bg-card">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
-                                                <ArrowUp className="h-4 w-4" />
-                                                <div className="flex flex-col items-start">
-                                                    <span className="truncate">{playerIn.name}</span>
-                                                    {playerInRating && <span className="text-xs font-mono text-muted-foreground">({playerInRating})</span>}
-                                                </div>
-                                            </div>
-        
-                                            <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
-        
-                                            <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
-                                                <ArrowDown className="h-4 w-4" />
-                                                <div className="flex flex-col items-end">
-                                                    <span className="truncate">{playerOut.name}</span>
-                                                    {playerOutRating && <span className="text-xs font-mono text-muted-foreground">({playerOutRating})</span>}
-                                                </div>
-                                            </div>
+                <h3 className="text-center text-base font-bold mb-2">{t('substitutes_and_changes')}</h3>
+                <div className="space-y-2 mb-4 bg-background p-2 rounded-lg">
+                    {substitutionEvents.map((event, index) => {
+                        const playerIn = event.player;
+                        const playerOut = event.assist;
+
+                        const playerInDetails = activeLineup.substitutes.find(p => p.player.id === playerIn.id)?.player;
+                        const playerOutDetails = activeLineup.startXI.find(starter => starter.player.id === playerOut.id)?.player;
+
+                        const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
+                        const playerOutRating = playerOutDetails?.rating && !isNaN(parseFloat(playerOutDetails.rating)) ? parseFloat(playerOutDetails.rating).toFixed(1) : null;
+
+                        return (
+                            <Card key={index} className="p-2 bg-card">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
+                                        <ArrowUp className="h-4 w-4" />
+                                        <div className="flex flex-col items-start">
+                                            <span className="truncate">{playerIn.name}</span>
+                                            {playerInRating && <span className="text-xs font-mono text-muted-foreground">({playerInRating})</span>}
                                         </div>
-                                    </Card>
-                                );
-                            })}
-                         </div>
-                    </div>
-                )}
+                                    </div>
+
+                                    <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
+
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
+                                        <ArrowDown className="h-4 w-4" />
+                                        <div className="flex flex-col items-end">
+                                            <span className="truncate">{playerOut.name}</span>
+                                            {playerOutRating && <span className="text-xs font-mono text-muted-foreground">({playerOutRating})</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+                        );
+                    })}
+                </div>
             
                 <Card>
                     <CardContent className="p-3 text-center">
@@ -414,7 +410,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
 
                  <div className="space-y-4 pt-4">
                     <h3 className="text-center text-base font-bold">الاحتياط</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-background p-2 rounded-lg">
                         {subsNotYetOn.map(p => (
                             <Card key={p.player.id || p.player.name} className="p-2 bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                                 <div className="flex items-center gap-3">
@@ -516,8 +512,7 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
 
 
 export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixture: initialFixture }: ScreenProps & { fixtureId: number, fixture?: Fixture }) {
-    const { isAdmin } = useAdmin();
-    const { db } = useFirestore();
+    const { isAdmin, db } = useAdmin();
     const { toast } = useToast();
     const [fixture, setFixture] = useState<Fixture | null>(initialFixture || null);
     const [lineups, setLineups] = useState<LineupData[] | null>(null);
@@ -527,12 +522,58 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [loading, setLoading] = useState(!initialFixture);
     const { t } = useTranslation();
     const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string } | null>(null);
+    const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> }>({});
+
+    const getDisplayName = useCallback((type: 'team' | 'league', id: number, defaultName: string) => {
+        return customNames[type]?.get(id) || defaultName;
+    }, [customNames]);
+    
+    const applyCustomNamesToFixture = useCallback((fixtureToUpdate: Fixture, names: { [key: string]: Map<number, string> }) => {
+        if (!fixtureToUpdate) return null;
+        return {
+            ...fixtureToUpdate,
+            league: {
+                ...fixtureToUpdate.league,
+                name: names.league?.get(fixtureToUpdate.league.id) || fixtureToUpdate.league.name,
+            },
+            teams: {
+                home: { ...fixtureToUpdate.teams.home, name: names.team?.get(fixtureToUpdate.teams.home.id) || fixtureToUpdate.teams.home.name },
+                away: { ...fixtureToUpdate.teams.away, name: names.team?.get(fixtureToUpdate.teams.away.id) || fixtureToUpdate.teams.away.name },
+            }
+        };
+    }, []);
+
+    const applyCustomNamesToLineups = useCallback((lineupsToUpdate: LineupData[], names: { [key: string]: Map<number, string> }) => {
+        if (!lineupsToUpdate) return [];
+        return lineupsToUpdate.map(lineup => ({
+            ...lineup,
+            team: {
+                ...lineup.team,
+                name: names.team?.get(lineup.team.id) || lineup.team.name
+            }
+        }));
+    }, []);
 
     const fetchData = useCallback(async (isInitialLoad: boolean) => {
         if (!fixtureId) return;
         if (isInitialLoad) setLoading(true);
-    
+
         try {
+            // Fetch custom names first
+            let fetchedCustomNames: { [key: string]: Map<number, string> } = {};
+            if (db) {
+                const [teamsSnapshot, leaguesSnapshot] = await Promise.all([
+                    getDocs(collection(db, 'teamCustomizations')),
+                    getDocs(collection(db, 'leagueCustomizations'))
+                ]);
+                const teamNames = new Map();
+                teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+                const leagueNames = new Map();
+                leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+                fetchedCustomNames = { team: teamNames, league: leagueNames };
+                setCustomNames(fetchedCustomNames);
+            }
+    
             const [fixtureRes, eventsRes, statisticsRes, lineupsRes, playersRes] = await Promise.all([
                 fetch(`/api/football/fixtures?id=${fixtureId}`),
                 fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
@@ -547,16 +588,19 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             const lineupsData = await lineupsRes.json();
             const playersData = await playersRes.json();
 
-
-            const currentFixture = fixtureData.response?.[0];
+            let currentFixture = fixtureData.response?.[0];
             if (!currentFixture) throw new Error("Fixture not found");
             
+            // Apply custom names to the main fixture object
+            if (Object.keys(fetchedCustomNames).length > 0) {
+                currentFixture = applyCustomNamesToFixture(currentFixture, fetchedCustomNames);
+            }
             setFixture(currentFixture);
+
             setEvents(eventsData.response || []);
             setStatistics(statisticsData.response || []);
             
             let finalLineups = lineupsData.response || [];
-            
             const detailedPlayers = playersData.response || [];
             
             if (detailedPlayers.length > 0 && finalLineups.length > 0) {
@@ -564,6 +608,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                  finalLineups = mergePlayerData(finalLineups, allPlayersFromFixture);
             }
             
+            // Apply custom names to lineups
+            if (Object.keys(fetchedCustomNames).length > 0) {
+                finalLineups = applyCustomNamesToLineups(finalLineups, fetchedCustomNames);
+            }
             setLineups(finalLineups);
 
             const matchSeason = currentFixture.league?.season || CURRENT_SEASON;
@@ -580,7 +628,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         } finally {
             if (isInitialLoad) setLoading(false);
         }
-    }, [fixtureId]);
+    }, [fixtureId, db, applyCustomNamesToFixture, applyCustomNamesToLineups]);
 
     useEffect(() => {
         fetchData(true);
