@@ -28,7 +28,7 @@ interface RenameDialogProps {
     type: ItemType;
     originalName?: string;
   } | null;
-  onSave: (type: ItemType, id: string | number, newName: string, newNote?: string) => void;
+  onSave: (newName: string, newNote?: string) => void;
 }
 
 export function RenameDialog({
@@ -51,9 +51,9 @@ export function RenameDialog({
     if (item) {
        // For matchStatus, it's okay to save an empty string to clear it
       if (item.type === 'matchStatus') {
-        onSave(item.type, item.id, newName, undefined);
+        onSave(newName.trim());
       } else {
-        onSave(item.type, item.id, newName.trim(), item.type === 'team' ? newNote.trim() : undefined);
+        onSave(newName.trim(), item.type === 'team' ? newNote.trim() : undefined);
       }
       onOpenChange(false);
     }

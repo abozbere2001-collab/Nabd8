@@ -185,9 +185,9 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                             }
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
-                                    <span>{awayValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
                                     <span>{homeValueRaw}</span>
+                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
+                                    <span>{awayValueRaw}</span>
                                 </div>
                             )
                         })
@@ -241,7 +241,10 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                     <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
                                         <p className="font-semibold">{event.player.name}</p>
                                         {event.type === 'subst' && event.assist.name ? (
-                                             <p className="text-xs text-muted-foreground">{t('substitution_for')} {event.assist.name}</p>
+                                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                {isHomeEvent ? <ArrowUp className="h-3 w-3 text-green-500"/> : <ArrowDown className="h-3 w-3 text-red-500"/>}
+                                                <span>{t('substitution_for')} {event.assist.name}</span>
+                                             </div>
                                         ) : (
                                             <p className="text-xs text-muted-foreground">{event.detail}</p>
                                         )}
@@ -366,7 +369,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                                     <div className="flex items-center gap-2 font-semibold w-2/5 text-red-500">
                                         <ArrowDown className="h-4 w-4" />
                                         <div className="flex flex-col items-start">
-                                            <span className="truncate">{playerOut.name}</span>
+                                            <span className="truncate">{playerIn.name}</span>
                                         </div>
                                     </div>
 
@@ -375,7 +378,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                                     <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-green-500">
                                         <ArrowUp className="h-4 w-4" />
                                         <div className="flex flex-col items-end">
-                                            <span className="truncate">{playerIn.name}</span>
+                                            <span className="truncate">{playerOut.name}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -647,8 +650,9 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         setRenameItem({ type, id, name });
     };
 
-    const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
-        if (!db) return;
+    const handleSaveRename = (newName: string) => {
+        if (!renameItem || !db) return;
+        const { id, type } = renameItem;
 
         if (type === 'matchStatus') {
             const docRef = doc(db, 'matchCustomizations', String(id));
