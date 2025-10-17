@@ -92,14 +92,14 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
                 </div>
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
-                        <Avatar className="h-12 w-12 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                        <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
                         <span className="font-bold text-[10px] text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="flex flex-col items-center justify-center min-w-[120px] text-center">
                         <LiveMatchStatus fixture={fixture} large />
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
-                         <Avatar className="h-12 w-12 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
                         <span className="font-bold text-[10px] text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                 </div>
@@ -144,7 +144,7 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                     </div>
                     <div className="flex justify-between py-2">
                         <span className="text-muted-foreground">{t('status')}</span>
-                        <span className="font-semibold">{fixture.fixture.status.long}</span>
+                        <span className="font-semibold">{t(fixture.fixture.status.long.toLowerCase().replace(/ /g, '_')) || fixture.fixture.status.long}</span>
                     </div>
                 </CardContent>
             </Card>
@@ -170,17 +170,17 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                                             <span>{awayValueRaw}</span>
                                         </div>
                                         <div className="flex items-center gap-1" dir="ltr">
-                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-l-full" className="rounded-l-full"/>
-                                            <Progress value={awayVal} indicatorClassName="bg-accent rounded-r-full" className="rounded-r-full"/>
+                                            <Progress value={awayVal} indicatorClassName="bg-accent rounded-l-full" className="rounded-l-full"/>
+                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-r-full" className="rounded-r-full"/>
                                         </div>
                                     </div>
                                 )
                             }
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
-                                    <span>{homeValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
                                     <span>{awayValueRaw}</span>
+                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
+                                    <span>{homeValueRaw}</span>
                                 </div>
                             )
                         })
@@ -349,80 +349,82 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             
             {renderPitch(activeLineup)}
             
-             <Card>
-                <CardContent className="p-3 text-center">
-                    <h3 className="font-bold text-sm mb-2">{t('coach')}</h3>
-                    <div className="relative inline-flex flex-col items-center gap-1">
-                        <Avatar className="h-12 w-12">
-                            <AvatarImage src={activeLineup.coach.photo} />
-                            <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
-                         {isAdmin && (
-                            <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
-                                <Pencil className="h-3 w-3" />
-                            </Button>
-                        )}
+            <div className="relative bg-background">
+                {substitutionEvents.length > 0 && (
+                    <div className="space-y-2">
+                         <h3 className="text-center text-base font-bold">التبديلات</h3>
+                         <div className="space-y-1">
+                            {substitutionEvents.map((event, index) => {
+                                const playerIn = event.player;
+                                const playerOut = event.assist;
+                                
+                                const playerInDetails = activeLineup.substitutes.find(p => p.player.id === playerIn.id)?.player;
+                                const playerOutDetails = activeLineup.startXI.find(starter => starter.player.id === playerOut.id)?.player;
+        
+                                const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
+                                const playerOutRating = playerOutDetails?.rating && !isNaN(parseFloat(playerOutDetails.rating)) ? parseFloat(playerOutDetails.rating).toFixed(1) : null;
+        
+                                return (
+                                    <Card key={index} className="p-2 bg-card">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
+                                                <ArrowUp className="h-4 w-4" />
+                                                <div className="flex flex-col items-start">
+                                                    <span className="truncate">{playerIn.name}</span>
+                                                    {playerInRating && <span className="text-xs font-mono text-muted-foreground">({playerInRating})</span>}
+                                                </div>
+                                            </div>
+        
+                                            <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
+        
+                                            <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
+                                                <ArrowDown className="h-4 w-4" />
+                                                <div className="flex flex-col items-end">
+                                                    <span className="truncate">{playerOut.name}</span>
+                                                    {playerOutRating && <span className="text-xs font-mono text-muted-foreground">({playerOutRating})</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                );
+                            })}
+                         </div>
                     </div>
-                </CardContent>
-            </Card>
-
-            {substitutionEvents.length > 0 && (
-                <div className="space-y-2">
-                     <h3 className="text-center text-base font-bold">التبديلات</h3>
-                     <div className="space-y-1">
-                        {substitutionEvents.map((event, index) => {
-                            const playerIn = event.player;
-                            const playerOut = event.assist;
-                            
-                            const playerInDetails = activeLineup.substitutes.find(p => p.player.id === playerIn.id)?.player;
-                            const playerOutDetails = activeLineup.startXI.find(starter => starter.player.id === playerOut.id)?.player;
-                            
-                            const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
-                            const playerOutRating = playerOutDetails?.rating && !isNaN(parseFloat(playerOutDetails.rating)) ? parseFloat(playerOutDetails.rating).toFixed(1) : null;
-    
-                            return (
-                                <Card key={index} className="p-2 bg-card">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
-                                            <ArrowUp className="h-4 w-4" />
-                                            <div className="flex flex-col items-start">
-                                                <span className="truncate">{playerIn.name}</span>
-                                                {playerInRating && <span className="text-xs font-mono text-muted-foreground">({playerInRating})</span>}
-                                            </div>
-                                        </div>
-    
-                                        <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
-    
-                                        <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
-                                            <ArrowDown className="h-4 w-4" />
-                                            <div className="flex flex-col items-end">
-                                                <span className="truncate">{playerOut.name}</span>
-                                                {playerOutRating && <span className="text-xs font-mono text-muted-foreground">({playerOutRating})</span>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Card>
-                            );
-                        })}
-                     </div>
-                </div>
-            )}
+                )}
             
-            <div className="space-y-4">
-                 <h3 className="text-center text-base font-bold">الاحتياط</h3>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {subsNotYetOn.map(p => (
-                         <Card key={p.player.id || p.player.name} className="p-2 bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
-                            <div className="flex items-center gap-3">
-                                <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
-                                <div className="flex-1 text-right">
-                                    <p className="font-semibold text-sm">{p.player.name}</p>
-                                    <p className="text-xs text-muted-foreground">{p.player.position}</p>
+                <Card>
+                    <CardContent className="p-3 text-center">
+                        <h3 className="font-bold text-sm mb-2">{t('coach')}</h3>
+                        <div className="relative inline-flex flex-col items-center gap-1">
+                            <Avatar className="h-12 w-12">
+                                <AvatarImage src={activeLineup.coach.photo} />
+                                <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
+                            {isAdmin && (
+                                <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
+                                    <Pencil className="h-3 w-3" />
+                                </Button>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <div className="space-y-4 pt-4">
+                    <h3 className="text-center text-base font-bold">الاحتياط</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {subsNotYetOn.map(p => (
+                            <Card key={p.player.id || p.player.name} className="p-2 bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                                <div className="flex items-center gap-3">
+                                    <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
+                                    <div className="flex-1 text-right">
+                                        <p className="font-semibold text-sm">{p.player.name}</p>
+                                        <p className="text-xs text-muted-foreground">{p.player.position}</p>
+                                    </div>
                                 </div>
-                            </div>
-                        </Card>
-                    ))}
+                            </Card>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>

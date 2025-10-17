@@ -10,21 +10,36 @@ import { useTranslation } from './LanguageProvider';
 export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureType, large?: boolean }) => {
     const { t } = useTranslation();
     const { status, date } = fixture.fixture;
-    const [elapsedTime, setElapsedTime] = useState(status.elapsed);
+    const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
     const live = isMatchLive(status);
 
     useEffect(() => {
         let interval: NodeJS.Timeout | null = null;
         if (live && status.elapsed !== null) {
-             setElapsedTime(status.elapsed);
-             // We don't update seconds for performance, only minutes.
-             // The parent component refetches data periodically.
+            // Initialize seconds based on last known elapsed minute
+            const initialSeconds = status.elapsed * 60;
+            setElapsedSeconds(initialSeconds);
+            
+            interval = setInterval(() => {
+                setElapsedSeconds(prev => (prev !== null ? prev + 1 : 0));
+            }, 1000);
+        } else {
+             setElapsedSeconds(null);
         }
+        
         return () => {
             if (interval) clearInterval(interval);
         };
     }, [status.short, status.elapsed, live]);
 
+    const formatTime = (totalSeconds: number | null) => {
+        if (totalSeconds === null) return null;
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}'${seconds.toString().padStart(2, '0')}"`;
+    };
+
+    const liveDisplayTime = formatTime(elapsedSeconds);
     const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
 
     if (large) {
@@ -33,7 +48,7 @@ export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureTy
                 <div className="flex flex-col items-center justify-center text-center">
                     <div className="font-bold text-3xl tracking-wider">{`${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`}</div>
                     <div className="text-red-500 font-bold text-xs animate-pulse mt-1">
-                        {status.short === 'HT' ? t('halftime') : elapsedTime ? `${elapsedTime}'` : t('live')}
+                        {status.short === 'HT' ? t('halftime') : liveDisplayTime ? liveDisplayTime : t('live')}
                     </div>
                 </div>
             );
@@ -42,14 +57,14 @@ export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureTy
             return (
                 <div className="flex flex-col items-center justify-center text-center">
                     <div className="font-bold text-3xl tracking-wider">{`${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{t(status.long.toLowerCase().replace(' ', '_')) || status.long}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{t(status.long.toLowerCase().replace(/ /g, '_')) || status.long}</div>
                 </div>
             );
         }
          return (
             <div className="flex flex-col items-center justify-center text-center">
                 <div className="font-bold text-2xl tracking-wider">{format(new Date(date), "HH:mm")}</div>
-                <div className="text-xs text-muted-foreground mt-1">{t(status.long.toLowerCase().replace(' ', '_')) || status.long}</div>
+                <div className="text-xs text-muted-foreground mt-1">{t(status.long.toLowerCase().replace(/ /g, '_')) || status.long}</div>
             </div>
         );
 
@@ -60,7 +75,7 @@ export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureTy
         return (
             <>
                 <div className="text-red-500 font-bold text-sm animate-pulse mb-1">
-                    {status.short === 'HT' ? t('halftime') : elapsedTime ? `${elapsedTime}'` : t('live')}
+                    {status.short === 'HT' ? t('halftime') : liveDisplayTime ? liveDisplayTime : t('live')}
                 </div>
                 <div className="font-bold text-xl">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
             </>
@@ -79,9 +94,7 @@ export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureTy
     return (
         <>
             <div className="font-bold text-base">{format(new Date(date), "HH:mm")}</div>
-            <div className="text-xs text-muted-foreground mt-1">{t(status.long.toLowerCase().replace(' ', '_')) || status.long}</div>
+            <div className="text-xs text-muted-foreground mt-1">{t(status.long.toLowerCase().replace(/ /g, '_')) || status.long}</div>
         </>
     );
 };
-
-    
