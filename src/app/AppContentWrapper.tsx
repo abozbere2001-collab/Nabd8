@@ -49,7 +49,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User as UserIcon } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
 import { cn } from '@/lib/utils';
-import { LanguageProvider, useTranslation } from '@/components/LanguageProvider';
 
 const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
@@ -95,7 +94,6 @@ type StackItem = {
 
 export const ProfileButton = () => {
     const { user } = useUser();
-    const { t } = useTranslation();
 
     const handleSignOut = async () => {
         await signOut();
@@ -132,12 +130,12 @@ export const ProfileButton = () => {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={navigateToProfile}>
                     <UserIcon className="mr-2 h-4 w-4" />
-                    <span>{t('profile')}</span>
+                    <span>الملف الشخصي</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>{t('log_out')}</span>
+                    <span>تسجيل الخروج</span>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
@@ -171,6 +169,7 @@ export function AppContentWrapper() {
                 }
             };
         }
+        // If not a main tab and stack is 1, go back to Matches.
         if (!mainTabs.includes(prevState.activeTab)) {
             return { ...prevState, activeTab: 'Matches' };
         }
@@ -179,23 +178,30 @@ export function AppContentWrapper() {
   }, []);
 
   const navigate = useCallback((screen: ScreenKey, props?: Record<string, any>) => {
-    const newKey = `${screen}-${Date.now()}`;
-    const newItem = { key: newKey, screen, props };
+      const newKey = `${screen}-${Date.now()}`;
+      const newItem = { key: newKey, screen, props };
 
-    setNavigationState(prevState => {
-        const newStacks = { ...prevState.stacks };
-
-        if (mainTabs.includes(screen)) {
-            // If navigating to a main tab, switch active tab and reset its stack
-            newStacks[screen] = [newItem];
-            return { activeTab: screen, stacks: newStacks };
-        } else {
-            // If navigating to a detail screen, push it onto the current active stack
-            const currentStack = newStacks[prevState.activeTab] || [];
-            newStacks[prevState.activeTab] = [...currentStack, newItem];
-            return { activeTab: prevState.activeTab, stacks: newStacks };
-        }
-    });
+      setNavigationState(prevState => {
+          if (mainTabs.includes(screen)) {
+              return {
+                  ...prevState,
+                  activeTab: screen,
+                  stacks: {
+                      ...prevState.stacks,
+                      [screen]: [newItem] // Reset stack for main tabs
+                  }
+              };
+          }
+          
+          const currentStack = prevState.stacks[prevState.activeTab] || [];
+          return {
+              ...prevState,
+              stacks: {
+                  ...prevState.stacks,
+                  [prevState.activeTab]: [...currentStack, newItem]
+              }
+          };
+      });
   }, []);
   
   useEffect(() => {
@@ -211,7 +217,6 @@ export function AppContentWrapper() {
   const activeStack = navigationState.stacks[navigationState.activeTab] || [];
 
   return (
-    <LanguageProvider>
         <main className="h-screen w-screen bg-background flex flex-col">
         <div className="relative flex-1 flex flex-col overflow-hidden">
             {Object.entries(navigationState.stacks).map(([tabKey, stack]) => {
@@ -247,8 +252,7 @@ export function AppContentWrapper() {
         </div>
         
         {showBannerAd && <BannerAd />}
-        {mainTabs.includes(navigationState.activeTab) && <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => navigate(screen)} />}
+        {mainTabs.includes(activeStack[activeStack.length - 1]?.screen) && <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => navigate(screen)} />}
         </main>
-    </LanguageProvider>
   );
 }
