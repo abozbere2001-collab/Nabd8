@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -52,7 +51,7 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, cus
          </div>
         </div>
          
-         <div className="absolute top-1 left-1 flex items-center gap-1">
+         <div className="absolute top-1 right-1 flex items-center gap-1">
             {hasCommentsFeature && (
                 <CommentsButton 
                   matchId={fixture.fixture.id} 
