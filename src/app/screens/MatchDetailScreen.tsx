@@ -93,70 +93,20 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
                         <Avatar className="h-12 w-12 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                        <span className="font-bold text-xs text-center truncate w-full">{fixture.teams.home.name}</span>
+                        <span className="font-bold text-[10px] text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="flex flex-col items-center justify-center min-w-[120px] text-center">
                         <LiveMatchStatus fixture={fixture} large />
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-12 w-12 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                        <span className="font-bold text-xs text-center truncate w-full">{fixture.teams.away.name}</span>
+                        <span className="font-bold text-[10px] text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                 </div>
             </CardContent>
         </Card>
     );
 };
-
-const ShotMap = ({ homeStats, awayStats }: { homeStats: any[], awayStats: any[] }) => {
-    const { t } = useTranslation();
-    const findStat = (stats: any[], type: string): number => {
-        const value = stats.find(s => s.type === type)?.value;
-        if (typeof value === 'string') return parseInt(value, 10) || 0;
-        return value || 0;
-    };
-
-    const homeShotsInside = findStat(homeStats, "Shots insidebox");
-    const homeShotsOutside = findStat(homeStats, "Shots outsidebox");
-    const awayShotsInside = findStat(awayStats, "Shots insidebox");
-    const awayShotsOutside = findStat(awayStats, "Shots outsidebox");
-    
-    if ((homeShotsInside + homeShotsOutside + awayShotsInside + awayShotsOutside) === 0) {
-        return null; // Don't render if there are no shot stats
-    }
-
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-lg text-center">{t('shot_map')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="relative w-full max-w-sm mx-auto aspect-[3/2] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50" style={{backgroundImage: "url('/pitch-horizontal.svg')"}}>
-                    {/* Home Team (Right side) */}
-                    <div className="absolute right-[18%] top-1/2 -translate-y-1/2 text-center text-white">
-                        <p className="font-bold text-2xl drop-shadow-lg">{homeShotsInside}</p>
-                        <p className="text-xs">{t('inside_box')}</p>
-                    </div>
-                     <div className="absolute right-[40%] top-1/2 -translate-y-1/2 text-center text-white">
-                        <p className="font-bold text-2xl drop-shadow-lg">{homeShotsOutside}</p>
-                         <p className="text-xs">{t('outside_box')}</p>
-                    </div>
-
-                    {/* Away Team (Left side) */}
-                     <div className="absolute left-[18%] top-1/2 -translate-y-1/2 text-center text-white">
-                        <p className="font-bold text-2xl drop-shadow-lg">{awayShotsInside}</p>
-                         <p className="text-xs">{t('inside_box')}</p>
-                    </div>
-                    <div className="absolute left-[40%] top-1/2 -translate-y-1/2 text-center text-white">
-                        <p className="font-bold text-2xl drop-shadow-lg">{awayShotsOutside}</p>
-                        <p className="text-xs">{t('outside_box')}</p>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    )
-}
 
 const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statistics: MatchStatistics[] | null }) => {
     const { t } = useTranslation();
@@ -182,9 +132,6 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
 
     return (
         <div className="space-y-4">
-             {statistics && statistics.length > 0 && (
-                <ShotMap homeStats={homeStats} awayStats={awayStats} />
-            )}
             <Card>
                 <CardContent className="p-4 text-sm">
                     <div className="flex justify-between py-2 border-b">
@@ -231,9 +178,9 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                             }
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
-                                    <span>{homeValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
                                     <span>{awayValueRaw}</span>
+                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
+                                    <span>{homeValueRaw}</span>
                                 </div>
                             )
                         })
@@ -402,17 +349,17 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             
             {renderPitch(activeLineup)}
             
-            <Card>
+             <Card>
                 <CardContent className="p-3 text-center">
                     <h3 className="font-bold text-sm mb-2">{t('coach')}</h3>
-                    <div className="relative flex flex-col items-center gap-1">
+                    <div className="relative inline-flex flex-col items-center gap-1">
                         <Avatar className="h-12 w-12">
                             <AvatarImage src={activeLineup.coach.photo} />
                             <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
                          {isAdmin && (
-                            <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
+                            <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
                                 <Pencil className="h-3 w-3" />
                             </Button>
                         )}
@@ -427,7 +374,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                         const playerIn = event.player; // Player coming in
                         const playerOut = event.assist;  // Player coming out
                         const playerInDetails = activeLineup.substitutes.find(p => p.player.id === playerIn.id)?.player;
-                        const playerOutDetails = activeLineup.startXI.find(p => p.player.id === playerOut.id)?.player;
+                        const playerOutDetails = activeLineup.startXI.find(starter => starter.player.id === playerOut.id)?.player;
                         
                         const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
                         const playerOutRating = playerOutDetails?.rating && !isNaN(parseFloat(playerOutDetails.rating)) ? parseFloat(playerOutDetails.rating).toFixed(1) : null;
@@ -435,21 +382,21 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                         return (
                             <Card key={index} className="p-2 bg-card">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-red-500">
-                                        <ArrowDown className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
+                                        <ArrowUp className="h-4 w-4" />
                                         <div className="flex flex-col items-start">
-                                            <span className="truncate">{playerOut.name}</span>
-                                            {playerOutRating && <span className="text-xs font-mono text-muted-foreground">({playerOutRating})</span>}
+                                            <span className="truncate">{playerIn.name}</span>
+                                            {playerInRating && <span className="text-xs font-mono text-muted-foreground">({playerInRating})</span>}
                                         </div>
                                     </div>
 
                                     <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
 
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-green-500">
-                                        <ArrowUp className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
+                                        <ArrowDown className="h-4 w-4" />
                                         <div className="flex flex-col items-end">
-                                            <span className="truncate">{playerIn.name}</span>
-                                            {playerInRating && <span className="text-xs font-mono text-muted-foreground">({playerInRating})</span>}
+                                            <span className="truncate">{playerOut.name}</span>
+                                            {playerOutRating && <span className="text-xs font-mono text-muted-foreground">({playerOutRating})</span>}
                                         </div>
                                     </div>
                                 </div>
@@ -645,7 +592,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
 
         setDoc(docRef, data)
             .then(() => {
-                toast({ title: 'نجاح', description: `تم تحديث اسم ${type === 'player' ? 'اللاعب' : 'المدرب'}.` });
+                toast({ title: t('success_title'), description: `تم تحديث اسم ${type === 'player' ? 'اللاعب' : 'المدرب'}.` });
                 fetchData(false); // Refetch data to show updated name
             })
             .catch(serverError => {
