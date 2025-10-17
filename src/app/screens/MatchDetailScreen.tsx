@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -21,7 +22,7 @@ import { OddsTab } from '@/components/OddsTab';
 import { useTranslation } from '@/components/LanguageProvider';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
-import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -429,31 +430,32 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                     </CardHeader>
                     <CardContent className="space-y-3">
                         {substitutionEvents.map((event, index) => {
-                            const playerIn = event.player;
-                            const playerOut = event.assist;
+                            const playerOut = event.player; // Player coming out
+                            const playerIn = event.assist;  // Player coming in
 
-                            const playerInDetails = [...activeLineup.startXI, ...activeLineup.substitutes].find(p => p.player.id === playerIn.id)?.player;
-                            const playerOutDetails = activeLineup.startXI.find(p => p.player.id === playerOut.id)?.player;
+                            const playerOutDetails = [...activeLineup.startXI, ...activeLineup.substitutes].find(p => p.player.id === playerOut.id)?.player;
+                            const playerInDetails = activeLineup.substitutes.find(p => p.player.id === playerIn.id)?.player;
                             
-                            const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
                             const playerOutRating = playerOutDetails?.rating && !isNaN(parseFloat(playerOutDetails.rating)) ? parseFloat(playerOutDetails.rating).toFixed(1) : null;
+                             const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
 
                             return (
-                                <div key={index} className="flex items-center justify-between p-2 border-b last:border-b-0">
+                                <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-card border">
                                     <div className="font-bold text-sm text-muted-foreground w-12 text-center">{event.time.elapsed}'</div>
                                     <div className="flex-1 flex flex-col items-center gap-2">
-                                        <div className="flex items-center gap-2 text-green-500 font-semibold w-full">
-                                            <ArrowUp className="h-4 w-4" />
-                                            <span className="flex-1 text-right">{playerIn.name}</span>
-                                            {playerInRating && <span className="text-xs font-mono">({playerInRating})</span>}
-                                        </div>
+                                        
                                         {playerOut.id && (
-                                            <div className="flex items-center gap-2 text-red-500 text-sm w-full">
-                                                <ArrowDown className="h-4 w-4" />
+                                            <div className="flex items-center gap-2 text-green-500 font-semibold w-full">
+                                                <ArrowUp className="h-4 w-4" />
                                                 <span className="flex-1 text-right">{playerOut.name}</span>
                                                 {playerOutRating && <span className="text-xs font-mono">({playerOutRating})</span>}
                                             </div>
                                         )}
+                                        <div className="flex items-center gap-2 text-red-500 text-sm w-full">
+                                            <ArrowDown className="h-4 w-4" />
+                                            <span className="flex-1 text-right">{playerIn.name}</span>
+                                            {playerInRating && <span className="text-xs font-mono">({playerInRating})</span>}
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -461,24 +463,24 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                     </CardContent>
                 </Card>
             )}
-
+            
             {subsNotYetOn.length > 0 && (
-                 <Card>
-                    <CardHeader>
-                        <CardTitle className="text-center text-base">الاحتياط</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-4">
+                     <h3 className="text-center text-base font-bold">الاحتياط</h3>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {subsNotYetOn.map(p => (
-                             <div key={p.player.id || p.player.name} className="flex items-center gap-3 p-2 bg-card border rounded-lg cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
-                                <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
-                                <div className="flex-1 text-right">
-                                    <p className="font-semibold text-sm">{p.player.name}</p>
-                                    <p className="text-xs text-muted-foreground">{p.player.position}</p>
+                            <Card key={p.player.id || p.player.name} className="p-2 bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                                <div className="flex items-center gap-3">
+                                    <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
+                                    <div className="flex-1 text-right">
+                                        <p className="font-semibold text-sm">{p.player.name}</p>
+                                        <p className="text-xs text-muted-foreground">{p.player.position}</p>
+                                    </div>
                                 </div>
-                            </div>
+                            </Card>
                         ))}
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             )}
         </div>
     );
@@ -693,7 +695,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     isOpen={!!renameItem}
                     item={renameItem}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-                    onSave={(type, id, newName) => handleSaveRename(type, id, newName)}
+                    onSave={handleSaveRename}
                 />
             )}
 
