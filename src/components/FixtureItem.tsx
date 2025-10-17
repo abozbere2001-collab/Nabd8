@@ -42,16 +42,16 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
             className="flex-1 p-2 cursor-pointer"
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
-         <main dir="ltr" className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
-            <HomeTeamDisplay team={fixture.teams.home} />
+         <main className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+            <AwayTeamDisplay team={fixture.teams.away} />
             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
                 <LiveMatchStatus fixture={fixture} />
             </div>
-            <AwayTeamDisplay team={fixture.teams.away} />
+            <HomeTeamDisplay team={fixture.teams.home} />
          </main>
         </div>
 
-         <div className="absolute top-1 right-1 flex items-center gap-1">
+         <div className="absolute top-1 left-1 flex items-center gap-1">
             {hasCommentsFeature && (
                 <CommentsButton
                   matchId={fixture.fixture.id}
