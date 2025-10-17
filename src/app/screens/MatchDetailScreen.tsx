@@ -342,6 +342,11 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
     if (!home || !away) return <p className="text-center text-muted-foreground p-8">{t('lineups_incomplete')}</p>;
 
     const activeLineup = activeTeamTab === 'home' ? home : away;
+    
+    const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
+    const subsNotYetOn = activeLineup.substitutes.filter(sub => 
+        !substitutionEvents.some(e => e.player.id === sub.player.id)
+    );
 
     const renderPitch = (lineup: LineupData) => {
         const formationGrid: { [key: number]: PlayerWithStats[] } = {};
@@ -383,11 +388,6 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             </div>
         )
     }
-    
-    const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
-    const subsNotYetOn = activeLineup.substitutes.filter(sub => 
-        !substitutionEvents.some(e => e.player.id === sub.player.id)
-    );
 
     return (
         <div className="space-y-4">
@@ -404,8 +404,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             
             <Card>
                 <CardContent className="p-3 text-center">
-                    <h3 className="font-bold text-sm mb-2">{t('coach')}</h3>
                     <div className="relative inline-flex flex-col items-center gap-1">
+                        <h3 className="font-bold text-sm mb-1">{t('coach')}</h3>
                         <Avatar className="h-12 w-12">
                             <AvatarImage src={activeLineup.coach.photo} />
                             <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
@@ -419,8 +419,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                     </div>
                 </CardContent>
             </Card>
-            
-            {substitutionEvents.length > 0 && (
+
+             {substitutionEvents.length > 0 && (
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-center text-base">التبديلات</CardTitle>
@@ -432,23 +432,27 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
 
                             const playerInDetails = [...activeLineup.startXI, ...activeLineup.substitutes].find(p => p.player.id === playerIn.id)?.player;
                             const playerOutDetails = activeLineup.startXI.find(p => p.player.id === playerOut.id)?.player;
+                            
+                            const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
+                            const playerOutRating = playerOutDetails?.rating && !isNaN(parseFloat(playerOutDetails.rating)) ? parseFloat(playerOutDetails.rating).toFixed(1) : null;
 
                             return (
                                 <div key={index} className="flex items-center justify-between p-2 border-b last:border-b-0">
-                                    <div className="font-bold text-sm text-muted-foreground">{event.time.elapsed}'</div>
-                                    <div className="flex-1 flex flex-col items-center gap-1">
-                                        <div className="flex items-center gap-2 text-green-500 font-semibold">
+                                    <div className="font-bold text-sm text-muted-foreground w-12 text-center">{event.time.elapsed}'</div>
+                                    <div className="flex-1 flex flex-col items-center gap-2">
+                                        <div className="flex items-center gap-2 text-green-500 font-semibold w-full">
                                             <ArrowUp className="h-4 w-4" />
-                                            <span>{playerIn.name}</span>
-                                            {playerInDetails?.rating && <span className="text-xs">({playerInDetails.rating})</span>}
+                                            <span className="flex-1 text-right">{playerIn.name}</span>
+                                            {playerInRating && <span className="text-xs font-mono">({playerInRating})</span>}
                                         </div>
-                                        <div className="flex items-center gap-2 text-red-500 text-sm">
-                                            <ArrowDown className="h-4 w-4" />
-                                            <span>{playerOut.name}</span>
-                                            {playerOutDetails?.rating && <span className="text-xs">({playerOutDetails.rating})</span>}
-                                        </div>
+                                        {playerOut.id && (
+                                            <div className="flex items-center gap-2 text-red-500 text-sm w-full">
+                                                <ArrowDown className="h-4 w-4" />
+                                                <span className="flex-1 text-right">{playerOut.name}</span>
+                                                {playerOutRating && <span className="text-xs font-mono">({playerOutRating})</span>}
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="w-8" />
                                 </div>
                             );
                         })}
@@ -461,13 +465,17 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                     <CardHeader>
                         <CardTitle className="text-center text-base">الاحتياط</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {subsNotYetOn.map(p => (
-                            <div key={p.player.id || p.player.name} className="flex items-center justify-between p-1.5">
-                                 <div className="flex items-center gap-3" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                            <Card key={p.player.id || p.player.name} className="p-2">
+                                <div className="flex items-center gap-3" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                                      <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
-                                 </div>
-                            </div>
+                                     <div className="flex-1 text-right">
+                                        <p className="font-semibold text-sm">{p.player.name}</p>
+                                        <p className="text-xs text-muted-foreground">{p.player.position}</p>
+                                     </div>
+                                </div>
+                            </Card>
                         ))}
                     </CardContent>
                 </Card>
@@ -683,8 +691,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             {renameItem && (
                 <RenameDialog
                     isOpen={!!renameItem}
-                    item={{id: renameItem.id, name: renameItem.name, type: renameItem.type}}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
+                    item={renameItem}
                     onSave={handleSaveRename}
                 />
             )}
@@ -711,5 +719,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
-    
