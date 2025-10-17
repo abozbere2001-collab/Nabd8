@@ -10,6 +10,39 @@ export async function GET(
 ) {
   const { searchParams } = new URL(request.url);
   const routePath = params.route ? params.route.join('/') : '';
+  
+  // Handle multi-ID requests specifically for players
+  if (routePath === 'players' && searchParams.has('id')) {
+    const ids = searchParams.get('id');
+    const season = searchParams.get('season');
+    if (ids && season) {
+        const individualIds = ids.split('-');
+        const promises = individualIds.map(id => {
+            const apiUrl = `https://${API_FOOTBALL_HOST}/players?id=${id}&season=${season}`;
+            return fetch(apiUrl, {
+                 headers: {
+                    'x-rapidapi-host': API_FOOTBALL_HOST,
+                    'x-rapidapi-key': API_FOOTBALL_KEY,
+                 },
+                 next: { revalidate: 3600 } // Cache player data for 1 hour
+            }).then(res => res.json());
+        });
+
+        try {
+            const results = await Promise.all(promises);
+            const combinedResponse = results.flatMap(result => result.response);
+            return NextResponse.json({ response: combinedResponse });
+        } catch (error) {
+             console.error('API proxy error for multi-ID players:', error);
+            return NextResponse.json(
+              { error: 'An internal error occurred while proxying the multi-ID request.' },
+              { status: 500 }
+            );
+        }
+    }
+  }
+
+
   const apiURL = `https://${API_FOOTBALL_HOST}/${routePath}?${searchParams.toString()}`;
 
   if (!API_FOOTBALL_KEY) {
@@ -23,7 +56,7 @@ export async function GET(
   // Smart Caching Strategy:
   // - Fixtures, odds, and player data (within a fixture context) change often.
   // - Other data (teams, leagues) is more static.
-  const isVolatileRequest = routePath.includes('fixtures') || routePath.includes('odds') || routePath.includes('players');
+  const isVolatileRequest = routePath.includes('fixtures') || routePath.includes('odds');
   const revalidateSeconds = isVolatileRequest ? 60 : 3600; // 1 minute for volatile, 1 hour for others
 
   try {
@@ -96,5 +129,3 @@ export async function GET(
     );
   }
 }
-
-      

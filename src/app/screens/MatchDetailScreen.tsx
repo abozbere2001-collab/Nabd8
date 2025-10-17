@@ -552,7 +552,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             const currentSeason = currentFixture.league.season || CURRENT_SEASON;
             
             const allPlayerIds = finalLineups.flatMap((l: LineupData) => 
-                [...l.startXI, ...l.substitutes].map(p => p.player.id).filter(Boolean)
+                [...l.startXI, ...l.substitutes].map(p => p.player.id).filter(id => id !== null && id !== undefined)
             );
             
             if(allPlayerIds.length > 0) {
