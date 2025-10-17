@@ -1,11 +1,11 @@
 
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
 const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
 const API_FOOTBALL_KEY = '75f36f22d689a0a61e777d92bbda1c08';
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { route: string[] } }
 ) {
   const { searchParams } = new URL(request.url);
