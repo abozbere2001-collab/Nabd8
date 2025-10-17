@@ -371,6 +371,8 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
         )
     }
 
+    const substitutions = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
+
     return (
         <div className="space-y-4">
             <Tabs value={activeTeamTab} onValueChange={(val) => setActiveTeamTab(val as 'home' | 'away')} className="w-full">
@@ -385,48 +387,61 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
             {renderPitch(activeLineup)}
             
             <Card>
-                <CardContent className="p-2">
-                    <h3 className="font-bold text-center p-2 text-sm">{t('substitutes_and_changes')}</h3>
-                     <div className="grid grid-cols-1 divide-y">
-                        {activeLineup.substitutes.map(p => {
-                             const subbedInEvent = events?.find(e => e.type === 'subst' && e.player.id === p.player.id);
-                             const subbedOutPlayer = subbedInEvent ? activeLineup.startXI.find(starter => starter.player.id === subbedInEvent.assist.id) : null;
-
-                            return (
-                                <div key={p.player.id || p.player.name} className="flex items-center justify-between p-1.5 text-xs">
-                                     <div className="flex-1 flex items-center gap-2">
-                                        {subbedInEvent && subbedOutPlayer && (
-                                            <div className="flex items-center gap-1 text-muted-foreground">
-                                                 <ArrowUp className="h-3 w-3 text-green-500"/>
-                                                  <span className="text-[10px]">({subbedInEvent.time.elapsed}')</span>
-                                                 <ArrowDown className="h-3 w-3 text-red-500"/>
-                                                 <span className="line-through">{subbedOutPlayer.player.name}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-muted-foreground">{p.player.name}</span>
-                                        <PlayerCard player={p.player} navigate={navigate} />
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
+                <CardHeader>
+                    <CardTitle className="text-center text-base">{t('coach')}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center gap-1">
+                    <Avatar className="h-16 w-16">
+                        <AvatarImage src={activeLineup.coach.photo} />
+                        <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span className="font-semibold text-sm">{activeLineup.coach.name}</span>
                 </CardContent>
             </Card>
+
+            {substitutions.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-center text-base">{t('substitutes_and_changes')}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {substitutions.map((sub, index) => (
+                             <div key={index} className="flex items-center justify-between text-sm p-2 border-b last:border-b-0">
+                                 <span className="text-muted-foreground">{sub.time.elapsed}'</span>
+                                 <div className="flex items-center gap-2 text-green-600">
+                                    <ArrowUp className="h-4 w-4"/>
+                                    <span>{sub.player.name}</span>
+                                 </div>
+                                 <div className="flex items-center gap-2 text-red-500">
+                                    <span className="line-through">{sub.assist.name}</span>
+                                    <ArrowDown className="h-4 w-4"/>
+                                 </div>
+                             </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            )}
 
             <Card>
-                <CardContent className="p-3 text-center">
-                    <h3 className="font-bold text-sm mb-2">{t('coach')}</h3>
-                    <div className="flex flex-col items-center gap-1">
-                        <Avatar className="h-12 w-12">
-                            <AvatarImage src={activeLineup.coach.photo} />
-                            <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
-                    </div>
+                <CardHeader>
+                     <CardTitle className="text-center text-base">الاحتياط</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-2">
+                    {activeLineup.substitutes.map(p => (
+                        <div key={p.player.id || p.player.name} className="flex items-center gap-2 p-2 rounded-md bg-card-foreground/5 border">
+                             <Avatar className="h-8 w-8">
+                                <AvatarImage src={p.player.photo} />
+                                <AvatarFallback>{p.player.name?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <p className="text-xs font-semibold">{p.player.name}</p>
+                                <p className="text-[10px] text-muted-foreground">{p.player.number}</p>
+                            </div>
+                        </div>
+                    ))}
                 </CardContent>
             </Card>
+
         </div>
     );
 };
@@ -471,7 +486,6 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
     );
 };
 
-// --- Main Screen Component ---
 const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, statistics: any[] }[]): LineupData[] => {
     if (!playersData || playersData.length === 0) {
         return lineups;
@@ -484,16 +498,18 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
             const lineupPlayer = pWithStats.player;
             if (lineupPlayer.id && playersMap.has(lineupPlayer.id)) {
                 const detailedPlayerInfo = playersMap.get(lineupPlayer.id)!;
+                // Correctly extract rating from the new data structure
                 const rating = detailedPlayerInfo.statistics?.[0]?.games?.rating;
                 
                 const mergedPlayer: PlayerType = {
                     ...lineupPlayer,
                     name: detailedPlayerInfo.player.name || lineupPlayer.name,
                     photo: detailedPlayerInfo.player.photo || lineupPlayer.photo,
-                    rating: rating || lineupPlayer.rating,
+                    rating: rating || lineupPlayer.rating, // Use the new rating
                 };
                 return { ...pWithStats, player: mergedPlayer };
             }
+            // If no detailed info found, return the original player data from lineup
             return pWithStats;
         });
     };
@@ -617,3 +633,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
