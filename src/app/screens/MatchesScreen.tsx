@@ -136,7 +136,6 @@ const FixturesList = ({
                                 fixture={f} 
                                 navigate={navigate}
                                 commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled}
-                                customStatus={null}
                             />
                         ))}
                     </div>
@@ -163,7 +162,6 @@ const FixturesList = ({
                                     fixture={f} 
                                     navigate={navigate}
                                     commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled} 
-                                    customStatus={null}
                                 />
                             ))}
                         </div>
@@ -242,7 +240,6 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
 }
 
 type TabName = 'my-results' | 'live' | 'predictions';
-type Cache<T> = { [date: string]: T };
 
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: ScreenProps & { isVisible: boolean }) {
@@ -295,7 +292,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   }, [db]);
   
   const fetchAndProcessData = useCallback(async (dateKey: string, isLive: boolean) => {
-      if (!db) return;
+      if (!db) {
+          setLoading(false);
+          return;
+      };
       setLoading(true);
 
       try {
@@ -440,3 +440,4 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
