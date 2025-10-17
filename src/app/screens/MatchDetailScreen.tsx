@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
+import { Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
@@ -22,11 +22,12 @@ import { OddsTab } from '@/components/OddsTab';
 import { useTranslation } from '@/components/LanguageProvider';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
-import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection } from 'firebase/firestore';
+import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
+import { Square } from 'lucide-react';
 
 type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country';
 
@@ -74,7 +75,7 @@ const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerTyp
                     </div>
                 )}
             </div>
-            <span className="mt-1 text-[11px] font-semibold text-center truncate w-16">{player?.name || t('unknown')}</span>
+            <span className="mt-1 text-[10px] font-semibold text-center truncate w-16">{player?.name || t('unknown')}</span>
         </div>
     );
 };
@@ -94,14 +95,14 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
                         <Avatar className="h-12 w-12 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
+                        <span className="font-bold text-xs text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="flex flex-col items-center justify-center min-w-[120px] text-center">
                         <LiveMatchStatus fixture={fixture} large />
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-12 w-12 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
+                        <span className="font-bold text-xs text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                 </div>
             </CardContent>
@@ -404,10 +405,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             {renderPitch(activeLineup)}
             
             <Card>
-                <CardHeader>
-                    <CardTitle className="text-center text-base">{t('coach')}</CardTitle>
-                </CardHeader>
                 <CardContent className="p-3 text-center">
+                    <h3 className="font-bold text-sm mb-2">{t('coach')}</h3>
                     <div className="relative inline-flex flex-col items-center gap-1">
                         <Avatar className="h-12 w-12">
                             <AvatarImage src={activeLineup.coach.photo} />
@@ -424,64 +423,60 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             </Card>
 
             {substitutionEvents.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-center text-base">التبديلات</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {substitutionEvents.map((event, index) => {
-                            const playerOut = event.player; // Player coming out
-                            const playerIn = event.assist;  // Player coming in
+                <div className="space-y-4 bg-transparent">
+                     <h3 className="text-center text-base font-bold">{t('substitutes_and_changes')}</h3>
+                    {substitutionEvents.map((event, index) => {
+                        const playerIn = event.player; // Player coming in
+                        const playerOut = event.assist;  // Player coming out
+                        const playerInDetails = activeLineup.substitutes.find(p => p.player.id === playerIn.id)?.player;
+                        const playerOutDetails = [...activeLineup.startXI, ...activeLineup.substitutes].find(p => p.player.id === playerOut.id)?.player;
+                        
+                        const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
+                        const playerOutRating = playerOutDetails?.rating && !isNaN(parseFloat(playerOutDetails.rating)) ? parseFloat(playerOutDetails.rating).toFixed(1) : null;
 
-                            const playerOutDetails = [...activeLineup.startXI, ...activeLineup.substitutes].find(p => p.player.id === playerOut.id)?.player;
-                            const playerInDetails = activeLineup.substitutes.find(p => p.player.id === playerIn.id)?.player;
-                            
-                            const playerOutRating = playerOutDetails?.rating && !isNaN(parseFloat(playerOutDetails.rating)) ? parseFloat(playerOutDetails.rating).toFixed(1) : null;
-                             const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
+                        return (
+                            <Card key={index} className="p-2 bg-card">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-red-500 font-semibold w-2/5">
+                                        <ArrowDown className="h-4 w-4" />
+                                        <div className="flex flex-col items-start">
+                                            <span className="truncate">{playerOut.name}</span>
+                                            {playerOutRating && <span className="text-xs font-mono text-muted-foreground">({playerOutRating})</span>}
+                                        </div>
+                                    </div>
 
-                            return (
-                                <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-card border">
-                                    <div className="font-bold text-sm text-muted-foreground w-12 text-center">{event.time.elapsed}'</div>
-                                    <div className="flex-1 flex flex-col items-center gap-2">
-                                        
-                                        {playerOut.id && (
-                                            <div className="flex items-center gap-2 text-green-500 font-semibold w-full">
-                                                <ArrowUp className="h-4 w-4" />
-                                                <span className="flex-1 text-right">{playerOut.name}</span>
-                                                {playerOutRating && <span className="text-xs font-mono">({playerOutRating})</span>}
-                                            </div>
-                                        )}
-                                        <div className="flex items-center gap-2 text-red-500 text-sm w-full">
-                                            <ArrowDown className="h-4 w-4" />
-                                            <span className="flex-1 text-right">{playerIn.name}</span>
-                                            {playerInRating && <span className="text-xs font-mono">({playerInRating})</span>}
+                                    <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
+
+                                    <div className="flex items-center gap-2 text-green-500 font-semibold w-2/5 flex-row-reverse">
+                                        <ArrowUp className="h-4 w-4" />
+                                        <div className="flex flex-col items-end">
+                                            <span className="truncate">{playerIn.name}</span>
+                                            {playerInRating && <span className="text-xs font-mono text-muted-foreground">({playerInRating})</span>}
                                         </div>
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </CardContent>
-                </Card>
-            )}
-            
-            {subsNotYetOn.length > 0 && (
-                <div className="space-y-4">
-                     <h3 className="text-center text-base font-bold">الاحتياط</h3>
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {subsNotYetOn.map(p => (
-                            <Card key={p.player.id || p.player.name} className="p-2 bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
-                                <div className="flex items-center gap-3">
-                                    <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
-                                    <div className="flex-1 text-right">
-                                        <p className="font-semibold text-sm">{p.player.name}</p>
-                                        <p className="text-xs text-muted-foreground">{p.player.position}</p>
-                                    </div>
-                                </div>
                             </Card>
-                        ))}
-                    </div>
+                        );
+                    })}
                 </div>
             )}
+            
+            <div className="space-y-4 bg-transparent">
+                 <h3 className="text-center text-base font-bold">الاحتياط</h3>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {subsNotYetOn.map(p => (
+                        <Card key={p.player.id || p.player.name} className="p-2 bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                            <div className="flex items-center gap-3">
+                                <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
+                                <div className="flex-1 text-right">
+                                    <p className="font-semibold text-sm">{p.player.name}</p>
+                                    <p className="text-xs text-muted-foreground">{p.player.position}</p>
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 };
@@ -693,8 +688,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             {renameItem && (
                 <RenameDialog
                     isOpen={!!renameItem}
-                    item={renameItem}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
+                    item={renameItem}
                     onSave={handleSaveRename}
                 />
             )}
@@ -721,3 +716,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
