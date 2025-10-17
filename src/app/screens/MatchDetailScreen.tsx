@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -170,17 +171,17 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                                             <span>{awayValueRaw}</span>
                                         </div>
                                         <div className="flex items-center gap-1" dir="ltr">
-                                            <Progress value={awayVal} indicatorClassName="bg-accent rounded-l-full" className="rounded-l-full"/>
-                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-r-full" className="rounded-r-full"/>
+                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-l-full" className="rounded-l-full"/>
+                                            <Progress value={awayVal} indicatorClassName="bg-accent rounded-r-full" className="rounded-r-full"/>
                                         </div>
                                     </div>
                                 )
                             }
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
-                                    <span>{awayValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
                                     <span>{homeValueRaw}</span>
+                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
+                                    <span>{awayValueRaw}</span>
                                 </div>
                             )
                         })
@@ -349,9 +350,9 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             
             {renderPitch(activeLineup)}
             
-            <div className="relative bg-background">
+            <div className="bg-background">
                 {substitutionEvents.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-2 mb-4">
                          <h3 className="text-center text-base font-bold">التبديلات</h3>
                          <div className="space-y-1">
                             {substitutionEvents.map((event, index) => {
@@ -639,7 +640,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 <RenameDialog
                     isOpen={!!renameItem}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-                    item={renameItem}
+                    item={{ ...renameItem, originalName: renameItem.name}}
                     onSave={handleSaveRename}
                 />
             )}
