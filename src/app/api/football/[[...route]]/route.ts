@@ -11,7 +11,7 @@ export async function GET(
   const { searchParams } = new URL(request.url);
   const routePath = Array.isArray(params.route) ? params.route.join('/') : '';
   
-  // Handle multi-ID requests specifically for players
+  // Handle multi-ID requests for players
   if (routePath === 'players' && searchParams.has('id')) {
     const ids = searchParams.get('id');
     const season = searchParams.get('season');
