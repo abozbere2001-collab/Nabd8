@@ -8,6 +8,7 @@ import { CommentsButton } from '@/components/CommentsButton';
 import type { Fixture as FixtureType } from '@/lib/types';
 import { useAdmin } from '@/firebase/provider';
 import { LiveMatchStatus } from './LiveMatchStatus';
+import { cn } from '@/lib/utils';
 
 const HomeTeamDisplay = ({ team }: { team: FixtureType['teams']['home'] }) => (
     <div className="flex items-center gap-2 justify-end truncate">
