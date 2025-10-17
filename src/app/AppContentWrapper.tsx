@@ -49,7 +49,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User as UserIcon } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
 import { cn } from '@/lib/utils';
-import { LanguageProvider } from '@/components/LanguageProvider';
+import { LanguageProvider, useTranslation } from '@/components/LanguageProvider';
 
 const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
@@ -95,6 +95,7 @@ type StackItem = {
 
 export const ProfileButton = () => {
     const { user } = useUser();
+    const { t } = useTranslation();
 
     const handleSignOut = async () => {
         await signOut();
@@ -131,12 +132,12 @@ export const ProfileButton = () => {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={navigateToProfile}>
                     <UserIcon className="mr-2 h-4 w-4" />
-                    <span>الملف الشخصي</span>
+                    <span>{t('profile')}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>تسجيل الخروج</span>
+                    <span>{t('log_out')}</span>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
@@ -172,9 +173,7 @@ export function AppContentWrapper() {
         }
         // If on a non-main tab and at the root, go back to the default tab
         if (!mainTabs.includes(prevState.activeTab)) {
-            const newStacks = {...prevState.stacks};
-            // delete newStacks[prevState.activeTab]; // Clean up the temporary stack
-            return { ...prevState, activeTab: 'Matches', stacks: newStacks };
+            return { ...prevState, activeTab: 'Matches' };
         }
         return prevState;
     });
@@ -215,6 +214,11 @@ export function AppContentWrapper() {
   const activeStack = navigationState.stacks[navigationState.activeTab] || [];
   const activeStackItem = activeStack[activeStack.length - 1];
 
+  // Memoize goBack and navigate to prevent re-creation on every render
+  const memoizedGoBack = useCallback(goBack, [goBack]);
+  const memoizedNavigate = useCallback(navigate, [navigate]);
+
+
   return (
     <LanguageProvider>
         <main className="h-screen w-screen bg-background flex flex-col">
@@ -232,8 +236,8 @@ export function AppContentWrapper() {
                             
                             const screenProps = {
                                 ...stackItem.props,
-                                navigate,
-                                goBack,
+                                navigate: memoizedNavigate,
+                                goBack: memoizedGoBack,
                                 // Correctly determine canGoBack based on the specific stack for this screen
                                 canGoBack: stack.length > 1,
                                 isVisible, // Pass isVisible prop
@@ -253,7 +257,7 @@ export function AppContentWrapper() {
         </div>
         
         {showBannerAd && <BannerAd />}
-        {mainTabs.includes(navigationState.activeTab) && <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => navigate(screen)} />}
+        {mainTabs.includes(navigationState.activeTab) && <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => memoizedNavigate(screen)} />}
         </main>
     </LanguageProvider>
   );

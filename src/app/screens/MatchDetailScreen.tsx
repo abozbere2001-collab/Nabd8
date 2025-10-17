@@ -281,7 +281,7 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
     );
 }
 
-const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string) => void }) => {
+const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string, originalName: string) => void }) => {
     const { t } = useTranslation();
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
@@ -331,12 +331,12 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
                 {sortedRows.map(row => (
                     <div key={row} className="flex justify-around items-center">
-                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />)}
+                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />)}
                     </div>
                 ))}
                  {ungriddedPlayers.length > 0 && (
                     <div className="flex justify-around items-center">
-                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />)}
+                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />)}
                     </div>
                 )}
             </div>
@@ -397,7 +397,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                             </Avatar>
                             <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
                             {isAdmin && (
-                                <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
+                                <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name, activeLineup.coach.name);}}>
                                     <Pencil className="h-3 w-3" />
                                 </Button>
                             )}
@@ -411,7 +411,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                         {activeLineup.substitutes.map(p => (
                             <div key={p.player.id || p.player.name} className="p-2 cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                                 <div className="flex items-center gap-3">
-                                    <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
+                                    <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />
                                     <div className="flex-1 text-right">
                                         <p className="font-semibold text-sm">{p.player.name}</p>
                                         <p className="text-xs text-muted-foreground">{p.player.position}</p>
@@ -646,13 +646,13 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         return () => unsub();
     }, [db, fixtureId]);
     
-    const handleOpenRename = (type: RenameType, id: number, name: string) => {
-        setRenameItem({ type, id, name, originalName: name });
+    const handleOpenRename = (type: RenameType, id: number, name: string, originalName?: string) => {
+        setRenameItem({ type, id, name, originalName: originalName || name });
     };
 
-    const handleSaveRename = (newName: string, note?: string) => {
+    const handleSaveRename = (newName: string) => {
         if (!renameItem || !db) return;
-        const { id, type } = renameItem;
+        const { id, type, originalName } = renameItem;
 
         if (type === 'matchStatus') {
             const docRef = doc(db, 'matchCustomizations', String(id));
@@ -676,19 +676,31 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         const docRef = doc(db, collectionName, String(id));
         const data = { customName: newName };
 
-        setDoc(docRef, data)
-            .then(() => {
-                toast({ title: t('success_title'), description: `تم تحديث اسم ${type === 'player' ? 'اللاعب' : 'المدرب'}.` });
-                fetchData(false); // Refetch data to show updated name
-            })
-            .catch(serverError => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'create',
-                    requestResourceData: data,
+        if(newName && newName !== originalName) {
+            setDoc(docRef, data)
+                .then(() => {
+                    toast({ title: t('success_title'), description: `تم تحديث اسم ${type === 'player' ? 'اللاعب' : 'المدرب'}.` });
+                    fetchData(false); // Refetch data to show updated name
+                })
+                .catch(serverError => {
+                    const permissionError = new FirestorePermissionError({
+                        path: docRef.path,
+                        operation: 'create',
+                        requestResourceData: data,
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
                 });
-                errorEmitter.emit('permission-error', permissionError);
+        } else {
+            // If new name is empty or same as original, delete the custom name doc
+            deleteDoc(docRef).then(() => {
+                 toast({ title: t('success_title'), description: `تمت إزالة الاسم المخصص.` });
+                 fetchData(false);
+            }).catch(serverError => {
+                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
+                 errorEmitter.emit('permission-error', permissionError);
             });
+        }
+
 
         setRenameItem(null);
     };
