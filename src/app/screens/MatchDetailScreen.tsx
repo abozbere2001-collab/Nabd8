@@ -472,28 +472,29 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
 };
 
 // --- Main Screen Component ---
-const mergePlayerData = (lineups: LineupData[], playersData: { player: PlayerType }[]): LineupData[] => {
+const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, statistics: any[] }[]): LineupData[] => {
     if (!playersData || playersData.length === 0) {
         return lineups;
     }
 
-    const playersMap = new Map(playersData.map(p => [p.player.id, p.player]));
+    const playersMap = new Map(playersData.map(p => [p.player.id, p]));
 
     const updatePlayerInList = (playerList: PlayerWithStats[]): PlayerWithStats[] => {
         return playerList.map(pWithStats => {
             const lineupPlayer = pWithStats.player;
             if (lineupPlayer.id && playersMap.has(lineupPlayer.id)) {
-                const detailedPlayer = playersMap.get(lineupPlayer.id)!;
-                // Merge, giving precedence to detailed data but keeping lineup-specifics
+                const detailedPlayerInfo = playersMap.get(lineupPlayer.id)!;
+                const rating = detailedPlayerInfo.statistics?.[0]?.games?.rating;
+                
                 const mergedPlayer: PlayerType = {
-                    ...lineupPlayer, // grid, number
-                    name: detailedPlayer.name || lineupPlayer.name,
-                    photo: detailedPlayer.photo || lineupPlayer.photo,
-                    rating: lineupPlayer.rating || detailedPlayer.rating, // Keep original rating from lineup if it exists
+                    ...lineupPlayer,
+                    name: detailedPlayerInfo.player.name || lineupPlayer.name,
+                    photo: detailedPlayerInfo.player.photo || lineupPlayer.photo,
+                    rating: rating || lineupPlayer.rating,
                 };
                 return { ...pWithStats, player: mergedPlayer };
             }
-            return pWithStats; // Return original if no detailed data found
+            return pWithStats;
         });
     };
 
@@ -524,7 +525,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
                 fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
                 fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
-                fetch(`/api/football/fixtures/players?fixture=${fixtureId}`) // New endpoint
+                fetch(`/api/football/fixtures/players?fixture=${fixtureId}`)
             ]);
 
             const fixtureData = await fixtureRes.json();
@@ -543,23 +544,11 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             
             let finalLineups = lineupsData.response || [];
             
-            // The /fixtures/players endpoint gives us players with stats including rating.
             const detailedPlayers = playersData.response || [];
             
-            if (detailedPlayers.length > 0) {
-                 const playerMap = new Map(detailedPlayers.flatMap((team: any) => team.players.map((p: any) => [p.player.id, p.player])));
-
-                 finalLineups = finalLineups.map((lineup: LineupData) => ({
-                    ...lineup,
-                    startXI: lineup.startXI.map(p => ({
-                        ...p,
-                        player: { ...p.player, ...(playerMap.get(p.player.id) || {}) }
-                    })),
-                    substitutes: lineup.substitutes.map(p => ({
-                        ...p,
-                        player: { ...p.player, ...(playerMap.get(p.player.id) || {}) }
-                    })),
-                 }));
+            if (detailedPlayers.length > 0 && finalLineups.length > 0) {
+                 const allPlayersFromFixture = detailedPlayers.flatMap((team: any) => team.players);
+                 finalLineups = mergePlayerData(finalLineups, allPlayersFromFixture);
             }
             
             setLineups(finalLineups);
@@ -628,4 +617,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
