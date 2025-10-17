@@ -477,22 +477,20 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: PlayerTyp
 
     const playersMap = new Map(playersData.map(p => [p.player.id, p]));
 
-    const updatePlayerInList = (playerList: PlayerWithStats[]) => {
+    const updatePlayerInList = (playerList: PlayerWithStats[]): PlayerWithStats[] => {
         return playerList.map(p => {
             if (!p.player.id) return p;
             const extraData = playersMap.get(p.player.id);
             
-            // Prioritize new data, but keep old data if new data is missing.
-            const newPhoto = extraData?.player?.photo || p.player.photo;
-            const newRating = extraData?.statistics?.[0]?.games?.rating || p.player.rating;
+            const mergedPlayer = {
+                ...p.player,
+                photo: extraData?.player?.photo || p.player.photo,
+                rating: extraData?.statistics?.[0]?.games?.rating || p.player.rating,
+            };
 
             return {
                 ...p,
-                player: {
-                    ...p.player,
-                    photo: newPhoto,
-                    rating: newRating,
-                }
+                player: mergedPlayer
             };
         });
     };
@@ -540,7 +538,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             
             let finalLineups = lineupsData.response || [];
             
-            // Extract the correct season from the fixture data itself
             const matchSeason = currentFixture.league.season || CURRENT_SEASON;
             
             const allPlayerIds = finalLineups.flatMap((l: LineupData) => 
@@ -549,7 +546,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             
             if(allPlayerIds.length > 0) {
                  try {
-                    // Use the correct season in the API call
                     const playersRes = await fetch(`/api/football/players?id=${allPlayerIds.join('-')}&season=${matchSeason}`);
                     const playersData = await playersRes.json();
                     if(playersData.response) {
@@ -564,7 +560,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             const currentLeagueId = currentFixture.league.id;
             
             if(currentLeagueId) {
-                // Use the correct season for standings as well
                 const standingsRes = await fetch(`/api/football/standings?league=${currentLeagueId}&season=${matchSeason}`);
                 const standingsData = await standingsRes.json();
                 setStandings(standingsData?.response?.[0]?.league?.standings[0] || []);
@@ -625,7 +620,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
-
-
-      
