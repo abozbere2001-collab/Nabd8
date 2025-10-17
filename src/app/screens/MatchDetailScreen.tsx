@@ -478,9 +478,8 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: PlayerTyp
 
     const playersMap = new Map(playersData.map(p => [p.player.id, p]));
 
-    return lineups.map(lineup => ({
-        ...lineup,
-        startXI: lineup.startXI.map(p => {
+    const updatePlayerInList = (playerList: PlayerWithStats[]) => {
+        return playerList.map(p => {
             if (!p.player.id) return p;
             const extraData = playersMap.get(p.player.id);
             if (extraData) {
@@ -493,23 +492,15 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: PlayerTyp
                     }
                 };
             }
+            // Return original player if no extra data is found
             return p;
-        }),
-        substitutes: lineup.substitutes.map(p => {
-            if (!p.player.id) return p;
-            const extraData = playersMap.get(p.player.id);
-            if (extraData) {
-                 return {
-                    ...p,
-                    player: {
-                        ...p.player,
-                        photo: extraData.player.photo || p.player.photo,
-                        rating: extraData.statistics[0]?.games?.rating || p.player.rating,
-                    }
-                };
-            }
-            return p;
-        })
+        });
+    };
+
+    return lineups.map(lineup => ({
+        ...lineup,
+        startXI: updatePlayerInList(lineup.startXI),
+        substitutes: updatePlayerInList(lineup.substitutes)
     }));
 };
 
@@ -551,9 +542,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             
             const currentSeason = currentFixture.league.season || CURRENT_SEASON;
             
+            // Note: `filter(Boolean)` removes any null/undefined IDs
             const allPlayerIds = finalLineups.flatMap((l: LineupData) => 
-                [...l.startXI, ...l.substitutes].map(p => p.player.id).filter(id => id !== null && id !== undefined)
-            );
+                [...l.startXI, ...l.substitutes].map(p => p.player.id)
+            ).filter(Boolean);
             
             if(allPlayerIds.length > 0) {
                  try {
@@ -570,9 +562,11 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
 
             const currentLeagueId = currentFixture.league.id;
             
-            const standingsRes = await fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`);
-            const standingsData = await standingsRes.json();
-            setStandings(standingsData?.response?.[0]?.league?.standings[0] || []);
+            if(currentLeagueId) {
+                const standingsRes = await fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`);
+                const standingsData = await standingsRes.json();
+                setStandings(standingsData?.response?.[0]?.league?.standings[0] || []);
+            }
     
         } catch (error) {
             console.error("Failed to fetch match details:", error);
