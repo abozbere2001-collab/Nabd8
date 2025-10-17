@@ -16,6 +16,12 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { auth, firestore as db } from "@/firebase";
 
+// ملاحظة أمنية هامة:
+// كل المعلومات والإعدادات في هذا الملف (مثل `firebaseConfig`) مصممة لتكون عامة وتعمل في بيئة العميل (المتصفح).
+// الأمان الحقيقي للتطبيق لا يعتمد على إخفاء هذه المعلومات، بل يعتمد بشكل كامل على "قواعد الأمان" (Security Rules)
+// التي يتم تطبيقها على خوادم Firebase. هذه القواعد هي التي تحدد من يمكنه قراءة أو كتابة البيانات،
+// وتمنع أي وصول غير مصرح به حتى لو كان شخص ما يمتلك إعدادات المشروع.
+
 export const handleNewUser = async (user: User, firestore: Firestore) => {
     const userRef = doc(firestore, 'users', user.uid);
     const leaderboardRef = doc(firestore, 'leaderboard', user.uid);
