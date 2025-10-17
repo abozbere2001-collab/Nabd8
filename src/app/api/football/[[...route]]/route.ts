@@ -41,7 +41,7 @@ export async function GET(
             const successfulResponses = results
                 .filter(result => result.status === 'fulfilled' && result.value.status === 'fulfilled')
                 // @ts-ignore - This is the key fix: correctly extract the nested response data
-                .flatMap(result => result.value.value.response);
+                .flatMap(result => (result.value.value as any).response);
             
             return NextResponse.json({ response: successfulResponses });
 
