@@ -9,26 +9,29 @@ import { useAdmin } from '@/firebase/provider';
 import { LiveMatchStatus } from './LiveMatchStatus';
 import { cn } from '@/lib/utils';
 
-const TeamDisplay = ({ team, isHome }: { team: FixtureType['teams']['home'] | FixtureType['teams']['away'], isHome: boolean }) => {
-    // For RTL (Arabic), the visual order is naturally reversed.
-    // To have the logo appear on the left for the home team (right-side component), we use flex-row-reverse.
-    // To have the logo appear on the right for the away team (left-side component), we use a standard flex.
-    const rtlHomeClasses = 'flex-row-reverse text-right';
-    const rtlAwayClasses = 'flex-row text-left';
+const TeamBlock = ({ team, isHome }: { team: FixtureType['teams']['home'] | FixtureType['teams']['away'], isHome: boolean }) => {
+    // In RTL, home is on the right, away is on the left.
+    // We want the logo to be closer to the center score.
+    const isRightSide = isHome;
 
     return (
-        <div className={cn("flex items-center gap-2 truncate", isHome ? rtlHomeClasses : rtlAwayClasses)}>
+        <div className={cn(
+            "flex items-center gap-2 truncate",
+            isRightSide ? 'flex-row-reverse justify-start' : 'justify-start'
+        )}>
             <Avatar className={'h-6 w-6'}>
                 <AvatarImage src={team.logo} alt={team.name} />
                 <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
             </Avatar>
-            <span className="font-semibold text-xs truncate">
+            <span className={cn(
+                "font-semibold text-xs truncate",
+                 isRightSide ? 'text-right' : 'text-left'
+            )}>
                 {team.name}
             </span>
         </div>
     );
 };
-
 
 export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
     const { isAdmin } = useAdmin();
@@ -43,12 +46,14 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
             className="flex-1 p-2 cursor-pointer"
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
-         <main className="grid grid-cols-[1fr_auto_1fr] items-center justify-between gap-1">
-            <TeamDisplay team={fixture.teams.away} isHome={false} />
+         <main className="grid grid-cols-[1fr_auto_1fr] items-center justify-between gap-2">
+            {/* Away team on the left for RTL */}
+            <TeamBlock team={fixture.teams.away} isHome={false} />
             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
                 <LiveMatchStatus fixture={fixture} />
             </div>
-            <TeamDisplay team={fixture.teams.home} isHome={true} />
+            {/* Home team on the right for RTL */}
+            <TeamBlock team={fixture.teams.home} isHome={true} />
          </main>
         </div>
 
