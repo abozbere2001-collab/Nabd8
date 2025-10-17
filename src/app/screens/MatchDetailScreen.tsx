@@ -24,7 +24,6 @@ import { useTranslation } from '@/components/LanguageProvider';
 
 const PlayerCard = ({ player, navigate }: { player: PlayerType, navigate: ScreenProps['navigate'] }) => {
     const { t } = useTranslation();
-    // Ensure there's always a fallback image to prevent errors
     const fallbackImage = "https://media.api-sports.io/football/players/0.png";
     const playerImage = player.photo && player.photo.trim() !== '' ? player.photo : fallbackImage;
 
@@ -482,18 +481,19 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: PlayerTyp
         return playerList.map(p => {
             if (!p.player.id) return p;
             const extraData = playersMap.get(p.player.id);
-            if (extraData) {
-                return {
-                    ...p,
-                    player: {
-                        ...p.player,
-                        photo: extraData.player.photo || p.player.photo,
-                        rating: extraData.statistics[0]?.games?.rating || p.player.rating,
-                    }
-                };
-            }
-            // Return original player if no extra data is found
-            return p;
+            
+            // Prioritize new data, but keep old data if new data is missing.
+            const newPhoto = extraData?.player?.photo || p.player.photo;
+            const newRating = extraData?.statistics?.[0]?.games?.rating || p.player.rating;
+
+            return {
+                ...p,
+                player: {
+                    ...p.player,
+                    photo: newPhoto,
+                    rating: newRating,
+                }
+            };
         });
     };
 
@@ -540,16 +540,17 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             
             let finalLineups = lineupsData.response || [];
             
-            const currentSeason = currentFixture.league.season || CURRENT_SEASON;
+            // Extract the correct season from the fixture data itself
+            const matchSeason = currentFixture.league.season || CURRENT_SEASON;
             
-            // Note: `filter(Boolean)` removes any null/undefined IDs
             const allPlayerIds = finalLineups.flatMap((l: LineupData) => 
                 [...l.startXI, ...l.substitutes].map(p => p.player.id)
             ).filter(Boolean);
             
             if(allPlayerIds.length > 0) {
                  try {
-                    const playersRes = await fetch(`/api/football/players?id=${allPlayerIds.join('-')}&season=${currentSeason}`);
+                    // Use the correct season in the API call
+                    const playersRes = await fetch(`/api/football/players?id=${allPlayerIds.join('-')}&season=${matchSeason}`);
                     const playersData = await playersRes.json();
                     if(playersData.response) {
                         finalLineups = mergePlayerData(finalLineups, playersData.response);
@@ -563,7 +564,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             const currentLeagueId = currentFixture.league.id;
             
             if(currentLeagueId) {
-                const standingsRes = await fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`);
+                // Use the correct season for standings as well
+                const standingsRes = await fetch(`/api/football/standings?league=${currentLeagueId}&season=${matchSeason}`);
                 const standingsData = await standingsRes.json();
                 setStandings(standingsData?.response?.[0]?.league?.standings[0] || []);
             }
