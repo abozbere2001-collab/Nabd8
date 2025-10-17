@@ -269,11 +269,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [customStatuses, setCustomStatuses] = useState<{ [key: number]: string | null }>({});
 
   const [fixturesCache, setFixturesCache] = useState<Cache<FixtureType[]>>({});
-  const [loadingFixtures, setLoadingFixtures] = useState(true);
-  
-  const [liveFixtures, setLiveFixtures] = useState<FixtureType[]>([]);
-  const [loadingLive, setLoadingLive] = useState(false);
-  
+  const [loading, setLoading] = useState(true);
+    
   const [commentedMatches, setCommentedMatches] = useState<{ [key: number]: MatchDetails }>({});
 
 
@@ -328,32 +325,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     return () => unsubscribe();
   }, [db]);
   
-  const fetchAllCustomNames = useCallback(async () => {
-    if (!db) return;
-    try {
-      const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
-        getDocs(collection(db, 'leagueCustomizations')),
-        getDocs(collection(db, 'teamCustomizations'))
-      ]);
-
-      const leagueNames = new Map<number, string>();
-      leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
-
-      const teamNames = new Map<number, string>();
-      teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-
-      setCustomNames({ leagues: leagueNames, teams: teamNames });
-    } catch (error) {
-      console.warn("Could not fetch custom names, this is expected for non-admins", error);
-      setCustomNames({ leagues: new Map(), teams: new Map() }); // Ensure it's not null
-    }
-  }, [db]);
-
-  // Load custom names on mount
-  useEffect(() => {
-    fetchAllCustomNames();
-  }, [fetchAllCustomNames]);
-  
   const applyCustomNames = useCallback((fixtures: FixtureType[], names: { leagues: Map<number, string>, teams: Map<number, string> }): FixtureType[] => {
     return fixtures.map(fixture => ({
       ...fixture,
@@ -373,64 +344,71 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
       }
     }));
   }, []);
-  
-  const fetchFixturesForDate = useCallback(async (dateKey: string) => {
-    if (fixturesCache[dateKey]) {
-      setLoadingFixtures(false);
-      return;
-    }
-    setLoadingFixtures(true);
-    const url = `/api/football/fixtures?date=${dateKey}`;
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-          const errorBody = await response.text();
-          console.error("API Error Body:", errorBody);
-          throw new Error('Failed to fetch fixtures');
-        }
-        const data = await response.json();
-        const fixtures = data.response || [];
-        setFixturesCache(prev => ({ ...prev, [dateKey]: fixtures }));
-    } catch (error) {
-        console.error(`Failed to fetch fixtures for ${dateKey}:`, error);
-        setFixturesCache(prev => ({ ...prev, [dateKey]: [] }));
-    } finally {
-        setLoadingFixtures(false);
-    }
-  }, [fixturesCache]);
 
-  const fetchLiveFixtures = useCallback(async () => {
-    setLoadingLive(true);
-    const url = `/api/football/fixtures?live=all`;
+  const fetchAndProcessData = useCallback(async (dateKey: string, forceLive = false) => {
+    setLoading(true);
+
     try {
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error('Failed to fetch live fixtures');
+        // Step 1: Ensure custom names are loaded
+        let names = customNames;
+        if (!names) {
+            const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+                getDocs(collection(db, 'leagueCustomizations')),
+                getDocs(collection(db, 'teamCustomizations'))
+            ]);
+            const leagueNames = new Map<number, string>();
+            leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+            const teamNames = new Map<number, string>();
+            teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+            names = { leagues: leagueNames, teams: teamNames };
+            setCustomNames(names);
         }
-        const data = await response.json();
-        setLiveFixtures(data.response || []);
+
+        // Step 2: Fetch fixtures from cache or API
+        const isLiveFetch = forceLive || activeTab === 'live';
+        const url = isLiveFetch ? `/api/football/fixtures?live=all` : `/api/football/fixtures?date=${dateKey}`;
+        let rawFixtures: FixtureType[] = [];
+
+        if (!isLiveFetch && fixturesCache[dateKey]) {
+            rawFixtures = fixturesCache[dateKey];
+        } else {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`Failed to fetch fixtures from ${url}`);
+            const data = await response.json();
+            rawFixtures = data.response || [];
+            if (!isLiveFetch) {
+                 setFixturesCache(prev => ({ ...prev, [dateKey]: rawFixtures }));
+            }
+        }
+        
+        // Step 3: Apply translations and update state
+        const processedFixtures = applyCustomNames(rawFixtures, names);
+        setFixturesCache(prev => ({ ...prev, [dateKey]: processedFixtures }));
+
     } catch (error) {
-        console.error(`Failed to fetch live fixtures:`, error);
-        setLiveFixtures([]);
+        console.error("Failed to fetch and process data:", error);
+        if (!fixturesCache[dateKey]) {
+           setFixturesCache(prev => ({ ...prev, [dateKey]: [] }));
+        }
     } finally {
-        setLoadingLive(false);
+        setLoading(false);
     }
-  }, []);
+  }, [db, customNames, activeTab, fixturesCache, applyCustomNames]);
 
   
   useEffect(() => {
-    if(activeTab === 'my-results' && customNames) {
-        fetchFixturesForDate(selectedDateKey);
+    if (activeTab === 'my-results') {
+        fetchAndProcessData(selectedDateKey);
     }
-  }, [selectedDateKey, fetchFixturesForDate, activeTab, customNames]);
+  }, [selectedDateKey, activeTab, fetchAndProcessData]);
 
   useEffect(() => {
-    if (activeTab === 'live' && isVisible && customNames) {
-        fetchLiveFixtures(); // Fetch immediately
-        const interval = setInterval(fetchLiveFixtures, 60000); // And every minute
+    if (activeTab === 'live' && isVisible) {
+        fetchAndProcessData(selectedDateKey, true); // force live
+        const interval = setInterval(() => fetchAndProcessData(selectedDateKey, true), 60000); // And every minute
         return () => clearInterval(interval);
     }
-  }, [activeTab, fetchLiveFixtures, isVisible, customNames]);
+  }, [activeTab, isVisible, selectedDateKey, fetchAndProcessData]);
 
 
   const handleDateChange = (dateKey: string) => {
@@ -447,12 +425,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
     
-  const rawFixtures = activeTab === 'live' ? liveFixtures : (fixturesCache[selectedDateKey] || []);
-  const currentFixtures = useMemo(() => {
-      if (!customNames) return [];
-      return applyCustomNames(rawFixtures, customNames)
-    }, [rawFixtures, applyCustomNames, customNames]);
-  const isLoading = activeTab === 'live' ? loadingLive : loadingFixtures || !customNames;
+  const currentFixtures = fixturesCache[selectedDateKey] || [];
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -493,7 +466,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             <TabsContent value="my-results" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0">
                 <FixturesList 
                     fixtures={currentFixtures}
-                    loading={isLoading}
+                    loading={loading}
                     activeTab={activeTab}
                     favoritedLeagueIds={favoritedLeagueIds}
                     favoritedTeamIds={favoritedTeamIds}
@@ -506,7 +479,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             <TabsContent value="live" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0">
                  <FixturesList 
                     fixtures={currentFixtures}
-                    loading={isLoading}
+                    loading={loading}
                     activeTab={activeTab}
                     favoritedLeagueIds={favoritedLeagueIds}
                     favoritedTeamIds={favoritedTeamIds}
@@ -523,4 +496,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-
