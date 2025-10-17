@@ -21,9 +21,9 @@ export async function GET(
   }
 
   // Smart Caching Strategy:
-  // - Fixtures and odds change often, so we revalidate frequently.
-  // - Other data (teams, leagues, players) is more static, so we can cache it for longer.
-  const isVolatileRequest = routePath.includes('fixtures') || routePath.includes('odds');
+  // - Fixtures, odds, and player data (within a fixture context) change often.
+  // - Other data (teams, leagues) is more static.
+  const isVolatileRequest = routePath.includes('fixtures') || routePath.includes('odds') || routePath.includes('players');
   const revalidateSeconds = isVolatileRequest ? 60 : 3600; // 1 minute for volatile, 1 hour for others
 
   try {
@@ -96,3 +96,5 @@ export async function GET(
     );
   }
 }
+
+      

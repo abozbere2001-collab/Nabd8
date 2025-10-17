@@ -472,6 +472,44 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
 };
 
 // --- Main Screen Component ---
+const mergePlayerData = (lineups: LineupData[], playersData: { player: PlayerType, statistics: any }[]): LineupData[] => {
+    if (!playersData || playersData.length === 0) return lineups;
+
+    const playersMap = new Map(playersData.map(p => [p.player.id, p]));
+
+    return lineups.map(lineup => ({
+        ...lineup,
+        startXI: lineup.startXI.map(p => {
+            const extraData = playersMap.get(p.player.id);
+            if (extraData) {
+                return {
+                    ...p,
+                    player: {
+                        ...p.player,
+                        photo: extraData.player.photo || p.player.photo,
+                        rating: extraData.statistics[0]?.games?.rating || p.player.rating,
+                    }
+                };
+            }
+            return p;
+        }),
+        substitutes: lineup.substitutes.map(p => {
+            const extraData = playersMap.get(p.player.id);
+            if (extraData) {
+                 return {
+                    ...p,
+                    player: {
+                        ...p.player,
+                        photo: extraData.player.photo || p.player.photo,
+                        rating: extraData.statistics[0]?.games?.rating || p.player.rating,
+                    }
+                };
+            }
+            return p;
+        })
+    }));
+};
+
 
 export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixture: initialFixture }: ScreenProps & { fixtureId: number, fixture?: Fixture }) {
     const [fixture, setFixture] = useState<Fixture | null>(initialFixture || null);
@@ -487,27 +525,52 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         if (isInitialLoad) setLoading(true);
     
         try {
-            const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
-            const fixtureData = await fixtureRes.json();
-            const currentFixture = fixtureData.response?.[0];
-    
-            if (!currentFixture) throw new Error("Fixture not found");
-            setFixture(currentFixture);
-    
-            const currentLeagueId = currentFixture.league.id;
-            const currentSeason = currentFixture.league.season || CURRENT_SEASON;
-    
-            const [eventsData, statisticsData, standingsData, lineupsData] = await Promise.all([
-                fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).then(res => res.json()),
-                fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`).then(res => res.json()),
-                fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`).then(res => res.json()),
-                fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`).then(res => res.json())
+            const [fixtureRes, eventsRes, statisticsRes, lineupsRes] = await Promise.all([
+                fetch(`/api/football/fixtures?id=${fixtureId}`),
+                fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
+                fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
+                fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`)
             ]);
-    
+
+            const fixtureData = await fixtureRes.json();
+            const eventsData = await eventsRes.json();
+            const statisticsData = await statisticsRes.json();
+            const lineupsData = await lineupsRes.json();
+
+            const currentFixture = fixtureData.response?.[0];
+            if (!currentFixture) throw new Error("Fixture not found");
+            
+            setFixture(currentFixture);
             setEvents(eventsData.response || []);
             setStatistics(statisticsData.response || []);
+            
+            let finalLineups = lineupsData.response || [];
+
+            // --- Efficient Player Data Fetching ---
+            const allPlayerIds = finalLineups.flatMap((l: LineupData) => 
+                [...l.startXI, ...l.substitutes].map(p => p.player.id).filter(Boolean)
+            );
+            
+            if(allPlayerIds.length > 0) {
+                 try {
+                    const playersRes = await fetch(`/api/football/players?id=${allPlayerIds.join('-')}&fixture=${fixtureId}`);
+                    const playersData = await playersRes.json();
+                    if(playersData.response) {
+                        finalLineups = mergePlayerData(finalLineups, playersData.response);
+                    }
+                } catch (e) {
+                    console.error("Could not fetch detailed player data, continuing with basic info.", e);
+                }
+            }
+            setLineups(finalLineups);
+            // ------------------------------------
+
+            const currentLeagueId = currentFixture.league.id;
+            const currentSeason = currentFixture.league.season || CURRENT_SEASON;
+            
+            const standingsRes = await fetch(`/api/football/standings?league=${currentLeagueId}&season=${currentSeason}`);
+            const standingsData = await standingsRes.json();
             setStandings(standingsData?.response?.[0]?.league?.standings[0] || []);
-            setLineups(lineupsData.response || []);
     
         } catch (error) {
             console.error("Failed to fetch match details:", error);
@@ -565,3 +628,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     );
 }
 
+
+
+      
