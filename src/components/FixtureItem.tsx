@@ -34,28 +34,28 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, cus
     const hasCommentsFeature = commentsEnabled || isAdmin;
 
     return (
-      <div 
-        key={fixture.fixture.id} 
+      <div
+        key={fixture.fixture.id}
         className="relative rounded-lg bg-card border text-sm transition-all duration-300 flex flex-col justify-between"
       >
-        <div 
+        <div
             className="flex-1 p-2 cursor-pointer"
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
-         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+         <main dir="ltr" className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
             <HomeTeamDisplay team={fixture.teams.home} />
             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
                 <LiveMatchStatus fixture={fixture} customStatus={customStatus} />
             </div>
             <AwayTeamDisplay team={fixture.teams.away} />
-         </div>
+         </main>
         </div>
-         
-         <div className="absolute top-1 left-1 flex items-center gap-1">
+
+         <div className="absolute top-1 right-1 flex items-center gap-1">
             {hasCommentsFeature && (
-                <CommentsButton 
-                  matchId={fixture.fixture.id} 
-                  navigate={navigate} 
+                <CommentsButton
+                  matchId={fixture.fixture.id}
+                  navigate={navigate}
                   commentsEnabled={commentsEnabled}
                   size="icon"
                 />
