@@ -7,28 +7,29 @@ import { CommentsButton } from '@/components/CommentsButton';
 import type { Fixture as FixtureType } from '@/lib/types';
 import { useAdmin } from '@/firebase/provider';
 import { LiveMatchStatus } from './LiveMatchStatus';
-import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
-const TeamBlock = ({ team, isHome }: { team: FixtureType['teams']['home'] | FixtureType['teams']['away'], isHome: boolean }) => {
-    // In RTL, home is on the right, away is on the left.
-    // We want the logo to be closer to the center score.
-    const isRightSide = isHome;
-
+const TeamBlock = ({ team, isHome, isRTL }: { team: FixtureType['teams']['home'] | FixtureType['teams']['away'], isHome: boolean, isRTL: boolean }) => {
+    const isLeftSide = isRTL ? !isHome : isHome; // يحدد من جهة اليسار
     return (
-        <div className={cn(
-            "flex items-center gap-2 truncate",
-            isRightSide ? 'flex-row-reverse justify-start' : 'justify-start'
-        )}>
-            <Avatar className={'h-6 w-6'}>
-                <AvatarImage src={team.logo} alt={team.name} />
-                <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
-            </Avatar>
-            <span className={cn(
-                "font-semibold text-xs truncate",
-                 isRightSide ? 'text-right' : 'text-left'
-            )}>
-                {team.name}
-            </span>
+        <div className={`flex items-center gap-2 truncate ${isLeftSide ? 'justify-end' : 'justify-start'}`}>
+            {isLeftSide ? (
+                <>
+                    <span className="font-semibold text-xs truncate text-right">{team.name}</span>
+                    <Avatar className={'h-6 w-6'}>
+                        <AvatarImage src={team.logo} alt={team.name} />
+                        <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
+                    </Avatar>
+                </>
+            ) : (
+                <>
+                    <Avatar className={'h-6 w-6'}>
+                        <AvatarImage src={team.logo} alt={team.name} />
+                        <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
+                    </Avatar>
+                    <span className="font-semibold text-xs truncate text-left">{team.name}</span>
+                </>
+            )}
         </div>
     );
 };
@@ -36,6 +37,8 @@ const TeamBlock = ({ team, isHome }: { team: FixtureType['teams']['home'] | Fixt
 export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
     const { isAdmin } = useAdmin();
     const hasCommentsFeature = commentsEnabled || isAdmin;
+    const { i18n } = useTranslation();
+    const isRTL = i18n.language === 'ar';
 
     return (
       <div
@@ -47,13 +50,11 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
          <main className="grid grid-cols-[1fr_auto_1fr] items-center justify-between gap-2">
-            {/* Away team on the left for RTL */}
-            <TeamBlock team={fixture.teams.away} isHome={false} />
+            <TeamBlock team={fixture.teams.home} isHome={true} isRTL={isRTL} />
             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
                 <LiveMatchStatus fixture={fixture} />
             </div>
-            {/* Home team on the right for RTL */}
-            <TeamBlock team={fixture.teams.home} isHome={true} />
+            <TeamBlock team={fixture.teams.away} isHome={false} isRTL={isRTL} />
          </main>
         </div>
 
