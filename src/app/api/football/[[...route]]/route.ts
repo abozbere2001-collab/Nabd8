@@ -67,7 +67,10 @@ export async function GET(
   // - Fixtures, odds, and player data (within a fixture context) change often.
   // - Other data (teams, leagues) is more static.
   const isVolatileRequest = routePath.includes('fixtures') || routePath.includes('odds');
-  const revalidateSeconds = isVolatileRequest ? 60 : 3600; // 1 minute for volatile, 1 hour for others
+  // Disable caching for fixture lists by date, as they can be very large.
+  const isLargeRequest = routePath === 'fixtures' && searchParams.has('date');
+  const cacheOptions = isLargeRequest ? { cache: 'no-store' } : { next: { revalidate: isVolatileRequest ? 60 : 3600 } };
+  
 
   try {
     const apiResponse = await fetch(apiURL, {
@@ -75,8 +78,8 @@ export async function GET(
         'x-rapidapi-host': API_FOOTBALL_HOST,
         'x-rapidapi-key': API_FOOTBALL_KEY,
       },
-      next: { revalidate: revalidateSeconds } 
-    });
+      ...cacheOptions
+    } as RequestInit);
 
     // Special handling for odds to include history
     if (routePath.includes('odds') && apiResponse.ok) {
@@ -89,7 +92,7 @@ export async function GET(
                     'x-rapidapi-host': API_FOOTBALL_HOST,
                     'x-rapidapi-key': API_FOOTBALL_KEY,
                  },
-                 next: { revalidate: revalidateSeconds }
+                 next: { revalidate: isVolatileRequest ? 60 : 3600 }
             });
             if (historyResponse.ok) {
                 const historyData = await historyResponse.json();
