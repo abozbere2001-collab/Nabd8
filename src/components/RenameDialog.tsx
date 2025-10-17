@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -41,11 +42,11 @@ export function RenameDialog({
   const [newNote, setNewNote] = useState('');
 
   useEffect(() => {
-    if (item) {
+    if (isOpen && item) {
       setNewName(item.name || '');
       setNewNote(item.note || '');
     }
-  }, [item]);
+  }, [isOpen, item]);
 
   const handleSave = () => {
     if (item) {
@@ -123,3 +124,5 @@ export function RenameDialog({
     </Dialog>
   );
 }
+
+    

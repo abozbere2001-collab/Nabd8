@@ -95,7 +95,7 @@ const MatchHeaderCard = ({ fixture, navigate, onRename, customStatus, isAdmin }:
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                        <span className="font-bold text-[10px] text-center truncate w-full">{fixture.teams.home.name}</span>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="flex flex-col items-center justify-center min-w-[120px] text-center">
                         <LiveMatchStatus fixture={fixture} customStatus={customStatus} large />
@@ -107,7 +107,7 @@ const MatchHeaderCard = ({ fixture, navigate, onRename, customStatus, isAdmin }:
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                        <span className="font-bold text-[10px] text-center truncate w-full">{fixture.teams.away.name}</span>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                 </div>
             </CardContent>
@@ -176,9 +176,9 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                                             <span className="text-muted-foreground">{stat.label}</span>
                                             <span>{awayValueRaw}</span>
                                         </div>
-                                        <div className="flex items-center gap-1" dir="ltr" style={{flexDirection: 'row-reverse'}}>
-                                            <Progress value={awayVal} indicatorClassName="bg-accent rounded-r-full" className="rounded-r-full" style={{transform: 'rotate(180deg)'}}/>
+                                        <div className="flex items-center gap-1" dir="ltr">
                                             <Progress value={homeVal} indicatorClassName="bg-primary rounded-l-full" className="rounded-l-full"/>
+                                            <Progress value={awayVal} indicatorClassName="bg-accent rounded-r-full" className="rounded-r-full" style={{transform: 'rotate(180deg)'}}/>
                                         </div>
                                     </div>
                                 )
@@ -241,7 +241,7 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                     <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
                                         <p className="font-semibold">{event.player.name}</p>
                                         {event.type === 'subst' && event.assist.name ? (
-                                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                             <div className={cn("flex items-center gap-1 text-xs text-muted-foreground", isHomeEvent ? "flex-row-reverse" : "")}>
                                                 {isHomeEvent ? <ArrowUp className="h-3 w-3 text-green-500"/> : <ArrowDown className="h-3 w-3 text-red-500"/>}
                                                 <span>{t('substitution_for')} {event.assist.name}</span>
                                              </div>
@@ -519,7 +519,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [customStatus, setCustomStatus] = useState<string | null>(null);
     const [loading, setLoading] = useState(!initialFixture);
     const { t } = useTranslation();
-    const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string } | null>(null);
+    const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> }>({});
 
     const applyCustomNamesToFixture = useCallback((fixtureToUpdate: Fixture | null, names: { [key: string]: Map<number, string> }) => {
@@ -647,10 +647,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     }, [db, fixtureId]);
     
     const handleOpenRename = (type: RenameType, id: number, name: string) => {
-        setRenameItem({ type, id, name });
+        setRenameItem({ type, id, name, originalName: name });
     };
 
-    const handleSaveRename = (newName: string) => {
+    const handleSaveRename = (newName: string, note?: string) => {
         if (!renameItem || !db) return;
         const { id, type } = renameItem;
 
@@ -667,6 +667,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                      errorEmitter.emit('permission-error', permissionError);
                 });
             }
+            toast({ title: "نجاح", description: "تم تحديث حالة المباراة." });
             setRenameItem(null);
             return;
         }
@@ -719,7 +720,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 <RenameDialog
                     isOpen={!!renameItem}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-                    item={{ ...renameItem, originalName: renameItem.name}}
+                    item={renameItem}
                     onSave={handleSaveRename}
                 />
             )}
@@ -752,5 +753,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
 
     
