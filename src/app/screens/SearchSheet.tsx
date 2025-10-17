@@ -72,7 +72,7 @@ const ItemRow = ({ item, itemType, isFavorited, onFavoriteToggle, onResultClick,
 
 export function SearchSheet({ children, navigate, initialItemType }: { children: React.ReactNode, navigate: ScreenProps['navigate'], initialItemType?: ItemType }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -167,7 +167,41 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     const resultsMap = new Map<string, SearchResult>();
 
     try {
-        // 1. Search external API with original query
+        // 1. Client-side search for custom names
+        const firestoreTeamIds: string[] = [];
+        customNames.teams.forEach((name, id) => {
+            if (name.toLowerCase().includes(query.toLowerCase())) {
+                firestoreTeamIds.push(String(id));
+            }
+        });
+
+        const firestoreLeagueIds: string[] = [];
+        customNames.leagues.forEach((name, id) => {
+            if (name.toLowerCase().includes(query.toLowerCase())) {
+                firestoreLeagueIds.push(String(id));
+            }
+        });
+        
+        // Fetch details for matched custom names
+        const teamPromises = firestoreTeamIds.map(async teamId => {
+            if (!resultsMap.has(`team-${teamId}`)) {
+                const res = await fetch(`/api/football/teams?id=${teamId}`);
+                const data = await res.json();
+                if (data.response?.[0]) resultsMap.set(`team-${teamId}`, { ...data.response[0], type: 'team' });
+            }
+        });
+
+        const leaguePromises = firestoreLeagueIds.map(async leagueId => {
+            if (!resultsMap.has(`league-${leagueId}`)) {
+                const res = await fetch(`/api/football/leagues?id=${leagueId}`);
+                const data = await res.json();
+                if (data.response?.[0]) resultsMap.set(`league-${leagueId}`, { ...data.response[0], type: 'league' });
+            }
+        });
+
+        await Promise.all([...teamPromises, ...leaguePromises]);
+
+        // 2. Search external API with original query
         const [teamsRes, leaguesRes] = await Promise.all([
             fetch(`/api/football/teams?search=${query}`),
             fetch(`/api/football/leagues?search=${query}`)
@@ -176,54 +210,18 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         const leaguesData = await leaguesRes.json();
 
         if (teamsData.response) {
-            teamsData.response.forEach((r: TeamResult) => resultsMap.set(`team-${r.team.id}`, { ...r, type: 'team' }));
+            teamsData.response.forEach((r: TeamResult) => {
+                if (!resultsMap.has(`team-${r.team.id}`)) {
+                    resultsMap.set(`team-${r.team.id}`, { ...r, type: 'team' });
+                }
+            });
         }
         if (leaguesData.response) {
-            leaguesData.response.forEach((r: LeagueResult) => resultsMap.set(`league-${r.league.id}`, { ...r, type: 'league' }));
-        }
-
-        // 2. Search Firestore for custom names
-        if (db) {
-            const teamCustomQuery = query(
-                collection(db, "teamCustomizations"), 
-                orderBy("customName"),
-                where("customName", ">=", query), 
-                where("customName", "<=", query + '\uf8ff'), 
-                limit(5)
-            );
-            const leagueCustomQuery = query(
-                collection(db, "leagueCustomizations"), 
-                orderBy("customName"),
-                where("customName", ">=", query), 
-                where("customName", "<=", query + '\uf8ff'), 
-                limit(5)
-            );
-            
-            const [teamCustomSnap, leagueCustomSnap] = await Promise.all([
-                getDocs(teamCustomQuery),
-                getDocs(leagueCustomQuery),
-            ]);
-            
-            const firestoreTeamIds = teamCustomSnap.docs.map(doc => doc.id);
-            const firestoreLeagueIds = leagueCustomSnap.docs.map(doc => doc.id);
-
-            const teamPromises = firestoreTeamIds.map(async teamId => {
-                if (!resultsMap.has(`team-${teamId}`)) {
-                    const res = await fetch(`/api/football/teams?id=${teamId}`);
-                    const data = await res.json();
-                    if (data.response?.[0]) resultsMap.set(`team-${teamId}`, { ...data.response[0], type: 'team' });
-                }
+            leaguesData.response.forEach((r: LeagueResult) => {
+                 if (!resultsMap.has(`league-${r.league.id}`)) {
+                    resultsMap.set(`league-${r.league.id}`, { ...r, type: 'league' });
+                 }
             });
-
-            const leaguePromises = firestoreLeagueIds.map(async leagueId => {
-                if (!resultsMap.has(`league-${leagueId}`)) {
-                    const res = await fetch(`/api/football/leagues?id=${leagueId}`);
-                    const data = await res.json();
-                    if (data.response?.[0]) resultsMap.set(`league-${leagueId}`, { ...data.response[0], type: 'league' });
-                }
-            });
-
-            await Promise.all([...teamPromises, ...leaguePromises]);
         }
       
       setSearchResults(Array.from(resultsMap.values()));
@@ -234,7 +232,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     } finally {
       setLoading(false);
     }
-  }, [db, toast]);
+  }, [customNames, toast]);
 
   useEffect(() => {
     if (debouncedSearchTerm && isOpen) {
