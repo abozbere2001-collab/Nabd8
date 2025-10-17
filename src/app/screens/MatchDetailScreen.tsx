@@ -403,9 +403,11 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             {renderPitch(activeLineup)}
             
             <Card>
+                <CardHeader>
+                    <CardTitle className="text-center text-base">{t('coach')}</CardTitle>
+                </CardHeader>
                 <CardContent className="p-3 text-center">
                     <div className="relative inline-flex flex-col items-center gap-1">
-                        <h3 className="font-bold text-sm mb-1">{t('coach')}</h3>
                         <Avatar className="h-12 w-12">
                             <AvatarImage src={activeLineup.coach.photo} />
                             <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
@@ -420,7 +422,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                 </CardContent>
             </Card>
 
-             {substitutionEvents.length > 0 && (
+            {substitutionEvents.length > 0 && (
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-center text-base">التبديلات</CardTitle>
@@ -461,21 +463,19 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             )}
 
             {subsNotYetOn.length > 0 && (
-                <Card>
+                 <Card>
                     <CardHeader>
                         <CardTitle className="text-center text-base">الاحتياط</CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {subsNotYetOn.map(p => (
-                            <Card key={p.player.id || p.player.name} className="p-2">
-                                <div className="flex items-center gap-3" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
-                                     <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
-                                     <div className="flex-1 text-right">
-                                        <p className="font-semibold text-sm">{p.player.name}</p>
-                                        <p className="text-xs text-muted-foreground">{p.player.position}</p>
-                                     </div>
+                             <div key={p.player.id || p.player.name} className="flex items-center gap-3 p-2 bg-card border rounded-lg cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                                <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
+                                <div className="flex-1 text-right">
+                                    <p className="font-semibold text-sm">{p.player.name}</p>
+                                    <p className="text-xs text-muted-foreground">{p.player.position}</p>
                                 </div>
-                            </Card>
+                            </div>
                         ))}
                     </CardContent>
                 </Card>
@@ -691,9 +691,9 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             {renameItem && (
                 <RenameDialog
                     isOpen={!!renameItem}
-                    onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
                     item={renameItem}
-                    onSave={handleSaveRename}
+                    onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
+                    onSave={(type, id, newName) => handleSaveRename(type, id, newName)}
                 />
             )}
 
