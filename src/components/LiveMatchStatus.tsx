@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -16,7 +17,7 @@ const getRelativeDay = (date: Date) => {
 };
 
 // Live Timer Component
-export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixture: FixtureType, large?: boolean, customStatus?: string | null }) => {
+export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureType, large?: boolean, customStatus?: string | null }) => {
     const { status, date } = fixture.fixture;
     const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
     const live = isMatchLive(status);
@@ -65,10 +66,6 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
                 sub: status.long,
                 isLive: false
             };
-        }
-
-        if (customStatus) {
-            return { main: customStatus, sub: null, isLive: false };
         }
 
         return {

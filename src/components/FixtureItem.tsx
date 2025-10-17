@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -11,7 +12,7 @@ import { LiveMatchStatus } from './LiveMatchStatus';
 
 const HomeTeamDisplay = ({ team }: { team: FixtureType['teams']['home'] }) => (
     <div className="flex items-center gap-2 justify-end truncate">
-        <span className="font-semibold text-sm truncate">{team.name}</span>
+        <span className="font-semibold text-xs truncate">{team.name}</span>
         <Avatar className={'h-6 w-6'}>
             <AvatarImage src={team.logo} alt={team.name} />
              <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
@@ -25,11 +26,11 @@ const AwayTeamDisplay = ({ team }: { team: FixtureType['teams']['away'] }) => (
             <AvatarImage src={team.logo} alt={team.name} />
             <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
         </Avatar>
-        <span className="font-semibold text-sm truncate">{team.name}</span>
+        <span className="font-semibold text-xs truncate">{team.name}</span>
     </div>
 );
 
-export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, customStatus }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean, customStatus?: string | null }) => {
+export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
     const { isAdmin } = useAdmin();
     const hasCommentsFeature = commentsEnabled || isAdmin;
 
@@ -45,7 +46,7 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, cus
          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
             <HomeTeamDisplay team={fixture.teams.home} />
             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
-                <LiveMatchStatus fixture={fixture} customStatus={customStatus} />
+                <LiveMatchStatus fixture={fixture} customStatus={null} />
             </div>
             <AwayTeamDisplay team={fixture.teams.away} />
          </div>

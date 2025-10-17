@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -38,7 +39,6 @@ const FixturesList = ({
     favoritedLeagueIds,
     favoritedTeamIds,
     commentedMatches,
-    customStatuses,
     navigate,
 }: { 
     fixtures: FixtureType[], 
@@ -48,7 +48,6 @@ const FixturesList = ({
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
     commentedMatches: { [key: number]: MatchDetails },
-    customStatuses: { [key: number]: string | null },
     navigate: ScreenProps['navigate'],
 }) => {
     
@@ -137,7 +136,7 @@ const FixturesList = ({
                                 fixture={f} 
                                 navigate={navigate}
                                 commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled}
-                                customStatus={customStatuses[f.fixture.id]}
+                                customStatus={null}
                             />
                         ))}
                     </div>
@@ -164,7 +163,7 @@ const FixturesList = ({
                                     fixture={f} 
                                     navigate={navigate}
                                     commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled} 
-                                    customStatus={customStatuses[f.fixture.id]}
+                                    customStatus={null}
                                 />
                             ))}
                         </div>
@@ -248,17 +247,13 @@ type Cache<T> = { [date: string]: T };
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: ScreenProps & { isVisible: boolean }) {
   const { user } = useAuth();
-  const { isAdmin } = useAdmin();
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
   const [activeTab, setActiveTab] = useState<TabName>('my-results');
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
   
-  const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string> } | null>(null);
-  const [customStatuses, setCustomStatuses] = useState<{ [key: number]: string | null }>({});
-
-  const [fixturesCache, setFixturesCache] = useState<Cache<FixtureType[]>>({});
+  const [fixtures, setFixtures] = useState<FixtureType[]>([]);
   const [loading, setLoading] = useState(true);
     
   const [commentedMatches, setCommentedMatches] = useState<{ [key: number]: MatchDetails }>({});
@@ -298,90 +293,60 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     });
     return () => unsubscribe();
   }, [db]);
-
-  useEffect(() => {
-    if (!db) return;
-    const customizationsRef = collection(db, 'matchCustomizations');
-    const unsubscribe = onSnapshot(customizationsRef, (snapshot) => {
-        const statuses: { [key: number]: string | null } = {};
-        snapshot.forEach(doc => {
-            statuses[Number(doc.id)] = doc.data().customStatus || null;
-        });
-        setCustomStatuses(statuses);
-    }, (error) => {
-        const permissionError = new FirestorePermissionError({ path: 'matchCustomizations', operation: 'list' });
-        errorEmitter.emit('permission-error', permissionError);
-    });
-    return () => unsubscribe();
-  }, [db]);
   
-  const applyCustomNames = useCallback((fixtures: FixtureType[], names: { leagues: Map<number, string>, teams: Map<number, string> }): FixtureType[] => {
-    return fixtures.map(fixture => ({
-      ...fixture,
-      league: {
-        ...fixture.league,
-        name: names.leagues.get(fixture.league.id) || fixture.league.name
-      },
-      teams: {
-        home: {
-          ...fixture.teams.home,
-          name: names.teams.get(fixture.teams.home.id) || fixture.teams.home.name
-        },
-        away: {
-          ...fixture.teams.away,
-          name: names.teams.get(fixture.teams.away.id) || fixture.teams.away.name
-        }
-      }
-    }));
-  }, []);
-
-  const fetchAndProcessData = useCallback(async (dateKey: string, forceLive = false) => {
+  const fetchAndProcessData = useCallback(async (dateKey: string, isLive: boolean) => {
+      if (!db) return;
       setLoading(true);
 
       try {
-          let names = customNames;
-          if (!names) {
-              if (!db) { setLoading(false); return; }
-              const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
-                  getDocs(collection(db, 'leagueCustomizations')),
-                  getDocs(collection(db, 'teamCustomizations'))
-              ]);
-              const leagueNames = new Map<number, string>();
-              leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
-              const teamNames = new Map<number, string>();
-              teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-              names = { leagues: leagueNames, teams: teamNames };
-              setCustomNames(names);
-          }
+        const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+            getDocs(collection(db, 'leagueCustomizations')),
+            getDocs(collection(db, 'teamCustomizations'))
+        ]);
+        const leagueNames = new Map<number, string>();
+        leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+        const teamNames = new Map<number, string>();
+        teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
 
-          const isLiveFetch = forceLive || activeTab === 'live';
-          const url = isLiveFetch ? `/api/football/fixtures?live=all` : `/api/football/fixtures?date=${dateKey}`;
-          
-          let rawFixtures: FixtureType[] = [];
-          if (!isLiveFetch && fixturesCache[dateKey]) {
-              rawFixtures = fixturesCache[dateKey];
-          } else {
-              const response = await fetch(url);
-              if (!response.ok) throw new Error(`Failed to fetch fixtures from ${url}`);
-              const data = await response.json();
-              rawFixtures = data.response || [];
-          }
-          
-          const processedFixtures = applyCustomNames(rawFixtures, names);
-          setFixturesCache(prev => ({ ...prev, [dateKey]: processedFixtures }));
+        const names = { leagues: leagueNames, teams: teamNames };
+
+        const url = isLive ? `/api/football/fixtures?live=all` : `/api/football/fixtures?date=${dateKey}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Failed to fetch fixtures`);
+        const data = await response.json();
+        const rawFixtures: FixtureType[] = data.response || [];
+
+        const processedFixtures = rawFixtures.map(fixture => ({
+            ...fixture,
+            league: {
+                ...fixture.league,
+                name: names.leagues.get(fixture.league.id) || fixture.league.name
+            },
+            teams: {
+                home: {
+                    ...fixture.teams.home,
+                    name: names.teams.get(fixture.teams.home.id) || fixture.teams.home.name
+                },
+                away: {
+                    ...fixture.teams.away,
+                    name: names.teams.get(fixture.teams.away.id) || fixture.teams.away.name
+                }
+            }
+        }));
+        setFixtures(processedFixtures);
 
       } catch (error) {
           console.error("Failed to fetch and process data:", error);
-          setFixturesCache(prev => ({ ...prev, [dateKey]: prev[dateKey] || [] }));
+          setFixtures([]);
       } finally {
           setLoading(false);
       }
-  }, [db, customNames, activeTab, fixturesCache, applyCustomNames]);
+  }, [db]);
 
   
   useEffect(() => {
     if (activeTab === 'my-results') {
-        fetchAndProcessData(selectedDateKey);
+        fetchAndProcessData(selectedDateKey, false);
     }
   }, [selectedDateKey, activeTab, fetchAndProcessData]);
 
@@ -408,8 +373,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
     
-  const currentFixtures = fixturesCache[selectedDateKey] || [];
-
   return (
     <div className="flex h-full flex-col bg-background">
         <ScreenHeader 
@@ -448,27 +411,25 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
             <TabsContent value="my-results" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0">
                 <FixturesList 
-                    fixtures={currentFixtures}
+                    fixtures={fixtures}
                     loading={loading}
                     activeTab={activeTab}
                     favoritedLeagueIds={favoritedLeagueIds}
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
                     commentedMatches={commentedMatches}
-                    customStatuses={customStatuses}
                     navigate={navigate}
                 />
             </TabsContent>
             <TabsContent value="live" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0">
                  <FixturesList 
-                    fixtures={currentFixtures}
+                    fixtures={fixtures}
                     loading={loading}
                     activeTab={activeTab}
                     favoritedLeagueIds={favoritedLeagueIds}
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
                     commentedMatches={commentedMatches}
-                    customStatuses={customStatuses}
                     navigate={navigate}
                 />
             </TabsContent>

@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from './ui/textarea';
 
-type ItemType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'matchStatus';
+type ItemType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach';
 
 interface RenameDialogProps {
   isOpen: boolean;
@@ -29,7 +29,7 @@ interface RenameDialogProps {
     type: ItemType;
     originalName?: string;
   } | null;
-  onSave: (newName: string, newNote?: string) => void;
+  onSave: (type: ItemType, id: string | number, newName: string, newNote?: string) => void;
 }
 
 export function RenameDialog({
@@ -50,7 +50,7 @@ export function RenameDialog({
 
   const handleSave = () => {
     if (item) {
-        onSave(newName, hasNoteField ? newNote : undefined);
+        onSave(item.type, item.id, newName, hasNoteField ? newNote : undefined);
     }
     onOpenChange(false);
   };
@@ -62,35 +62,30 @@ export function RenameDialog({
     continent: 'القارة',
     country: 'الدولة',
     coach: 'المدرب',
-    matchStatus: 'حالة المباراة'
   };
 
   const hasNoteField = item?.type === 'team';
   const itemTypeDisplay = item ? itemTypeMap[item.type] : 'العنصر';
-  const isMatchStatus = item?.type === 'matchStatus';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>تعديل {itemTypeDisplay}</DialogTitle>
-           {(hasNoteField || isMatchStatus) && (
+           {hasNoteField && (
              <DialogDescription>
-                {isMatchStatus 
-                    ? "أدخل نصًا مخصصًا ليظهر بدلاً من توقيت المباراة (مثل 'الكلاسيكو'). اتركه فارغًا للعودة للحالة الافتراضية."
-                    : "يمكنك تعديل الاسم المخصص وإضافة ملاحظة إدارية خاصة."
-                }
+                يمكنك تعديل الاسم المخصص وإضافة ملاحظة إدارية خاصة.
              </DialogDescription>
            )}
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="name">{isMatchStatus ? 'الحالة المخصصة' : 'الاسم المخصص'}</Label>
+            <Label htmlFor="name">الاسم المخصص</Label>
             <Input
               id="name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder={isMatchStatus ? 'مثال: الكلاسيكر' : `الاسم الأصلي: ${item?.originalName || item?.name}`}
+              placeholder={`الاسم الأصلي: ${item?.originalName || item?.name}`}
             />
           </div>
           {hasNoteField && (

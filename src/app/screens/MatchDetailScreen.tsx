@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -95,7 +96,7 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
                         <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="flex flex-col items-center justify-center min-w-[120px] text-center">
-                        <LiveMatchStatus fixture={fixture} customStatus={null} large />
+                        <LiveMatchStatus fixture={fixture} large />
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
@@ -622,9 +623,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         setRenameItem({ type, id, name, originalName: originalName || name });
     };
 
-    const handleSaveRename = (newName: string) => {
+    const handleSaveRename = (type: RenameType, id: number, newName: string, originalName?: string) => {
         if (!renameItem || !db) return;
-        const { id, type, originalName } = renameItem;
 
         const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
@@ -687,7 +687,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     isOpen={!!renameItem}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
                     item={renameItem}
-                    onSave={handleSaveRename}
+                    onSave={(newName) => handleSaveRename(renameItem.type, renameItem.id, newName, renameItem.originalName)}
                 />
             )}
 
@@ -708,7 +708,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     <TabsContent value="odds" className="mt-4"><OddsTab fixtureId={fixture.fixture.id} /></TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
                     <TabsContent value="lineups" className="mt-4">
-                        <LineupsTab lineups={lineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename}/>
+                        <LineupsTab lineups={lineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={(type, id, name, originalName) => handleOpenRename(type, id, name, originalName)}/>
                     </TabsContent>
                     <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} navigate={navigate} /></TabsContent>
                 </Tabs>

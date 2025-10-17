@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from '@/components/ui/button';
-import { Search, Star, Pencil, Loader2, Heart } from 'lucide-react';
+import { Search, Star, Pencil, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenProps } from '@/app/page';
@@ -164,7 +165,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     }
   }, [isOpen, fetchFavorites, fetchAllCustomNames]);
 
-  const applyCustomNamesToResults = useCallback((results: SearchResult[]): SearchResult[] => {
+ const applyCustomNamesToResults = useCallback((results: SearchResult[]): SearchResult[] => {
     return results.map(result => {
         if (result.type === 'team') {
             return {
@@ -231,7 +232,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             });
             await Promise.all(customNamePromises);
 
-        } else { // English or mixed search
+        } else {
             const [teamsData, leaguesData] = await Promise.all([
                 fetch(`/api/football/teams?search=${trimmedQuery}`).then(res => res.json()),
                 fetch(`/api/football/leagues?search=${trimmedQuery}`).then(res => res.json()),
@@ -274,47 +275,45 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     const fieldPath = `${type}.${item.id}`;
     const isFavorited = !!favorites?.[type]?.[item.id];
 
-    // Optimistically update UI
     const currentFavorites = { ...favorites };
     if (!currentFavorites[type]) {
       (currentFavorites as any)[type] = {};
     }
 
     if (isFavorited) {
-      delete (currentFavorites[type]as any)[item.id];
+      delete (currentFavorites[type] as any)[item.id];
     } else {
-        const dataToSave: any = { 
+      const idKey = type === 'teams' ? 'teamId' : 'leagueId';
+       (currentFavorites[type] as any)[item.id] = { 
+          [idKey]: item.id, 
           name: item.name, 
-          logo: item.logo || '' 
-        };
-        if (type === 'teams') {
-            dataToSave.teamId = item.id;
-            dataToSave.type = (item as any).national ? 'National' : 'Club';
-        } else {
-            dataToSave.leagueId = item.id;
-        }
-        (currentFavorites[type] as any)[item.id] = dataToSave;
+          logo: item.logo,
+      };
+      if (type === 'teams' && 'national' in item) {
+         (currentFavorites.teams as any)[item.id].type = (item as any).national ? 'National' : 'Club'
+      }
     }
     setFavorites(currentFavorites);
-
+    
     let dataToSave: any = { 
-        name: item.name, 
-        logo: item.logo || '' 
+      name: item.name, 
+      logo: item.logo || '' 
     };
 
     if (type === 'teams') {
         dataToSave.teamId = item.id;
-        dataToSave.type = (item as any).national ? 'National' : 'Club';
+        dataToSave.type = 'national' in item && item.national ? 'National' : 'Club';
     } else {
         dataToSave.leagueId = item.id;
     }
+
 
     const operation = isFavorited
       ? updateDoc(favRef, { [fieldPath]: deleteField() })
       : setDoc(favRef, { [type]: { [item.id]: dataToSave } }, { merge: true });
 
     operation.catch(serverError => {
-      setFavorites(favorites); // Revert on error
+      setFavorites(favorites);
       const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update' });
       errorEmitter.emit('permission-error', permissionError);
     });
@@ -337,21 +336,19 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     setRenameItem({ id, name: currentName, note, type, originalData });
   };
   
-  const handleSaveRename = async (newName: string, newNote?: string) => {
+  const handleSaveRename = async (type: RenameType, id: string | number, newName: string, newNote?: string) => {
     if (!renameItem || !db) return;
-    const { id, type, originalData } = renameItem;
+    const { originalData } = renameItem;
 
     const batch = writeBatch(db);
 
-    // Save Custom Name
     const nameRef = doc(db, `${type}Customizations`, String(id));
     if (newName && newName !== originalData.name) {
         batch.set(nameRef, { customName: newName });
     } else {
-        batch.delete(nameRef); // Delete if name is cleared or same as original
+        batch.delete(nameRef); 
     }
 
-    // Save Admin Note (only for teams)
     if (type === 'team') {
         const noteRef = doc(db, "adminFavorites", String(id));
         if (newNote !== undefined && newNote.length > 0) {
@@ -370,7 +367,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     try {
         await batch.commit();
         toast({ title: 'نجاح', description: 'تم حفظ التغييرات بنجاح.' });
-        await fetchAllCustomNames(); // Refetch all names to update UI
+        await fetchAllCustomNames(); 
         if(debouncedSearchTerm) {
             handleSearch(debouncedSearchTerm);
         }
@@ -451,7 +448,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             isOpen={!!renameItem}
             onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
             item={renameItem}
-            onSave={(name, note) => handleSaveRename(name, note)}
+            onSave={(name, note) => handleSaveRename(renameItem.type, renameItem.id, name, note)}
           />
         )}
       </SheetContent>

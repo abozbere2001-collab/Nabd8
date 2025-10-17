@@ -39,25 +39,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useTranslation } from '@/components/LanguageProvider';
 
 
 type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach';
 
 function SeasonSelector({ season, onSeasonChange, isAdmin }: { season: number, onSeasonChange: (newSeason: number) => void, isAdmin: boolean }) {
-    const { t } = useTranslation();
     if (!isAdmin) {
-        return <p className="text-center text-xs text-muted-foreground pt-2 pb-1">{t('data_for_season')} {season}</p>;
+        return <p className="text-center text-xs text-muted-foreground pt-2 pb-1">عرض بيانات موسم {season}</p>;
     }
 
     const seasons = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + 2 - i);
 
     return (
         <div className="flex items-center justify-center gap-2 px-4 pt-2 pb-1 text-xs text-muted-foreground">
-            <span>{t('view_data_for_season')}</span>
+            <span>عرض بيانات موسم</span>
             <Select value={String(season)} onValueChange={(value) => onSeasonChange(Number(value))}>
                 <SelectTrigger className="w-[100px] h-7 text-xs">
-                    <SelectValue placeholder={t('select_season')} />
+                    <SelectValue placeholder="اختر موسماً" />
                 </SelectTrigger>
                 <SelectContent>
                     {seasons.map(s => (
@@ -75,7 +73,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const { user } = useAuth();
   const { db } = useFirestore();
   const { toast } = useToast();
-  const { t } = useTranslation();
 
   const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || '', leagues: {}, teams: {}, players: {} });
   
@@ -133,7 +130,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const handleCopy = (url: string | null) => {
     if (!url) return;
     navigator.clipboard.writeText(url);
-    toast({ title: t('link_copied'), description: url });
+    toast({ title: "تم نسخ الرابط", description: url });
   };
 
   useEffect(() => {
@@ -313,7 +310,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
     deleteDoc(docRef)
       .then(() => {
-        toast({ title: t('success_title'), description: t('delete_competition_success_desc') });
+        toast({ title: "نجاح", description: "تم حذف البطولة بنجاح." });
         goBack();
       })
       .catch(serverError => {
@@ -344,19 +341,19 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 </Button>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>{t('are_you_sure')}</AlertDialogTitle>
+                        <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                           {t('delete_competition_confirm_desc')}
+                           سيتم حذف هذه البطولة من قائمة البطولات المدارة.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
                         <AlertDialogAction
                             className="bg-destructive hover:bg-destructive/90"
                             onClick={handleDeleteCompetition}
                             disabled={isDeleting}
                         >
-                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('delete')}
+                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "حذف"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -392,10 +389,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
            <div className="sticky top-0 bg-background z-10 border-b">
              <SeasonSelector season={season} onSeasonChange={setSeason} isAdmin={isAdmin} />
              <TabsList className="grid w-full grid-cols-4 rounded-none h-auto p-0 border-t">
-              <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'><Shield className="w-4 h-4 ml-1"/>{t('matches')}</TabsTrigger>
-              <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'><Trophy className="w-4 h-4 ml-1"/>{t('standings')}</TabsTrigger>
-              <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'><BarChart2 className="w-4 h-4 ml-1"/>{t('top_scorers')}</TabsTrigger>
-              <TabsTrigger value="teams" className='rounded-none data-[state=active]:rounded-md'><Users className="w-4 h-4 ml-1"/>{t('teams')}</TabsTrigger>
+              <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
+              <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
+              <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'><BarChart2 className="w-4 h-4 ml-1"/>الهدافين</TabsTrigger>
+              <TabsTrigger value="teams" className='rounded-none data-[state=active]:rounded-md'><Users className="w-4 h-4 ml-1"/>الفرق</TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="matches" className="p-0 mt-0">
@@ -409,7 +406,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                        <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />
                     ))}
                 </div>
-            ) : <p className="pt-4 text-center text-muted-foreground">{t('no_matches_for_season')}</p>}
+            ) : <p className="pt-4 text-center text-muted-foreground">لا توجد مباريات لهذا الموسم.</p>}
           </TabsContent>
           <TabsContent value="standings" className="p-0 mt-0">
             {loading ? (
@@ -421,12 +418,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     <TableHeader>
                         <TableRow>
                             <TableHead className="w-[120px] text-right"></TableHead>
-                            <TableHead className="text-center">{t('points')}</TableHead>
-                            <TableHead className="text-center">{t('loss_short')}</TableHead>
-                            <TableHead className="text-center">{t('draw_short')}</TableHead>
-                            <TableHead className="text-center">{t('win_short')}</TableHead>
-                            <TableHead className="text-center">{t('played_short')}</TableHead>
-                            <TableHead className="text-right w-1/2">{t('team')}</TableHead>
+                            <TableHead className="text-center">نقاط</TableHead>
+                            <TableHead className="text-center">خ</TableHead>
+                            <TableHead className="text-center">ت</TableHead>
+                            <TableHead className="text-center">ف</TableHead>
+                            <TableHead className="text-center">لعب</TableHead>
+                            <TableHead className="text-right w-1/2">الفريق</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -470,7 +467,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                         )})}
                     </TableBody>
                 </Table>
-            ): <p className="pt-4 text-center text-muted-foreground">{t('standings_not_available')}</p>}
+            ): <p className="pt-4 text-center text-muted-foreground">الترتيب غير متاح حالياً.</p>}
           </TabsContent>
            <TabsContent value="scorers" className="p-0 mt-0">
             {loading ? (
@@ -481,9 +478,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="text-right">{t('player')}</TableHead>
-                            <TableHead className="text-right">{t('team')}</TableHead>
-                            <TableHead className="text-center">{t('goals')}</TableHead>
+                            <TableHead className="text-right">اللاعب</TableHead>
+                            <TableHead className="text-right">الفريق</TableHead>
+                            <TableHead className="text-center">الأهداف</TableHead>
                             <TableHead className="text-left w-[90px]"></TableHead>
                         </TableRow>
                     </TableHeader>
@@ -523,7 +520,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                         ))}
                     </TableBody>
                 </Table>
-            ) : <p className="pt-4 text-center text-muted-foreground">{t('top_scorers_not_available')}</p>}
+            ) : <p className="pt-4 text-center text-muted-foreground">قائمة الهدافين غير متاحة.</p>}
           </TabsContent>
           <TabsContent value="teams" className="mt-0">
             {loading ? (
@@ -563,7 +560,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                         </div>
                     )})}
                 </div>
-            ) : <p className="pt-4 text-center text-muted-foreground">{t('teams_not_available')}</p>}
+            ) : <p className="pt-4 text-center text-muted-foreground">الفرق غير متاحة.</p>}
         </TabsContent>
         </Tabs>
       </div>

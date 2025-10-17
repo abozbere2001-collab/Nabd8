@@ -8,14 +8,14 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Sun, Moon, Laptop, Gem, UserCog, Languages, Crown } from 'lucide-react';
+import { Sun, Moon, Laptop, Gem, UserCog } from 'lucide-react';
 import { useAuth, useAdmin } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
 export function GeneralSettingsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
   const { theme, setTheme } = useTheme();
-  const { isProUser, setProUser } = useAuth();
+  const { isProUser } = useAuth();
   const { isAdmin, makeAdmin } = useAdmin();
   const { toast } = useToast();
 
@@ -79,9 +79,8 @@ export function GeneralSettingsScreen({ navigate, goBack, canGoBack, headerActio
                     الترقية إلى النسخة الإحترافية
                 </Button>
             )}
-             {isAdmin && (
+             {!isAdmin && (
                 <Button onClick={handleMakeAdmin} className="w-full">
-                    <Crown className="ml-2 h-4 w-4" />
                     {"ترقية إلى حساب مدير"}
                 </Button>
             )}
