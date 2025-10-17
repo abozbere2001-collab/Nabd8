@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -163,11 +164,14 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
     const [loading, setLoading] = useState(true);
     const { t } = useTranslation();
     const { db } = useFirestore();
-    const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>}>({leagues: new Map(), teams: new Map()});
+    const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>} | null>(null);
 
 
      const fetchAllCustomNames = useCallback(async () => {
-        if (!db) return;
+        if (!db) {
+            setCustomNames({ leagues: new Map(), teams: new Map() });
+            return;
+        }
         try {
             const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
                 getDocs(collection(db, 'leagueCustomizations')),
@@ -183,13 +187,9 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
             setCustomNames({ leagues: leagueNames, teams: teamNames });
         } catch(error) {
              console.warn("Could not fetch custom names, this is expected for non-admins", error);
+             setCustomNames({ leagues: new Map(), teams: new Map() });
         }
     }, [db]);
-
-    const getDisplayName = useCallback((type: 'team' | 'league', id: number, defaultName: string) => {
-      const key = `${type}s` as 'teams' | 'leagues';
-      return customNames[key]?.get(id) || defaultName;
-    }, [customNames]);
     
     useEffect(() => {
         const fetchData = async () => {
@@ -224,8 +224,15 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
         };
         fetchData();
     }, [teamId, fetchAllCustomNames]);
+
+    const getDisplayName = useCallback((type: 'team' | 'league', id: number, defaultName: string) => {
+        if (!customNames) return defaultName;
+        const key = `${type}s` as 'teams' | 'leagues';
+        return customNames[key]?.get(id) || defaultName;
+    }, [customNames]);
     
-    if (loading) {
+    
+    if (loading || customNames === null) {
          return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
 
@@ -433,3 +440,4 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
+

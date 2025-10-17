@@ -265,7 +265,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
   
-  const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string> }>({ leagues: new Map(), teams: new Map() });
+  const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string> } | null>(null);
   const [customStatuses, setCustomStatuses] = useState<{ [key: number]: string | null }>({});
 
   const [fixturesCache, setFixturesCache] = useState<Cache<FixtureType[]>>({});
@@ -345,36 +345,34 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
       setCustomNames({ leagues: leagueNames, teams: teamNames });
     } catch (error) {
       console.warn("Could not fetch custom names, this is expected for non-admins", error);
+      setCustomNames({ leagues: new Map(), teams: new Map() }); // Ensure it's not null
     }
   }, [db]);
 
+  // Load custom names on mount
   useEffect(() => {
     fetchAllCustomNames();
   }, [fetchAllCustomNames]);
-
   
-  const applyCustomNames = useCallback((fixtures: FixtureType[]): FixtureType[] => {
-    if (customNames.leagues.size === 0 && customNames.teams.size === 0) {
-      return fixtures;
-    }
+  const applyCustomNames = useCallback((fixtures: FixtureType[], names: { leagues: Map<number, string>, teams: Map<number, string> }): FixtureType[] => {
     return fixtures.map(fixture => ({
       ...fixture,
       league: {
         ...fixture.league,
-        name: customNames.leagues.get(fixture.league.id) || fixture.league.name
+        name: names.leagues.get(fixture.league.id) || fixture.league.name
       },
       teams: {
         home: {
           ...fixture.teams.home,
-          name: customNames.teams.get(fixture.teams.home.id) || fixture.teams.home.name
+          name: names.teams.get(fixture.teams.home.id) || fixture.teams.home.name
         },
         away: {
           ...fixture.teams.away,
-          name: customNames.teams.get(fixture.teams.away.id) || fixture.teams.away.name
+          name: names.teams.get(fixture.teams.away.id) || fixture.teams.away.name
         }
       }
     }));
-  }, [customNames]);
+  }, []);
   
   const fetchFixturesForDate = useCallback(async (dateKey: string) => {
     if (fixturesCache[dateKey]) {
@@ -421,18 +419,18 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   
   useEffect(() => {
-    if(activeTab === 'my-results') {
+    if(activeTab === 'my-results' && customNames) {
         fetchFixturesForDate(selectedDateKey);
     }
-  }, [selectedDateKey, fetchFixturesForDate, activeTab]);
+  }, [selectedDateKey, fetchFixturesForDate, activeTab, customNames]);
 
   useEffect(() => {
-    if (activeTab === 'live' && isVisible) {
+    if (activeTab === 'live' && isVisible && customNames) {
         fetchLiveFixtures(); // Fetch immediately
         const interval = setInterval(fetchLiveFixtures, 60000); // And every minute
         return () => clearInterval(interval);
     }
-  }, [activeTab, fetchLiveFixtures, isVisible]);
+  }, [activeTab, fetchLiveFixtures, isVisible, customNames]);
 
 
   const handleDateChange = (dateKey: string) => {
@@ -450,8 +448,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
     
   const rawFixtures = activeTab === 'live' ? liveFixtures : (fixturesCache[selectedDateKey] || []);
-  const currentFixtures = useMemo(() => applyCustomNames(rawFixtures), [rawFixtures, applyCustomNames]);
-  const isLoading = activeTab === 'live' ? loadingLive : loadingFixtures;
+  const currentFixtures = useMemo(() => {
+      if (!customNames) return [];
+      return applyCustomNames(rawFixtures, customNames)
+    }, [rawFixtures, applyCustomNames, customNames]);
+  const isLoading = activeTab === 'live' ? loadingLive : loadingFixtures || !customNames;
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -522,3 +523,4 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
