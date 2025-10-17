@@ -352,6 +352,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         // Step 1: Ensure custom names are loaded
         let names = customNames;
         if (!names) {
+            if (!db) { setLoading(false); return; }
             const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
                 getDocs(collection(db, 'leagueCustomizations')),
                 getDocs(collection(db, 'teamCustomizations'))
@@ -376,9 +377,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             if (!response.ok) throw new Error(`Failed to fetch fixtures from ${url}`);
             const data = await response.json();
             rawFixtures = data.response || [];
-            if (!isLiveFetch) {
-                 setFixturesCache(prev => ({ ...prev, [dateKey]: rawFixtures }));
-            }
         }
         
         // Step 3: Apply translations and update state

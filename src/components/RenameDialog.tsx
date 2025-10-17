@@ -50,14 +50,9 @@ export function RenameDialog({
 
   const handleSave = () => {
     if (item) {
-       // For matchStatus, it's okay to save an empty string to clear it
-      if (item.type === 'matchStatus') {
-        onSave(newName.trim());
-      } else {
-        onSave(newName.trim(), item.type === 'team' ? newNote.trim() : undefined);
-      }
-      onOpenChange(false);
+        onSave(newName, hasNoteField ? newNote : undefined);
     }
+    onOpenChange(false);
   };
 
   const itemTypeMap: Record<ItemType, string> = {

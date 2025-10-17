@@ -12,19 +12,21 @@ import { LiveMatchStatus } from './LiveMatchStatus';
 // Explicitly define components for Home and Away teams to avoid any ambiguity
 const HomeTeamDisplay = ({ team }: { team: FixtureType['teams']['home'] }) => (
     <div className="flex items-center gap-2 justify-end truncate">
-        <span className="font-semibold text-[10px] truncate">{team.name}</span>
-        <Avatar className={'h-4 w-4'}>
+        <span className="font-semibold text-sm truncate">{team.name}</span>
+        <Avatar className={'h-6 w-6'}>
             <AvatarImage src={team.logo} alt={team.name} />
+             <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
         </Avatar>
     </div>
 );
 
 const AwayTeamDisplay = ({ team }: { team: FixtureType['teams']['away'] }) => (
     <div className="flex items-center gap-2 justify-start truncate">
-        <Avatar className={'h-4 w-4'}>
+        <Avatar className={'h-6 w-6'}>
             <AvatarImage src={team.logo} alt={team.name} />
+            <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
         </Avatar>
-        <span className="font-semibold text-[10px] truncate">{team.name}</span>
+        <span className="font-semibold text-sm truncate">{team.name}</span>
     </div>
 );
 
