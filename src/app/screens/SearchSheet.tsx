@@ -44,12 +44,14 @@ type RenameType = 'league' | 'team';
 
 // Helper function to normalize Arabic text for searching
 const normalizeArabic = (text: string) => {
+  if (!text) return '';
   return text
     .replace(/[\u064B-\u0652]/g, "") // Remove harakat
     .replace(/[أإآ]/g, "ا")
     .replace(/ة/g, "ه")
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .toLowerCase();
 };
 
 
@@ -182,18 +184,22 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         // 1. Client-side search for custom names (Arabic search)
         const normalizedQuery = normalizeArabic(trimmedQuery);
         const matchedTeamIds: string[] = [];
-        customNames.teams.forEach((name, id) => {
-            if (normalizeArabic(name).includes(normalizedQuery)) {
-                matchedTeamIds.push(String(id));
-            }
-        });
-
+        if (customNames.teams.size > 0) {
+            customNames.teams.forEach((name, id) => {
+                if (normalizeArabic(name).includes(normalizedQuery)) {
+                    matchedTeamIds.push(String(id));
+                }
+            });
+        }
+        
         const matchedLeagueIds: string[] = [];
-        customNames.leagues.forEach((name, id) => {
-            if (normalizeArabic(name).includes(normalizedQuery)) {
-                matchedLeagueIds.push(String(id));
-            }
-        });
+        if (customNames.leagues.size > 0) {
+            customNames.leagues.forEach((name, id) => {
+                if (normalizeArabic(name).includes(normalizedQuery)) {
+                    matchedLeagueIds.push(String(id));
+                }
+            });
+        }
         
         // Fetch details for matched custom names
         const teamPromises = matchedTeamIds.map(async teamId => {
@@ -219,10 +225,10 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         // 2. Search external API with original query (English search)
         const [teamsRes, leaguesRes] = await Promise.all([
             fetch(`/api/football/teams?search=${trimmedQuery}`),
-            fetch(`/api/football/leagues?search=${trimmedQuery}`)
+            fetch(`/api/football/leagues?search=${trimmedQuery}`),
+            ...teamPromises,
+            ...leaguePromises
         ]);
-        
-        await Promise.all([...teamPromises, ...leaguePromises]);
 
         const teamsData = await teamsRes.json();
         const leaguesData = await leaguesRes.json();
@@ -251,6 +257,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
       setLoading(false);
     }
   }, [customNames.teams, customNames.leagues, toast]);
+
 
   useEffect(() => {
     if (debouncedSearchTerm && isOpen) {
@@ -453,3 +460,5 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
+
+    
