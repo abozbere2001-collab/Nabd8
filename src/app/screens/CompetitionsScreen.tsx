@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -19,14 +18,12 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { useTranslation } from '@/components/LanguageProvider';
 
 // --- MAIN SCREEN COMPONENT ---
 export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user } = useAuth();
     const { db } = useFirestore();
     const { toast } = useToast();
-    const { t } = useTranslation();
     const [favorites, setFavorites] = useState<Favorites | null>(null);
     const [loading, setLoading] = useState(true);
     const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string> }>({ leagues: new Map(), teams: new Map() });
@@ -103,7 +100,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     return (
         <div className="flex h-full flex-col bg-background">
              <ScreenHeader 
-                title={t('my_choices')} 
+                title={"اختياراتي"} 
                 onBack={goBack} 
                 canGoBack={canGoBack} 
                 actions={
@@ -128,7 +125,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                             <Plus className="h-6 w-6 text-primary" />
                                         </div>
                                       </SearchSheet>
-                                      <span className="text-xs font-medium truncate w-full text-primary">{t('add')}</span>
+                                      <span className="text-xs font-medium truncate w-full text-primary">أضف</span>
                                 </div>
                                 {favoriteTeams.map((team, index) => (
                                     <div key={`${team.teamId}-${index}`} className="relative flex flex-col items-center gap-2 w-20 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.teamId })}>
@@ -146,9 +143,9 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
 
                         <Tabs defaultValue="teams" className="w-full px-4">
                              <TabsList className="grid w-full grid-cols-3 bg-card text-card-foreground">
-                                <TabsTrigger value="players"><PlayerIcon className="ml-1 h-4 w-4"/>{t('players')}</TabsTrigger>
-                                <TabsTrigger value="competitions"><Trophy className="ml-1 h-4 w-4"/>{t('competitions')}</TabsTrigger>
-                                <TabsTrigger value="teams"><Users className="ml-1 h-4 w-4"/>{t('teams')}</TabsTrigger>
+                                <TabsTrigger value="players"><PlayerIcon className="ml-1 h-4 w-4"/>اللاعبين</TabsTrigger>
+                                <TabsTrigger value="competitions"><Trophy className="ml-1 h-4 w-4"/>البطولات</TabsTrigger>
+                                <TabsTrigger value="teams"><Users className="ml-1 h-4 w-4"/>الفرق</TabsTrigger>
                             </TabsList>
                             
                             <TabsContent value="teams" className="mt-4">
@@ -209,7 +206,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                         </div>
                                      </div>
                                      <div className="h-[76px] w-full col-span-3 flex items-center justify-center">
-                                        <p className="text-muted-foreground text-center text-sm">{t('favorite_players_soon')}</p>
+                                        <p className="text-muted-foreground text-center text-sm">قائمة اللاعبين المفضلين قيد التطوير.</p>
                                      </div>
                                 </div>
                             </TabsContent>
@@ -220,5 +217,3 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         </div>
     );
 }
-
-    

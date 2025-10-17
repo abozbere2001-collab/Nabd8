@@ -20,7 +20,6 @@ import { ProfileButton } from '../AppContentWrapper';
 import { FixtureItem } from '@/components/FixtureItem';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { Card, CardContent } from '@/components/ui/card';
-import { useTranslation } from '@/components/LanguageProvider';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -87,14 +86,13 @@ function OurLeagueTab({
     loading: boolean,
     isAdmin: boolean
 }) {
-    const { t } = useTranslation();
     return (
         <Tabs defaultValue="matches" className="w-full">
             <div className="sticky top-0 bg-background z-10 border-b -mx-4 px-4">
                 <TabsList className="grid w-full grid-cols-3 rounded-none h-auto p-0 border-t flex-row-reverse">
-                    <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'>{t('top_scorers')}</TabsTrigger>
-                    <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'>{t('standings')}</TabsTrigger>
-                    <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>{t('matches')}</TabsTrigger>
+                    <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'>الهدافين</TabsTrigger>
+                    <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'>الترتيب</TabsTrigger>
+                    <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>المباريات</TabsTrigger>
                 </TabsList>
             </div>
             <TabsContent value="matches" className="p-4 mt-0 -mx-4">
@@ -319,7 +317,6 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [topScorers, setTopScorers] = useState<ManualTopScorer[]>([]);
   const { isAdmin } = useAdmin();
   const { db } = useFirestore();
-  const { t } = useTranslation();
   const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
   const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
 
@@ -407,7 +404,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader 
-        title={t('iraq')} 
+        title={"العراق"} 
         onBack={goBack} 
         canGoBack={canGoBack} 
         actions={
@@ -446,8 +443,8 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         <Tabs defaultValue="our-league" className="w-full">
           <div className="sticky top-0 bg-background z-10">
             <TabsList className="grid w-full grid-cols-2 flex-row-reverse">
-              <TabsTrigger value="our-ball">{t('our_ball')}</TabsTrigger>
-              <TabsTrigger value="our-league">{t('our_league')}</TabsTrigger>
+              <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
+              <TabsTrigger value="our-league">دورينا</TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="our-league" className="pt-0">

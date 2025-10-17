@@ -12,34 +12,32 @@ import { Sun, Moon, Laptop, Gem, UserCog, Languages, Crown } from 'lucide-react'
 import { useAuth, useAdmin } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useTranslation } from '@/components/LanguageProvider';
 
 export function GeneralSettingsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
   const { theme, setTheme } = useTheme();
   const { isProUser, setProUser } = useAuth();
   const { isAdmin, makeAdmin } = useAdmin();
   const { toast } = useToast();
-  const { t, setLanguage, language } = useTranslation();
 
   const handleMakeAdmin = async () => {
     await makeAdmin();
     toast({
-        title: t('upgrade_success_title'),
-        description: t('upgrade_success_desc'),
+        title: "تمت الترقية!",
+        description: "لقد حصلت على صلاحيات المدير.",
     });
   }
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title={t('general_settings')} onBack={goBack} canGoBack={true} actions={headerActions} />
+      <ScreenHeader title={"الإعدادات العامة"} onBack={goBack} canGoBack={true} actions={headerActions} />
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
               <Sun className="h-6 w-6" />
               <div>
-                <CardTitle>{t('appearance')}</CardTitle>
-                <CardDescription>{t('appearance_desc')}</CardDescription>
+                <CardTitle>{"مظهر التطبيق"}</CardTitle>
+                <CardDescription>{"اختر المظهر المفضل لديك."}</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -48,45 +46,29 @@ export function GeneralSettingsScreen({ navigate, goBack, canGoBack, headerActio
               <Label htmlFor="light" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">
                 <RadioGroupItem value="light" id="light" className="sr-only" />
                 <Sun className="mb-2 h-5 w-5" />
-                {t('light')}
+                {"فاتح"}
               </Label>
               <Label htmlFor="dark" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">
                 <RadioGroupItem value="dark" id="dark" className="sr-only" />
                 <Moon className="mb-2 h-5 w-5" />
-                {t('dark')}
+                {"داكن"}
               </Label>
               <Label htmlFor="system" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">
                 <RadioGroupItem value="system" id="system" className="sr-only" />
                 <Laptop className="mb-2 h-5 w-5" />
-                {t('system')}
+                {"النظام"}
               </Label>
             </RadioGroup>
           </CardContent>
         </Card>
         
         <Card>
-            <CardHeader>
-                <div className="flex items-center gap-3">
-                    <Languages className="h-6 w-6" />
-                    <div>
-                        <CardTitle>{t('app_language')}</CardTitle>
-                        <CardDescription>{t('app_language_desc')}</CardDescription>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="flex gap-4">
-                <Button variant={language === 'ar' ? 'default' : 'outline'} className="flex-1" onClick={() => setLanguage('ar')}>العربية</Button>
-                <Button variant={language === 'en' ? 'default' : 'outline'} className="flex-1" onClick={() => setLanguage('en')}>English</Button>
-            </CardContent>
-        </Card>
-
-        <Card>
            <CardHeader>
                 <div className="flex items-center gap-3">
                     <UserCog className="h-6 w-6" />
                     <div>
-                        <CardTitle>{t('account_settings')}</CardTitle>
-                        <CardDescription>{t('account_settings_desc')}</CardDescription>
+                        <CardTitle>{"إعدادات الحساب"}</CardTitle>
+                        <CardDescription>{"قم بترقية حسابك أو تعديل صلاحياتك."}</CardDescription>
                     </div>
                 </div>
             </CardHeader>
@@ -100,7 +82,7 @@ export function GeneralSettingsScreen({ navigate, goBack, canGoBack, headerActio
              {isAdmin && (
                 <Button onClick={handleMakeAdmin} className="w-full">
                     <Crown className="ml-2 h-4 w-4" />
-                    {t('upgrade_to_admin')}
+                    {"ترقية إلى حساب مدير"}
                 </Button>
             )}
           </CardContent>

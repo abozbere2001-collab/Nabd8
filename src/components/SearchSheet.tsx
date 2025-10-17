@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -25,7 +24,6 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
 import { POPULAR_TEAMS, POPULAR_LEAGUES } from '@/lib/popular-data';
-import { useTranslation } from './LanguageProvider';
 
 interface TeamResult {
   team: { id: number; name: string; logo: string; national?: boolean; };
@@ -92,7 +90,6 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   const { user } = useAuth();
   const { db } = useFirestore();
   const { toast } = useToast();
-  const { t } = useTranslation();
   const [favorites, setFavorites] = useState<Favorites>({ userId: '' });
   const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>, adminNotes: Map<number, string>}>({leagues: new Map(), teams: new Map(), adminNotes: new Map() });
   
@@ -292,7 +289,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         };
         if (type === 'teams') {
             dataToSave.teamId = item.id;
-            dataToSave.type = item.national ? 'National' : 'Club';
+            dataToSave.type = (item as any).national ? 'National' : 'Club';
         } else {
             dataToSave.leagueId = item.id;
         }
@@ -307,7 +304,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
     if (type === 'teams') {
         dataToSave.teamId = item.id;
-        dataToSave.type = item.national ? 'National' : 'Club';
+        dataToSave.type = (item as any).national ? 'National' : 'Club';
     } else {
         dataToSave.leagueId = item.id;
     }
@@ -428,7 +425,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
       <SheetTrigger asChild onClick={(e) => { e.stopPropagation(); setIsOpen(true) }}>{children}</SheetTrigger>
       <SheetContent side="bottom" className="flex flex-col h-[90vh] top-0 rounded-t-none">
         <SheetHeader>
-          <SheetTitle>{t('search')}</SheetTitle>
+          <SheetTitle>اكتشف</SheetTitle>
         </SheetHeader>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -441,8 +438,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         </div>
         {!debouncedSearchTerm && (
              <div className="flex items-center justify-center pt-2">
-                <Button variant={itemType === 'teams' ? 'secondary' : 'ghost'} size="sm" onClick={() => setItemType('teams')}>{t('teams')}</Button>
-                <Button variant={itemType === 'leagues' ? 'secondary' : 'ghost'} size="sm" onClick={() => setItemType('leagues')}>{t('competitions')}</Button>
+                <Button variant={itemType === 'teams' ? 'secondary' : 'ghost'} size="sm" onClick={() => setItemType('teams')}>الفرق</Button>
+                <Button variant={itemType === 'leagues' ? 'secondary' : 'ghost'} size="sm" onClick={() => setItemType('leagues')}>البطولات</Button>
             </div>
         )}
         <div className="mt-4 flex-1 overflow-y-auto space-y-1 pr-2">
@@ -461,4 +458,3 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
-

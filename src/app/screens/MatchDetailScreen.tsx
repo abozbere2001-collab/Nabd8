@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -12,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType, MatchCustomization } from '@/lib/types';
+import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
@@ -20,7 +19,6 @@ import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { OddsTab } from '@/components/OddsTab';
-import { useTranslation } from '@/components/LanguageProvider';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
 import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection, onSnapshot, getDoc } from 'firebase/firestore';
@@ -29,11 +27,10 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 
-type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'matchStatus';
+type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country';
 
 
 const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerType, navigate: ScreenProps['navigate'], onRename: () => void, isAdmin: boolean }) => {
-    const { t } = useTranslation();
     const fallbackImage = "https://media.api-sports.io/football/players/0.png";
     const playerImage = player.photo && player.photo.trim() !== '' ? player.photo : fallbackImage;
 
@@ -75,13 +72,13 @@ const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerTyp
                     </div>
                 )}
             </div>
-            <span className="mt-1 text-[10px] font-semibold text-center truncate w-16">{player?.name || t('unknown')}</span>
+            <span className="mt-1 text-[10px] font-semibold text-center truncate w-16">{player?.name || "غير معروف"}</span>
         </div>
     );
 };
 
 
-const MatchHeaderCard = ({ fixture, navigate, onRename, customStatus, isAdmin }: { fixture: Fixture, navigate: ScreenProps['navigate'], onRename: () => void, customStatus: string | null, isAdmin: boolean }) => {
+const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
     return (
         <Card className="mb-4 bg-card/80 backdrop-blur-sm">
             <CardContent className="p-4">
@@ -98,12 +95,7 @@ const MatchHeaderCard = ({ fixture, navigate, onRename, customStatus, isAdmin }:
                         <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="flex flex-col items-center justify-center min-w-[120px] text-center">
-                        <LiveMatchStatus fixture={fixture} customStatus={customStatus} large />
-                         {isAdmin && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 mt-1" onClick={onRename}>
-                                <Pencil className="h-3 w-3" />
-                            </Button>
-                        )}
+                        <LiveMatchStatus fixture={fixture} customStatus={null} large />
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
@@ -116,7 +108,6 @@ const MatchHeaderCard = ({ fixture, navigate, onRename, customStatus, isAdmin }:
 };
 
 const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statistics: MatchStatistics[] | null }) => {
-    const { t } = useTranslation();
     if (!fixture) return <Skeleton className="h-40 w-full" />;
 
     const homeStats = statistics?.find(s => s.team.id === fixture.teams.home.id)?.statistics || [];
@@ -125,16 +116,16 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
     const findStat = (stats: any[], type: string) => stats.find(s => s.type === type)?.value ?? '0';
 
     const statMapping: { labelKey: string; type: string; isProgress?: boolean }[] = [
-      { labelKey: 'possession', type: "Ball Possession", isProgress: true },
-      { labelKey: 'total_shots', type: "Total Shots" },
-      { labelKey: 'shots_on_goal', type: "Shots on Goal" },
-      { labelKey: 'shots_off_goal', type: "Shots off Goal" },
-      { labelKey: 'blocked_shots', type: "Blocked Shots"},
-      { labelKey: 'fouls', type: "Fouls" },
-      { labelKey: 'yellow_cards', type: "Yellow Cards" },
-      { labelKey: 'red_cards', type: "Red Cards" },
-      { labelKey: 'corner_kicks', type: "Corner Kicks" },
-      { labelKey: 'offsides', type: "Offsides" },
+      { labelKey: "الاستحواذ", type: "Ball Possession", isProgress: true },
+      { labelKey: "التسديدات", type: "Total Shots" },
+      { labelKey: "تسديدات على المرمى", type: "Shots on Goal" },
+      { labelKey: "تسديدات خارج المرمى", type: "Shots off Goal" },
+      { labelKey: "تسديدات محجوبة", type: "Blocked Shots"},
+      { labelKey: "الأخطاء", type: "Fouls" },
+      { labelKey: "البطاقات الصفراء", type: "Yellow Cards" },
+      { labelKey: "البطاقات الحمراء", type: "Red Cards" },
+      { labelKey: "الركنيات", type: "Corner Kicks" },
+      { labelKey: "التسلل", type: "Offsides" },
     ];
 
     return (
@@ -142,23 +133,23 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
             <Card>
                 <CardContent className="p-4 text-sm">
                     <div className="flex justify-between py-2 border-b">
-                        <span className="font-semibold">{fixture.fixture.venue.name || t('not_specified')}</span>
-                        <span className="text-muted-foreground">{t('stadium')}</span>
+                        <span className="font-semibold">{fixture.fixture.venue.name || "غير محدد"}</span>
+                        <span className="text-muted-foreground">الملعب</span>
                     </div>
                     <div className="flex justify-between py-2 border-b">
                         <span className="font-semibold">{fixture.league.round}</span>
-                        <span className="text-muted-foreground">{t('round')}</span>
+                        <span className="text-muted-foreground">الجولة</span>
                     </div>
                     <div className="flex justify-between py-2">
-                        <span className="font-semibold">{t(fixture.fixture.status.long.toLowerCase().replace(/ /g, '_')) || fixture.fixture.status.long}</span>
-                        <span className="text-muted-foreground">{t('status')}</span>
+                        <span className="font-semibold">{fixture.fixture.status.long}</span>
+                        <span className="text-muted-foreground">الحالة</span>
                     </div>
                 </CardContent>
             </Card>
 
             <Card>
                 <CardContent className="p-4 space-y-4">
-                    <h3 className="font-bold text-center">{t('match_stats')}</h3>
+                    <h3 className="font-bold text-center">إحصائيات المباراة</h3>
                     {statistics === null ? (
                         <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
                     ) : statistics.length > 0 ? (
@@ -173,7 +164,7 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                                     <div key={stat.type} className="space-y-2">
                                         <div className="flex justify-between items-center text-xs font-bold">
                                             <span>{homeValueRaw}</span>
-                                            <span className="text-muted-foreground">{t(stat.labelKey)}</span>
+                                            <span className="text-muted-foreground">{stat.labelKey}</span>
                                             <span>{awayValueRaw}</span>
                                         </div>
                                         <div className="flex items-center gap-1" dir="ltr">
@@ -186,13 +177,13 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
                                     <span>{homeValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{t(stat.labelKey)}</span>
+                                    <span className="text-muted-foreground font-normal">{stat.labelKey}</span>
                                     <span>{awayValueRaw}</span>
                                 </div>
                             )
                         })
                     ) : (
-                       <p className="text-center text-muted-foreground p-4">{t('stats_not_available')}</p>
+                       <p className="text-center text-muted-foreground p-4">الإحصائيات غير متاحة لهذه المباراة.</p>
                     )}
                 </CardContent>
             </Card>
@@ -202,7 +193,6 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
 
 
 const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: MatchEvent[] | null, homeTeamId: number, highlightsOnly: boolean }) => {
-    const { t } = useTranslation();
     if (!events) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     
     const filteredEvents = useMemo(() => {
@@ -211,7 +201,7 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
     }, [events, highlightsOnly]);
 
     if (filteredEvents.length === 0) {
-        const message = highlightsOnly ? t('no_goals_or_red_cards') : t('no_major_events_yet');
+        const message = highlightsOnly ? "لا توجد أهداف أو بطاقات حمراء." : "لا توجد أحداث رئيسية في المباراة بعد.";
         return <p className="text-center text-muted-foreground p-8">{message}</p>;
     }
 
@@ -243,7 +233,7 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                         {event.type === 'subst' && event.assist.name ? (
                                              <div className={cn("flex items-center gap-1 text-xs text-muted-foreground", isHomeEvent ? "flex-row-reverse" : "")}>
                                                 {isHomeEvent ? <ArrowUp className="h-3 w-3 text-green-500"/> : <ArrowDown className="h-3 w-3 text-red-500"/>}
-                                                <span>{t('substitution_for')} {event.assist.name}</span>
+                                                <span>تبديل بـ {event.assist.name}</span>
                                              </div>
                                         ) : (
                                             <p className="text-xs text-muted-foreground">{event.detail}</p>
@@ -264,12 +254,11 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
 };
 
 const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; homeTeamId: number }) => {
-    const { t } = useTranslation();
     return (
         <Tabs defaultValue="highlights" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="highlights">{t('highlights')}</TabsTrigger>
-                <TabsTrigger value="all">{t('all_events')}</TabsTrigger>
+                <TabsTrigger value="highlights">الأبرز</TabsTrigger>
+                <TabsTrigger value="all">كل الأحداث</TabsTrigger>
             </TabsList>
             <TabsContent value="highlights">
                 <TimelineTabContent events={events} homeTeamId={homeTeamId} highlightsOnly={true} />
@@ -282,7 +271,6 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
 }
 
 const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string, originalName: string) => void }) => {
-    const { t } = useTranslation();
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
     if (lineups === null) {
@@ -290,13 +278,13 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
     }
     
     if (lineups.length < 2) {
-        return <p className="text-center text-muted-foreground p-8">{t('lineups_not_available')}</p>;
+        return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     }
 
     const home = lineups.find(l => l.team.id === lineups[0].team.id);
     const away = lineups.find(l => l.team.id !== lineups[0].team.id);
     
-    if (!home || !away) return <p className="text-center text-muted-foreground p-8">{t('lineups_incomplete')}</p>;
+    if (!home || !away) return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
 
     const activeLineup = activeTeamTab === 'home' ? home : away;
     
@@ -352,12 +340,12 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                 </TabsList>
             </Tabs>
             
-            <div className="font-bold text-center text-muted-foreground text-sm">{t('formation')}: {activeLineup.formation}</div>
+            <div className="font-bold text-center text-muted-foreground text-sm">التشكيلة: {activeLineup.formation}</div>
             
             {renderPitch(activeLineup)}
             
             <div className="bg-background">
-                <h3 className="text-center text-base font-bold mb-2">{t('substitutes_and_changes')}</h3>
+                <h3 className="text-center text-base font-bold mb-2">الاحتياط والتبديلات</h3>
                 <div className="bg-card/50 space-y-2 mb-4 rounded-lg p-2" style={{backgroundColor: '#000000'}}>
                     {substitutionEvents.map((event, index) => {
                         const playerOut = event.player;
@@ -389,7 +377,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             
                 <Card>
                     <CardContent className="p-3 text-center">
-                        <h3 className="font-bold text-sm mb-2">{t('coach')}</h3>
+                        <h3 className="font-bold text-sm mb-2">المدرب</h3>
                         <div className="relative inline-flex flex-col items-center gap-1">
                             <Avatar className="h-12 w-12">
                                 <AvatarImage src={activeLineup.coach.photo} />
@@ -428,19 +416,18 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
 
 
 const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] | null, fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
-    const { t } = useTranslation();
     if (!standings) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    if (standings.length === 0) return <p className="text-center text-muted-foreground p-8">{t('standings_not_available')}</p>;
+    if (standings.length === 0) return <p className="text-center text-muted-foreground p-8">جدول الترتيب غير متاح حاليًا.</p>;
     
     return (
         <Table>
             <TableHeader>
                 <TableRow>
                     <TableHead className="w-[40px]">#</TableHead>
-                    <TableHead className="w-1/2 text-right">{t('team')}</TableHead>
-                    <TableHead className="text-center">{t('played_short')}</TableHead>
-                    <TableHead className="text-center">{t('w_d_l')}</TableHead>
-                    <TableHead className="text-center">{t('points')}</TableHead>
+                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                    <TableHead className="text-center">لعب</TableHead>
+                    <TableHead className="text-center">ف/ت/خ</TableHead>
+                    <TableHead className="text-center">نقاط</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -516,9 +503,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [events, setEvents] = useState<MatchEvent[] | null>(null);
     const [statistics, setStatistics] = useState<MatchStatistics[] | null>(null);
     const [standings, setStandings] = useState<Standing[] | null>(null);
-    const [customStatus, setCustomStatus] = useState<string | null>(null);
     const [loading, setLoading] = useState(!initialFixture);
-    const { t } = useTranslation();
     const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> }>({});
 
@@ -632,45 +617,14 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     }, [db, fixture?.fixture.id, applyCustomNamesToFixture]);
 
 
-    useEffect(() => {
-        if (!db || !fixtureId) return;
-        const unsub = onSnapshot(doc(db, "matchCustomizations", String(fixtureId)), (doc) => {
-            if (doc.exists()) {
-                setCustomStatus(doc.data()?.customStatus || null);
-            } else {
-                setCustomStatus(null);
-            }
-        }, (error) => {
-            console.error("Failed to listen to custom match status:", error);
-        });
-        return () => unsub();
-    }, [db, fixtureId]);
     
     const handleOpenRename = (type: RenameType, id: number, name: string, originalName?: string) => {
         setRenameItem({ type, id, name, originalName: originalName || name });
     };
 
-    const handleSaveRename = (newName: string, newNote?:string) => {
+    const handleSaveRename = (newName: string) => {
         if (!renameItem || !db) return;
         const { id, type, originalName } = renameItem;
-
-        if (type === 'matchStatus') {
-            const docRef = doc(db, 'matchCustomizations', String(id));
-            if(newName && newName.trim().length > 0) {
-                setDoc(docRef, { customStatus: newName }).catch(serverError => {
-                    const permissionError = new FirestorePermissionError({path: docRef.path, operation: 'create', requestResourceData: {customStatus: newName}});
-                    errorEmitter.emit('permission-error', permissionError);
-                });
-            } else {
-                deleteDoc(docRef).catch(serverError => {
-                     const permissionError = new FirestorePermissionError({path: docRef.path, operation: 'delete'});
-                     errorEmitter.emit('permission-error', permissionError);
-                });
-            }
-            toast({ title: "نجاح", description: "تم تحديث حالة المباراة." });
-            setRenameItem(null);
-            return;
-        }
 
         const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
@@ -679,7 +633,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         if(newName && newName !== originalName) {
             setDoc(docRef, data)
                 .then(() => {
-                    toast({ title: t('success_title'), description: `تم تحديث اسم ${type === 'player' ? 'اللاعب' : 'المدرب'}.` });
+                    toast({ title: "نجاح", description: `تم تحديث اسم ${type === 'player' ? 'اللاعب' : 'المدرب'}.` });
                     fetchData(false); // Refetch data to show updated name
                 })
                 .catch(serverError => {
@@ -693,7 +647,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         } else {
             // If new name is empty or same as original, delete the custom name doc
             deleteDoc(docRef).then(() => {
-                 toast({ title: t('success_title'), description: `تمت إزالة الاسم المخصص.` });
+                 toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` });
                  fetchData(false);
             }).catch(serverError => {
                  const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
@@ -709,7 +663,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     if (loading && !fixture) {
         return (
             <div className="flex h-full flex-col bg-background">
-                <ScreenHeader title={t('match_details_title')} onBack={goBack} canGoBack={canGoBack} />
+                <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} />
                 <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
             </div>
         );
@@ -718,8 +672,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     if (!fixture) {
          return (
             <div className="flex h-full flex-col bg-background">
-                <ScreenHeader title={t('error_title')} onBack={goBack} canGoBack={canGoBack} />
-                <p className="text-center p-8">{t('match_not_found')}</p>
+                <ScreenHeader title={'خطأ'} onBack={goBack} canGoBack={canGoBack} />
+                <p className="text-center p-8">لم يتم العثور على تفاصيل المباراة.</p>
             </div>
         );
     }
@@ -741,17 +695,14 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 <MatchHeaderCard 
                     fixture={fixture} 
                     navigate={navigate} 
-                    customStatus={customStatus} 
-                    isAdmin={isAdmin}
-                    onRename={() => handleOpenRename('matchStatus', fixture.fixture.id, customStatus || '')} 
                 />
                 <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-5 rounded-lg h-auto p-1 bg-card">
-                        <TabsTrigger value="details"><ShieldCheck className="w-4 h-4 ml-1" />{t('details')}</TabsTrigger>
-                        <TabsTrigger value="odds"><TrendingUp className="w-4 h-4 ml-1" />{t('odds')}</TabsTrigger>
-                        <TabsTrigger value="events"><Clock className="w-4 h-4 ml-1" />{t('events')}</TabsTrigger>
-                        <TabsTrigger value="lineups"><Users className="w-4 h-4 ml-1" />{t('lineups')}</TabsTrigger>
-                        <TabsTrigger value="standings"><BarChart className="w-4 h-4 ml-1" />{t('standings')}</TabsTrigger>
+                        <TabsTrigger value="details"><ShieldCheck className="w-4 h-4 ml-1" />تفاصيل</TabsTrigger>
+                        <TabsTrigger value="odds"><TrendingUp className="w-4 h-4 ml-1" />احتمالات</TabsTrigger>
+                        <TabsTrigger value="events"><Clock className="w-4 h-4 ml-1" />مُجريات</TabsTrigger>
+                        <TabsTrigger value="lineups"><Users className="w-4 h-4 ml-1" />التشكيل</TabsTrigger>
+                        <TabsTrigger value="standings"><BarChart className="w-4 h-4 ml-1" />الترتيب</TabsTrigger>
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="odds" className="mt-4"><OddsTab fixtureId={fixture.fixture.id} /></TabsContent>
@@ -765,8 +716,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
-    
-
-    
-

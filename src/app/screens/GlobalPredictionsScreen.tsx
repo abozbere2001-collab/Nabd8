@@ -37,7 +37,6 @@ import {
   AlertDialogClose,
 } from "@/components/ui/alert-dialog";
 import { PREMIER_LEAGUE_ID, LALIGA_ID, SERIE_A_ID, BUNDESLIGA_ID, CHAMPIONS_LEAGUE_ID, CURRENT_SEASON } from '@/lib/constants';
-import { useTranslation } from '@/components/LanguageProvider';
 
 
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -520,7 +519,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     const { isAdmin } = useAdmin();
     const { user } = useAuth();
     const { db } = useFirestore();
-    const { t } = useTranslation();
     const { toast } = useToast();
     const [loading, setLoading] = useState(true);
     const [selectedMatches, setSelectedMatches] = useState<Fixture[]>([]);
@@ -810,9 +808,9 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 <Tabs defaultValue="predictions" className="w-full">
                     <div className="sticky top-0 bg-background z-10 border-b">
                        <TabsList className="grid w-full grid-cols-3 bg-card text-card-foreground">
-                           <TabsTrigger value="prizes">{t('prizes')}</TabsTrigger>
-                           <TabsTrigger value="leaderboard">{t('standings')}</TabsTrigger>
-                           <TabsTrigger value="predictions">{t('voting')}</TabsTrigger>
+                           <TabsTrigger value="prizes">الجوائز</TabsTrigger>
+                           <TabsTrigger value="leaderboard">الترتيب</TabsTrigger>
+                           <TabsTrigger value="predictions">التصويت</TabsTrigger>
                        </TabsList>
                     </div>
 
