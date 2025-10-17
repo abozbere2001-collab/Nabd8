@@ -37,7 +37,7 @@ export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureTy
         if (totalSeconds === null) return null;
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
-        return `${minutes.toString().padStart(2, '0')}'${seconds.toString().padStart(2, '0')}"`;
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 
     const liveDisplayTime = formatTime(elapsedSeconds);
@@ -76,7 +76,7 @@ export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureTy
         return (
             <>
                 <div className="text-red-500 font-bold text-sm animate-pulse mb-1">
-                    {status.short === 'HT' ? t('halftime') : liveDisplayTime ? liveDisplayTime : t('live')}
+                    {status.short === 'HT' ? t('halftime') : liveDisplayTime ? liveDisplayTime.split(':')[0] + "'" : t('live')}
                 </div>
                 <div className="font-bold text-xl">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
             </>

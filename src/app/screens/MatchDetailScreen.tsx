@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -166,9 +167,9 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                                 return (
                                     <div key={stat.type} className="space-y-2">
                                         <div className="flex justify-between items-center text-xs font-bold">
-                                            <span>{homeValueRaw}</span>
+                                            <span className='text-right'>{homeValueRaw}</span>
                                             <span className="text-muted-foreground">{stat.label}</span>
-                                            <span>{awayValueRaw}</span>
+                                            <span className='text-left'>{awayValueRaw}</span>
                                         </div>
                                         <div className="flex items-center gap-1" dir="ltr">
                                             <Progress value={homeVal} indicatorClassName="bg-primary rounded-l-full" className="rounded-l-full"/>
@@ -179,9 +180,9 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                             }
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
-                                    <span>{homeValueRaw}</span>
+                                    <span className='text-right'>{homeValueRaw}</span>
                                     <span className="text-muted-foreground font-normal">{stat.label}</span>
-                                    <span>{awayValueRaw}</span>
+                                    <span className='text-left'>{awayValueRaw}</span>
                                 </div>
                             )
                         })
@@ -350,10 +351,10 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             
             {renderPitch(activeLineup)}
             
-            <div className="bg-background">
+            <div className="bg-transparent">
                 {substitutionEvents.length > 0 && (
                     <div className="space-y-2 mb-4">
-                         <h3 className="text-center text-base font-bold">التبديلات</h3>
+                         <h3 className="text-center text-base font-bold">{t('substitutes_and_changes')}</h3>
                          <div className="space-y-1">
                             {substitutionEvents.map((event, index) => {
                                 const playerIn = event.player;
@@ -411,7 +412,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                     </CardContent>
                 </Card>
 
-                <div className="space-y-4 pt-4">
+                 <div className="space-y-4 pt-4">
                     <h3 className="text-center text-base font-bold">الاحتياط</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {subsNotYetOn.map(p => (
