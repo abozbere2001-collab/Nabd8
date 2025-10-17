@@ -178,9 +178,9 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                             }
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
-                                    <span>{awayValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
                                     <span>{homeValueRaw}</span>
+                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
+                                    <span>{awayValueRaw}</span>
                                 </div>
                             )
                         })
@@ -368,41 +368,44 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             </Card>
 
             {substitutionEvents.length > 0 && (
-                <div className="space-y-2 bg-transparent">
+                <div className="space-y-2">
                      <h3 className="text-center text-base font-bold">التبديلات</h3>
-                    {substitutionEvents.map((event, index) => {
-                        const playerIn = event.player; // Player coming in
-                        const playerOut = event.assist;  // Player coming out
-                        const playerInDetails = activeLineup.substitutes.find(p => p.player.id === playerIn.id)?.player;
-                        const playerOutDetails = activeLineup.startXI.find(starter => starter.player.id === playerOut.id)?.player;
-                        
-                        const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
-                        const playerOutRating = playerOutDetails?.rating && !isNaN(parseFloat(playerOutDetails.rating)) ? parseFloat(playerOutDetails.rating).toFixed(1) : null;
-
-                        return (
-                            <Card key={index} className="p-2 bg-card">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
-                                        <ArrowUp className="h-4 w-4" />
-                                        <div className="flex flex-col items-start">
-                                            <span className="truncate">{playerIn.name}</span>
-                                            {playerInRating && <span className="text-xs font-mono text-muted-foreground">({playerInRating})</span>}
+                     <div className="space-y-1">
+                        {substitutionEvents.map((event, index) => {
+                            const playerIn = event.player;
+                            const playerOut = event.assist;
+                            
+                            const playerInDetails = activeLineup.substitutes.find(p => p.player.id === playerIn.id)?.player;
+                            const playerOutDetails = activeLineup.startXI.find(starter => starter.player.id === playerOut.id)?.player;
+                            
+                            const playerInRating = playerInDetails?.rating && !isNaN(parseFloat(playerInDetails.rating)) ? parseFloat(playerInDetails.rating).toFixed(1) : null;
+                            const playerOutRating = playerOutDetails?.rating && !isNaN(parseFloat(playerOutDetails.rating)) ? parseFloat(playerOutDetails.rating).toFixed(1) : null;
+    
+                            return (
+                                <Card key={index} className="p-2 bg-card">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
+                                            <ArrowUp className="h-4 w-4" />
+                                            <div className="flex flex-col items-start">
+                                                <span className="truncate">{playerIn.name}</span>
+                                                {playerInRating && <span className="text-xs font-mono text-muted-foreground">({playerInRating})</span>}
+                                            </div>
+                                        </div>
+    
+                                        <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
+    
+                                        <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
+                                            <ArrowDown className="h-4 w-4" />
+                                            <div className="flex flex-col items-end">
+                                                <span className="truncate">{playerOut.name}</span>
+                                                {playerOutRating && <span className="text-xs font-mono text-muted-foreground">({playerOutRating})</span>}
+                                            </div>
                                         </div>
                                     </div>
-
-                                    <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
-
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
-                                        <ArrowDown className="h-4 w-4" />
-                                        <div className="flex flex-col items-end">
-                                            <span className="truncate">{playerOut.name}</span>
-                                            {playerOutRating && <span className="text-xs font-mono text-muted-foreground">({playerOutRating})</span>}
-                                        </div>
-                                    </div>
-                                </div>
-                            </Card>
-                        );
-                    })}
+                                </Card>
+                            );
+                        })}
+                     </div>
                 </div>
             )}
             
@@ -410,7 +413,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                  <h3 className="text-center text-base font-bold">الاحتياط</h3>
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {subsNotYetOn.map(p => (
-                        <Card key={p.player.id || p.player.name} className="p-2 bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                         <Card key={p.player.id || p.player.name} className="p-2 bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                             <div className="flex items-center gap-3">
                                 <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
                                 <div className="flex-1 text-right">
@@ -661,3 +664,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    

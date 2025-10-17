@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -43,14 +42,14 @@ export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureTy
             return (
                 <div className="flex flex-col items-center justify-center text-center">
                     <div className="font-bold text-3xl tracking-wider">{`${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{status.long}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{t(status.long.toLowerCase().replace(' ', '_')) || status.long}</div>
                 </div>
             );
         }
          return (
             <div className="flex flex-col items-center justify-center text-center">
                 <div className="font-bold text-2xl tracking-wider">{format(new Date(date), "HH:mm")}</div>
-                <div className="text-xs text-muted-foreground mt-1">{status.long}</div>
+                <div className="text-xs text-muted-foreground mt-1">{t(status.long.toLowerCase().replace(' ', '_')) || status.long}</div>
             </div>
         );
 
@@ -80,7 +79,9 @@ export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureTy
     return (
         <>
             <div className="font-bold text-base">{format(new Date(date), "HH:mm")}</div>
-            <div className="text-xs text-muted-foreground mt-1">{status.long}</div>
+            <div className="text-xs text-muted-foreground mt-1">{t(status.long.toLowerCase().replace(' ', '_')) || status.long}</div>
         </>
     );
 };
+
+    

@@ -125,5 +125,10 @@
     "player": "Player",
     "goals": "Goals",
     "top_scorers_not_available": "Top scorers list is not available at this time.",
-    "teams_not_available": "Teams list is not available at this time."
+    "teams_not_available": "Teams list is not available at this time.",
+    "match_postponed": "Postponed",
+    "not_started": "Not Started",
+    "match_finished": "Finished"
 }
+
+    

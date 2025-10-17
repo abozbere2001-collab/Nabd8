@@ -1,4 +1,3 @@
-
 {
     "general_settings": "الإعدادات العامة",
     "appearance": "مظهر التطبيق",
@@ -148,5 +147,10 @@
     "Saudi Arabia": "السعودية",
     "Qatar": "قطر",
     "Japan": "اليابان",
-    "South Korea": "كوريا الجنوبية"
+    "South Korea": "كوريا الجنوبية",
+    "match_postponed": "مؤجلة",
+    "not_started": "لم تبدأ",
+    "match_finished": "انتهت"
 }
+
+    
