@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: { route: string[] } }
 ) {
   const { searchParams } = new URL(request.url);
-  const routePath = params.route ? params.route.join('/') : '';
+  const routePath = Array.isArray(params.route) ? params.route.join('/') : '';
   
   // Handle multi-ID requests specifically for players
   if (routePath === 'players' && searchParams.has('id')) {
