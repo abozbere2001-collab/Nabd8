@@ -8,7 +8,7 @@ import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, onSnapshot, query, updateDoc, deleteField, getDocs } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot, query, updateDoc, deleteField, getDocs, writeBatch } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -16,7 +16,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import type { Favorites, ManagedCompetition as ManagedCompetitionType } from '@/lib/types';
 import { SearchSheet } from '@/components/SearchSheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-
+import { useToast } from '@/hooks/use-toast';
 
 // --- TYPE DEFINITIONS ---
 interface CompetitionsByCountry {
@@ -30,12 +30,14 @@ interface GroupedCompetitions {
   [continent: string]: CompetitionsByCountry | { leagues: ManagedCompetitionType[] };
 }
 
+type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach';
 interface RenameState {
-    isOpen: boolean;
-    type: 'league' | 'country' | 'continent' | null;
-    id: string;
-    currentName: string;
+  id: string | number;
+  name: string;
+  originalName?: string;
+  type: RenameType;
 }
+
 
 // --- CONSTANTS ---
 const countryToContinent: { [key: string]: string } = {
@@ -106,8 +108,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const { isAdmin } = useAdmin();
     const { user } = useAuth();
     const { db } = useFirestore();
+    const { toast } = useToast();
     const [favorites, setFavorites] = useState<Favorites>({ userId: '', leagues: {}, teams: {}, players: {} });
-    const [renameState, setRenameState] = useState<RenameState>({ isOpen: false, type: null, id: '', currentName: '' });
+    const [renameItem, setRenameItem] = useState<RenameState | null>(null);
     const [isAddOpen, setAddOpen] = useState(false);
 
     const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> }>({ leagues: new Map(), countries: new Map(), continents: new Map() });
@@ -301,28 +304,37 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     }, [managedCompetitions, getName, customNames]);
 
-    const handleSaveRename = (newName: string) => {
-        if (!renameState.type || !renameState.id || !db) return;
-        
-        const collectionName = `${renameState.type}Customizations`;
-        const docId = renameState.id;
-        
-        const docRef = doc(db, collectionName, String(docId));
-        const data = { customName: newName };
-        setDoc(docRef, data)
-            .then(() => fetchAllCustomNames())
-            .catch(serverError => {
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
-                errorEmitter.emit('permission-error', permissionError);
-            });
-        setRenameState({ isOpen: false, type: null, id: '', currentName: '' });
-    };
-  
-    const openRenameDialog = (type: RenameState['type'], id: string | number, currentName: string) => {
-      setRenameState({ isOpen: true, type, id: String(id), currentName });
-    };
+    const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
+      if (!db) return;
+      const collectionName = `${type}Customizations`;
+      const docId = String(id);
+      
+      const originalItem = managedCompetitions?.find(c => String(c.leagueId) === docId);
 
-    const itemTypeMap: {[key: string]: string} = { league: 'البطولة', country: 'الدولة', continent: 'القارة' };
+      const data = { customName: newName };
+
+      // If the new name is empty or same as original, delete the custom name
+      if (!newName || (originalItem && newName === originalItem.name)) {
+          deleteDoc(doc(db, collectionName, docId)).then(() => {
+              fetchAllCustomNames();
+              toast({ title: 'نجاح', description: 'تمت إزالة الاسم المخصص.' });
+          }).catch(serverError => {
+              const permissionError = new FirestorePermissionError({ path: doc(db, collectionName, docId).path, operation: 'delete' });
+              errorEmitter.emit('permission-error', permissionError);
+          });
+      } else {
+          setDoc(doc(db, collectionName, docId), data)
+              .then(() => {
+                  fetchAllCustomNames();
+                  toast({ title: 'نجاح', description: 'تم حفظ الاسم المخصص.' });
+              })
+              .catch(serverError => {
+                  const permissionError = new FirestorePermissionError({ path: doc(db, collectionName, docId).path, operation: 'create', requestResourceData: data });
+                  errorEmitter.emit('permission-error', permissionError);
+              });
+      }
+      setRenameItem(null);
+    };
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -358,7 +370,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                     <AccordionTrigger className="hover:no-underline flex-1">
                                         <h3 className="text-lg font-bold">{getName('continent', continent, continent)}</h3>
                                     </AccordionTrigger>
-                                    {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('continent', continent, getName('continent', continent, continent)); }}>
+                                    {isAdmin && (<Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'continent', id: continent, name: getName('continent', continent, continent), originalName: continent }); }}>
                                             <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                     </Button>)}
                                 </div>
@@ -377,7 +389,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                         </div>
                                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                             {isAdmin && (
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openRenameDialog('league', comp.leagueId, comp.name); }}>
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'league', id: comp.leagueId, name: comp.name, originalName: managedCompetitions.find(c => c.leagueId === comp.leagueId)?.name }) }}>
                                                                     <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                                 </Button>
                                                             )}
@@ -400,7 +412,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                               <span className="font-semibold">{getName('country', country, country)}</span>
                                                           </div>
                                                         </AccordionTrigger>
-                                                        {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); openRenameDialog('country', country, getName('country', country, country)); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
+                                                        {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'country', id: country, name: getName('country', country, country), originalName: country }); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
                                                       </div>
                                                     <AccordionContent className="p-1">
                                                         <ul className="flex flex-col">{leagues.map(comp => 
@@ -414,7 +426,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                                 </div>
                                                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                     {isAdmin && (
-                                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openRenameDialog('league', comp.leagueId, comp.name); }}>
+                                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'league', id: comp.leagueId, name: comp.name, originalName: managedCompetitions.find(c => c.leagueId === comp.leagueId)?.name }) }}>
                                                                             <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                                         </Button>
                                                                     )}
@@ -440,11 +452,14 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     </div>
                 )}
             </div>
-
-            <RenameDialog isOpen={renameState.isOpen} onOpenChange={(isOpen) => setRenameState({ ...renameState, isOpen })} currentName={renameState.currentName} onSave={handleSaveRename} itemType={renameState.type ? itemTypeMap[renameState.type] : "العنصر"} />
+            
+            {renameItem && <RenameDialog
+                isOpen={!!renameItem}
+                onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
+                item={renameItem}
+                onSave={handleSaveRename}
+            />}
             <AddCompetitionDialog isOpen={isAddOpen} onOpenChange={setAddOpen} />
         </div>
     );
 }
-
-    

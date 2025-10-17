@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -22,13 +23,13 @@ import { OddsTab } from '@/components/OddsTab';
 import { useTranslation } from '@/components/LanguageProvider';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { FirestorePermissionError } from '@/firebase';
+import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 
-type RenameType = 'player' | 'coach';
+type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country';
 
 
 const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerType, navigate: ScreenProps['navigate'], onRename: () => void, isAdmin: boolean }) => {
@@ -606,10 +607,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         setRenameItem({ type, id, name });
     };
 
-    const handleSaveRename = (newName: string) => {
-        if (!renameItem || !db) return;
-        const { id, type } = renameItem;
-        const collectionName = type === 'player' ? 'playerCustomizations' : 'coachCustomizations';
+    const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
+        if (!db) return;
+        
+        const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
         const data = { customName: newName };
 
@@ -657,9 +658,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 <RenameDialog
                     isOpen={!!renameItem}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-                    currentName={renameItem.name}
+                    item={renameItem}
                     onSave={handleSaveRename}
-                    itemType={renameItem.type === 'player' ? 'اللاعب' : 'المدرب'}
                 />
             )}
 

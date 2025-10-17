@@ -15,47 +15,64 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from './ui/textarea';
 
+type ItemType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach';
+
 interface RenameDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  currentName: string;
-  currentNote?: string;
-  onSave: (newName: string, newNote?: string) => void;
-  itemType?: string;
-  hasNoteField?: boolean;
+  item?: {
+    id: string | number;
+    name: string;
+    note?: string;
+    type: ItemType;
+    originalName?: string;
+  } | null;
+  onSave: (type: ItemType, id: string | number, newName: string, newNote?: string) => void;
 }
 
 export function RenameDialog({
   isOpen,
   onOpenChange,
-  currentName,
-  currentNote = '',
+  item,
   onSave,
-  itemType = 'العنصر',
-  hasNoteField = false,
 }: RenameDialogProps) {
-  const [newName, setNewName] = useState(currentName);
-  const [newNote, setNewNote] = useState(currentNote);
+  const [newName, setNewName] = useState('');
+  const [newNote, setNewNote] = useState('');
 
   useEffect(() => {
-    if (isOpen) {
-      setNewName(currentName);
-      setNewNote(currentNote);
+    if (isOpen && item) {
+      setNewName(item.name || '');
+      setNewNote(item.note || '');
+    } else {
+      setNewName('');
+      setNewNote('');
     }
-  }, [isOpen, currentName, currentNote]);
+  }, [isOpen, item]);
 
   const handleSave = () => {
-    if (newName.trim()) {
-      onSave(newName.trim(), hasNoteField ? newNote.trim() : undefined);
+    if (item && newName.trim()) {
+      onSave(item.type, item.id, newName.trim(), item.type === 'team' ? newNote.trim() : undefined);
       onOpenChange(false);
     }
   };
+
+  const itemTypeMap: Record<ItemType, string> = {
+    league: 'البطولة',
+    team: 'الفريق',
+    player: 'اللاعب',
+    continent: 'القارة',
+    country: 'الدولة',
+    coach: 'المدرب'
+  };
+
+  const hasNoteField = item?.type === 'team';
+  const itemTypeDisplay = item ? itemTypeMap[item.type] : 'العنصر';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>تعديل {itemType}</DialogTitle>
+          <DialogTitle>تعديل {itemTypeDisplay}</DialogTitle>
            {hasNoteField && (
              <DialogDescription>
                 يمكنك تعديل الاسم المخصص وإضافة ملاحظة إدارية خاصة.
@@ -69,6 +86,7 @@ export function RenameDialog({
               id="name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
+              placeholder={`الاسم الأصلي: ${item?.originalName || item?.name}`}
             />
           </div>
           {hasNoteField && (

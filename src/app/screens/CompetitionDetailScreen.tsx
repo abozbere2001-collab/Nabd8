@@ -42,7 +42,7 @@ import {
 import { useTranslation } from '@/components/LanguageProvider';
 
 
-type RenameType = 'league' | 'team' | 'player';
+type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach';
 
 function SeasonSelector({ season, onSeasonChange, isAdmin }: { season: number, onSeasonChange: (newSeason: number) => void, isAdmin: boolean }) {
     const { t } = useTranslation();
@@ -78,13 +78,11 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const { t } = useTranslation();
 
   const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || '', leagues: {}, teams: {}, players: {} });
-  const [isTopCompetition, setIsTopCompetition] = useState(false);
-  const [topTeamIds, setTopTeamIds] = useState<Set<number>>(new Set());
-
+  
   const [loading, setLoading] = useState(true);
   const [displayTitle, setDisplayTitle] = useState(initialTitle);
   
-  const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, note?: string, type: RenameType, originalData?: any } | null>(null);
+  const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, originalName?: string, note?: string, type: RenameType } | null>(null);
   
   const [isDeleteAlertOpen, setDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -116,43 +114,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         const adminNotes = new Map<number, string>();
         adminFavsSnapshot.forEach(doc => adminNotes.set(Number(doc.id), doc.data().note));
 
-        setCustomNames({ teams: teamNames, players: playerNames, adminNotes });
+        setCustomNames({ teams: teamNames, players: playerNames, adminNotes: adminNotes });
     } catch (error) {
         // This might fail for regular users, which is okay. Admin features will be hidden.
         console.warn("Could not fetch custom names, this is expected for non-admins:", error);
     }
   }, [db, isAdmin]);
   
-  useEffect(() => {
-    if (!db || !leagueId) return;
-      const checkTopStatus = async () => {
-          const topLeagueDocRef = doc(db, "topCompetitions", String(leagueId));
-          try {
-            const docSnap = await getDoc(topLeagueDocRef);
-            setIsTopCompetition(docSnap.exists());
-          } catch(e) {
-            // This is expected to fail for non-admins if rules are strict
-            console.warn("Could not check top competition status, this is expected for non-admins");
-            setIsTopCompetition(false);
-          }
-      };
-      if (isAdmin) {
-        checkTopStatus();
-      }
-
-      // For top teams, we can still listen as it's a broader list
-      const unsubTopTeams = onSnapshot(collection(db, "topTeams"), (snapshot) => {
-          const teamIds = new Set(snapshot.docs.map(doc => Number(doc.id)));
-          setTopTeamIds(teamIds);
-      }, (error) => {
-          console.warn("Could not listen to top teams, this is expected for non-admins:", error);
-      });
-      
-      return () => {
-        unsubTopTeams();
-      }
-
-  }, [db, leagueId, isAdmin]);
 
   const getDisplayName = useCallback((type: 'team' | 'player', id: number, defaultName: string) => {
     const key = `${type}s` as 'teams' | 'players';
@@ -280,79 +248,61 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     });
   };
   
-  const handleToggleTopItem = (type: 'league' | 'team', item: {id: number, name: string, logo: string}) => {
-      if (!isAdmin || !db) return;
-      
-      const collectionName = type === 'league' ? 'topCompetitions' : 'topTeams';
-      const docId = String(item.id);
-      const docRef = doc(db, collectionName, docId);
-
-      const isCurrentlyTop = type === 'league' ? isTopCompetition : topTeamIds.has(item.id);
-
-      const operation = isCurrentlyTop
-        ? deleteDoc(docRef)
-        : setDoc(docRef, item);
-      
-      operation
-      .then(() => {
-        if(type === 'league') setIsTopCompetition(!isCurrentlyTop);
-      })
-      .catch(serverError => {
-        const permissionError = new FirestorePermissionError({
-            path: docRef.path,
-            operation: isCurrentlyTop ? 'delete' : 'create',
-            requestResourceData: isCurrentlyTop ? undefined : item,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      });
-  }
-
   const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
-    const currentName = getDisplayName(type, id, originalData.name);
+    const currentName = getDisplayName(type as 'team'|'player', id, originalData.name);
     const note = type === 'team' ? customNames.adminNotes.get(id) : undefined;
-    setRenameItem({ id, name: currentName, note, type, originalData });
+    setRenameItem({ id, name: currentName, note, type, originalName: originalData.name });
   };
 
-  const handleSaveRename = async (newName: string, newNote?: string) => {
-    if (!renameItem || !db) return;
-    const { id, type, originalData } = renameItem;
+  const handleSaveRename = async (type: RenameType, id: string | number, newName: string, newNote?: string) => {
+    if (!db) return;
 
-    const batch = writeBatch(db);
-
-    // Save Custom Name
-    const nameRef = doc(db, `${type}Customizations`, String(id));
-    if (newName && newName !== originalData.name) {
-        batch.set(nameRef, { customName: newName });
-    } else {
-        batch.delete(nameRef); // Delete if name is cleared or same as original
-    }
-
-    // Save Admin Note (only for teams)
     if (type === 'team') {
+        const team = teams.find(t => t.team.id === id)?.team;
+        if (!team) return;
+
+        const batch = writeBatch(db);
+        const nameRef = doc(db, "teamCustomizations", String(id));
         const noteRef = doc(db, "adminFavorites", String(id));
+
+        if (newName && newName !== team.name) {
+            batch.set(nameRef, { customName: newName });
+        } else {
+            batch.delete(nameRef);
+        }
+
         if (newNote !== undefined && newNote.length > 0) {
-            const data: AdminFavorite = {
-                teamId: id,
-                name: originalData.name,
-                logo: originalData.logo,
-                note: newNote
-            };
-            batch.set(noteRef, data);
+            batch.set(noteRef, { teamId: id, name: team.name, logo: team.logo, note: newNote });
         } else {
             batch.delete(noteRef);
         }
-    }
 
-    try {
-        await batch.commit();
-        toast({ title: 'نجاح', description: 'تم حفظ التغييرات بنجاح.' });
-        await fetchAllCustomNames(); // Refetch all names to update UI
-    } catch (serverError) {
-        const permissionError = new FirestorePermissionError({
-            path: `batch write for customizations`,
-            operation: 'write'
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        try {
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم حفظ التغييرات بنجاح.' });
+            await fetchAllCustomNames();
+        } catch (serverError) {
+             const permissionError = new FirestorePermissionError({ path: `batch write for team ${id}`, operation: 'write' });
+             errorEmitter.emit('permission-error', permissionError);
+        }
+
+    } else if (type === 'player') {
+        const player = topScorers.find(p => p.player.id === id)?.player;
+        if(!player) return;
+        
+        const docRef = doc(db, "playerCustomizations", String(id));
+        if (newName && newName !== player.name) {
+            setDoc(docRef, { customName: newName }).then(fetchAllCustomNames);
+        } else {
+            deleteDoc(docRef).then(fetchAllCustomNames);
+        }
+    } else if (type === 'league' && leagueId) {
+        const docRef = doc(db, "leagueCustomizations", String(id));
+        if (newName && newName !== initialTitle) {
+            setDoc(docRef, { customName: newName }).then(() => setDisplayTitle(newName));
+        } else {
+            deleteDoc(docRef).then(() => setDisplayTitle(initialTitle));
+        }
     }
   };
 
@@ -414,7 +364,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handleOpenRename('league', leagueId, { name: displayTitle || '' })}
+                onClick={() => setRenameItem({ type: 'league', id: leagueId, name: displayTitle || '', originalName: initialTitle })}
             >
                 <Pencil className="h-5 w-5" />
             </Button>
@@ -434,11 +384,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       {renameItem && <RenameDialog 
           isOpen={!!renameItem}
           onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-          currentName={renameItem.name}
-          currentNote={renameItem.note}
+          item={renameItem}
           onSave={handleSaveRename}
-          itemType={t('the_item')}
-          hasNoteField={renameItem.type === 'team'}
         />}
        <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="matches" className="w-full">
