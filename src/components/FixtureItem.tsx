@@ -30,7 +30,7 @@ const AwayTeamDisplay = ({ team }: { team: FixtureType['teams']['away'] }) => (
     </div>
 );
 
-export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
+export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, customStatus }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean, customStatus?: string | null }) => {
     const { isAdmin } = useAdmin();
     const hasCommentsFeature = commentsEnabled || isAdmin;
 
@@ -46,7 +46,7 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
             <HomeTeamDisplay team={fixture.teams.home} />
             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
-                <LiveMatchStatus fixture={fixture} customStatus={null} />
+                <LiveMatchStatus fixture={fixture} customStatus={customStatus} />
             </div>
             <AwayTeamDisplay team={fixture.teams.away} />
          </div>
