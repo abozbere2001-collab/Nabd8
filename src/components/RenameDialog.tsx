@@ -119,5 +119,3 @@ export function RenameDialog({
     </Dialog>
   );
 }
-
-    

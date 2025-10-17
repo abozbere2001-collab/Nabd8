@@ -349,7 +349,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     setLoading(true);
 
     try {
-        // Step 1: Ensure custom names are loaded
         let names = customNames;
         if (!names) {
             if (!db) { setLoading(false); return; }
@@ -365,11 +364,12 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             setCustomNames(names);
         }
 
-        // Step 2: Fetch fixtures from cache or API
         const isLiveFetch = forceLive || activeTab === 'live';
         const url = isLiveFetch ? `/api/football/fixtures?live=all` : `/api/football/fixtures?date=${dateKey}`;
+        
         let rawFixtures: FixtureType[] = [];
 
+        // Don't use cache for live fetches
         if (!isLiveFetch && fixturesCache[dateKey]) {
             rawFixtures = fixturesCache[dateKey];
         } else {
@@ -379,8 +379,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             rawFixtures = data.response || [];
         }
         
-        // Step 3: Apply translations and update state
         const processedFixtures = applyCustomNames(rawFixtures, names);
+        
         setFixturesCache(prev => ({ ...prev, [dateKey]: processedFixtures }));
 
     } catch (error) {
@@ -403,7 +403,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   useEffect(() => {
     if (activeTab === 'live' && isVisible) {
         fetchAndProcessData(selectedDateKey, true); // force live
-        const interval = setInterval(() => fetchAndProcessData(selectedDateKey, true), 60000); // And every minute
+        const interval = setInterval(() => fetchAndProcessData(selectedDateKey, true), 60000);
         return () => clearInterval(interval);
     }
   }, [activeTab, isVisible, selectedDateKey, fetchAndProcessData]);

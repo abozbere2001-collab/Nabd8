@@ -9,7 +9,6 @@ import type { Fixture as FixtureType } from '@/lib/types';
 import { useAdmin } from '@/firebase/provider';
 import { LiveMatchStatus } from './LiveMatchStatus';
 
-// Explicitly define components for Home and Away teams to avoid any ambiguity
 const HomeTeamDisplay = ({ team }: { team: FixtureType['teams']['home'] }) => (
     <div className="flex items-center gap-2 justify-end truncate">
         <span className="font-semibold text-sm truncate">{team.name}</span>
@@ -44,20 +43,15 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, cus
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
-            {/* Home Team (Right) - Explicitly placed */}
             <HomeTeamDisplay team={fixture.teams.home} />
-
-            {/* Match Status (Center) */}
             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
                 <LiveMatchStatus fixture={fixture} customStatus={customStatus} />
             </div>
-
-            {/* Away Team (Left) - Explicitly placed */}
             <AwayTeamDisplay team={fixture.teams.away} />
          </div>
         </div>
          
-         <div className="absolute top-1 right-1 flex items-center gap-1">
+         <div className="absolute top-1 left-1 flex items-center gap-1">
             {hasCommentsFeature && (
                 <CommentsButton 
                   matchId={fixture.fixture.id} 

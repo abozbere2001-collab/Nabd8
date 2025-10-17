@@ -131,7 +131,7 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
     
     return (
         <div className="space-y-2">
-            {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={(isOpen) => !isOpen && setRenameItem(null)} item={renameItem} onSave={handleSaveRename} />}
+            {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={(isOpen) => !isOpen && setRenameItem(null)} item={{...renameItem, type: 'player'}} onSave={handleSaveRename} />}
             {players.map(player => (
                 <Card key={player.id} className="p-2">
                     <div className="flex items-center gap-3">
@@ -440,4 +440,3 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
-

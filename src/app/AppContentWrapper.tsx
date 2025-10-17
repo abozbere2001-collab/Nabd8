@@ -171,7 +171,6 @@ export function AppContentWrapper() {
                 }
             };
         }
-        // If on a non-main tab and at the root, go back to the default tab
         if (!mainTabs.includes(prevState.activeTab)) {
             return { ...prevState, activeTab: 'Matches' };
         }
@@ -184,20 +183,18 @@ export function AppContentWrapper() {
     const newItem = { key: newKey, screen, props };
 
     setNavigationState(prevState => {
-        let activeTab = prevState.activeTab;
         const newStacks = { ...prevState.stacks };
 
         if (mainTabs.includes(screen)) {
             // If navigating to a main tab, switch active tab and reset its stack
-            activeTab = screen;
             newStacks[screen] = [newItem];
+            return { activeTab: screen, stacks: newStacks };
         } else {
             // If navigating to a detail screen, push it onto the current active stack
-            const currentStack = newStacks[activeTab] || [];
-            newStacks[activeTab] = [...currentStack, newItem];
+            const currentStack = newStacks[prevState.activeTab] || [];
+            newStacks[prevState.activeTab] = [...currentStack, newItem];
+            return { activeTab: prevState.activeTab, stacks: newStacks };
         }
-
-        return { activeTab, stacks: newStacks };
     });
   }, []);
   
@@ -212,12 +209,6 @@ export function AppContentWrapper() {
   }
   
   const activeStack = navigationState.stacks[navigationState.activeTab] || [];
-  const activeStackItem = activeStack[activeStack.length - 1];
-
-  // Memoize goBack and navigate to prevent re-creation on every render
-  const memoizedGoBack = useCallback(goBack, [goBack]);
-  const memoizedNavigate = useCallback(navigate, [navigate]);
-
 
   return (
     <LanguageProvider>
@@ -236,11 +227,10 @@ export function AppContentWrapper() {
                             
                             const screenProps = {
                                 ...stackItem.props,
-                                navigate: memoizedNavigate,
-                                goBack: memoizedGoBack,
-                                // Correctly determine canGoBack based on the specific stack for this screen
+                                navigate,
+                                goBack,
                                 canGoBack: stack.length > 1,
-                                isVisible, // Pass isVisible prop
+                                isVisible,
                             };
 
                             return (
@@ -257,7 +247,7 @@ export function AppContentWrapper() {
         </div>
         
         {showBannerAd && <BannerAd />}
-        {mainTabs.includes(navigationState.activeTab) && <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => memoizedNavigate(screen)} />}
+        {mainTabs.includes(navigationState.activeTab) && <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => navigate(screen)} />}
         </main>
     </LanguageProvider>
   );

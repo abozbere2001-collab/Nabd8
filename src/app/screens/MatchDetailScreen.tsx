@@ -124,17 +124,17 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
 
     const findStat = (stats: any[], type: string) => stats.find(s => s.type === type)?.value ?? '0';
 
-    const statMapping: { label: string; type: string; isProgress?: boolean }[] = [
-      { label: t('possession'), type: "Ball Possession", isProgress: true },
-      { label: t('total_shots'), type: "Total Shots" },
-      { label: t('shots_on_goal'), type: "Shots on Goal" },
-      { label: t('shots_off_goal'), type: "Shots off Goal" },
-      { label: t('blocked_shots'), type: "Blocked Shots"},
-      { label: t('fouls'), type: "Fouls" },
-      { label: t('yellow_cards'), type: "Yellow Cards" },
-      { label: t('red_cards'), type: "Red Cards" },
-      { label: t('corner_kicks'), type: "Corner Kicks" },
-      { label: t('offsides'), type: "Offsides" },
+    const statMapping: { labelKey: string; type: string; isProgress?: boolean }[] = [
+      { labelKey: 'possession', type: "Ball Possession", isProgress: true },
+      { labelKey: 'total_shots', type: "Total Shots" },
+      { labelKey: 'shots_on_goal', type: "Shots on Goal" },
+      { labelKey: 'shots_off_goal', type: "Shots off Goal" },
+      { labelKey: 'blocked_shots', type: "Blocked Shots"},
+      { labelKey: 'fouls', type: "Fouls" },
+      { labelKey: 'yellow_cards', type: "Yellow Cards" },
+      { labelKey: 'red_cards', type: "Red Cards" },
+      { labelKey: 'corner_kicks', type: "Corner Kicks" },
+      { labelKey: 'offsides', type: "Offsides" },
     ];
 
     return (
@@ -173,7 +173,7 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                                     <div key={stat.type} className="space-y-2">
                                         <div className="flex justify-between items-center text-xs font-bold">
                                             <span>{homeValueRaw}</span>
-                                            <span className="text-muted-foreground">{stat.label}</span>
+                                            <span className="text-muted-foreground">{t(stat.labelKey)}</span>
                                             <span>{awayValueRaw}</span>
                                         </div>
                                         <div className="flex items-center gap-1" dir="ltr">
@@ -186,7 +186,7 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
                                     <span>{homeValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
+                                    <span className="text-muted-foreground font-normal">{t(stat.labelKey)}</span>
                                     <span>{awayValueRaw}</span>
                                 </div>
                             )
@@ -650,7 +650,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         setRenameItem({ type, id, name, originalName: originalName || name });
     };
 
-    const handleSaveRename = (newName: string) => {
+    const handleSaveRename = (newName: string, newNote?:string) => {
         if (!renameItem || !db) return;
         const { id, type, originalName } = renameItem;
 
@@ -769,3 +769,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     
 
     
+
