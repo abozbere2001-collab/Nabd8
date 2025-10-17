@@ -42,7 +42,6 @@ type SearchResult = (TeamResult & { type: 'team' }) | (LeagueResult & { type: 'l
 
 type RenameType = 'league' | 'team';
 
-// Helper function to normalize Arabic text for searching
 const normalizeArabic = (text: string) => {
   if (!text) return '';
   return text
@@ -184,54 +183,45 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         // 1. Client-side search for custom names (Arabic search)
         const normalizedQuery = normalizeArabic(trimmedQuery);
         const matchedTeamIds: string[] = [];
-        if (customNames.teams.size > 0) {
-            customNames.teams.forEach((name, id) => {
-                if (normalizeArabic(name).includes(normalizedQuery)) {
-                    matchedTeamIds.push(String(id));
-                }
-            });
-        }
+        customNames.teams.forEach((name, id) => {
+            if (normalizeArabic(name).includes(normalizedQuery)) {
+                matchedTeamIds.push(String(id));
+            }
+        });
         
         const matchedLeagueIds: string[] = [];
-        if (customNames.leagues.size > 0) {
-            customNames.leagues.forEach((name, id) => {
-                if (normalizeArabic(name).includes(normalizedQuery)) {
-                    matchedLeagueIds.push(String(id));
-                }
-            });
-        }
+        customNames.leagues.forEach((name, id) => {
+            if (normalizeArabic(name).includes(normalizedQuery)) {
+                matchedLeagueIds.push(String(id));
+            }
+        });
         
-        // Fetch details for matched custom names
-        const teamPromises = matchedTeamIds.map(async teamId => {
-            if (!resultsMap.has(`team-${teamId}`)) {
-                const res = await fetch(`/api/football/teams?id=${teamId}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.response?.[0]) resultsMap.set(`team-${teamId}`, { ...data.response[0], type: 'team' });
-                }
+        const fetchAndSet = async (id: string, type: 'team' | 'league') => {
+          if (!resultsMap.has(`${type}-${id}`)) {
+            const endpoint = type === 'team' ? 'teams' : 'leagues';
+            const res = await fetch(`/api/football/${endpoint}?id=${id}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.response?.[0]) resultsMap.set(`${type}-${id}`, { ...data.response[0], type });
             }
-        });
+          }
+        };
 
-        const leaguePromises = matchedLeagueIds.map(async leagueId => {
-            if (!resultsMap.has(`league-${leagueId}`)) {
-                const res = await fetch(`/api/football/leagues?id=${leagueId}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.response?.[0]) resultsMap.set(`league-${leagueId}`, { ...data.response[0], type: 'league' });
-                }
-            }
-        });
-
+        const customNamePromises = [
+          ...matchedTeamIds.map(id => fetchAndSet(id, 'team')),
+          ...matchedLeagueIds.map(id => fetchAndSet(id, 'league'))
+        ];
+        
         // 2. Search external API with original query (English search)
-        const [teamsRes, leaguesRes] = await Promise.all([
-            fetch(`/api/football/teams?search=${trimmedQuery}`),
-            fetch(`/api/football/leagues?search=${trimmedQuery}`),
-            ...teamPromises,
-            ...leaguePromises
-        ]);
+        const apiSearchPromises = [
+          fetch(`/api/football/teams?search=${trimmedQuery}`).then(res => res.json()),
+          fetch(`/api/football/leagues?search=${trimmedQuery}`).then(res => res.json())
+        ];
 
-        const teamsData = await teamsRes.json();
-        const leaguesData = await leaguesRes.json();
+        const [[teamsData, leaguesData], ..._] = await Promise.all([
+          Promise.all(apiSearchPromises),
+          Promise.all(customNamePromises)
+        ]);
 
         if (teamsData.response) {
             teamsData.response.forEach((r: TeamResult) => {
@@ -274,7 +264,6 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     const fieldPath = `${type}.${item.id}`;
     const isFavorited = !!favorites?.[type]?.[item.id];
 
-    // Optimistically update UI
     const currentFavorites = { ...favorites };
     if (!currentFavorites[type]) {
       (currentFavorites as any)[type] = {};
@@ -313,7 +302,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
       : setDoc(favRef, { [type]: { [item.id]: dataToSave } }, { merge: true });
 
     operation.catch(serverError => {
-      setFavorites(favorites); // Revert on error
+      setFavorites(favorites);
       const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update' });
       errorEmitter.emit('permission-error', permissionError);
     });
@@ -403,9 +392,10 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         {popularItemsToShow.map(item => {
           const isFavorited = !!favorites?.[itemType]?.[item.id];
           const displayName = getDisplayName(itemType.slice(0,-1) as 'team' | 'league' , item.id, item.name);
-          const result: SearchResult = { [itemType.slice(0,-1)]: item, type: itemType } as any;
+          const resultType = itemType === 'teams' ? 'team' : 'league';
+          const result = { [resultType]: item, type: resultType } as SearchResult;
 
-          return <ItemRow key={item.id} item={{...item, name: displayName}} itemType={itemType} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, itemType)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(itemType.slice(0,-1) as 'team' | 'league', item.id, displayName)} onAddNote={() => handleOpenNote(item as TeamResult['team'])} />;
+          return <ItemRow key={item.id} item={{...item, name: displayName}} itemType={itemType} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, itemType)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(resultType, item.id, displayName)} onAddNote={() => handleOpenNote(item as TeamResult['team'])} />;
         })}
         {!showAllPopular && popularItems.length > 6 && (
           <Button variant="ghost" className="w-full" onClick={() => setShowAllPopular(true)}>عرض الكل</Button>
