@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -402,14 +400,14 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             <Card>
                 <CardContent className="p-3 text-center">
                     <h3 className="font-bold text-sm mb-2">{t('coach')}</h3>
-                    <div className="relative flex flex-col items-center gap-1">
+                    <div className="relative inline-flex flex-col items-center gap-1">
                         <Avatar className="h-12 w-12">
                             <AvatarImage src={activeLineup.coach.photo} />
                             <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
                          {isAdmin && (
-                            <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
+                            <Button variant="ghost" size="icon" className="absolute top-0 right-[-30px] h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
                                 <Pencil className="h-3 w-3" />
                             </Button>
                         )}
@@ -421,27 +419,30 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                 <CardHeader>
                      <CardTitle className="text-center text-base">{t('substitutes_and_changes')}</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-3">
                     {activeLineup.substitutes.map(p => {
                          const subbedInEvent = events?.find(e => e.type === 'subst' && e.player.id === p.player.id);
                          const subbedOutPlayer = subbedInEvent ? activeLineup.startXI.find(starter => starter.player.id === subbedInEvent.assist.id) : null;
 
                         return (
                             <div key={p.player.id || p.player.name} className="flex items-center justify-between p-1.5 border-b last:border-b-0">
-                                <div className="flex items-center gap-2">
-                                     <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
-                                     <span className="text-xs font-semibold">{p.player.name}</span>
+                                <div className="flex items-center gap-3" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                                     <Avatar className="h-8 w-8">
+                                        <AvatarImage src={p.player.photo} alt={p.player.name} />
+                                        <AvatarFallback>{p.player.name?.charAt(0) || 'P'}</AvatarFallback>
+                                     </Avatar>
+                                     <span className="text-sm font-semibold">{p.player.name}</span>
                                 </div>
                                 {subbedInEvent && (
-                                     <div className="flex items-center gap-2 text-xs">
-                                         <div className="flex items-center gap-1 text-green-500">
-                                            <ArrowUp className="h-3 w-3"/>
-                                            <span>({subbedInEvent.time.elapsed}')</span>
+                                     <div className="flex items-center gap-4 text-xs">
+                                         <div className="flex items-center gap-1.5 text-green-500 font-semibold">
+                                            <ArrowUp className="h-4 w-4"/>
+                                            <span>{subbedInEvent.player.name}</span>
                                          </div>
                                          {subbedOutPlayer && (
-                                            <div className="flex items-center gap-1 text-red-500">
-                                                <ArrowDown className="h-3 w-3"/>
-                                                <span className="line-through">{subbedOutPlayer.player.name}</span>
+                                            <div className="flex items-center gap-1.5 text-red-500">
+                                                <ArrowDown className="h-4 w-4"/>
+                                                <span>{subbedOutPlayer.player.name}</span>
                                             </div>
                                          )}
                                     </div>
@@ -503,7 +504,7 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
 
     const playersMap = new Map<number, { player: Player, statistics: any[] }>();
     playersData.forEach(p => {
-        if (p.player.id) {
+        if (p.player && p.player.id) {
             playersMap.set(p.player.id, p);
         }
     });
@@ -511,10 +512,10 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
     const updatePlayerInList = (playerList: PlayerWithStats[]): PlayerWithStats[] => {
         if (!playerList) return [];
         return playerList.map(pWithStats => {
-            if (!pWithStats || !pWithStats.player) return pWithStats;
+            if (!pWithStats || !pWithStats.player || !pWithStats.player.id) return pWithStats;
 
             const lineupPlayer = pWithStats.player;
-            if (lineupPlayer.id && playersMap.has(lineupPlayer.id)) {
+            if (playersMap.has(lineupPlayer.id)) {
                 const detailedPlayerInfo = playersMap.get(lineupPlayer.id)!;
                 const rating = detailedPlayerInfo.statistics?.[0]?.games?.rating;
                 
@@ -691,6 +692,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
-    
-    
