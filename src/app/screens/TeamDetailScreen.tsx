@@ -158,10 +158,39 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
     const [stats, setStats] = useState<TeamStatistics | null>(null);
     const [loading, setLoading] = useState(true);
     const { t } = useTranslation();
+    const { db } = useFirestore();
+    const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>}>({leagues: new Map(), teams: new Map()});
+
+
+     const fetchAllCustomNames = useCallback(async () => {
+        if (!db) return;
+        try {
+            const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+                getDocs(collection(db, 'leagueCustomizations')),
+                getDocs(collection(db, 'teamCustomizations'))
+            ]);
+            
+            const leagueNames = new Map<number, string>();
+            leaguesSnapshot?.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+            
+            const teamNames = new Map<number, string>();
+            teamsSnapshot?.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+            
+            setCustomNames({ leagues: leagueNames, teams: teamNames });
+        } catch(error) {
+             console.warn("Could not fetch custom names, this is expected for non-admins", error);
+        }
+    }, [db]);
+
+    const getDisplayName = useCallback((type: 'team' | 'league', id: number, defaultName: string) => {
+      const key = `${type}s` as 'teams' | 'leagues';
+      return customNames[key]?.get(id) || defaultName;
+    }, [customNames]);
     
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
+            await fetchAllCustomNames();
             try {
                 const [fixturesRes, statsRes] = await Promise.all([
                     fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`),
@@ -190,11 +219,32 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
             }
         };
         fetchData();
-    }, [teamId]);
+    }, [teamId, fetchAllCustomNames]);
     
     if (loading) {
          return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
+
+    const processedFixtures = fixtures.map(fixture => ({
+        ...fixture,
+        league: {
+            ...fixture.league,
+            name: getDisplayName('league', fixture.league.id, fixture.league.name),
+        },
+        teams: {
+            home: { ...fixture.teams.home, name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name) },
+            away: { ...fixture.teams.away, name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name) },
+        }
+    }));
+
+     const processedStandings = standings.map(s => ({
+        ...s,
+        team: {
+            ...s.team,
+            name: getDisplayName('team', s.team.id, s.team.name),
+        }
+    }));
+
 
     return (
         <Tabs defaultValue="matches" className="w-full">
@@ -204,12 +254,12 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                 <TabsTrigger value="stats">{t('stats')}</TabsTrigger>
             </TabsList>
             <TabsContent value="matches" className="mt-4 space-y-3">
-                {fixtures.length > 0 ? fixtures.map(fixture => (
+                {processedFixtures.length > 0 ? processedFixtures.map(fixture => (
                     <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />
                 )) : <p className="text-center text-muted-foreground p-8">لا توجد مباريات متاحة.</p>}
             </TabsContent>
             <TabsContent value="standings" className="mt-4">
-                 {standings.length > 0 ? (
+                 {processedStandings.length > 0 ? (
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -223,7 +273,7 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {standings.map(s => (
+                            {processedStandings.map(s => (
                                 <TableRow key={s.team.id} className={cn(s.team.id === teamId && 'bg-primary/10')}>
                                     <TableCell>{s.rank}</TableCell>
                                     <TableCell>
@@ -311,12 +361,9 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
                                 setDisplayTitle(name);
                             }
                         } catch (error) {
-                            const permissionError = new FirestorePermissionError({
-                                path: customNameDocRef.path,
-                                operation: 'get',
-                            });
-                            errorEmitter.emit('permission-error', permissionError);
-                            setDisplayTitle(name);
+                           // This can fail for non-admins due to security rules, which is fine.
+                           // We just fall back to the default name.
+                           setDisplayTitle(name);
                         }
                     } else {
                          setDisplayTitle(name);

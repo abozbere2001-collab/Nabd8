@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -23,7 +24,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { POPULAR_TEAMS, POPULAR_LEAGUES } from '@/lib/popular-data';
 
-type Item = { id: number; name: string; logo: string; type?: 'Club' | 'National' };
+type Item = { id: number; name: string; logo: string; type?: 'Club' | 'National'; national?: boolean; };
 type ItemType = 'teams' | 'leagues';
 
 interface TeamResult { team: Item; }
@@ -151,35 +152,33 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     }
 
     if (isFavorited) {
-      delete (currentFavorites[type] as any)[item.id];
+      delete (currentFavorites[type]as any)[item.id];
     } else {
-      const idKey = type === 'teams' ? 'teamId' : 'leagueId';
-      (currentFavorites[type] as any)[item.id] = { 
-          [idKey]: item.id, 
+        const dataToSave: any = { 
           name: item.name, 
-          logo: item.logo,
-          type: item.type,
-      };
+          logo: item.logo || '' 
+        };
+        if (type === 'teams') {
+            dataToSave.teamId = item.id;
+            dataToSave.type = item.national ? 'National' : 'Club';
+        } else {
+            dataToSave.leagueId = item.id;
+        }
+        (currentFavorites[type] as any)[item.id] = dataToSave;
     }
     setFavorites(currentFavorites);
 
-    const dataToSave: any = {
-      name: item.name,
-      logo: item.logo || '',
+    let dataToSave: any = { 
+        name: item.name, 
+        logo: item.logo || '' 
     };
 
     if (type === 'teams') {
-      dataToSave.teamId = item.id;
-      // This is the key fix: ensure the type ('Club' or 'National') is saved.
-      // The API response for teams includes a `national` boolean. We map this to our type.
-      // We look up the original search result to get this info.
-      const originalResult = searchResults.find(r => r.type === 'team' && r.team.id === item.id) as (TeamResult & {type: 'team'}) | undefined;
-      const isNational = originalResult ? (originalResult as any).team.national : false;
-      dataToSave.type = isNational ? 'National' : 'Club';
+        dataToSave.teamId = item.id;
+        dataToSave.type = item.national ? 'National' : 'Club';
     } else {
-      dataToSave.leagueId = item.id;
+        dataToSave.leagueId = item.id;
     }
-
 
     const operation = isFavorited
       ? updateDoc(favRef, { [fieldPath]: deleteField() })
@@ -214,7 +213,6 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         searchResults.map(result => {
           const item = result.type === 'team' ? result.team : result.league;
           const isFavorited = !!favorites?.[result.type]?.[item.id];
-          // For search results, we pass the full item from the result to handleFavorite
           return <ItemRow key={`${result.type}-${item.id}`} item={item} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={() => handleFavorite(item, result.type)} onResultClick={() => handleResultClick(result)} />;
         })
       ) : <p className="text-muted-foreground text-center pt-8">لا توجد نتائج بحث.</p>;
@@ -225,7 +223,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         <h3 className="font-bold text-md text-center text-muted-foreground">{itemType === 'teams' ? 'الفرق الأكثر شعبية' : 'البطولات الأكثر شعبية'}</h3>
         {popularItemsToShow.map(item => {
           const isFavorited = !!favorites?.[itemType]?.[item.id];
-          return <ItemRow key={item.id} item={item} itemType={itemType} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, itemType)} onResultClick={() => handleResultClick({[itemType.slice(0,-1)]: item, type: itemType} as any)} />;
+          const result: SearchResult = { [itemType.slice(0,-1)]: item, type: itemType } as any;
+          return <ItemRow key={item.id} item={item} itemType={itemType} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, itemType)} onResultClick={() => handleResultClick(result)} />;
         })}
         {!showAllPopular && popularItems.length > 6 && (
           <Button variant="ghost" className="w-full" onClick={() => setShowAllPopular(true)}>عرض الكل</Button>
