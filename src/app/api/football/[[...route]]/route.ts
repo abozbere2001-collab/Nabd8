@@ -11,47 +11,44 @@ export async function GET(
   const { searchParams } = new URL(request.url);
   const routePath = Array.isArray(params.route) ? params.route.join('/') : '';
   
-  // Handle multi-ID requests for players
-  if (routePath === 'players' && searchParams.has('id')) {
-    const ids = searchParams.get('id');
-    const season = searchParams.get('season');
-    if (ids && season) {
-        const individualIds = ids.split('-');
-        const promises = individualIds.map(id => {
-            const apiUrl = `https://${API_FOOTBALL_HOST}/players?id=${id}&season=${season}`;
-            return fetch(apiUrl, {
-                 headers: {
-                    'x-rapidapi-host': API_FOOTBALL_HOST,
-                    'x-rapidapi-key': API_FOOTBALL_KEY,
-                 },
-                 next: { revalidate: 3600 } // Cache player data for 1 hour
-            }).then(async res => {
-                const json = await res.json();
-                if (!res.ok) {
-                    return { status: 'rejected', reason: json };
-                }
-                return { status: 'fulfilled', value: json };
-            });
+  // Handle multi-ID requests specifically for players or fixture-specific player requests
+  if (routePath === 'fixtures/players' || (routePath === 'players' && searchParams.has('id'))) {
+    let apiUrl = '';
+    const fixtureId = searchParams.get('fixture');
+    const playerIds = searchParams.get('id');
+
+    if(routePath === 'fixtures/players' && fixtureId) {
+        apiUrl = `https://${API_FOOTBALL_HOST}/fixtures/players?fixture=${fixtureId}`;
+    } else if (routePath === 'players' && playerIds) {
+        apiUrl = `https://${API_FOOTBALL_HOST}/players?id=${playerIds}&season=${searchParams.get('season')}`;
+    } else {
+        return NextResponse.json({ error: 'Invalid players request' }, { status: 400 });
+    }
+    
+    try {
+        const apiResponse = await fetch(apiUrl, {
+             headers: {
+                'x-rapidapi-host': API_FOOTBALL_HOST,
+                'x-rapidapi-key': API_FOOTBALL_KEY,
+             },
+             next: { revalidate: 3600 } // Cache player data for 1 hour
         });
 
-        try {
-            // Using allSettled to ensure all requests complete, even if some fail
-            const results = await Promise.allSettled(promises);
-            
-            const successfulResponses = results
-                .filter(result => result.status === 'fulfilled' && result.value.status === 'fulfilled')
-                // @ts-ignore - This is the key fix: correctly extract the nested response data
-                .flatMap(result => (result.value.value as any).response);
-            
-            return NextResponse.json({ response: successfulResponses });
-
-        } catch (error) {
-             console.error('API proxy error for multi-ID players:', error);
-            return NextResponse.json(
-              { error: 'An internal error occurred while proxying the multi-ID request.' },
-              { status: 500 }
-            );
+        if (!apiResponse.ok) {
+            const errorBody = await apiResponse.text();
+            console.error(`API Error for ${apiUrl}:`, errorBody);
+            return NextResponse.json({ error: 'Failed to fetch player data from football API', details: errorBody }, { status: apiResponse.status });
         }
+        
+        const data = await apiResponse.json();
+        return NextResponse.json(data);
+
+    } catch (error) {
+         console.error(`API proxy error for players request (${apiUrl}):`, error);
+        return NextResponse.json(
+          { error: 'An internal error occurred while proxying the player data request.' },
+          { status: 500 }
+        );
     }
   }
 
