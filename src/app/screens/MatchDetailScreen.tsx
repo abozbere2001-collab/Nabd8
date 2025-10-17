@@ -473,7 +473,9 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
 
 // --- Main Screen Component ---
 const mergePlayerData = (lineups: LineupData[], playersData: { player: PlayerType, statistics: any }[]): LineupData[] => {
-    if (!playersData || playersData.length === 0) return lineups;
+    if (!playersData || playersData.length === 0) {
+        return lineups;
+    }
 
     const playersMap = new Map(playersData.map(p => [p.player.id, p]));
 
@@ -482,15 +484,18 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: PlayerTyp
             if (!p.player.id) return p;
             const extraData = playersMap.get(p.player.id);
             
-            const mergedPlayer = {
-                ...p.player,
-                photo: extraData?.player?.photo || p.player.photo,
-                rating: extraData?.statistics?.[0]?.games?.rating || p.player.rating,
-            };
+            // Start with the original player data from the lineup
+            let mergedPlayer: PlayerType = { ...p.player };
 
+            // If extra data is found, merge it carefully
+            if (extraData) {
+                mergedPlayer.photo = extraData.player?.photo || mergedPlayer.photo;
+                mergedPlayer.rating = extraData.statistics?.[0]?.games?.rating || mergedPlayer.rating;
+            }
+            
             return {
                 ...p,
-                player: mergedPlayer
+                player: mergedPlayer,
             };
         });
     };
@@ -538,7 +543,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             
             let finalLineups = lineupsData.response || [];
             
-            const matchSeason = currentFixture.league.season || CURRENT_SEASON;
+            const matchSeason = currentFixture.league?.season || CURRENT_SEASON;
             
             const allPlayerIds = finalLineups.flatMap((l: LineupData) => 
                 [...l.startXI, ...l.substitutes].map(p => p.player.id)
