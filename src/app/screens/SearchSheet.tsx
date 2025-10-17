@@ -16,11 +16,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
-import { NoteDialog } from '@/components/NoteDialog';
 import { cn } from '@/lib/utils';
-import type { Favorites } from '@/lib/types';
+import type { Favorites, AdminFavorite } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
@@ -54,7 +53,7 @@ const normalizeArabic = (text: string) => {
 };
 
 
-const ItemRow = ({ item, itemType, isFavorited, onFavoriteToggle, onResultClick, onRename, onAddNote, isAdmin }: { item: Item, itemType: ItemType, isFavorited: boolean, onFavoriteToggle: (item: Item) => void, onResultClick: () => void, onRename: () => void, onAddNote: () => void, isAdmin: boolean }) => {
+const ItemRow = ({ item, itemType, isFavorited, onFavoriteToggle, onResultClick, onRename, isAdmin }: { item: Item, itemType: ItemType, isFavorited: boolean, onFavoriteToggle: (item: Item) => void, onResultClick: () => void, onRename: () => void, isAdmin: boolean }) => {
   return (
     <div className="flex items-center gap-2 p-1.5 border-b last:border-b-0 hover:bg-accent/50 rounded-md">
        <div className="flex-1 flex items-center gap-2 cursor-pointer" onClick={onResultClick}>
@@ -64,11 +63,6 @@ const ItemRow = ({ item, itemType, isFavorited, onFavoriteToggle, onResultClick,
             </Avatar>
             <div className="flex-1 font-semibold truncate text-sm">{item.name}</div>
         </div>
-      {isAdmin && itemType === 'teams' && (
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onAddNote}>
-            <Heart className="h-4 w-4 text-muted-foreground" />
-        </Button>
-      )}
       {isAdmin && (
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onRename}>
             <Pencil className="h-4 w-4 text-muted-foreground" />
@@ -97,13 +91,9 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   const { db } = useFirestore();
   const { toast } = useToast();
   const [favorites, setFavorites] = useState<Favorites>({ userId: '' });
-  const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>}>({leagues: new Map(), teams: new Map()});
+  const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>, adminNotes: Map<number, string>}>({leagues: new Map(), teams: new Map(), adminNotes: new Map() });
   
-  const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, type: RenameType } | null>(null);
-  const [isRenameOpen, setRenameOpen] = useState(false);
-  
-  const [noteTeam, setNoteTeam] = useState<{id: number, name: string, logo: string} | null>(null);
-  const [isNoteOpen, setIsNoteOpen] = useState(false);
+  const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, note?: string, type: RenameType, originalData?: any } | null>(null);
   
   useEffect(() => {
     if(initialItemType) {
@@ -141,9 +131,10 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   const fetchAllCustomNames = useCallback(async () => {
     if (!db) return;
     try {
-        const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+        const [leaguesSnapshot, teamsSnapshot, adminFavsSnapshot] = await Promise.all([
             getDocs(collection(db, 'leagueCustomizations')),
-            getDocs(collection(db, 'teamCustomizations'))
+            getDocs(collection(db, 'teamCustomizations')),
+            isAdmin ? getDocs(collection(db, 'adminFavorites')) : Promise.resolve({ docs: [] }),
         ]);
         
         const leagueNames = new Map<number, string>();
@@ -151,12 +142,15 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         
         const teamNames = new Map<number, string>();
         teamsSnapshot?.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+
+        const adminNotes = new Map<number, string>();
+        adminFavsSnapshot?.forEach(doc => adminNotes.set(Number(doc.id), doc.data().note));
         
-        setCustomNames({ leagues: leagueNames, teams: teamNames });
+        setCustomNames({ leagues: leagueNames, teams: teamNames, adminNotes: adminNotes });
     } catch(error) {
          console.warn("Could not fetch custom names, this is expected for non-admins", error);
     }
-  }, [db]);
+  }, [db, isAdmin]);
 
   const getDisplayName = useCallback((type: 'team' | 'league', id: number, defaultName: string) => {
       const key = `${type}s` as 'teams' | 'leagues';
@@ -349,53 +343,57 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     handleOpenChange(false);
   }
 
-  const handleOpenRename = (type: RenameType, id: string | number, name: string) => {
-    setRenameItem({ id, name, type });
-    setRenameOpen(true);
+  const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
+    const currentName = getDisplayName(type, id, originalData.name);
+    const note = type === 'team' ? customNames.adminNotes.get(id) : undefined;
+    setRenameItem({ id, name: currentName, note, type, originalData });
   };
   
-  const handleSaveRename = (newName: string) => {
+  const handleSaveRename = async (newName: string, newNote?: string) => {
     if (!renameItem || !db) return;
-    const { id, type } = renameItem;
-    let collectionName = type === 'league' ? 'leagueCustomizations' : 'teamCustomizations';
-    const docRef = doc(db, collectionName, String(id));
-    const data = { customName: newName };
-    setDoc(docRef, data)
-        .then(() => fetchAllCustomNames())
-        .catch(serverError => {
-            const permissionError = new FirestorePermissionError({
-                path: docRef.path,
-                operation: 'create',
-                requestResourceData: data,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        });
-  };
-  
-  const handleOpenNote = (team: {id: number, name: string, logo: string}) => {
-    setNoteTeam(team);
-    setIsNoteOpen(true);
-  }
+    const { id, type, originalData } = renameItem;
 
-  const handleSaveNote = (note: string) => {
-    if (!noteTeam || !db) return;
-    const docRef = doc(db, "adminFavorites", String(noteTeam.id));
-    const data = {
-      teamId: noteTeam.id,
-      name: noteTeam.name,
-      logo: noteTeam.logo,
-      note: note
-    };
-    setDoc(docRef, data)
-        .catch(serverError => {
-            const permissionError = new FirestorePermissionError({
-                path: docRef.path,
-                operation: 'create',
-                requestResourceData: data,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+    const batch = writeBatch(db);
+
+    // Save Custom Name
+    const nameRef = doc(db, `${type}Customizations`, String(id));
+    if (newName && newName !== originalData.name) {
+        batch.set(nameRef, { customName: newName });
+    } else {
+        batch.delete(nameRef); // Delete if name is cleared or same as original
+    }
+
+    // Save Admin Note (only for teams)
+    if (type === 'team') {
+        const noteRef = doc(db, "adminFavorites", String(id));
+        if (newNote !== undefined && newNote.length > 0) {
+            const data: AdminFavorite = {
+                teamId: originalData.id,
+                name: originalData.name,
+                logo: originalData.logo,
+                note: newNote
+            };
+            batch.set(noteRef, data);
+        } else {
+            batch.delete(noteRef);
+        }
+    }
+
+    try {
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم حفظ التغييرات بنجاح.' });
+        await fetchAllCustomNames(); // Refetch all names to update UI
+        if(debouncedSearchTerm) {
+            handleSearch(debouncedSearchTerm);
+        }
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: `batch write for customizations`,
+            operation: 'write'
         });
-  }
+        errorEmitter.emit('permission-error', permissionError);
+    }
+  };
   
   const popularItems = itemType === 'teams' ? POPULAR_TEAMS : POPULAR_LEAGUES;
   const popularItemsToShow = showAllPopular ? popularItems : popularItems.slice(0, 6);
@@ -410,7 +408,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         searchResults.map(result => {
           const item = result.type === 'team' ? result.team : result.league;
           const isFavorited = !!favorites?.[result.type]?.[item.id];
-          return <ItemRow key={`${result.type}-${item.id}`} item={item} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, result.type)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(result.type, item.id, item.name)} onAddNote={() => handleOpenNote(item as TeamResult['team'])} />;
+          return <ItemRow key={`${result.type}-${item.id}`} item={item} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, result.type)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(result.type, item.id, item)} />;
         })
       ) : <p className="text-muted-foreground text-center pt-8">لا توجد نتائج بحث.</p>;
     }
@@ -424,7 +422,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
           const resultType = itemType === 'teams' ? 'team' : 'league';
           const result = { [resultType]: { ...item, name: displayName }, type: resultType } as SearchResult;
 
-          return <ItemRow key={item.id} item={{...item, name: displayName}} itemType={itemType} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, itemType)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(resultType, item.id, displayName)} onAddNote={() => handleOpenNote(item as TeamResult['team'])} />;
+          return <ItemRow key={item.id} item={{...item, name: displayName}} itemType={itemType} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, itemType)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(resultType, item.id, item)} />;
         })}
         {!showAllPopular && popularItems.length > 6 && (
           <Button variant="ghost" className="w-full" onClick={() => setShowAllPopular(true)}>عرض الكل</Button>
@@ -461,20 +459,15 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         
         {renameItem && (
           <RenameDialog 
-            isOpen={isRenameOpen}
-            onOpenChange={setRenameOpen}
+            isOpen={!!renameItem}
+            onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
             currentName={renameItem.name}
+            currentNote={renameItem.note}
             onSave={handleSaveRename}
             itemType={renameItem.type === 'team' ? 'الفريق' : 'البطولة'}
+            hasNoteField={renameItem.type === 'team'}
           />
         )}
-        {noteTeam && <NoteDialog
-            isOpen={isNoteOpen}
-            onOpenChange={setIsNoteOpen}
-            onSave={handleSaveNote}
-            teamName={noteTeam.name}
-        />}
-
       </SheetContent>
     </Sheet>
   );

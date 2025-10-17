@@ -205,12 +205,22 @@ function OurBallTab({ navigate, isAdmin }: { navigate: ScreenProps['navigate'], 
     const [deletingId, setDeletingId] = useState<number | null>(null);
     const { db } = useFirestore();
     const { toast } = useToast();
+    const [customTeamNames, setCustomTeamNames] = useState<Map<number, string>>(new Map());
 
     useEffect(() => {
         if (!db) return;
-        setLoading(true);
+
+        const fetchCustomNames = async () => {
+            const snapshot = await getDocs(collection(db, 'teamCustomizations'));
+            const names = new Map<number, string>();
+            snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
+            setCustomTeamNames(names);
+        };
+
         const favsRef = collection(db, 'adminFavorites');
-        const unsubscribe = onSnapshot(favsRef, (snapshot) => {
+        const unsubscribe = onSnapshot(favsRef, async (snapshot) => {
+            setLoading(true);
+            await fetchCustomNames();
             const fetchedTeams: AdminFavorite[] = [];
             snapshot.forEach((doc) => {
                 fetchedTeams.push(doc.data() as AdminFavorite);
@@ -222,6 +232,7 @@ function OurBallTab({ navigate, isAdmin }: { navigate: ScreenProps['navigate'], 
             errorEmitter.emit('permission-error', permissionError);
             setLoading(false);
         });
+
         return () => unsubscribe();
     }, [db]);
 
@@ -257,43 +268,46 @@ function OurBallTab({ navigate, isAdmin }: { navigate: ScreenProps['navigate'], 
 
     return (
         <div className="space-y-3 pt-4">
-            {teams.map(team => (
-                <div key={team.teamId} className="p-3 rounded-lg border bg-card flex items-center gap-3">
-                    <div onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: team.teamId, teamName: team.name })} className="flex-1 flex items-center gap-3 cursor-pointer">
-                        <Avatar className="h-10 w-10">
-                            <AvatarImage src={team.logo} alt={team.name} />
-                            <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                            <p className="font-bold">{team.name}</p>
-                            <p className="text-xs text-muted-foreground">{team.note}</p>
+            {teams.map(team => {
+                const displayName = customTeamNames.get(team.teamId) || team.name;
+                return (
+                    <div key={team.teamId} className="p-3 rounded-lg border bg-card flex items-center gap-3">
+                        <div onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: team.teamId, teamName: displayName })} className="flex-1 flex items-center gap-3 cursor-pointer">
+                            <Avatar className="h-10 w-10">
+                                <AvatarImage src={team.logo} alt={displayName} />
+                                <AvatarFallback>{displayName.substring(0, 2)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <p className="font-bold">{displayName}</p>
+                                <p className="text-xs text-muted-foreground">{team.note}</p>
+                            </div>
                         </div>
+                        {isAdmin && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" disabled={deletingId === team.teamId} onClick={(e) => e.stopPropagation()}>
+                                        {deletingId === team.teamId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            سيتم حذف فريق "{displayName}" من قائمة "كرتنا". لا يمكن التراجع عن هذا الإجراء.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDelete(team.teamId)} className="bg-destructive hover:bg-destructive/90">
+                                            حذف
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        )}
                     </div>
-                     {isAdmin && (
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" disabled={deletingId === team.teamId} onClick={(e) => e.stopPropagation()}>
-                                    {deletingId === team.teamId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        سيتم حذف فريق "{team.name}" من قائمة "كرتنا". لا يمكن التراجع عن هذا الإجراء.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(team.teamId)} className="bg-destructive hover:bg-destructive/90">
-                                        حذف
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    )}
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }

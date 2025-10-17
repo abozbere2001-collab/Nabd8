@@ -8,37 +8,45 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from './ui/textarea';
 
 interface RenameDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   currentName: string;
-  onSave: (newName: string) => void;
+  currentNote?: string;
+  onSave: (newName: string, newNote?: string) => void;
   itemType?: string;
+  hasNoteField?: boolean;
 }
 
 export function RenameDialog({
   isOpen,
   onOpenChange,
   currentName,
+  currentNote = '',
   onSave,
   itemType = 'العنصر',
+  hasNoteField = false,
 }: RenameDialogProps) {
   const [newName, setNewName] = useState(currentName);
+  const [newNote, setNewNote] = useState(currentNote);
 
   useEffect(() => {
     if (isOpen) {
       setNewName(currentName);
+      setNewNote(currentNote);
     }
-  }, [isOpen, currentName]);
+  }, [isOpen, currentName, currentNote]);
 
   const handleSave = () => {
     if (newName.trim()) {
-      onSave(newName.trim());
+      onSave(newName.trim(), hasNoteField ? newNote.trim() : undefined);
       onOpenChange(false);
     }
   };
@@ -47,20 +55,33 @@ export function RenameDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>إعادة تسمية {itemType}</DialogTitle>
+          <DialogTitle>تعديل {itemType}</DialogTitle>
+           {hasNoteField && (
+             <DialogDescription>
+                يمكنك تعديل الاسم المخصص وإضافة ملاحظة إدارية خاصة.
+             </DialogDescription>
+           )}
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
-              الاسم الجديد
-            </Label>
+          <div className="grid w-full items-center gap-1.5">
+            <Label htmlFor="name">الاسم المخصص</Label>
             <Input
               id="name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="col-span-3"
             />
           </div>
+          {hasNoteField && (
+            <div className="grid w-full items-center gap-1.5">
+                <Label htmlFor="note">ملاحظة إدارية (اختياري)</Label>
+                <Textarea 
+                    id="note"
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="اكتب ملاحظتك هنا... (تظهر في قسم 'كرتنا')"
+                />
+            </div>
+          )}
         </div>
         <DialogFooter>
           <DialogClose asChild>
