@@ -21,7 +21,7 @@ import { OddsTab } from '@/components/OddsTab';
 import { useTranslation } from '@/components/LanguageProvider';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
-import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection } from 'firebase/firestore';
+import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -383,6 +383,11 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             </div>
         )
     }
+    
+    const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
+    const subsNotYetOn = activeLineup.substitutes.filter(sub => 
+        !substitutionEvents.some(e => e.player.id === sub.player.id)
+    );
 
     return (
         <div className="space-y-4">
@@ -407,52 +412,66 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                         </Avatar>
                         <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
                          {isAdmin && (
-                            <Button variant="ghost" size="icon" className="absolute top-0 right-[-30px] h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
+                            <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
                                 <Pencil className="h-3 w-3" />
                             </Button>
                         )}
                     </div>
                 </CardContent>
             </Card>
+            
+            {substitutionEvents.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-center text-base">التبديلات</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {substitutionEvents.map((event, index) => {
+                            const playerIn = event.player;
+                            const playerOut = event.assist;
 
-            <Card>
-                <CardHeader>
-                     <CardTitle className="text-center text-base">{t('substitutes_and_changes')}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    {activeLineup.substitutes.map(p => {
-                         const subbedInEvent = events?.find(e => e.type === 'subst' && e.player.id === p.player.id);
-                         const subbedOutPlayer = subbedInEvent ? activeLineup.startXI.find(starter => starter.player.id === subbedInEvent.assist.id) : null;
+                            const playerInDetails = [...activeLineup.startXI, ...activeLineup.substitutes].find(p => p.player.id === playerIn.id)?.player;
+                            const playerOutDetails = activeLineup.startXI.find(p => p.player.id === playerOut.id)?.player;
 
-                        return (
-                            <div key={p.player.id || p.player.name} className="flex items-center justify-between p-1.5 border-b last:border-b-0">
-                                <div className="flex items-center gap-3" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
-                                     <Avatar className="h-8 w-8">
-                                        <AvatarImage src={p.player.photo} alt={p.player.name} />
-                                        <AvatarFallback>{p.player.name?.charAt(0) || 'P'}</AvatarFallback>
-                                     </Avatar>
-                                     <span className="text-sm font-semibold">{p.player.name}</span>
-                                </div>
-                                {subbedInEvent && (
-                                     <div className="flex items-center gap-4 text-xs">
-                                         <div className="flex items-center gap-1.5 text-green-500 font-semibold">
-                                            <ArrowUp className="h-4 w-4"/>
-                                            <span>{subbedInEvent.player.name}</span>
-                                         </div>
-                                         {subbedOutPlayer && (
-                                            <div className="flex items-center gap-1.5 text-red-500">
-                                                <ArrowDown className="h-4 w-4"/>
-                                                <span>{subbedOutPlayer.player.name}</span>
-                                            </div>
-                                         )}
+                            return (
+                                <div key={index} className="flex items-center justify-between p-2 border-b last:border-b-0">
+                                    <div className="font-bold text-sm text-muted-foreground">{event.time.elapsed}'</div>
+                                    <div className="flex-1 flex flex-col items-center gap-1">
+                                        <div className="flex items-center gap-2 text-green-500 font-semibold">
+                                            <ArrowUp className="h-4 w-4" />
+                                            <span>{playerIn.name}</span>
+                                            {playerInDetails?.rating && <span className="text-xs">({playerInDetails.rating})</span>}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-red-500 text-sm">
+                                            <ArrowDown className="h-4 w-4" />
+                                            <span>{playerOut.name}</span>
+                                            {playerOutDetails?.rating && <span className="text-xs">({playerOutDetails.rating})</span>}
+                                        </div>
                                     </div>
-                                )}
-                            </div>
-                        )
-                    })}
-                </CardContent>
-            </Card>
+                                    <div className="w-8" />
+                                </div>
+                            );
+                        })}
+                    </CardContent>
+                </Card>
+            )}
 
+            {subsNotYetOn.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-center text-base">الاحتياط</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {subsNotYetOn.map(p => (
+                            <div key={p.player.id || p.player.name} className="flex items-center justify-between p-1.5">
+                                 <div className="flex items-center gap-3" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                                     <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
+                                 </div>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 };
@@ -504,7 +523,7 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
 
     const playersMap = new Map<number, { player: Player, statistics: any[] }>();
     playersData.forEach(p => {
-        if (p.player && p.player.id) {
+        if (p.player.id) {
             playersMap.set(p.player.id, p);
         }
     });
@@ -512,10 +531,10 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
     const updatePlayerInList = (playerList: PlayerWithStats[]): PlayerWithStats[] => {
         if (!playerList) return [];
         return playerList.map(pWithStats => {
-            if (!pWithStats || !pWithStats.player || !pWithStats.player.id) return pWithStats;
+            if (!pWithStats || !pWithStats.player) return pWithStats;
 
             const lineupPlayer = pWithStats.player;
-            if (playersMap.has(lineupPlayer.id)) {
+            if (lineupPlayer.id && playersMap.has(lineupPlayer.id)) {
                 const detailedPlayerInfo = playersMap.get(lineupPlayer.id)!;
                 const rating = detailedPlayerInfo.statistics?.[0]?.games?.rating;
                 
@@ -664,8 +683,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             {renameItem && (
                 <RenameDialog
                     isOpen={!!renameItem}
+                    item={{id: renameItem.id, name: renameItem.name, type: renameItem.type}}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-                    item={renameItem}
                     onSave={handleSaveRename}
                 />
             )}
@@ -692,3 +711,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
