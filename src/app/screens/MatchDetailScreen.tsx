@@ -497,7 +497,7 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
 };
 
 const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, statistics: any[] }[]): LineupData[] => {
-    if (!playersData || playersData.length === 0) {
+    if (!playersData || playersData.length === 0 || !lineups || lineups.length === 0) {
         return lineups;
     }
 
@@ -509,7 +509,10 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
     });
 
     const updatePlayerInList = (playerList: PlayerWithStats[]): PlayerWithStats[] => {
+        if (!playerList) return [];
         return playerList.map(pWithStats => {
+            if (!pWithStats || !pWithStats.player) return pWithStats;
+
             const lineupPlayer = pWithStats.player;
             if (lineupPlayer.id && playersMap.has(lineupPlayer.id)) {
                 const detailedPlayerInfo = playersMap.get(lineupPlayer.id)!;
