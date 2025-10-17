@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -14,15 +13,25 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp } from 'lucide-react';
+import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { OddsTab } from '@/components/OddsTab';
 import { useTranslation } from '@/components/LanguageProvider';
+import { useAdmin, useFirestore } from '@/firebase/provider';
+import { RenameDialog } from '@/components/RenameDialog';
+import { doc, setDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { FirestorePermissionError } from '@/firebase';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { Button } from '@/components/ui/button';
 
-const PlayerCard = ({ player, navigate }: { player: PlayerType, navigate: ScreenProps['navigate'] }) => {
+type RenameType = 'player' | 'coach';
+
+
+const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerType, navigate: ScreenProps['navigate'], onRename: () => void, isAdmin: boolean }) => {
     const { t } = useTranslation();
     const fallbackImage = "https://media.api-sports.io/football/players/0.png";
     const playerImage = player.photo && player.photo.trim() !== '' ? player.photo : fallbackImage;
@@ -46,6 +55,11 @@ const PlayerCard = ({ player, navigate }: { player: PlayerType, navigate: Screen
                     <AvatarImage src={playerImage} alt={player?.name || "Player"} />
                     <AvatarFallback>{player?.name?.charAt(0) || 'P'}</AvatarFallback>
                 </Avatar>
+                {isAdmin && (
+                    <Button variant="ghost" size="icon" className="absolute -bottom-2 -left-2 h-6 w-6 bg-background/80 hover:bg-background rounded-full" onClick={(e) => {e.stopPropagation(); onRename();}}>
+                        <Pencil className="h-3 w-3" />
+                    </Button>
+                )}
                 {player.number && (
                     <div className="absolute -top-1 -left-1 bg-gray-800 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-background">
                         {player.number}
@@ -311,7 +325,7 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
     );
 }
 
-const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'] }) => {
+const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string) => void }) => {
     const { t } = useTranslation();
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
@@ -359,19 +373,17 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
                 {sortedRows.map(row => (
                     <div key={row} className="flex justify-around items-center">
-                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} />)}
+                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />)}
                     </div>
                 ))}
                  {ungriddedPlayers.length > 0 && (
                     <div className="flex justify-around items-center">
-                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate}/>)}
+                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />)}
                     </div>
                 )}
             </div>
         )
     }
-
-    const substitutions = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
 
     return (
         <div className="space-y-4">
@@ -387,58 +399,55 @@ const LineupsTab = ({ lineups, events, navigate }: { lineups: LineupData[] | nul
             {renderPitch(activeLineup)}
             
             <Card>
-                <CardHeader>
-                    <CardTitle className="text-center text-base">{t('coach')}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col items-center gap-1">
-                    <Avatar className="h-16 w-16">
-                        <AvatarImage src={activeLineup.coach.photo} />
-                        <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <span className="font-semibold text-sm">{activeLineup.coach.name}</span>
+                <CardContent className="p-3 text-center">
+                    <h3 className="font-bold text-sm mb-2">{t('coach')}</h3>
+                    <div className="relative flex flex-col items-center gap-1">
+                        <Avatar className="h-12 w-12">
+                            <AvatarImage src={activeLineup.coach.photo} />
+                            <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
+                         {isAdmin && (
+                            <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
+                                <Pencil className="h-3 w-3" />
+                            </Button>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
 
-            {substitutions.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-center text-base">{t('substitutes_and_changes')}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {substitutions.map((sub, index) => (
-                             <div key={index} className="flex items-center justify-between text-sm p-2 border-b last:border-b-0">
-                                 <span className="text-muted-foreground">{sub.time.elapsed}'</span>
-                                 <div className="flex items-center gap-2 text-green-600">
-                                    <ArrowUp className="h-4 w-4"/>
-                                    <span>{sub.player.name}</span>
-                                 </div>
-                                 <div className="flex items-center gap-2 text-red-500">
-                                    <span className="line-through">{sub.assist.name}</span>
-                                    <ArrowDown className="h-4 w-4"/>
-                                 </div>
-                             </div>
-                        ))}
-                    </CardContent>
-                </Card>
-            )}
-
             <Card>
                 <CardHeader>
-                     <CardTitle className="text-center text-base">الاحتياط</CardTitle>
+                     <CardTitle className="text-center text-base">{t('substitutes_and_changes')}</CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-2 gap-2">
-                    {activeLineup.substitutes.map(p => (
-                        <div key={p.player.id || p.player.name} className="flex items-center gap-2 p-2 rounded-md bg-card-foreground/5 border">
-                             <Avatar className="h-8 w-8">
-                                <AvatarImage src={p.player.photo} />
-                                <AvatarFallback>{p.player.name?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <p className="text-xs font-semibold">{p.player.name}</p>
-                                <p className="text-[10px] text-muted-foreground">{p.player.number}</p>
+                <CardContent className="space-y-2">
+                    {activeLineup.substitutes.map(p => {
+                         const subbedInEvent = events?.find(e => e.type === 'subst' && e.player.id === p.player.id);
+                         const subbedOutPlayer = subbedInEvent ? activeLineup.startXI.find(starter => starter.player.id === subbedInEvent.assist.id) : null;
+
+                        return (
+                            <div key={p.player.id || p.player.name} className="flex items-center justify-between p-1.5 border-b last:border-b-0">
+                                <div className="flex items-center gap-2">
+                                     <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
+                                     <span className="text-xs font-semibold">{p.player.name}</span>
+                                </div>
+                                {subbedInEvent && (
+                                     <div className="flex items-center gap-2 text-xs">
+                                         <div className="flex items-center gap-1 text-green-500">
+                                            <ArrowUp className="h-3 w-3"/>
+                                            <span>({subbedInEvent.time.elapsed}')</span>
+                                         </div>
+                                         {subbedOutPlayer && (
+                                            <div className="flex items-center gap-1 text-red-500">
+                                                <ArrowDown className="h-3 w-3"/>
+                                                <span className="line-through">{subbedOutPlayer.player.name}</span>
+                                            </div>
+                                         )}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </CardContent>
             </Card>
 
@@ -523,6 +532,9 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
 
 
 export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixture: initialFixture }: ScreenProps & { fixtureId: number, fixture?: Fixture }) {
+    const { isAdmin } = useAdmin();
+    const { db } = useFirestore();
+    const { toast } = useToast();
     const [fixture, setFixture] = useState<Fixture | null>(initialFixture || null);
     const [lineups, setLineups] = useState<LineupData[] | null>(null);
     const [events, setEvents] = useState<MatchEvent[] | null>(null);
@@ -530,6 +542,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [standings, setStandings] = useState<Standing[] | null>(null);
     const [loading, setLoading] = useState(!initialFixture);
     const { t } = useTranslation();
+    const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string } | null>(null);
 
     const fetchData = useCallback(async (isInitialLoad: boolean) => {
         if (!fixtureId) return;
@@ -588,6 +601,34 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     useEffect(() => {
         fetchData(true);
     }, [fetchData]);
+    
+    const handleOpenRename = (type: RenameType, id: number, name: string) => {
+        setRenameItem({ type, id, name });
+    };
+
+    const handleSaveRename = (newName: string) => {
+        if (!renameItem || !db) return;
+        const { id, type } = renameItem;
+        const collectionName = type === 'player' ? 'playerCustomizations' : 'coachCustomizations';
+        const docRef = doc(db, collectionName, String(id));
+        const data = { customName: newName };
+
+        setDoc(docRef, data)
+            .then(() => {
+                toast({ title: 'نجاح', description: `تم تحديث اسم ${type === 'player' ? 'اللاعب' : 'المدرب'}.` });
+                fetchData(false); // Refetch data to show updated name
+            })
+            .catch(serverError => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'create',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+
+        setRenameItem(null);
+    };
 
 
     if (loading && !fixture) {
@@ -611,6 +652,17 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     return (
         <div className="flex h-full flex-col bg-background">
             <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} />
+            
+            {renameItem && (
+                <RenameDialog
+                    isOpen={!!renameItem}
+                    onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
+                    currentName={renameItem.name}
+                    onSave={handleSaveRename}
+                    itemType={renameItem.type === 'player' ? 'اللاعب' : 'المدرب'}
+                />
+            )}
+
             <div className="flex-1 overflow-y-auto p-1">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} />
                 <Tabs defaultValue="lineups" className="w-full">
@@ -625,7 +677,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     <TabsContent value="odds" className="mt-4"><OddsTab fixtureId={fixture.fixture.id} /></TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
                     <TabsContent value="lineups" className="mt-4">
-                        <LineupsTab lineups={lineups} events={events} navigate={navigate} />
+                        <LineupsTab lineups={lineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename}/>
                     </TabsContent>
                     <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} navigate={navigate} /></TabsContent>
                 </Tabs>
