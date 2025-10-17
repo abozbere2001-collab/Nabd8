@@ -8,11 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
+import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType, MatchCustomization } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
@@ -23,13 +23,13 @@ import { OddsTab } from '@/components/OddsTab';
 import { useTranslation } from '@/components/LanguageProvider';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
-import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection, onSnapshot, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 
-type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country';
+type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'matchStatus';
 
 
 const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerType, navigate: ScreenProps['navigate'], onRename: () => void, isAdmin: boolean }) => {
@@ -81,7 +81,7 @@ const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerTyp
 };
 
 
-const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
+const MatchHeaderCard = ({ fixture, navigate, onRename, customStatus, isAdmin }: { fixture: Fixture, navigate: ScreenProps['navigate'], onRename: () => void, customStatus: string | null, isAdmin: boolean }) => {
     return (
         <Card className="mb-4 bg-card/80 backdrop-blur-sm">
             <CardContent className="p-4">
@@ -98,7 +98,12 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
                         <span className="font-bold text-[10px] text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="flex flex-col items-center justify-center min-w-[120px] text-center">
-                        <LiveMatchStatus fixture={fixture} large />
+                        <LiveMatchStatus fixture={fixture} customStatus={customStatus} large />
+                         {isAdmin && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 mt-1" onClick={onRename}>
+                                <Pencil className="h-3 w-3" />
+                            </Button>
+                        )}
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
@@ -171,18 +176,18 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
                                             <span className="text-muted-foreground">{stat.label}</span>
                                             <span>{awayValueRaw}</span>
                                         </div>
-                                        <div className="flex items-center gap-1" dir="ltr">
-                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-l-full" className="rounded-l-full"/>
+                                        <div className="flex items-center gap-1" dir="ltr" style={{flexDirection: 'row-reverse'}}>
                                             <Progress value={awayVal} indicatorClassName="bg-accent rounded-r-full" className="rounded-r-full" style={{transform: 'rotate(180deg)'}}/>
+                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-l-full" className="rounded-l-full"/>
                                         </div>
                                     </div>
                                 )
                             }
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
-                                    <span>{homeValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
                                     <span>{awayValueRaw}</span>
+                                    <span className="text-muted-foreground font-normal">{stat.label}</span>
+                                    <span>{homeValueRaw}</span>
                                 </div>
                             )
                         })
@@ -293,10 +298,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
     const activeLineup = activeTeamTab === 'home' ? home : away;
     
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
-    const subsNotYetOn = activeLineup.substitutes.filter(sub => 
-        !substitutionEvents.some(e => e.player.id === sub.player.id)
-    );
-
+    
     const renderPitch = (lineup: LineupData) => {
         const formationGrid: { [key: number]: PlayerWithStats[] } = {};
         const ungriddedPlayers: PlayerWithStats[] = [];
@@ -351,18 +353,18 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             
             {renderPitch(activeLineup)}
             
-            <div className="bg-transparent">
+            <div className="bg-background">
                 <h3 className="text-center text-base font-bold mb-2">{t('substitutes_and_changes')}</h3>
-                <div className="bg-background space-y-2 mb-4 rounded-lg">
+                <div className="bg-card/50 space-y-2 mb-4 rounded-lg p-2">
                     {substitutionEvents.map((event, index) => {
-                        const playerIn = event.player;
-                        const playerOut = event.assist;
+                        const playerOut = event.player;
+                        const playerIn = event.assist;
 
                         return (
-                            <Card key={index} className="p-2 bg-card">
+                             <div key={index} className="p-2">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-red-500">
-                                        <ArrowDown className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
+                                        <ArrowUp className="h-4 w-4" />
                                         <div className="flex flex-col items-start">
                                             <span className="truncate">{playerIn.name}</span>
                                         </div>
@@ -370,14 +372,14 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
 
                                     <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
 
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-green-500">
-                                        <ArrowUp className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
+                                        <ArrowDown className="h-4 w-4" />
                                         <div className="flex flex-col items-end">
                                             <span className="truncate">{playerOut.name}</span>
                                         </div>
                                     </div>
                                 </div>
-                            </Card>
+                            </div>
                         );
                     })}
                 </div>
@@ -402,9 +404,9 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
 
                  <div className="space-y-4 pt-4">
                     <h3 className="text-center text-base font-bold">الاحتياط</h3>
-                    <div className="bg-background grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg">
-                        {subsNotYetOn.map(p => (
-                            <Card key={p.player.id || p.player.name} className="p-2 bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                    <div className="bg-card/50 grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg p-2">
+                        {activeLineup.substitutes.map(p => (
+                            <div key={p.player.id || p.player.name} className="p-2 cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                                 <div className="flex items-center gap-3">
                                     <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name)} />
                                     <div className="flex-1 text-right">
@@ -412,7 +414,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                                         <p className="text-xs text-muted-foreground">{p.player.position}</p>
                                     </div>
                                 </div>
-                            </Card>
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -511,6 +513,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [events, setEvents] = useState<MatchEvent[] | null>(null);
     const [statistics, setStatistics] = useState<MatchStatistics[] | null>(null);
     const [standings, setStandings] = useState<Standing[] | null>(null);
+    const [customStatus, setCustomStatus] = useState<string | null>(null);
     const [loading, setLoading] = useState(!initialFixture);
     const { t } = useTranslation();
     const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string } | null>(null);
@@ -614,13 +617,44 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         fetchData(true);
     }, [fetchData]);
     
+    useEffect(() => {
+        if (!db || !fixtureId) return;
+        const unsub = onSnapshot(doc(db, "matchCustomizations", String(fixtureId)), (doc) => {
+            if (doc.exists()) {
+                setCustomStatus(doc.data()?.customStatus || null);
+            } else {
+                setCustomStatus(null);
+            }
+        }, (error) => {
+            console.error("Failed to listen to custom match status:", error);
+        });
+        return () => unsub();
+    }, [db, fixtureId]);
+    
     const handleOpenRename = (type: RenameType, id: number, name: string) => {
         setRenameItem({ type, id, name });
     };
 
     const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
         if (!db) return;
-        
+
+        if (type === 'matchStatus') {
+            const docRef = doc(db, 'matchCustomizations', String(id));
+            if(newName && newName.trim().length > 0) {
+                setDoc(docRef, { customStatus: newName }).catch(serverError => {
+                    const permissionError = new FirestorePermissionError({path: docRef.path, operation: 'create', requestResourceData: {customStatus: newName}});
+                    errorEmitter.emit('permission-error', permissionError);
+                });
+            } else {
+                deleteDoc(docRef).catch(serverError => {
+                     const permissionError = new FirestorePermissionError({path: docRef.path, operation: 'delete'});
+                     errorEmitter.emit('permission-error', permissionError);
+                });
+            }
+            setRenameItem(null);
+            return;
+        }
+
         const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
         const data = { customName: newName };
@@ -675,7 +709,13 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             )}
 
             <div className="flex-1 overflow-y-auto p-1">
-                <MatchHeaderCard fixture={fixture} navigate={navigate} />
+                <MatchHeaderCard 
+                    fixture={fixture} 
+                    navigate={navigate} 
+                    customStatus={customStatus} 
+                    isAdmin={isAdmin}
+                    onRename={() => handleOpenRename('matchStatus', fixture.fixture.id, customStatus || '')} 
+                />
                 <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-5 rounded-lg h-auto p-1 bg-card">
                         <TabsTrigger value="details"><ShieldCheck className="w-4 h-4 ml-1" />{t('details')}</TabsTrigger>

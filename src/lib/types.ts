@@ -103,6 +103,12 @@ export interface StatisticItem {
     value: string | number | null;
 }
 
+export interface MatchStatistics {
+  team: { id: number; name: string; logo: string; };
+  statistics: StatisticItem[];
+}
+
+
 export interface TeamStatistics {
   league: { id: number; name: string; country: string; logo: string; flag: string; season: number; };
   team: { id: number; name: string; logo: string; };
@@ -296,4 +302,8 @@ export interface PinnedMatch {
     competitionName: string;
     matchDate: string;
     matchTime: string;
+}
+
+export interface MatchCustomization {
+  customStatus: string;
 }

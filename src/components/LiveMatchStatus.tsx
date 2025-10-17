@@ -3,22 +3,32 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday, isTomorrow } from 'date-fns';
+import { ar, enUS } from 'date-fns/locale';
 import type { Fixture as FixtureType } from '@/lib/types';
 import { isMatchLive } from '@/lib/matchStatus';
 import { useTranslation } from './LanguageProvider';
 
+const getRelativeDay = (date: Date, lang: string) => {
+    const locale = lang === 'ar' ? ar : enUS;
+    if (isToday(date)) return lang === 'ar' ? "اليوم" : "Today";
+    if (isYesterday(date)) return lang === 'ar' ? "الأمس" : "Yesterday";
+    if (isTomorrow(date)) return lang === 'ar' ? "غداً" : "Tomorrow";
+    return format(date, "EEEE", { locale });
+};
+
+
 // Live Timer Component
-export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureType, large?: boolean }) => {
-    const { t } = useTranslation();
+export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixture: FixtureType, large?: boolean, customStatus?: string | null }) => {
+    const { t, language } = useTranslation();
     const { status, date } = fixture.fixture;
     const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
     const live = isMatchLive(status);
+    const fixtureDate = new Date(date);
 
     useEffect(() => {
         let interval: NodeJS.Timeout | null = null;
         if (live && status.elapsed !== null) {
-            // Initialize seconds based on last known elapsed minute
             const initialSeconds = status.elapsed * 60;
             setElapsedSeconds(initialSeconds);
             
@@ -52,59 +62,57 @@ export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureTy
     }
 
 
-    if (large) {
+    const renderStatus = () => {
+         if (customStatus) {
+            return { main: customStatus, sub: null, isLive: false };
+        }
+
         if (live) {
-            return (
-                <div className="flex flex-col items-center justify-center text-center">
-                    <div className="font-bold text-3xl tracking-wider">{`${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`}</div>
-                    <div className="text-red-500 font-bold text-xs animate-pulse mt-1">
-                        {status.short === 'HT' ? t('halftime') : liveDisplayTime ? liveDisplayTime : t('live')}
-                    </div>
-                </div>
-            );
+            return {
+                main: `${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`,
+                sub: status.short === 'HT' ? t('halftime') : liveDisplayTime ? liveDisplayTime : t('live'),
+                isLive: true
+            };
         }
         if (isFinished) {
-            return (
-                <div className="flex flex-col items-center justify-center text-center">
-                    <div className="font-bold text-3xl tracking-wider">{`${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{getTranslatedStatus(status.long)}</div>
-                </div>
-            );
+            return {
+                main: `${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`,
+                sub: getTranslatedStatus(status.long),
+                isLive: false
+            };
         }
+        // Not started yet
+        return {
+            main: format(fixtureDate, "HH:mm"),
+            sub: getRelativeDay(fixtureDate, language),
+            isLive: false
+        };
+    };
+
+    const { main, sub, isLive } = renderStatus();
+
+    if (large) {
          return (
             <div className="flex flex-col items-center justify-center text-center">
-                <div className="font-bold text-2xl tracking-wider">{format(new Date(date), "HH:mm")}</div>
-                <div className="text-xs text-muted-foreground mt-1">{getTranslatedStatus(status.long)}</div>
+                <div className="font-bold text-3xl tracking-wider">{main}</div>
+                {sub && (
+                    <div className={cn("text-xs mt-1", isLive ? "text-red-500 font-bold animate-pulse" : "text-muted-foreground")}>
+                        {sub}
+                    </div>
+                )}
             </div>
         );
-
     }
 
     // Small version
-    if (live) {
-        return (
-            <>
-                <div className="text-red-500 font-bold text-sm animate-pulse mb-1">
-                    {status.short === 'HT' ? t('halftime') : liveDisplayTime ? liveDisplayTime : t('live')}
-                </div>
-                <div className="font-bold text-xl">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
-            </>
-        );
-    }
-    
-    if (isFinished) {
-         return (
-            <>
-                <div className="font-bold text-lg">{`${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`}</div>
-                <div className="text-xs text-muted-foreground mt-1">{t('finished')}</div>
-            </>
-        );
-    }
-
-    return (
+     return (
         <>
-            <div className="font-bold text-base">{format(new Date(date), "HH:mm")}</div>
-            <div className="text-xs text-muted-foreground mt-1">{getTranslatedStatus(status.long)}</div>
+            <div className={cn("font-bold", isLive ? "text-xl" : "text-base")}>{main}</div>
+            {sub && (
+                 <div className={cn("text-xs mt-1", isLive ? "text-red-500 font-bold animate-pulse" : "text-muted-foreground")}>
+                    {sub}
+                </div>
+            )}
         </>
     );
 };
