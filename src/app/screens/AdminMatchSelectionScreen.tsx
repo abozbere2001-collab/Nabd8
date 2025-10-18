@@ -129,30 +129,37 @@ interface GroupedFixtures {
 }
 
 const leagueOrder: { [key: string]: number } = {
-  // Top 5
-  "La Liga": 1, "Premier League": 2, "Ligue 1": 3, "Bundesliga": 4, "Serie A": 5, 
-  "الدوري الإسباني": 1, "الدوري الإنجليزي الممتاز": 2, "الدوري الفرنسي": 3, "الدوري الألماني": 4, "الدوري الإيطالي": 5,
-
-  // Other European
-  "Eredivisie": 6, "دوري الهولندي": 6,
-
-  // Arab Leagues
-  "Iraq Stars League": 7, "دوري نجوم العراق": 7,
-  "Saudi Professional League": 8, "دوري المحترفين السعودي": 8,
+  // Custom Order as requested
+  "الدوري الإسباني": 1,
+  "La Liga": 1,
+  "الدوري الإنجليزي الممتاز": 2,
+  "Premier League": 2,
+  "الدوري الفرنسي": 3,
+  "Ligue 1": 3,
+  "الدوري الألماني": 4,
+  "Bundesliga": 4,
+  "الدوري الهولندي": 5,
+  "Eredivisie": 5,
+  "دوري نجوم العراق": 6,
+  "Iraq Stars League": 6,
+  "دوري المحترفين السعودي": 7,
+  "Saudi Professional League": 7,
+  
+  // Continental National
+  "كأس العالم": 20, "World Cup": 20,
+  "بطولة أمم أوروبا": 21, "Euro Championship": 21,
+  "كأس الأمم الأفريقية": 22, "Africa Cup of Nations": 22,
+  "كأس آسيا": 23, "AFC Asian Cup": 23,
+  "كوبا أمريكا": 24, "Copa America": 24,
 
   // Continental Club
-  "UEFA Champions League": 20, "دوري أبطال أوروبا": 20,
-  "UEFA Europa League": 21, "الدوري الأوروبي": 21,
-  "AFC Champions League": 22, "دوري أبطال آسيا": 22,
-  "CAF Champions League": 23, "دوري أبطال أفريقيا": 23,
-  "Copa Libertadores": 24, "كأس ليبرتادوريس": 24,
+  "دوري أبطال أوروبا": 30, "UEFA Champions League": 30,
+  "الدوري الأوروبي": 31, "UEFA Europa League": 31,
+  "دوري أبطال آسيا": 32, "AFC Champions League": 32,
+  "دوري أبطال أفريقيا": 33, "CAF Champions League": 33,
+  "كأس ليبرتادوريس": 34, "Copa Libertadores": 34,
 
-  // National Team Comps
-  "World Cup": 30, "كأس العالم": 30,
-  "Euro Championship": 31, "بطولة أمم أوروبا": 31,
-  "Africa Cup of Nations": 32, "كأس الأمم الأفريقية": 32,
-  "AFC Asian Cup": 33, "كأس آسيا": 33,
-  "Copa America": 34, "كوبا أمريكا": 34,
+  // Other leagues by alphabet
 };
 
 
@@ -322,7 +329,7 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack }: Scree
                 {loading ? (
                     Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)
                 ) : sortedLeagues.length > 0 ? (
-                    <Accordion type="multiple" className="w-full space-y-4" defaultValue={sortedLeagues}>
+                    <Accordion type="multiple" className="w-full space-y-4">
                         {sortedLeagues.map(leagueName => {
                             const { league, fixtures } = groupedFixtures[leagueName];
                             return (
