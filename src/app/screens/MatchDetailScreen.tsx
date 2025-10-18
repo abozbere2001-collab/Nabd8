@@ -223,6 +223,9 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
             <div className="flex flex-col-reverse">
                 {sortedEvents.map((event, index) => {
                     const isHomeEvent = event.team.id === homeTeamId;
+                    // For substitutions, player = player out, assist = player in
+                    const playerOut = event.player;
+                    const playerIn = event.assist;
                     return (
                         <div key={`${event.time.elapsed}-${event.player.name}-${index}`} className={cn("relative flex my-4", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
                             <div className="flex-1 px-4">
@@ -235,9 +238,9 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                         {event.type === 'subst' && event.assist.name ? (
                                              <div className={cn("flex items-center gap-1 text-xs text-muted-foreground", isHomeEvent ? "flex-row-reverse" : "")}>
                                                 <ArrowUp className="h-3 w-3 text-green-500"/>
-                                                <span>{event.player.name}</span>
+                                                <span>{playerOut.name}</span>
                                                 <ArrowDown className="h-3 w-3 text-red-500 ml-2 mr-2" />
-                                                <span>{event.assist.name}</span>
+                                                <span>{playerIn.name}</span>
                                              </div>
                                         ) : (
                                             <p className="text-xs text-muted-foreground">{event.detail}</p>
@@ -352,8 +355,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                 <h3 className="text-center text-base font-bold mb-2">الاحتياط والتبديلات</h3>
                 <div className="bg-card/50 space-y-2 mb-4 rounded-lg p-2" style={{backgroundColor: '#000000'}}>
                     {substitutionEvents.map((event, index) => {
-                        const playerIn = event.player;
-                        const playerOut = event.assist;
+                        const playerOut = event.player;
+                        const playerIn = event.assist;
 
                         return (
                              <div key={index} className="p-2">
@@ -532,7 +535,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
 
       if(type === 'team' || type === 'league') {
           const hardcodedMap = hardcodedTranslations[type === 'team' ? 'teams' : 'leagues'];
-          const hardcodedName = hardcodedMap[id];
+          const hardcodedName = hardcodedMap[id as any];
           if(hardcodedName) return hardcodedName;
       }
       
@@ -658,7 +661,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         };
 
         fetchAndApplyNames().then(() => fetchData(true));
-    }, [fixtureId]); // Only depends on fixtureId to run once at the start
+    }, [fixtureId, db, fetchData]);
 
 
     
@@ -773,4 +776,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-

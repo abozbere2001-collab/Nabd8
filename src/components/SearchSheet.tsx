@@ -161,7 +161,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
       // Fallback to hardcoded translations
       const hardcodedMap = type === 'team' ? hardcodedTranslations.teams : hardcodedTranslations.leagues;
-      const hardcodedName = hardcodedMap[id];
+      const hardcodedName = hardcodedMap[id as any];
       if(hardcodedName) return hardcodedName;
 
       return defaultName;
@@ -243,13 +243,13 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
             // Search hardcoded translations
             for (const id in hardcodedTranslations.teams) {
-                const name = hardcodedTranslations.teams[id];
+                const name = hardcodedTranslations.teams[id as any];
                 if (normalizeArabic(name).includes(normalizedQuery)) {
                      localSearchPromises.push(fetchAndSet(Number(id), 'team'));
                 }
             }
              for (const id in hardcodedTranslations.leagues) {
-                const name = hardcodedTranslations.leagues[id];
+                const name = hardcodedTranslations.leagues[id as any];
                 if (normalizeArabic(name).includes(normalizedQuery)) {
                      localSearchPromises.push(fetchAndSet(Number(id), 'league'));
                 }
