@@ -34,7 +34,7 @@ interface PlayerResponse {
 }
 
 
-const PlayerListItem = React.memo(({ player, isPredictedTopScorer, onScorerSelect }: { player: Player, isPredictedTopScorer: boolean, onScorerSelect: (playerId: number) => void }) => {
+const PlayerListItem = React.memo(({ player, isPredictedTopScorer, onScorerSelect, disabled }: { player: Player, isPredictedTopScorer: boolean, onScorerSelect: (playerId: number) => void, disabled: boolean }) => {
     return (
         <div className="flex items-center p-2 border rounded-lg bg-card">
              <div className="flex-1 flex items-center gap-3">
@@ -44,7 +44,7 @@ const PlayerListItem = React.memo(({ player, isPredictedTopScorer, onScorerSelec
                    <p className="text-xs text-muted-foreground">{player.position}</p>
                 </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => onScorerSelect(player.id)}>
+            <Button variant="ghost" size="icon" onClick={() => onScorerSelect(player.id)} disabled={disabled && !isPredictedTopScorer}>
                 <FootballIcon className={cn("h-6 w-6 text-muted-foreground transition-colors", isPredictedTopScorer && "text-yellow-400")} />
             </Button>
         </div>
@@ -59,6 +59,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
     const { toast } = useToast();
     const [players, setPlayers] = useState<PlayerResponse[]>([]);
     const [loading, setLoading] = useState(true);
+    const [hasPrediction, setHasPrediction] = useState(false);
     const [predictedTopScorerId, setPredictedTopScorerId] = useState<number | undefined>();
 
     const privatePredictionDocRef = useMemo(() => {
@@ -125,7 +126,10 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
             .then(docSnap => {
                 if (docSnap.exists()) {
                     const data = docSnap.data() as SeasonPrediction;
-                    setPredictedTopScorerId(data.predictedTopScorerId);
+                    if(data.predictedTopScorerId) {
+                        setHasPrediction(true);
+                        setPredictedTopScorerId(data.predictedTopScorerId);
+                    }
                 }
             })
             .catch(error => {
@@ -135,6 +139,15 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
     }, [privatePredictionDocRef]);
 
     const handleScorerSelect = useCallback(async (playerId: number) => {
+        if (hasPrediction) {
+            toast({
+                variant: 'destructive',
+                title: 'التوقع مقفل',
+                description: 'لقد قمت بتحديد توقعك لهذا الموسم ولا يمكن تغييره.',
+            });
+            return;
+        }
+
         const newScorerId = predictedTopScorerId === playerId ? undefined : playerId;
         setPredictedTopScorerId(newScorerId);
         
@@ -160,6 +173,11 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
             batch.set(publicPredictionDocRef, publicData, { merge: true });
 
             await batch.commit();
+             toast({
+                title: 'تم حفظ التوقع',
+                description: 'تم تسجيل توقعك لهداف الموسم بنجاح.',
+            });
+            setHasPrediction(true);
         } catch (error) {
              const permissionError = new FirestorePermissionError({
                 path: `batch write to ${privatePredictionDocRef.path} and ${publicPredictionDocRef.path}`,
@@ -167,7 +185,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
             });
             errorEmitter.emit('permission-error', permissionError);
         }
-    }, [predictedTopScorerId, privatePredictionDocRef, publicPredictionDocRef, user, db, leagueId, leagueName]);
+    }, [predictedTopScorerId, privatePredictionDocRef, publicPredictionDocRef, user, db, leagueId, leagueName, hasPrediction, toast]);
 
 
     const Row = ({ index, style }: { index: number, style: React.CSSProperties }) => {
@@ -181,6 +199,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                     player={player}
                     isPredictedTopScorer={predictedTopScorerId === player.id}
                     onScorerSelect={handleScorerSelect}
+                    disabled={hasPrediction}
                 />
             </div>
         )
@@ -200,7 +219,11 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
         <div className="flex h-full flex-col bg-background">
             <ScreenHeader title={`اختيار هداف من ${teamName}`} onBack={goBack} canGoBack={true} />
              <div className='p-4 text-center text-sm text-muted-foreground border-b'>
-                <p>اختر الهداف المتوقع للدوري بالضغط على أيقونة الكرة.</p>
+                <p>
+                    {hasPrediction
+                        ? 'لقد قمت بتثبيت توقعك لهداف هذا الدوري.'
+                        : 'اختر الهداف المتوقع للدوري بالضغط على أيقونة الكرة. لا يمكنك تغيير اختيارك لاحقًا.'}
+                </p>
             </div>
             <div className="flex-1 overflow-y-auto">
                 {players.length > 0 ? (

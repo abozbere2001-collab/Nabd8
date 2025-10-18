@@ -24,7 +24,7 @@ interface SeasonTeamSelectionScreenProps extends ScreenProps {
     leagueName: string;
 }
 
-const TeamListItem = React.memo(({ team, isPredictedChampion, onChampionSelect, onTeamClick }: { team: Team, isPredictedChampion: boolean, onChampionSelect: () => void, onTeamClick: () => void }) => {
+const TeamListItem = React.memo(({ team, isPredictedChampion, onChampionSelect, onTeamClick, disabled }: { team: Team, isPredictedChampion: boolean, onChampionSelect: () => void, onTeamClick: () => void, disabled: boolean }) => {
     return (
         <div className="flex items-center p-2 border rounded-lg bg-card">
             <div 
@@ -34,7 +34,7 @@ const TeamListItem = React.memo(({ team, isPredictedChampion, onChampionSelect, 
                 <Avatar className="h-8 w-8"><AvatarImage src={team.logo} /></Avatar>
                 <span className="font-semibold">{team.name}</span>
             </div>
-            <Button variant="ghost" size="icon" onClick={onChampionSelect}>
+            <Button variant="ghost" size="icon" onClick={onChampionSelect} disabled={disabled && !isPredictedChampion}>
                 <Trophy className={cn("h-6 w-6 text-muted-foreground transition-colors", isPredictedChampion && "text-yellow-400 fill-current")} />
             </Button>
         </div>
@@ -50,6 +50,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
     const [teams, setTeams] = useState<{ team: Team }[]>([]);
     const [loading, setLoading] = useState(true);
     const [predictedChampionId, setPredictedChampionId] = useState<number | undefined>();
+    const [hasPrediction, setHasPrediction] = useState(false);
 
     const privatePredictionDocRef = useMemo(() => {
         if (!user || !db) return null;
@@ -95,7 +96,10 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
             .then(docSnap => {
                 if (docSnap.exists()) {
                     const data = docSnap.data() as SeasonPrediction;
-                    setPredictedChampionId(data.predictedChampionId);
+                    if(data.predictedChampionId) {
+                        setHasPrediction(true);
+                        setPredictedChampionId(data.predictedChampionId);
+                    }
                 }
             })
             .catch(error => {
@@ -105,6 +109,15 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
     }, [privatePredictionDocRef]);
 
     const handleChampionSelect = useCallback(async (teamId: number) => {
+        if (hasPrediction) {
+            toast({
+                variant: 'destructive',
+                title: 'التوقع مقفل',
+                description: 'لقد قمت بتحديد توقعك لهذا الموسم ولا يمكن تغييره.',
+            });
+            return;
+        }
+
         const newChampionId = predictedChampionId === teamId ? undefined : teamId;
         
         setPredictedChampionId(newChampionId);
@@ -131,6 +144,11 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
             batch.set(publicPredictionDocRef, publicData, { merge: true });
             
             await batch.commit();
+            toast({
+                title: 'تم حفظ التوقع',
+                description: 'تم تسجيل توقعك لبطل الموسم بنجاح.',
+            });
+            setHasPrediction(true);
 
         } catch (error) {
              const permissionError = new FirestorePermissionError({
@@ -139,7 +157,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
             });
             errorEmitter.emit('permission-error', permissionError);
         }
-    }, [predictedChampionId, privatePredictionDocRef, publicPredictionDocRef, user, db, leagueId, leagueName]);
+    }, [predictedChampionId, privatePredictionDocRef, publicPredictionDocRef, user, db, leagueId, leagueName, hasPrediction, toast]);
 
 
     const handleTeamClick = (teamId: number, teamName: string) => {
@@ -156,6 +174,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
                     isPredictedChampion={predictedChampionId === team.id}
                     onChampionSelect={() => handleChampionSelect(team.id)}
                     onTeamClick={() => handleTeamClick(team.id, team.name)}
+                    disabled={hasPrediction}
                 />
             </div>
         );
@@ -174,7 +193,13 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
         <div className="flex h-full flex-col bg-background">
             <ScreenHeader title={`توقع بطل ${leagueName}`} onBack={goBack} canGoBack={true} />
             <div className='p-4 text-center text-sm text-muted-foreground border-b'>
-                <p>اختر الفريق البطل بالضغط على أيقونة الكأس. ثم اضغط على أي فريق لاختيار الهداف من لاعبيه.</p>
+                 <p>
+                    {hasPrediction 
+                        ? 'لقد قمت بتثبيت توقعك لهذا الدوري. يمكنك الآن اختيار الهداف.'
+                        : 'اختر الفريق البطل بالضغط على أيقونة الكأس. لا يمكنك تغيير اختيارك لاحقًا.'
+                    }
+                </p>
+                <p className="mt-2">ثم اضغط على أي فريق لاختيار الهداف من لاعبيه.</p>
             </div>
             <div className="flex-1 overflow-y-auto">
                 {teams.length > 0 ? (

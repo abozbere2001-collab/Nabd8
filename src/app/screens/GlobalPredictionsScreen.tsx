@@ -125,7 +125,7 @@ const AdminMatchSelector = ({ navigate }: { navigate: ScreenProps['navigate'] })
 }
 
 const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture, userPrediction?: Prediction, onSave: (home: string, away: string) => void }) => {
-    const isPredictionDisabled = isPast(new Date(fixture.fixture.date));
+    const isPredictionDisabled = new Date(fixture.fixture.timestamp * 1000) < new Date(Date.now() + 10 * 60 * 1000);
     const [homeValue, setHomeValue] = useState(userPrediction?.homeGoals?.toString() ?? '');
     const [awayValue, setAwayValue] = useState(userPrediction?.awayGoals?.toString() ?? '');
     
@@ -185,7 +185,7 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
     return (
         <Card>
             <CardContent className="p-3">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-1">
                      <div className="flex flex-col items-center gap-1 flex-1 justify-end truncate">
                         <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
                         <span className="font-semibold text-xs text-center truncate w-full">{fixture.teams.home.name}</span>
@@ -193,7 +193,7 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                     <div className="flex items-center gap-1">
                         <Input 
                             type="number" 
-                            className="w-12 h-10 text-center text-lg font-bold" 
+                            className="w-10 h-9 text-center text-md font-bold" 
                             min="0" 
                             value={homeValue}
                             onChange={handleHomeChange}
@@ -201,7 +201,7 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                             disabled={isPredictionDisabled}
                         />
                          <div className={cn(
-                            "font-bold text-lg px-2 rounded-md min-w-[70px] text-center transition-colors",
+                            "font-bold text-md px-1 rounded-md min-w-[60px] text-center transition-colors",
                              isMatchLiveOrFinished ? getPredictionStatusColors() : "text-sm",
                             )}>
                              {isMatchLiveOrFinished
@@ -210,7 +210,7 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                          </div>
                         <Input 
                             type="number" 
-                            className="w-12 h-10 text-center text-lg font-bold" 
+                            className="w-10 h-9 text-center text-md font-bold" 
                             min="0"
                             value={awayValue}
                             onChange={handleAwayChange}
@@ -451,7 +451,7 @@ const UserPredictionSummary = ({ userScore }: { userScore: UserScore | null }) =
     }
 
     return (
-        <Card className="mb-4 overflow-hidden bg-card/50">
+        <Card className="mb-4 overflow-hidden bg-card/80">
           <CardContent className="p-4 space-y-4">
             <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16 border-2 border-primary">
@@ -934,6 +934,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
 
 
 
