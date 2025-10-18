@@ -403,7 +403,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                 <h3 className="text-center text-base font-bold mb-2">الاحتياط</h3>
                 <div className="space-y-1">
                     {activeLineup.substitutes.map(p => (
-                        <div key={p.player.id || p.player.name} className="p-1 rounded-lg bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                         <div key={p.player.id || p.player.name} className="p-2 rounded-lg bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                             <div className="flex items-center gap-3">
                                 <Avatar className="h-8 w-8">
                                     <AvatarImage src={p.player.photo} />
@@ -535,13 +535,9 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
       const customName = firestoreMap?.get(id);
       if (customName) return customName;
 
-      if(type === 'team' || type === 'league') {
-          const hardcodedMap = hardcodedTranslations[type === 'team' ? 'teams' : 'leagues'];
-          const hardcodedName = hardcodedMap[id as any];
-          if(hardcodedName) return hardcodedName;
-      }
-       if(type === 'player') {
-          const hardcodedMap = hardcodedTranslations.players;
+      if(type === 'team' || type === 'league' || type === 'player') {
+          const key = `${type}s` as 'teams' | 'leagues' | 'players';
+          const hardcodedMap = hardcodedTranslations[key];
           const hardcodedName = hardcodedMap[id as any];
           if(hardcodedName) return hardcodedName;
       }
@@ -565,7 +561,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             data.teams.home.name = getDisplayName('team', data.teams.home.id, data.teams.home.name);
             data.teams.away.name = getDisplayName('team', data.teams.away.id, data.teams.away.name);
         } else if (type === 'lineups' && data.team) {
-            data.coach.name = getDisplayName('coach', data.coach.id, data.coach.name);
+            if(data.coach?.id) data.coach.name = getDisplayName('coach', data.coach.id, data.coach.name);
             data.startXI = data.startXI.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
             data.substitutes = data.substitutes.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
         } else if (type === 'events' && data.player) {
@@ -800,4 +796,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
