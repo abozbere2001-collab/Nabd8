@@ -240,7 +240,7 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                     </div>
                                     <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
                                         {event.type === 'subst' && event.assist.name ? (
-                                             <div className={cn("flex flex-col gap-1 text-xs")}>
+                                             <div className="flex flex-col gap-1 text-xs">
                                                 <div className='flex items-center gap-1 font-semibold text-green-500'><ArrowUp className="h-3 w-3"/><span>{playerIn.name}</span></div>
                                                 <div className='flex items-center gap-1 font-semibold text-red-500'><ArrowDown className="h-3 w-3"/><span>{playerOut.name}</span></div>
                                              </div>
@@ -356,7 +356,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             
             {renderPitch(activeLineup)}
             
-             <Card>
+            <Card>
                 <CardContent className="p-3 text-center">
                     <h3 className="font-bold text-sm mb-2">المدرب</h3>
                     <div className="relative inline-flex flex-col items-center gap-1">
@@ -375,37 +375,35 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             </Card>
 
             {substitutionEvents.length > 0 && (
-                <Accordion type="single" collapsible className="w-full" defaultValue='item-1'>
-                    <AccordionItem value="item-1" className="border-none">
-                        <AccordionTrigger className="text-base font-bold justify-center p-2 bg-card rounded-md border hover:no-underline">التبديلات</AccordionTrigger>
-                        <AccordionContent className="p-0 pt-2 space-y-1">
-                            {substitutionEvents.map((event, index) => {
-                                const playerIn = event.assist; // Player coming in
-                                const playerOut = event.player; // Player going out
-                                return (
-                                    <div key={index} className="flex items-center justify-between p-2 text-xs bg-card rounded-lg border">
-                                        <div className='font-bold w-10 text-center'>{event.time.elapsed}'</div>
-                                        <div className='flex-1 flex items-center justify-end gap-1 font-semibold text-green-500'>
-                                            <span>{playerIn.name}</span>
-                                            <ArrowUp className="h-3 w-3"/>
-                                        </div>
-                                        <div className='flex-1 flex items-center justify-start gap-1 font-semibold text-red-500 ml-4'>
-                                            <ArrowDown className="h-3 w-3"/>
-                                            <span>{playerOut.name}</span>
-                                        </div>
+                <div className='bg-card p-2 rounded-lg'>
+                    <h3 className="text-base font-bold text-center p-2">التبديلات</h3>
+                    <div className="space-y-1">
+                        {substitutionEvents.map((event, index) => {
+                            const playerIn = event.assist;
+                            const playerOut = event.player;
+                            return (
+                                <div key={index} className="flex items-center justify-between text-xs p-1">
+                                    <div className='font-bold w-10 text-center'>{event.time.elapsed}'</div>
+                                    <div className='flex-1 flex items-center justify-end gap-1 font-semibold text-red-500'>
+                                        <span>{playerOut.name}</span>
+                                        <ArrowDown className="h-3 w-3"/>
                                     </div>
-                                );
-                            })}
-                        </AccordionContent>
-                    </AccordionItem>
-                </Accordion>
+                                    <div className='flex-1 flex items-center justify-start gap-1 font-semibold text-green-500 ml-4'>
+                                        <ArrowUp className="h-3 w-3"/>
+                                        <span>{playerIn.name}</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             )}
             
             <div className="pt-4">
                 <h3 className="text-center text-base font-bold mb-2">الاحتياط</h3>
                 <div className="space-y-1">
                     {activeLineup.substitutes.map(p => (
-                        <Card key={p.player.id || p.player.name} className="p-2 cursor-pointer bg-card/50" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                        <div key={p.player.id || p.player.name} className="p-1 rounded-lg bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                             <div className="flex items-center gap-3">
                                 <Avatar className="h-8 w-8">
                                     <AvatarImage src={p.player.photo} />
@@ -417,7 +415,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                                 </div>
                                 {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {e.stopPropagation(); onRename('player', p.player.id, p.player.name, p.player.name)}}><Pencil className="h-4 w-4" /></Button>}
                             </div>
-                        </Card>
+                        </div>
                     ))}
                 </div>
             </div>
@@ -802,3 +800,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
