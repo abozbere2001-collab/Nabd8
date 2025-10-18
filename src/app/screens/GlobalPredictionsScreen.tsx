@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Trophy, Award, Info, Shield, User, X } from 'lucide-react';
 import { format, isPast, subDays, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
@@ -38,6 +38,7 @@ import {
   AlertDialogClose,
 } from "@/components/ui/alert-dialog";
 import { PREMIER_LEAGUE_ID, LALIGA_ID, SERIE_A_ID, BUNDESLIGA_ID, CHAMPIONS_LEAGUE_ID, CURRENT_SEASON } from '@/lib/constants';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -186,7 +187,7 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
             <CardContent className="p-3">
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex flex-col items-center gap-1 flex-1 justify-end truncate">
-                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                        <Avatar className="h-10 w-10"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
                         <span className="font-semibold text-xs text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                     <div className="flex items-center gap-1">
@@ -218,7 +219,7 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                         />
                     </div>
                     <div className="flex flex-col items-center gap-1 flex-1 truncate">
-                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                        <Avatar className="h-10 w-10"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
                         <span className="font-semibold text-xs text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                 </div>
@@ -443,55 +444,57 @@ const UserPredictionSummary = ({ userScore }: { userScore: UserScore | null }) =
     }
 
     return (
-      <Card className="mb-4 overflow-hidden">
-        <CardContent className="p-4">
-          <div className="flex flex-row-reverse gap-4">
-            <div className="flex flex-col items-center justify-center space-y-2 pr-4 border-r-2 border-dashed border-border">
-              <Avatar className="h-16 w-16 border-2 border-primary">
-                <AvatarImage src={userProfile?.photoURL || userScore.userPhoto} />
-                <AvatarFallback>{userScore.userName.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <div className="text-center">
-                <p className="font-bold text-lg">{userScore.userName}</p>
-                <p className="text-sm text-muted-foreground">الترتيب: {userScore.rank ? `#${userScore.rank}` : 'N/A'}</p>
-                <p className="text-sm text-primary font-bold">النقاط: {userScore.totalPoints}</p>
-              </div>
-            </div>
-
-            <div className="flex-1 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 text-center">
-              {uniquePredictions.map(pred => {
-                const champion = pred.predictedChampionId ? teams.get(pred.predictedChampionId) : null;
-                const topScorer = pred.predictedTopScorerId ? players.get(pred.predictedTopScorerId) : null;
-                const championName = champion ? getDisplayName('team', champion.id, champion.name) : 'لم يختر';
-                const topScorerName = topScorer ? getDisplayName('player', topScorer.id, topScorer.name) : 'لم يختر';
-
-                return (
-                  <div key={pred.leagueId} className="p-2 border rounded-lg bg-card-foreground/5 flex flex-col items-center justify-start h-full">
-                    <p className="font-bold text-[10px] mb-1 h-8 leading-tight">{pred.leagueName}</p>
-                    <div className="flex flex-col items-center justify-center flex-1 space-y-2">
-                      <div className="flex flex-col items-center">
-                        <Trophy className="h-4 w-4 text-yellow-500 mb-1" />
-                        <Avatar className="h-8 w-8 border">
-                          {champion ? <AvatarImage src={champion.logo} /> : <AvatarFallback>?</AvatarFallback>}
-                        </Avatar>
-                        <p className="text-[10px] mt-1 truncate w-20">{championName}</p>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <FootballIcon className="h-4 w-4 mb-1" />
-                         <Avatar className="h-8 w-8 border">
-                          {topScorer ? <AvatarImage src={topScorer.photo} /> : <AvatarFallback>?</AvatarFallback>}
-                        </Avatar>
-                        <p className="text-[10px] mt-1 truncate w-20">{topScorerName}</p>
-                      </div>
-                    </div>
+        <Card className="mb-4 overflow-hidden bg-card/50">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16 border-2 border-primary">
+                  <AvatarImage src={userProfile?.photoURL || userScore.userPhoto} />
+                  <AvatarFallback>{userScore.userName.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <p className="font-bold text-lg">{userScore.userName}</p>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <span>الترتيب: {userScore.rank ? `#${userScore.rank}` : 'N/A'}</span>
+                    <span className="text-primary font-bold">النقاط: {userScore.totalPoints}</span>
                   </div>
-                );
-              })}
+                </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {uniquePredictions.map(pred => {
+                    const champion = pred.predictedChampionId ? teams.get(pred.predictedChampionId) : null;
+                    const topScorer = pred.predictedTopScorerId ? players.get(pred.predictedTopScorerId) : null;
+                    const championName = champion ? getDisplayName('team', champion.id, champion.name) : 'لم يختر';
+                    const topScorerName = topScorer ? getDisplayName('player', topScorer.id, topScorer.name) : 'لم يختر';
+                    
+                    return (
+                        <div key={pred.leagueId} className="p-3 border rounded-lg bg-background shadow-sm space-y-3">
+                             <p className="font-bold text-sm text-center border-b pb-2">{pred.leagueName}</p>
+                             <div className="flex items-center gap-2">
+                                <Trophy className="h-4 w-4 text-yellow-500 flex-shrink-0"/>
+                                 <div className="flex items-center gap-2 min-w-0">
+                                    <Avatar className="h-6 w-6 border">
+                                        {champion ? <AvatarImage src={champion.logo} /> : <AvatarFallback>?</AvatarFallback>}
+                                    </Avatar>
+                                    <p className="text-xs truncate">{championName}</p>
+                                 </div>
+                             </div>
+                             <div className="flex items-center gap-2">
+                                <FootballIcon className="h-4 w-4 flex-shrink-0" />
+                                 <div className="flex items-center gap-2 min-w-0">
+                                     <Avatar className="h-6 w-6 border">
+                                      {topScorer ? <AvatarImage src={topScorer.photo} /> : <AvatarFallback>?</AvatarFallback>}
+                                    </Avatar>
+                                    <p className="text-xs truncate">{topScorerName}</p>
+                                 </div>
+                             </div>
+                        </div>
+                    );
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      );
 };
 
 
@@ -707,7 +710,13 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             const res = await fetch(`/api/football/fixtures?ids=${fixtureIds.join('-')}`);
             if (!res.ok) throw new Error('Failed to fetch fixtures');
             const data = await res.json();
-            const fetchedFixtures = data.response || [];
+            const fetchedFixtures = (data.response || []).map((fixture: Fixture) => ({
+                ...fixture,
+                teams: {
+                    home: { ...fixture.teams.home, name: hardcodedTranslations.teams[fixture.teams.home.id] || fixture.teams.home.name },
+                    away: { ...fixture.teams.away, name: hardcodedTranslations.teams[fixture.teams.away.id] || fixture.teams.away.name },
+                }
+            }));
             setSelectedMatches(fetchedFixtures);
     
             if (fixtureIds.length > 0 && user) {
@@ -770,7 +779,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         <div className="flex h-full flex-col bg-background">
             <div className="flex-1 overflow-y-auto">
                  <AlertDialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
-                    <AlertDialogContent className="max-w-lg w-full">
+                    <AlertDialogContent className="max-w-2xl w-full">
                        <AlertDialogHeader>
                             <AlertDialogTitle>بطاقة توقعات {selectedUser?.userName}</AlertDialogTitle>
                        </AlertDialogHeader>
@@ -845,25 +854,24 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>الترتيب</TableHead>
-                                        <TableHead>المستخدم</TableHead>
+                                        <TableHead className="text-right">المستخدم</TableHead>
                                         <TableHead className="text-center">النقاط</TableHead>
+                                        <TableHead>الترتيب</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {loadingLeaderboard ? (
                                         Array.from({ length: 5 }).map((_, i) => (
                                             <TableRow key={i}>
-                                                <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                                                 <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                                                 <TableCell className="text-center"><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
+                                                <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                                             </TableRow>
                                         ))
                                     ) : leaderboard.length > 0 ? (
                                         <>
                                             {leaderboard.map((score, index) => (
                                                 <TableRow key={`${score.userId}-${index}`} className={cn("cursor-pointer", user && score.userId === user.uid && 'bg-primary/10')} onClick={() => setSelectedUser(score)}>
-                                                    <TableCell>{score.rank}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">
                                                             <Avatar className="h-6 w-6">
@@ -874,6 +882,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
+                                                    <TableCell>{score.rank}</TableCell>
                                                 </TableRow>
                                             ))}
                                         </>
@@ -914,6 +923,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
 
 
 
