@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { Player, SeasonPrediction } from '@/lib/types';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
@@ -65,11 +65,6 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
     const privatePredictionDocRef = useMemo(() => {
         if (!user || !db) return null;
         return doc(db, 'seasonPredictions', `${user.uid}_${leagueId}_${CURRENT_SEASON}`);
-    }, [user, db, leagueId]);
-
-    const publicPredictionDocRef = useMemo(() => {
-        if(!user || !db) return null;
-        return doc(db, 'publicSeasonPredictions', `${user.uid}_${leagueId}_${CURRENT_SEASON}`);
     }, [user, db, leagueId]);
 
     // Fetch players with pagination
@@ -151,41 +146,35 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
         const newScorerId = predictedTopScorerId === playerId ? undefined : playerId;
         setPredictedTopScorerId(newScorerId);
         
-        if (!privatePredictionDocRef || !publicPredictionDocRef || !user || !db) return;
+        if (!privatePredictionDocRef || !user || !db) return;
 
-        try {
-            const batch = writeBatch(db);
+        const privateData: Partial<SeasonPrediction> = {
+            userId: user.uid,
+            leagueId: leagueId,
+            leagueName: leagueName,
+            season: CURRENT_SEASON,
+            predictedTopScorerId: newScorerId,
+            timestamp: new Date(),
+        };
 
-            const privateData: Partial<SeasonPrediction> = {
-                predictedTopScorerId: newScorerId,
-                timestamp: new Date(),
-            };
-            batch.set(privatePredictionDocRef, privateData, { merge: true });
-
-            const publicData: Partial<SeasonPrediction> = {
-                userId: user.uid,
-                leagueId: leagueId,
-                leagueName: leagueName,
-                season: CURRENT_SEASON,
-                predictedTopScorerId: newScorerId,
-                timestamp: new Date(),
-            };
-            batch.set(publicPredictionDocRef, publicData, { merge: true });
-
-            await batch.commit();
-             toast({
-                title: 'تم حفظ التوقع',
-                description: 'تم تسجيل توقعك لهداف الموسم بنجاح.',
+        setDoc(privatePredictionDocRef, privateData, { merge: true })
+            .then(() => {
+                toast({
+                    title: 'تم حفظ التوقع',
+                    description: 'تم تسجيل توقعك لهداف الموسم بنجاح.',
+                });
+                setHasPrediction(true);
+            })
+            .catch((serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: privatePredictionDocRef.path,
+                    operation: 'create', // or 'update'
+                    requestResourceData: privateData
+                });
+                errorEmitter.emit('permission-error', permissionError);
             });
-            setHasPrediction(true);
-        } catch (error) {
-             const permissionError = new FirestorePermissionError({
-                path: `batch write to ${privatePredictionDocRef.path} and ${publicPredictionDocRef.path}`,
-                operation: 'write',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        }
-    }, [predictedTopScorerId, privatePredictionDocRef, publicPredictionDocRef, user, db, leagueId, leagueName, hasPrediction, toast]);
+
+    }, [predictedTopScorerId, privatePredictionDocRef, user, db, leagueId, leagueName, hasPrediction, toast]);
 
 
     const Row = ({ index, style }: { index: number, style: React.CSSProperties }) => {
