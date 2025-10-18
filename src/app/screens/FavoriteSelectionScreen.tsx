@@ -3,7 +3,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
+import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import type { Favorites } from '@/lib/types';
@@ -119,7 +119,7 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
             <Button variant="ghost" onClick={onOnboardingComplete}>تخطي</Button>
         </div>
         <div className="flex-1 flex flex-col items-center p-4 pt-0 text-center">
-            <GoalStackLogo className="h-16 w-16 mb-4" />
+            <NabdAlMalaebLogo className="h-16 w-16 mb-4" />
             <h1 className="text-2xl font-bold mb-2 font-headline">خصص تجربتك</h1>
             <p className="text-muted-foreground mb-6">اختر فرقك وبطولاتك المفضلة لتبقى على اطلاع دائم.</p>
         

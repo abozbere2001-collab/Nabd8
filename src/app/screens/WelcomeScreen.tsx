@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
+import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2, User } from 'lucide-react';
@@ -72,7 +72,7 @@ export function WelcomeScreen({ onOnboardingComplete }: WelcomeScreenProps) {
           </Alert>
         )}
         
-        <GoalStackLogo className="h-24 w-24 mb-8" />
+        <NabdAlMalaebLogo className="h-24 w-24 mb-8" />
         <h1 className="text-3xl font-bold mb-2 font-headline">أهلاً بك في نبض الملاعب</h1>
         <p className="text-muted-foreground mb-12">عالم كرة القدم بين يديك. تابع فرقك المفضلة، لا تفوت أي مباراة، وكن أول من يعلم.</p>
         

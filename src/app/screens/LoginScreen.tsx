@@ -2,7 +2,7 @@
 "use client";
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { GoalStackLogo } from '@/components/icons/GoalStackLogo';
+import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
@@ -62,7 +62,7 @@ export function LoginScreen({ goBack }: ScreenProps) {
           </Alert>
         )}
         
-        <GoalStackLogo className="h-24 w-24 mb-8" />
+        <NabdAlMalaebLogo className="h-24 w-24 mb-8" />
         <h1 className="text-2xl font-bold mb-2">مرحباً بك في نبض الملاعب</h1>
         <p className="text-muted-foreground mb-8">سجل دخولك باستخدام جوجل للمتابعة.</p>
         
