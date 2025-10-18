@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -233,11 +234,9 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                     </div>
                                     <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
                                         {event.type === 'subst' && event.assist.name ? (
-                                             <div className={cn("flex items-center gap-1 text-xs", isHomeEvent ? "flex-row-reverse" : "")}>
-                                                <div className='flex flex-col'>
-                                                     <div className='flex items-center gap-1 font-semibold text-red-500'><ArrowDown className="h-3 w-3"/><span>{playerIn.name}</span></div>
-                                                    <div className='flex items-center gap-1 font-semibold text-green-500'><ArrowUp className="h-3 w-3"/><span>{playerOut.name}</span></div>
-                                                </div>
+                                             <div className={cn("flex flex-col gap-1 text-xs", isHomeEvent ? "items-end" : "items-start")}>
+                                                <div className='flex items-center gap-1 font-semibold text-green-500'><ArrowUp className="h-3 w-3"/><span>{playerIn.name}</span></div>
+                                                <div className='flex items-center gap-1 font-semibold text-red-500'><ArrowDown className="h-3 w-3"/><span>{playerOut.name}</span></div>
                                              </div>
                                         ) : (
                                             <>
@@ -361,8 +360,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                         return (
                              <div key={index} className="p-2">
                                 <div className="flex items-center justify-between">
-                                     <div className="flex items-center gap-2 font-semibold w-2/5 text-red-500">
-                                        <ArrowDown className="h-4 w-4" />
+                                     <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
+                                        <ArrowUp className="h-4 w-4" />
                                         <div className="flex flex-col items-start">
                                             <span className="truncate">{playerIn.name}</span>
                                         </div>
@@ -370,8 +369,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
 
                                     <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
 
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-green-500">
-                                        <ArrowUp className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
+                                        <ArrowDown className="h-4 w-4" />
                                         <div className="flex flex-col items-end">
                                             <span className="truncate">{playerOut.name}</span>
                                         </div>
@@ -535,6 +534,11 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
 
       if(type === 'team' || type === 'league') {
           const hardcodedMap = hardcodedTranslations[type === 'team' ? 'teams' : 'leagues'];
+          const hardcodedName = hardcodedMap[id as any];
+          if(hardcodedName) return hardcodedName;
+      }
+       if(type === 'player') {
+          const hardcodedMap = hardcodedTranslations.players;
           const hardcodedName = hardcodedMap[id as any];
           if(hardcodedName) return hardcodedName;
       }
@@ -793,5 +797,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
 
     
