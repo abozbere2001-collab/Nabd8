@@ -53,7 +53,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
     const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
 
     const renderStatus = () => {
-        if (customStatus && !hasStarted) {
+        if (customStatus && customStatus.trim() && !hasStarted) {
              return {
                 main: customStatus,
                 sub: getRelativeDay(fixtureDate),
@@ -108,3 +108,5 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
         </>
     );
 };
+
+    

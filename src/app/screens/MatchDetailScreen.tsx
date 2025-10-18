@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -223,7 +222,6 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
             <div className="flex flex-col-reverse">
                 {sortedEvents.map((event, index) => {
                     const isHomeEvent = event.team.id === homeTeamId;
-                    // For substitutions, player = player out, assist = player in
                     const playerOut = event.player;
                     const playerIn = event.assist;
                     return (
@@ -234,16 +232,18 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                         {getEventIcon(event)}
                                     </div>
                                     <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
-                                        <p className="font-semibold">{event.player.name}</p>
                                         {event.type === 'subst' && event.assist.name ? (
-                                             <div className={cn("flex items-center gap-1 text-xs text-muted-foreground", isHomeEvent ? "flex-row-reverse" : "")}>
-                                                <ArrowUp className="h-3 w-3 text-green-500"/>
-                                                <span>{playerOut.name}</span>
-                                                <ArrowDown className="h-3 w-3 text-red-500 ml-2 mr-2" />
-                                                <span>{playerIn.name}</span>
+                                             <div className={cn("flex items-center gap-1 text-xs", isHomeEvent ? "flex-row-reverse" : "")}>
+                                                <div className='flex flex-col'>
+                                                    <div className='flex items-center gap-1 text-red-500'><ArrowDown className="h-3 w-3"/><span>{playerIn.name}</span></div>
+                                                    <div className='flex items-center gap-1 text-green-500'><ArrowUp className="h-3 w-3"/><span>{playerOut.name}</span></div>
+                                                </div>
                                              </div>
                                         ) : (
-                                            <p className="text-xs text-muted-foreground">{event.detail}</p>
+                                            <>
+                                                <p className="font-semibold">{event.player.name}</p>
+                                                <p className="text-xs text-muted-foreground">{event.detail}</p>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -361,19 +361,19 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                         return (
                              <div key={index} className="p-2">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
-                                        <ArrowUp className="h-4 w-4" />
+                                     <div className="flex items-center gap-2 font-semibold w-2/5 text-red-500">
+                                        <ArrowDown className="h-4 w-4" />
                                         <div className="flex flex-col items-start">
-                                            <span className="truncate">{playerOut.name}</span>
+                                            <span className="truncate">{playerIn.name}</span>
                                         </div>
                                     </div>
 
                                     <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
 
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
-                                        <ArrowDown className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-green-500">
+                                        <ArrowUp className="h-4 w-4" />
                                         <div className="flex flex-col items-end">
-                                            <span className="truncate">{playerIn.name}</span>
+                                            <span className="truncate">{playerOut.name}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -669,37 +669,54 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         setRenameItem({ type, id, name, originalName: originalName || name });
     };
 
-    const handleSaveRename = (type: RenameType, id: number, newName: string, originalName?: string) => {
+    const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
         if (!renameItem || !db) return;
 
+        const { originalName } = renameItem;
         const isStatusRename = type === 'status';
         const collectionName = isStatusRename ? 'matchCustomizations' : `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
-        const data = { customStatus: newName };
+        const data = { customName: newName };
 
-        if(newName && newName !== originalName) {
-            setDoc(docRef, data)
-                .then(() => {
-                    toast({ title: "نجاح", description: `تم تحديث ${isStatusRename ? 'الحالة' : 'الاسم'}.` });
-                    if (!isStatusRename) fetchData(false);
-                })
-                .catch(serverError => {
-                    const permissionError = new FirestorePermissionError({
-                        path: docRef.path,
-                        operation: 'create',
-                        requestResourceData: data,
+        if(isStatusRename) {
+             const statusData = { customStatus: newName };
+             if(newName.trim()) {
+                 setDoc(docRef, statusData)
+                    .then(() => toast({ title: "نجاح", description: `تم تحديث الحالة.` }))
+                    .catch(serverError => {
+                        const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: statusData });
+                        errorEmitter.emit('permission-error', permissionError);
                     });
-                    errorEmitter.emit('permission-error', permissionError);
-                });
+             } else {
+                 deleteDoc(docRef)
+                    .then(() => toast({ title: "نجاح", description: `تمت إزالة الحالة المخصصة.` }))
+                    .catch(serverError => {
+                        const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
+                        errorEmitter.emit('permission-error', permissionError);
+                    });
+             }
         } else {
-            deleteDoc(docRef).then(() => {
-                 toast({ title: "نجاح", description: `تمت إزالة ${isStatusRename ? 'الحالة' : 'الاسم'} المخصص.` });
-                 if (!isStatusRename) fetchData(false);
-            }).catch(serverError => {
-                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
-                 errorEmitter.emit('permission-error', permissionError);
-            });
+            if(newName && newName !== originalName) {
+                setDoc(docRef, data)
+                    .then(() => {
+                        toast({ title: "نجاح", description: `تم تحديث الاسم.` });
+                        fetchData(false);
+                    })
+                    .catch(serverError => {
+                        const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
+                        errorEmitter.emit('permission-error', permissionError);
+                    });
+            } else {
+                deleteDoc(docRef).then(() => {
+                     toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` });
+                     fetchData(false);
+                }).catch(serverError => {
+                     const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
+                     errorEmitter.emit('permission-error', permissionError);
+                });
+            }
         }
+
         setRenameItem(null);
     };
 
@@ -746,7 +763,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     isOpen={!!renameItem}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
                     item={renameItem}
-                    onSave={(type, id, newName) => handleSaveRename(type, id as number, newName, renameItem.originalName)}
+                    onSave={(type, id, name) => handleSaveRename(type, id, name)}
                 />
             )}
 
@@ -776,3 +793,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    

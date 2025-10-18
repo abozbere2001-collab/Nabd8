@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -336,7 +335,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             if (customName) return customName;
 
             const hardcodedMap = type === 'team' ? hardcodedTranslations.teams : hardcodedTranslations.leagues;
-            const hardcodedName = hardcodedMap[id];
+            const hardcodedName = hardcodedMap[id as any];
             if(hardcodedName) return hardcodedName;
 
             return defaultName;
@@ -475,3 +474,4 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   );
 }
 
+    
