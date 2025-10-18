@@ -9,7 +9,7 @@ import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { Player, SeasonPrediction } from '@/lib/types';
 import { CURRENT_SEASON } from '@/lib/constants';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Check } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -44,7 +44,7 @@ const PlayerListItem = React.memo(({ player, isPredictedTopScorer, onScorerSelec
                    <p className="text-xs text-muted-foreground">{player.position}</p>
                 </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => onScorerSelect(player.id)} disabled={disabled && !isPredictedTopScorer}>
+            <Button variant="ghost" size="icon" onClick={() => onScorerSelect(player.id)} disabled={disabled}>
                 <FootballIcon className={cn("h-6 w-6 text-muted-foreground transition-colors", isPredictedTopScorer && "text-yellow-400")} />
             </Button>
         </div>
@@ -59,8 +59,13 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
     const { toast } = useToast();
     const [players, setPlayers] = useState<PlayerResponse[]>([]);
     const [loading, setLoading] = useState(true);
-    const [hasPrediction, setHasPrediction] = useState(false);
-    const [predictedTopScorerId, setPredictedTopScorerId] = useState<number | undefined>();
+    const [saving, setSaving] = useState(false);
+    
+    const [savedTopScorerId, setSavedTopScorerId] = useState<number | undefined>();
+    const [stagedTopScorerId, setStagedTopScorerId] = useState<number | undefined>();
+
+    const hasPredictionBeenSaved = !!savedTopScorerId;
+
 
     const privatePredictionDocRef = useMemo(() => {
         if (!user || !db) return null;
@@ -122,8 +127,8 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                 if (docSnap.exists()) {
                     const data = docSnap.data() as SeasonPrediction;
                     if(data.predictedTopScorerId) {
-                        setHasPrediction(true);
-                        setPredictedTopScorerId(data.predictedTopScorerId);
+                        setSavedTopScorerId(data.predictedTopScorerId);
+                        setStagedTopScorerId(data.predictedTopScorerId);
                     }
                 }
             })
@@ -132,30 +137,34 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                 errorEmitter.emit('permission-error', permissionError);
             });
     }, [privatePredictionDocRef]);
-
-    const handleScorerSelect = useCallback(async (playerId: number) => {
-        if (hasPrediction) {
-            toast({
+    
+    const handleStagingSelect = (playerId: number) => {
+        if (hasPredictionBeenSaved) {
+             toast({
                 variant: 'destructive',
                 title: 'التوقع مقفل',
-                description: 'لقد قمت بتحديد توقعك لهذا الموسم ولا يمكن تغييره.',
+                description: 'لقد قمت بتثبيت توقعك لهذا الموسم ولا يمكن تغييره.',
             });
             return;
         }
+        setStagedTopScorerId(prev => prev === playerId ? undefined : playerId);
+    };
 
-        const newScorerId = predictedTopScorerId === playerId ? undefined : playerId;
-        setPredictedTopScorerId(newScorerId);
+    const handleSavePrediction = useCallback(async () => {
+        if (hasPredictionBeenSaved || !stagedTopScorerId || !privatePredictionDocRef || !user || !db) return;
         
-        if (!privatePredictionDocRef || !user || !db) return;
-
+        setSaving(true);
         const privateData: Partial<SeasonPrediction> = {
             userId: user.uid,
             leagueId: leagueId,
             leagueName: leagueName,
             season: CURRENT_SEASON,
-            predictedTopScorerId: newScorerId,
+            predictedTopScorerId: stagedTopScorerId,
             timestamp: new Date(),
         };
+
+        // Ensure the document exists before updating
+        await setDoc(privatePredictionDocRef, {}, { merge: true });
 
         setDoc(privatePredictionDocRef, privateData, { merge: true })
             .then(() => {
@@ -163,18 +172,21 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                     title: 'تم حفظ التوقع',
                     description: 'تم تسجيل توقعك لهداف الموسم بنجاح.',
                 });
-                setHasPrediction(true);
+                setSavedTopScorerId(stagedTopScorerId);
             })
             .catch((serverError) => {
                 const permissionError = new FirestorePermissionError({
                     path: privatePredictionDocRef.path,
-                    operation: 'create', // or 'update'
+                    operation: 'update',
                     requestResourceData: privateData
                 });
                 errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => {
+                setSaving(false);
             });
 
-    }, [predictedTopScorerId, privatePredictionDocRef, user, db, leagueId, leagueName, hasPrediction, toast]);
+    }, [stagedTopScorerId, privatePredictionDocRef, user, db, leagueId, leagueName, hasPredictionBeenSaved, toast]);
 
 
     const Row = ({ index, style }: { index: number, style: React.CSSProperties }) => {
@@ -186,13 +198,15 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
              <div style={style} className="px-4 py-1">
                 <PlayerListItem
                     player={player}
-                    isPredictedTopScorer={predictedTopScorerId === player.id}
-                    onScorerSelect={handleScorerSelect}
-                    disabled={hasPrediction}
+                    isPredictedTopScorer={stagedTopScorerId === player.id}
+                    onScorerSelect={handleStagingSelect}
+                    disabled={hasPredictionBeenSaved && stagedTopScorerId !== player.id}
                 />
             </div>
         )
     };
+    
+    const showSaveButton = !hasPredictionBeenSaved && stagedTopScorerId !== undefined;
 
 
     if (loading) {
@@ -209,15 +223,15 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
             <ScreenHeader title={`اختيار هداف من ${teamName}`} onBack={goBack} canGoBack={true} />
              <div className='p-4 text-center text-sm text-muted-foreground border-b'>
                 <p>
-                    {hasPrediction
+                    {hasPredictionBeenSaved
                         ? 'لقد قمت بتثبيت توقعك لهداف هذا الدوري.'
-                        : 'اختر الهداف المتوقع للدوري بالضغط على أيقونة الكرة. لا يمكنك تغيير اختيارك لاحقًا.'}
+                        : 'اختر الهداف المتوقع للدوري بالضغط على أيقونة الكرة.'}
                 </p>
             </div>
             <div className="flex-1 overflow-y-auto">
                 {players.length > 0 ? (
                      <List
-                        height={window.innerHeight - 150} // Adjust height based on your layout
+                        height={window.innerHeight - (showSaveButton ? 220 : 150)}
                         itemCount={players.length}
                         itemSize={76} // The height of each PlayerListItem + padding
                         width="100%"
@@ -228,6 +242,14 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                     <p className="text-center pt-8 text-muted-foreground">لا يوجد لاعبون متاحون لهذا الفريق.</p>
                 )}
             </div>
+
+            {showSaveButton && (
+                <div className="p-4 border-t bg-background/90 backdrop-blur-sm sticky bottom-0">
+                    <Button className="w-full" size="lg" onClick={handleSavePrediction} disabled={saving}>
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="mr-2 h-4 w-4" /> حفظ توقع الهداف</>}
+                    </Button>
+                </div>
+            )}
         </div>
     );
 }

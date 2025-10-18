@@ -9,7 +9,7 @@ import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { Team, SeasonPrediction } from '@/lib/types';
 import { CURRENT_SEASON } from '@/lib/constants';
-import { Loader2, Trophy } from 'lucide-react';
+import { Loader2, Trophy, Check } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -34,7 +34,7 @@ const TeamListItem = React.memo(({ team, isPredictedChampion, onChampionSelect, 
                 <Avatar className="h-8 w-8"><AvatarImage src={team.logo} /></Avatar>
                 <span className="font-semibold">{team.name}</span>
             </div>
-            <Button variant="ghost" size="icon" onClick={onChampionSelect} disabled={disabled && !isPredictedChampion}>
+            <Button variant="ghost" size="icon" onClick={onChampionSelect} disabled={disabled}>
                 <Trophy className={cn("h-6 w-6 text-muted-foreground transition-colors", isPredictedChampion && "text-yellow-400 fill-current")} />
             </Button>
         </div>
@@ -49,8 +49,15 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
     const { toast } = useToast();
     const [teams, setTeams] = useState<{ team: Team }[]>([]);
     const [loading, setLoading] = useState(true);
-    const [predictedChampionId, setPredictedChampionId] = useState<number | undefined>();
-    const [hasPrediction, setHasPrediction] = useState(false);
+    const [saving, setSaving] = useState(false);
+    
+    // Tracks the saved prediction from Firestore
+    const [savedChampionId, setSavedChampionId] = useState<number | undefined>();
+    // Tracks the user's current selection before saving
+    const [stagedChampionId, setStagedChampionId] = useState<number | undefined>();
+    
+    const hasPredictionBeenSaved = !!savedChampionId;
+
 
     const privatePredictionDocRef = useMemo(() => {
         if (!user || !db) return null;
@@ -91,8 +98,8 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
                 if (docSnap.exists()) {
                     const data = docSnap.data() as SeasonPrediction;
                     if(data.predictedChampionId) {
-                        setHasPrediction(true);
-                        setPredictedChampionId(data.predictedChampionId);
+                        setSavedChampionId(data.predictedChampionId);
+                        setStagedChampionId(data.predictedChampionId);
                     }
                 }
             })
@@ -101,31 +108,36 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
                 errorEmitter.emit('permission-error', permissionError);
             });
     }, [privatePredictionDocRef]);
-
-    const handleChampionSelect = useCallback(async (teamId: number) => {
-        if (hasPrediction) {
+    
+    const handleStagingSelect = (teamId: number) => {
+        if (hasPredictionBeenSaved) {
             toast({
                 variant: 'destructive',
                 title: 'التوقع مقفل',
-                description: 'لقد قمت بتحديد توقعك لهذا الموسم ولا يمكن تغييره.',
+                description: 'لقد قمت بتثبيت توقعك لهذا الموسم ولا يمكن تغييره.',
             });
             return;
         }
+        setStagedChampionId(prev => prev === teamId ? undefined : teamId);
+    };
 
-        const newChampionId = predictedChampionId === teamId ? undefined : teamId;
+
+    const handleSavePrediction = useCallback(async () => {
+        if (hasPredictionBeenSaved || !stagedChampionId || !privatePredictionDocRef || !user || !db) return;
         
-        setPredictedChampionId(newChampionId);
-        
-        if (!privatePredictionDocRef || !user || !db) return;
+        setSaving(true);
 
         const privateData: Partial<SeasonPrediction> = {
             userId: user.uid,
             leagueId,
             leagueName,
             season: CURRENT_SEASON,
-            predictedChampionId: newChampionId,
+            predictedChampionId: stagedChampionId,
             timestamp: new Date()
         };
+        
+        // Ensure the document exists before updating
+        await setDoc(privatePredictionDocRef, {}, { merge: true });
 
         setDoc(privatePredictionDocRef, privateData, { merge: true })
             .then(() => {
@@ -133,18 +145,21 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
                     title: 'تم حفظ التوقع',
                     description: 'تم تسجيل توقعك لبطل الموسم بنجاح.',
                 });
-                setHasPrediction(true);
+                setSavedChampionId(stagedChampionId);
             })
             .catch((serverError) => {
                 const permissionError = new FirestorePermissionError({
                     path: privatePredictionDocRef.path,
-                    operation: 'create', // or 'update'
+                    operation: 'update',
                     requestResourceData: privateData
                 });
                 errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => {
+                setSaving(false);
             });
 
-    }, [predictedChampionId, privatePredictionDocRef, user, db, leagueId, leagueName, hasPrediction, toast]);
+    }, [stagedChampionId, privatePredictionDocRef, user, db, leagueId, leagueName, hasPredictionBeenSaved, toast]);
 
 
     const handleTeamClick = (teamId: number, teamName: string) => {
@@ -158,14 +173,16 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
             <div style={style} className="px-4 py-1">
                 <TeamListItem
                     team={team}
-                    isPredictedChampion={predictedChampionId === team.id}
-                    onChampionSelect={() => handleChampionSelect(team.id)}
+                    isPredictedChampion={stagedChampionId === team.id}
+                    onChampionSelect={() => handleStagingSelect(team.id)}
                     onTeamClick={() => handleTeamClick(team.id, team.name)}
-                    disabled={hasPrediction}
+                    disabled={hasPredictionBeenSaved && stagedChampionId !== team.id}
                 />
             </div>
         );
     };
+    
+    const showSaveButton = !hasPredictionBeenSaved && stagedChampionId !== undefined;
 
     if (loading) {
         return (
@@ -181,9 +198,9 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
             <ScreenHeader title={`توقع بطل ${leagueName}`} onBack={goBack} canGoBack={true} />
             <div className='p-4 text-center text-sm text-muted-foreground border-b'>
                  <p>
-                    {hasPrediction 
+                    {hasPredictionBeenSaved 
                         ? 'لقد قمت بتثبيت توقعك لهذا الدوري. يمكنك الآن اختيار الهداف.'
-                        : 'اختر الفريق البطل بالضغط على أيقونة الكأس. لا يمكنك تغيير اختيارك لاحقًا.'
+                        : 'اختر الفريق البطل بالضغط على أيقونة الكأس.'
                     }
                 </p>
                 <p className="mt-2">ثم اضغط على أي فريق لاختيار الهداف من لاعبيه.</p>
@@ -191,9 +208,9 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
             <div className="flex-1 overflow-y-auto">
                 {teams.length > 0 ? (
                      <List
-                        height={window.innerHeight - 150} // Adjust height based on your layout
+                        height={window.innerHeight - (showSaveButton ? 220 : 150)}
                         itemCount={teams.length}
-                        itemSize={68} // The height of each TeamListItem + padding
+                        itemSize={68}
                         width="100%"
                     >
                         {Row}
@@ -202,6 +219,14 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
                     <p className="text-center pt-8 text-muted-foreground">لا توجد فرق متاحة لهذا الدوري.</p>
                 )}
             </div>
+            
+            {showSaveButton && (
+                <div className="p-4 border-t bg-background/90 backdrop-blur-sm sticky bottom-0">
+                    <Button className="w-full" size="lg" onClick={handleSavePrediction} disabled={saving}>
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="mr-2 h-4 w-4" /> حفظ التوقع</>}
+                    </Button>
+                </div>
+            )}
         </div>
     );
 }
