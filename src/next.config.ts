@@ -2,14 +2,6 @@
 import type {NextConfig} from 'next';
 import withPWA from 'next-pwa';
 
-const pwaConfig = withPWA({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-});
-
-
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
@@ -48,6 +40,16 @@ const nextConfig: NextConfig = {
   },
 };
 
-const config = pwaConfig(nextConfig);
+const pwaConfig = {
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+};
+
+// Only wrap with PWA in production
+const config = process.env.NODE_ENV === 'production' 
+  ? withPWA(pwaConfig)(nextConfig) 
+  : nextConfig;
+
 
 export default config;
