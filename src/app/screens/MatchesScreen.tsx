@@ -128,7 +128,7 @@ const FixturesList = ({
         <div className="space-y-4">
             {activeTab === 'my-results' && favoriteTeamMatches.length > 0 && (
                  <div>
-                    <div className="font-semibold text-foreground py-1 px-3 rounded-md bg-card border flex items-center gap-2 text-xs h-8">
+                    <div className="font-semibold text-foreground py-1 px-3 rounded-md bg-card border flex items-center gap-2 text-xs h-6">
                         <Star className="h-4 w-4 text-yellow-400" />
                         <span className="truncate">مباريات فرقك المفضلة</span>
                     </div>
@@ -413,7 +413,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             actions={
                <div className="flex items-center gap-2">
                   <SearchSheet navigate={navigate}>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
                           <Search className="h-5 w-5" />
                       </Button>
                   </SearchSheet>

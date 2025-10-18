@@ -90,7 +90,7 @@ function OurLeagueTab({
     return (
         <Tabs defaultValue="matches" className="w-full">
             <div className="sticky top-0 bg-background z-10 border-b -mx-4 px-4">
-                <TabsList className="grid w-full grid-cols-3 rounded-none h-10 p-0 border-t flex-row-reverse bg-card">
+                <TabsList className="grid w-full grid-cols-3 rounded-none h-9 p-0 border-t flex-row-reverse bg-card">
                     <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'>الهدافين</TabsTrigger>
                     <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'>الترتيب</TabsTrigger>
                     <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>المباريات</TabsTrigger>
@@ -377,13 +377,13 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   useEffect(() => {
       if (db) {
           const scorersRef = collection(db, 'iraqiLeagueTopScorers');
-          const q = query(scorersRef, orderBy('goals', 'desc'));
+          const q = query(scorersRef, orderBy('rank', 'asc'));
           const unsubscribe = onSnapshot(q, (snapshot) => {
               const fetchedScorers = snapshot.docs.map((doc) => doc.data() as Omit<ManualTopScorer, 'rank'>);
 
               fetchedScorers.sort((a, b) => {
                   if (a.goals !== b.goals) {
-                      return 0;
+                      return b.goals - a.goals;
                   }
                   return a.playerName.localeCompare(b.playerName);
               });
@@ -411,7 +411,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         actions={
           <div className="flex items-center gap-1">
               <SearchSheet navigate={navigate}>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" className="h-7 w-7">
                       <Search className="h-5 w-5" />
                   </Button>
               </SearchSheet>
@@ -443,7 +443,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
         <Tabs defaultValue="our-league" className="w-full">
           <div className="sticky top-0 bg-background z-10">
-            <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-10 bg-card">
+            <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-9 bg-card">
               <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
               <TabsTrigger value="our-league">دورينا</TabsTrigger>
             </TabsList>

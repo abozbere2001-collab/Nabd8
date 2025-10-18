@@ -115,7 +115,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 actions={
                   <div className="flex items-center gap-1">
                       <SearchSheet navigate={navigate}>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
                               <Search className="h-5 w-5" />
                           </Button>
                       </SearchSheet>
