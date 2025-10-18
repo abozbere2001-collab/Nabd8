@@ -139,7 +139,7 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
     return (
         <div className="space-y-4">
             <Card>
-                <CardContent className="p-4 text-sm">
+                <CardContent className="p-4 text-sm text-right">
                     <div className="flex justify-between py-2 border-b">
                         <span className="font-semibold">{fixture.fixture.venue.name || "غير محدد"}</span>
                         <span className="text-muted-foreground">الملعب</span>
@@ -200,7 +200,7 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
 };
 
 
-const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: MatchEvent[] | null, homeTeamId: number, highlightsOnly: boolean }) => {
+const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { events: MatchEvent[] | null, homeTeam: Fixture['teams']['home'], awayTeam: Fixture['teams']['away'], highlightsOnly: boolean }) => {
     if (!events) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     
     const filteredEvents = useMemo(() => {
@@ -219,43 +219,57 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
         if (event.type === 'Card' && event.detail.includes('Red')) return <Square className="w-5 h-5 text-red-500 fill-current" />;
         if (event.type === 'subst') return <Users className="w-4 h-4 text-blue-500" />;
         return <Clock className="w-5 h-5 text-muted-foreground" />;
-    }
-
-    const sortedEvents = [...filteredEvents].sort((a, b) => a.time.elapsed - b.time.elapsed);
+    };
+    
+    const sortedEvents = [...filteredEvents].sort((a, b) => b.time.elapsed - a.time.elapsed);
 
     return (
-        <div className="relative px-2 py-8">
-            <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
-            <div className="flex flex-col-reverse">
+        <div className="space-y-6 pt-4">
+             <div className="flex justify-between items-center px-4">
+                <div className="flex items-center gap-2">
+                    <Avatar className="h-8 w-8"><AvatarImage src={awayTeam.logo} /></Avatar>
+                    <span className="font-bold">{awayTeam.name}</span>
+                </div>
+                 <div className="flex items-center gap-2">
+                    <span className="font-bold">{homeTeam.name}</span>
+                    <Avatar className="h-8 w-8"><AvatarImage src={homeTeam.logo} /></Avatar>
+                </div>
+            </div>
+            
+            <div className="relative px-2">
+                <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-border -translate-x-1/2"></div>
                 {sortedEvents.map((event, index) => {
-                    const isHomeEvent = event.team.id === homeTeamId;
+                    const isHomeEvent = event.team.id === homeTeam.id;
                     const playerOut = event.player;
                     const playerIn = event.assist;
+
                     return (
-                        <div key={`${event.time.elapsed}-${event.player.name}-${index}`} className={cn("relative flex my-4", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
-                            <div className="flex-1 px-4">
-                                <div className={cn("flex items-center gap-3 bg-card p-2 rounded-md border w-full", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
-                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background">
+                        <div key={`${event.time.elapsed}-${event.player.name}-${index}`} className={cn("relative flex my-4 items-center", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
+                           <div className="flex-1 px-4">
+                                <div className={cn("flex items-center gap-3 w-full", isHomeEvent ? "flex-row-reverse text-right" : "flex-row text-left")}>
+                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background flex-shrink-0">
                                         {getEventIcon(event)}
                                     </div>
-                                    <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
+                                    <div className="flex-1 text-sm min-w-0">
                                         {event.type === 'subst' && event.assist.name ? (
-                                             <div className="flex flex-col gap-1 text-xs">
+                                            <div className="flex flex-col gap-1 text-xs">
                                                 <div className='flex items-center gap-1 font-semibold text-green-500'><ArrowUp className="h-3 w-3"/><span>{playerIn.name}</span></div>
                                                 <div className='flex items-center gap-1 font-semibold text-red-500'><ArrowDown className="h-3 w-3"/><span>{playerOut.name}</span></div>
-                                             </div>
+                                            </div>
                                         ) : (
                                             <>
-                                                <p className="font-semibold">{event.player.name}</p>
-                                                <p className="text-xs text-muted-foreground">{event.detail}</p>
+                                                <p className="font-semibold truncate">{event.player.name}</p>
+                                                <p className="text-xs text-muted-foreground truncate">{event.detail}</p>
                                             </>
                                         )}
                                     </div>
                                 </div>
                             </div>
+                           
                             <div className="absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 z-10 bg-background border rounded-full h-8 w-8 flex items-center justify-center font-bold text-xs">
                                 {event.time.elapsed}'
                             </div>
+                            
                             <div className="flex-1" />
                         </div>
                     );
@@ -265,7 +279,7 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
     );
 };
 
-const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; homeTeamId: number }) => {
+const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | null; homeTeam: Fixture['teams']['home'], awayTeam: Fixture['teams']['away'] }) => {
     return (
         <Tabs defaultValue="highlights" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
@@ -273,10 +287,10 @@ const TimelineTab = ({ events, homeTeamId }: { events: MatchEvent[] | null; home
                 <TabsTrigger value="all">كل الأحداث</TabsTrigger>
             </TabsList>
             <TabsContent value="highlights">
-                <TimelineTabContent events={events} homeTeamId={homeTeamId} highlightsOnly={true} />
+                <TimelineTabContent events={events} homeTeam={homeTeam} awayTeam={awayTeam} highlightsOnly={true} />
             </TabsContent>
             <TabsContent value="all">
-                <TimelineTabContent events={events} homeTeamId={homeTeamId} highlightsOnly={false} />
+                <TimelineTabContent events={events} homeTeam={homeTeam} awayTeam={awayTeam} highlightsOnly={false} />
             </TabsContent>
         </Tabs>
     );
@@ -740,7 +754,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="odds" className="mt-4"><OddsTab fixtureId={fixture.fixture.id} /></TabsContent>
-                    <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeamId={fixture.teams.home.id} /></TabsContent>
+                    <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} /></TabsContent>
                     <TabsContent value="lineups" className="mt-4">
                         <LineupsTab lineups={lineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={(type, id, name, originalName) => handleOpenRename(type, id, name, originalName)}/>
                     </TabsContent>
