@@ -279,29 +279,26 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>الفريق</TableHead>
-                                <TableHead className="text-center">لعب</TableHead>
-                                <TableHead className="text-center">ف</TableHead>
-                                <TableHead className="text-center">ت</TableHead>
-                                <TableHead className="text-center">خ</TableHead>
                                 <TableHead className="text-center">نقاط</TableHead>
+                                <TableHead className="text-center">ف/ت/خ</TableHead>
+                                <TableHead className="text-center">لعب</TableHead>
+                                <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                                <TableHead className="w-[40px]">#</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {processedStandings.map(s => (
                                 <TableRow key={s.team.id} className={cn(s.team.id === teamId && 'bg-primary/10')}>
+                                    <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                    <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
+                                    <TableCell className="text-center">{s.all.played}</TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-semibold">{s.rank}</span>
+                                        <div className="flex items-center gap-2 justify-end">
+                                            <span className="font-semibold truncate">{s.team.name}</span>
                                             <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
-                                            <span className="font-semibold">{s.team.name}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-center">{s.all.played}</TableCell>
-                                    <TableCell className="text-center">{s.all.win}</TableCell>
-                                    <TableCell className="text-center">{s.all.draw}</TableCell>
-                                    <TableCell className="text-center">{s.all.lose}</TableCell>
-                                    <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                    <TableCell className="font-bold">{s.rank}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>

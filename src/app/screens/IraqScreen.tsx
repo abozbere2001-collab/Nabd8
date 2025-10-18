@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
@@ -33,26 +33,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { isMatchLive } from '@/lib/matchStatus';
-import { cn } from '@/lib/utils';
 
 const IRAQI_LEAGUE_ID = 542;
-
-// --- Helper Components ---
-const FixtureGroup = ({ title, fixtures, navigate, titleClassName }: { title: string, fixtures: Fixture[], navigate: ScreenProps['navigate'], titleClassName?: string }) => {
-    if (fixtures.length === 0) return null;
-
-    return (
-        <div className="mb-4">
-            <h2 className={cn("text-md font-bold mb-2 px-2 text-primary", titleClassName)}>{title}</h2>
-            <div className="space-y-2">
-                {fixtures.map(fixture => (
-                    <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />
-                ))}
-            </div>
-        </div>
-    );
-};
-
 
 function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onManage: () => void, isAdmin: boolean}) {
     if (!match.isEnabled) return null;
@@ -105,27 +87,25 @@ function OurLeagueTab({
     loading: boolean,
     isAdmin: boolean
 }) {
+    const listRef = useRef<HTMLDivElement>(null);
+    const firstUpcomingMatchRef = useRef<HTMLDivElement>(null);
 
-     const categorizedFixtures = useMemo(() => {
-        const live: Fixture[] = [];
-        const upcoming: Fixture[] = [];
-        const finished: Fixture[] = [];
-
-        fixtures.forEach(fixture => {
-            if (isMatchLive(fixture.fixture.status)) {
-                live.push(fixture);
-            } else if (['TBD', 'NS', 'PST'].includes(fixture.fixture.status.short)) {
-                upcoming.push(fixture);
-            } else {
-                finished.push(fixture);
-            }
-        });
-        
-        finished.sort((a, b) => b.fixture.timestamp - a.fixture.timestamp);
-        upcoming.sort((a, b) => a.fixture.timestamp - b.fixture.timestamp);
-        
-        return { live, upcoming, finished };
+    const sortedFixtures = useMemo(() => {
+        return [...fixtures].sort((a, b) => a.fixture.timestamp - b.fixture.timestamp);
     }, [fixtures]);
+
+    useEffect(() => {
+        if (!loading && firstUpcomingMatchRef.current && listRef.current) {
+            // Delay to allow DOM to settle
+            setTimeout(() => {
+                if (firstUpcomingMatchRef.current && listRef.current) {
+                    const listTop = listRef.current.offsetTop;
+                    const itemTop = firstUpcomingMatchRef.current.offsetTop;
+                    listRef.current.scrollTop = itemTop - listTop;
+                }
+            }, 100);
+        }
+    }, [loading, sortedFixtures]);
 
     return (
         <Tabs defaultValue="matches" className="w-full">
@@ -136,19 +116,28 @@ function OurLeagueTab({
                     <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>المباريات</TabsTrigger>
                 </TabsList>
             </div>
-            <TabsContent value="matches" className="p-4 mt-0 -mx-4">
-             {loading ? (
-                <div className="flex items-center justify-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <TabsContent value="matches" className="mt-0 -mx-4">
+                <div ref={listRef} className="h-full overflow-y-auto p-4 space-y-3">
+                    {loading ? (
+                        <div className="flex items-center justify-center h-64">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                    ) : sortedFixtures.length > 0 ? (
+                        sortedFixtures.map((fixture, index) => {
+                            const isUpcoming = !isMatchLive(fixture.fixture.status) && !['FT', 'AET', 'PEN', 'PST'].includes(fixture.fixture.status.short);
+                            const isFirstUpcoming = isUpcoming && !sortedFixtures.slice(0, index).some(f => !isMatchLive(f.fixture.status) && !['FT', 'AET', 'PEN', 'PST'].includes(f.fixture.status.short));
+                            
+                            return (
+                                <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
+                                    <FixtureItem fixture={fixture} navigate={navigate} />
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <p className="pt-8 text-center text-muted-foreground">لا توجد مباريات متاحة لهذا الموسم.</p>
+                    )}
                 </div>
-            ) : fixtures.length > 0 ? (
-                <>
-                    <FixtureGroup title="مباشر" fixtures={categorizedFixtures.live} navigate={navigate} titleClassName="text-red-500 animate-pulse" />
-                    <FixtureGroup title="القادمة" fixtures={categorizedFixtures.upcoming} navigate={navigate} />
-                    <FixtureGroup title="المنتهية" fixtures={categorizedFixtures.finished} navigate={navigate} />
-                </>
-            ) : <p className="pt-8 text-center text-muted-foreground">لا توجد مباريات متاحة لهذا الموسم.</p>}
-          </TabsContent>
+            </TabsContent>
           <TabsContent value="standings" className="p-0 mt-0 -mx-4">
             {loading ? (
                  <div className="space-y-px p-4">
@@ -158,32 +147,32 @@ function OurLeagueTab({
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-1/2 text-right">الفريق</TableHead>
-                            <TableHead className="text-center">لعب</TableHead>
-                            <TableHead className="text-center">ف</TableHead>
-                            <TableHead className="text-center">ت</TableHead>
-                            <TableHead className="text-center">خ</TableHead>
                             <TableHead className="text-center">نقاط</TableHead>
+                            <TableHead className="text-center">خ</TableHead>
+                            <TableHead className="text-center">ت</TableHead>
+                            <TableHead className="text-center">ف</TableHead>
+                            <TableHead className="text-center">لعب</TableHead>
+                            <TableHead className="w-1/2 text-right">الفريق</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {standings.map((s) => (
                             <TableRow key={`${s.rank}-${s.team.id}`} className="cursor-pointer" onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: s.team.id, teamName: s.team.name })}>
+                                <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                <TableCell className="text-center">{s.all.lose}</TableCell>
+                                <TableCell className="text-center">{s.all.draw}</TableCell>
+                                <TableCell className="text-center">{s.all.win}</TableCell>
+                                <TableCell className="text-center">{s.all.played}</TableCell>
                                 <TableCell className="font-medium">
                                     <div className="flex items-center gap-2 justify-end">
-                                        <span>{s.rank}</span>
+                                        <span className="truncate">{s.team.name}</span>
                                         <Avatar className="h-6 w-6">
                                             <AvatarImage src={s.team.logo} alt={s.team.name} />
                                             <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
                                         </Avatar>
-                                        <span className="truncate">{s.team.name}</span>
+                                        <span>{s.rank}</span>
                                     </div>
                                 </TableCell>
-                                <TableCell className="text-center">{s.all.played}</TableCell>
-                                <TableCell className="text-center">{s.all.win}</TableCell>
-                                <TableCell className="text-center">{s.all.draw}</TableCell>
-                                <TableCell className="text-center">{s.all.lose}</TableCell>
-                                <TableCell className="text-center font-bold">{s.points}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -207,14 +196,18 @@ function OurLeagueTab({
                 <Table>
                     <TableHeader>
                         <TableRow>
-                             <TableHead className="text-right">اللاعب</TableHead>
-                             <TableHead className="text-right">الفريق</TableHead>
                              <TableHead className="text-center">الأهداف</TableHead>
+                             <TableHead className="text-right">الفريق</TableHead>
+                             <TableHead className="text-right">اللاعب</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {topScorers.map((scorer) => (
                             <TableRow key={scorer.rank}>
+                                <TableCell className="text-center font-bold text-lg">{scorer.goals}</TableCell>
+                                <TableCell>
+                                     <p className="text-xs text-muted-foreground text-right">{scorer.teamName}</p>
+                                </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-3 justify-end">
                                         <p className="font-semibold">{scorer.playerName}</p>
@@ -224,10 +217,6 @@ function OurLeagueTab({
                                         </Avatar>
                                     </div>
                                 </TableCell>
-                                <TableCell>
-                                     <p className="text-xs text-muted-foreground text-right">{scorer.teamName}</p>
-                                </TableCell>
-                                <TableCell className="text-center font-bold text-lg">{scorer.goals}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
