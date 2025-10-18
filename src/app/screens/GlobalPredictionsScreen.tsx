@@ -528,7 +528,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     const [calculatingPoints, setCalculatingPoints] = useState(false);
     
     const LEADERBOARD_PAGE_SIZE = 100;
-    const FULL_RESET_PIN = '1990';
+    const FULL_RESET_PIN = 'abojasem2022';
     
     const [isResetAlertOpen, setResetAlertOpen] = useState(false);
     const [resetPin, setResetPin] = useState('');
@@ -874,7 +874,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                 type="password"
                                 value={resetPin}
                                 onChange={(e) => setResetPin(e.target.value)}
-                                placeholder="أدخل الرمز 1990"
+                                placeholder="ابنك محمد"
                              />
                         </div>
                         <AlertDialogFooter>
@@ -1032,4 +1032,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
 
