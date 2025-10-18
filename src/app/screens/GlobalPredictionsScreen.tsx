@@ -808,7 +808,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 </AlertDialog>
                 <Tabs defaultValue="predictions" className="w-full">
                     <div className="sticky top-0 bg-background z-10 border-b">
-                       <TabsList>
+                       <TabsList className="grid w-full grid-cols-3">
                            <TabsTrigger value="prizes">الجوائز</TabsTrigger>
                            <TabsTrigger value="leaderboard">الترتيب</TabsTrigger>
                            <TabsTrigger value="predictions">التصويت</TabsTrigger>
