@@ -9,20 +9,29 @@ import type { Fixture as FixtureType } from '@/lib/types';
 import { useAdmin } from '@/firebase/provider';
 import { LiveMatchStatus } from './LiveMatchStatus';
 
-const TeamDisplay = ({ team }: { team: FixtureType['teams']['home'] | FixtureType['teams']['away'] }) => (
-    <div className="flex flex-col items-center gap-1 flex-1 truncate">
-        <Avatar className={'h-8 w-8 flex-shrink-0'}>
-            <AvatarImage src={team.logo} alt={team.name} />
-            <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
-        </Avatar>
-        <span className="font-semibold text-xs truncate text-center w-full">{team.name}</span>
-    </div>
-);
-
-
 export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
     const { isAdmin } = useAdmin();
     const hasCommentsFeature = commentsEnabled || isAdmin;
+
+    const HomeTeamDisplay = () => (
+        <div className="flex flex-col items-center gap-1 flex-1 truncate">
+            <Avatar className={'h-8 w-8 flex-shrink-0'}>
+                <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
+                <AvatarFallback>{fixture.teams.home.name?.charAt(0) || ''}</AvatarFallback>
+            </Avatar>
+            <span className="font-semibold text-xs truncate text-center w-full">{fixture.teams.home.name}</span>
+        </div>
+    );
+
+    const AwayTeamDisplay = () => (
+        <div className="flex flex-col items-center gap-1 flex-1 truncate">
+            <Avatar className={'h-8 w-8 flex-shrink-0'}>
+                <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
+                <AvatarFallback>{fixture.teams.away.name?.charAt(0) || ''}</AvatarFallback>
+            </Avatar>
+            <span className="font-semibold text-xs truncate text-center w-full">{fixture.teams.away.name}</span>
+        </div>
+    );
 
     return (
       <div
@@ -34,11 +43,11 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
          <main className="flex items-start justify-between gap-2">
-            <TeamDisplay team={fixture.teams.home} />
+            <AwayTeamDisplay />
             <div className="flex flex-col items-center justify-center min-w-[70px] pt-1 text-center">
                 <LiveMatchStatus fixture={fixture} />
             </div>
-            <TeamDisplay team={fixture.teams.away} />
+            <HomeTeamDisplay />
          </main>
         </div>
 
