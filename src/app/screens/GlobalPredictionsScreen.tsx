@@ -613,7 +613,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             console.error("Error calculating points:", error);
             const permissionError = new FirestorePermissionError({ 
                 path: `predictions or leaderboard`,
-                operation: 'update',
+                operation: 'write',
             });
             errorEmitter.emit('permission-error', permissionError);
             toast({ variant: 'destructive', title: 'خطأ', description: error.message || 'فشل احتساب النقاط.' });
@@ -845,25 +845,25 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="text-center">النقاط</TableHead>
-                                        <TableHead>المستخدم</TableHead>
                                         <TableHead>الترتيب</TableHead>
+                                        <TableHead>المستخدم</TableHead>
+                                        <TableHead className="text-center">النقاط</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {loadingLeaderboard ? (
                                         Array.from({ length: 5 }).map((_, i) => (
                                             <TableRow key={i}>
-                                                <TableCell className="text-center"><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
-                                                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                                                 <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                                                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                                <TableCell className="text-center"><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
                                             </TableRow>
                                         ))
                                     ) : leaderboard.length > 0 ? (
                                         <>
                                             {leaderboard.map((score, index) => (
                                                 <TableRow key={`${score.userId}-${index}`} className={cn("cursor-pointer", user && score.userId === user.uid && 'bg-primary/10')} onClick={() => setSelectedUser(score)}>
-                                                    <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
+                                                    <TableCell>{score.rank}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">
                                                             <Avatar className="h-6 w-6">
@@ -873,7 +873,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                                             {score.userName}
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell>{score.rank}</TableCell>
+                                                    <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
                                                 </TableRow>
                                             ))}
                                         </>
@@ -914,5 +914,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
 
 

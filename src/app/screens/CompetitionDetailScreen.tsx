@@ -417,13 +417,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-1/2 text-right">الفريق</TableHead>
-                            <TableHead className="text-center">لعب</TableHead>
-                            <TableHead className="text-center">ف</TableHead>
-                            <TableHead className="text-center">ت</TableHead>
-                            <TableHead className="text-center">خ</TableHead>
-                            <TableHead className="text-center">نقاط</TableHead>
                             <TableHead className="w-[120px] text-left"></TableHead>
+                            <TableHead className="text-center">نقاط</TableHead>
+                            <TableHead className="text-center">خ</TableHead>
+                            <TableHead className="text-center">ت</TableHead>
+                            <TableHead className="text-center">ف</TableHead>
+                            <TableHead className="text-center">لعب</TableHead>
+                            <TableHead className="w-1/2 text-right">الفريق</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -431,27 +431,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const isFavoritedTeam = !!favorites?.teams?.[s.team.id];
                             return (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                                <TableCell className="font-medium">
-                                    <div className="flex items-center gap-2 justify-end">
-                                        <span>{s.rank}</span>
-                                        <div className="relative">
-                                            <Avatar className="h-6 w-6">
-                                                <AvatarImage src={s.team.logo} alt={s.team.name} />
-                                                <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
-                                            </Avatar>
-                                            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(s.team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
-                                        </div>
-                                        <p className="truncate">
-                                            {getDisplayName('team', s.team.id, s.team.name)}
-                                            {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {s.team.id})</span>}
-                                        </p>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-center">{s.all.played}</TableCell>
-                                <TableCell className="text-center">{s.all.win}</TableCell>
-                                <TableCell className="text-center">{s.all.draw}</TableCell>
-                                <TableCell className="text-center">{s.all.lose}</TableCell>
-                                <TableCell className="text-center font-bold">{s.points}</TableCell>
                                 <TableCell onClick={e => e.stopPropagation()}>
                                      <div className='flex items-center justify-end opacity-80'>
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('team', s.team.id, s.team)}>
@@ -461,6 +440,27 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                         </Button>
                                      </div>
+                                </TableCell>
+                                <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                <TableCell className="text-center">{s.all.lose}</TableCell>
+                                <TableCell className="text-center">{s.all.draw}</TableCell>
+                                <TableCell className="text-center">{s.all.win}</TableCell>
+                                <TableCell className="text-center">{s.all.played}</TableCell>
+                                <TableCell className="font-medium">
+                                    <div className="flex items-center gap-2 justify-end">
+                                        <p className="truncate">
+                                            {getDisplayName('team', s.team.id, s.team.name)}
+                                            {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {s.team.id})</span>}
+                                        </p>
+                                        <div className="relative">
+                                            <Avatar className="h-6 w-6">
+                                                <AvatarImage src={s.team.logo} alt={s.team.name} />
+                                                <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
+                                            </Avatar>
+                                            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(s.team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                                        </div>
+                                         <span>{s.rank}</span>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         )})}
@@ -477,10 +477,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[90px] text-right"></TableHead>
-                            <TableHead className="text-center">الأهداف</TableHead>
-                            <TableHead className="text-right">الفريق</TableHead>
+                            <TableHead className="w-[90px] text-left"></TableHead>
                             <TableHead className="text-right">اللاعب</TableHead>
+                            <TableHead className="text-right">الفريق</TableHead>
+                            <TableHead className="text-center">الأهداف</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -495,10 +495,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             <Star className={cn("h-5 w-5", favorites?.players?.[player.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                         </Button>
                                      </div>
-                                </TableCell>
-                                <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
-                                <TableCell onClick={(e) => { e.stopPropagation(); navigate('TeamDetails', { teamId: statistics[0]?.team.id })}}>
-                                     <p className="text-xs text-muted-foreground text-right">{getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name)}</p>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-3 justify-end">
@@ -515,6 +511,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                         </div>
                                     </div>
                                 </TableCell>
+                                <TableCell onClick={(e) => { e.stopPropagation(); navigate('TeamDetails', { teamId: statistics[0]?.team.id })}}>
+                                     <p className="text-xs text-muted-foreground text-right">{getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name)}</p>
+                                </TableCell>
+                                <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

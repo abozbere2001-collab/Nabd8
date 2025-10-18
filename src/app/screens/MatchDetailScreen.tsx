@@ -432,11 +432,11 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead className="w-[40px]">#</TableHead>
-                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
-                    <TableHead className="text-center">لعب</TableHead>
-                    <TableHead className="text-center">ف/ت/خ</TableHead>
                     <TableHead className="text-center">نقاط</TableHead>
+                    <TableHead className="text-center">ف/ت/خ</TableHead>
+                    <TableHead className="text-center">لعب</TableHead>
+                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                    <TableHead className="w-[40px]">#</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -444,16 +444,16 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
                     const isRelevantTeam = s.team.id === fixture.teams.home.id || s.team.id === fixture.teams.away.id;
                     return (
                         <TableRow key={s.team.id} className={cn(isRelevantTeam && "bg-primary/10", "cursor-pointer")} onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                            <TableCell className="font-bold">{s.rank}</TableCell>
+                            <TableCell className="text-center font-bold">{s.points}</TableCell>
+                            <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
+                            <TableCell className="text-center">{s.all.played}</TableCell>
                             <TableCell className="font-medium">
                                 <div className="flex items-center gap-2 justify-end">
                                     <span className="truncate">{s.team.name}</span>
                                     <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
                                 </div>
                             </TableCell>
-                            <TableCell className="text-center">{s.all.played}</TableCell>
-                            <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
-                            <TableCell className="text-center font-bold">{s.points}</TableCell>
+                            <TableCell className="font-bold">{s.rank}</TableCell>
                         </TableRow>
                     );
                 })}
