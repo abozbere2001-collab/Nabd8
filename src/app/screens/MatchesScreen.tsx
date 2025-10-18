@@ -7,7 +7,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
+import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { Loader2, Search, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -173,8 +173,7 @@ const FixturesList = React.memo(({
 FixturesList.displayName = 'FixturesList';
 
 
-const GlobalPredictionsTab = React.memo(GlobalPredictionsScreen);
-GlobalPredictionsTab.displayName = 'GlobalPredictionsTab';
+const MemoizedGlobalPredictions = React.memo(GlobalPredictionsScreen);
 
 
 // Date Scroller
@@ -256,9 +255,15 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
   const [activeTab, setActiveTab] = useState<TabName>('my-results');
-
-  const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
   
+  // Initialize state to null to prevent hydration mismatch
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  
+  // Set the date only on the client-side
+  useEffect(() => {
+    setSelectedDateKey(formatDateKey(new Date()));
+  }, []);
+
   const [myResultsCache, setMyResultsCache] = useState<Map<string, FixtureType[]>>(new Map());
   const [myResultsLoading, setMyResultsLoading] = useState(true);
     
@@ -389,7 +394,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   
   useEffect(() => {
-      if (activeTab === 'my-results' && isVisible) {
+      if (activeTab === 'my-results' && isVisible && selectedDateKey) {
           if (myResultsCache.has(selectedDateKey)) {
               setMyResultsLoading(false);
               return;
@@ -415,7 +420,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
   
-  const currentFixtures = myResultsCache.get(selectedDateKey) || [];
+  const currentFixtures = selectedDateKey ? myResultsCache.get(selectedDateKey) || [] : [];
     
   return (
     <div className="flex h-full flex-col bg-background">
@@ -441,7 +446,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                         <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
                     ))}
                  </TabsList>
-                 {activeTab === 'my-results' && (
+                 {activeTab === 'my-results' && selectedDateKey && (
                      <div className="py-2 px-2">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                     </div>
@@ -463,7 +468,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             </TabsContent>
 
             <TabsContent value="predictions" className="flex-1 overflow-y-auto p-0 mt-0" hidden={activeTab !== 'predictions'}>
-                <GlobalPredictionsTab navigate={navigate} goBack={goBack} canGoBack={canGoBack} />
+                <MemoizedGlobalPredictions navigate={navigate} goBack={goBack} canGoBack={canGoBack} />
             </TabsContent>
         </Tabs>
     </div>
