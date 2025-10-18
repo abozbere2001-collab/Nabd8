@@ -269,7 +269,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
           return;
       };
       
-      if (isLive) setLiveLoading(true); else setMyResultsLoading(false);
+      if (isLive) setLiveLoading(true); else setMyResultsLoading(true);
 
       try {
         const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
@@ -408,7 +408,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         const controller = new AbortController();
         fetchAndProcessData(selectedDateKey, true, controller.signal);
         const interval = setInterval(() => {
-            // We don't need a new controller here, just call the fetch
             fetchAndProcessData(selectedDateKey, true, new AbortController().signal);
         }, 60000); // 1 minute
         return () => {
@@ -452,19 +451,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         />
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col min-h-0">
             <div className="flex flex-col border-b bg-card">
-                 <TabsList>
+                 <TabsList className="grid w-full grid-cols-2">
                      <TabsTrigger value="predictions">التوقعات</TabsTrigger>
-                     <TabsTrigger value="live">مباشر</TabsTrigger>
                      <TabsTrigger value="my-results">نتائجي</TabsTrigger>
                  </TabsList>
                  {activeTab === 'my-results' && (
                      <div className="py-2 px-2">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
-                    </div>
-                 )}
-                  {activeTab === 'live' && (
-                    <div className="h-[53px] flex items-center justify-center">
-                        <p className="text-sm text-muted-foreground">يتم التحديث كل دقيقة</p>
                     </div>
                  )}
             </div>
@@ -482,6 +475,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     navigate={navigate}
                 />
             </TabsContent>
+            
             <TabsContent value="live" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0" hidden={activeTab !== 'live'}>
                  <FixturesList 
                     fixtures={liveFixtures}
@@ -495,6 +489,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     navigate={navigate}
                 />
             </TabsContent>
+
             <TabsContent value="predictions" className="flex-1 overflow-y-auto p-0 mt-0" hidden={activeTab !== 'predictions'}>
                 <GlobalPredictionsScreen navigate={navigate} goBack={goBack} canGoBack={canGoBack} />
             </TabsContent>
@@ -502,5 +497,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    
 
     
