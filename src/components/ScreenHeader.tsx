@@ -14,6 +14,14 @@ interface ScreenHeaderProps {
 }
 
 export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActions }: ScreenHeaderProps) {
+  
+  const screensWithoutCentralTitle = [
+    "المزيد", "الملف الشخصي", "كل البطولات", "إشعارات", 
+    "الإعدادات العامة", "سياسة الخصوصية", "شروط الخدمة", "النسخة الاحترافية"
+  ];
+
+  const showCentralTitle = !screensWithoutCentralTitle.includes(title);
+
   return (
     <header data-id={`screen-header-${title.replace(/\s+/g, '-').toLowerCase()}`} 
     className={cn(
@@ -33,12 +41,15 @@ export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActio
             <ArrowLeft className="h-4 w-4" />
             </Button>
         )}
-         {(title && title !== "المزيد" && title !== "أخبار" && title !== "اختياراتي" && title !== "العراق") && <div className='font-bold text-md px-2'>{title}</div>}
+         {(title && !showCentralTitle) && <div className='font-bold text-md px-2'>{title}</div>}
       </div>
 
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-        <span className="font-bold text-sm font-headline text-primary">نبض الملاعب</span>
-      </div>
+      {showCentralTitle && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+          <span className="font-bold text-sm font-headline text-primary">نبض الملاعب</span>
+        </div>
+      )}
+
       <div data-id="screen-header-actions" className="flex items-center gap-1">
         {actions}
       </div>
