@@ -71,12 +71,16 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                         ref={isSelected ? selectedButtonRef : null}
                         className={cn(
                             "relative flex flex-col items-center justify-center h-auto py-1 px-2.5 min-w-[48px] rounded-lg transition-colors ml-2",
-                            isSelected ? "text-primary bg-primary/10" : "text-foreground/80 hover:text-primary"
+                             "text-foreground/80 hover:text-primary",
+                            isSelected && "text-primary"
                         )}
                         onClick={() => onDateSelect(dateKey)}
                     >
                         <span className="text-xs font-normal">{getDayLabel(date)}</span>
                         <span className="font-bold text-sm">{format(date, 'd')}</span>
+                        {isSelected && (
+                            <span className="absolute bottom-0 h-0.5 w-4 rounded-full bg-primary transition-transform" />
+                        )}
                     </button>
                 )
             })}

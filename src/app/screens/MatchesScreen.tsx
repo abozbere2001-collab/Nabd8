@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -232,10 +233,9 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
                     >
                         <span className="text-[10px] font-normal">{getDayLabel(date)}</span>
                         <span className="font-semibold text-sm">{format(date, 'd')}</span>
-                        <span className={cn(
-                            "absolute bottom-0 h-0.5 w-3 rounded-full bg-primary transition-transform scale-x-0",
-                            isSelected && "scale-x-100"
-                        )} />
+                        {isSelected && (
+                          <span className="absolute bottom-0 h-0.5 w-3 rounded-full bg-primary transition-transform" />
+                        )}
                     </button>
                 )
             })}
@@ -423,7 +423,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         />
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col min-h-0">
             <div className="flex flex-col border-b bg-card">
-                 <TabsList className="grid w-full grid-cols-3 h-auto p-0 rounded-none bg-transparent">
+                 <TabsList>
                      <TabsTrigger value="predictions">التوقعات</TabsTrigger>
                      <TabsTrigger value="live">مباشر</TabsTrigger>
                      <TabsTrigger value="my-results">نتائجي</TabsTrigger>
