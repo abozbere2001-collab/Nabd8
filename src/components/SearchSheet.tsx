@@ -227,17 +227,17 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
         if (isArabic) {
             const normalizedQuery = normalizeArabic(trimmedQuery);
-            const customNamePromises: Promise<void>[] = [];
+            const localSearchPromises: Promise<void>[] = [];
 
             // Search Firestore custom names
             customNames.teams.forEach((name, id) => {
                 if (normalizeArabic(name).includes(normalizedQuery)) {
-                    customNamePromises.push(fetchAndSet(id, 'team'));
+                    localSearchPromises.push(fetchAndSet(id, 'team'));
                 }
             });
             customNames.leagues.forEach((name, id) => {
                 if (normalizeArabic(name).includes(normalizedQuery)) {
-                    customNamePromises.push(fetchAndSet(id, 'league'));
+                    localSearchPromises.push(fetchAndSet(id, 'league'));
                 }
             });
 
@@ -245,18 +245,18 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             for (const id in hardcodedTranslations.teams) {
                 const name = hardcodedTranslations.teams[id];
                 if (normalizeArabic(name).includes(normalizedQuery)) {
-                     customNamePromises.push(fetchAndSet(Number(id), 'team'));
+                     localSearchPromises.push(fetchAndSet(Number(id), 'team'));
                 }
             }
              for (const id in hardcodedTranslations.leagues) {
                 const name = hardcodedTranslations.leagues[id];
                 if (normalizeArabic(name).includes(normalizedQuery)) {
-                     customNamePromises.push(fetchAndSet(Number(id), 'league'));
+                     localSearchPromises.push(fetchAndSet(Number(id), 'league'));
                 }
             }
-            await Promise.all(customNamePromises);
+            await Promise.all(localSearchPromises);
 
-        } else { // English search
+        } else { // English search - API only
             const [teamsData, leaguesData] = await Promise.all([
                 fetch(`/api/football/teams?search=${trimmedQuery}`).then(res => res.json()),
                 fetch(`/api/football/leagues?search=${trimmedQuery}`).then(res => res.json()),
@@ -472,7 +472,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             isOpen={!!renameItem}
             onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
             item={renameItem}
-            onSave={(name, note) => handleSaveRename(renameItem.type, renameItem.id, name, note)}
+            onSave={(type, id, name, note) => handleSaveRename(type, id, name, note)}
           />
         )}
       </SheetContent>

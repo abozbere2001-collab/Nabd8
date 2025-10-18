@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
+import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType, MatchCustomization } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
@@ -79,7 +79,7 @@ const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerTyp
 };
 
 
-const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
+const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture, navigate: ScreenProps['navigate'], customStatus: string | null | undefined }) => {
     return (
         <Card className="mb-4 bg-card/80 backdrop-blur-sm">
             <CardContent className="p-4">
@@ -96,7 +96,7 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
                         <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="flex flex-col items-center justify-center min-w-[120px] text-center">
-                        <LiveMatchStatus fixture={fixture} large />
+                        <LiveMatchStatus fixture={fixture} customStatus={customStatus} large />
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
@@ -233,8 +233,10 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                         <p className="font-semibold">{event.player.name}</p>
                                         {event.type === 'subst' && event.assist.name ? (
                                              <div className={cn("flex items-center gap-1 text-xs text-muted-foreground", isHomeEvent ? "flex-row-reverse" : "")}>
-                                                <ArrowUp className="h-3 w-3 text-green-500"/>
-                                                <span>تبديل بـ {event.assist.name}</span>
+                                                <ArrowDown className="h-3 w-3 text-red-500"/>
+                                                <span>{event.assist.name}</span>
+                                                <ArrowUp className="h-3 w-3 text-green-500 ml-2 mr-2" />
+                                                <span>{event.player.name}</span>
                                              </div>
                                         ) : (
                                             <p className="text-xs text-muted-foreground">{event.detail}</p>
@@ -349,14 +351,14 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                 <h3 className="text-center text-base font-bold mb-2">الاحتياط والتبديلات</h3>
                 <div className="bg-card/50 space-y-2 mb-4 rounded-lg p-2" style={{backgroundColor: '#000000'}}>
                     {substitutionEvents.map((event, index) => {
-                        const playerIn = event.player;
-                        const playerOut = event.assist;
+                        const playerIn = event.assist; // Player coming IN
+                        const playerOut = event.player; // Player going OUT
 
                         return (
                              <div key={index} className="p-2">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
-                                        <ArrowUp className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-red-500">
+                                        <ArrowDown className="h-4 w-4" />
                                         <div className="flex flex-col items-start">
                                             <span className="truncate">{playerIn.name}</span>
                                         </div>
@@ -364,8 +366,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
 
                                     <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
 
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
-                                        <ArrowDown className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-green-500">
+                                        <ArrowUp className="h-4 w-4" />
                                         <div className="flex flex-col items-end">
                                             <span className="truncate">{playerOut.name}</span>
                                         </div>
@@ -507,6 +509,20 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [loading, setLoading] = useState(!initialFixture);
     const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> }>({});
+    const [customStatus, setCustomStatus] = useState<string | null>(null);
+
+     useEffect(() => {
+        if (!db || !fixtureId) return;
+        const customStatusRef = doc(db, 'matchCustomizations', String(fixtureId));
+        const unsubscribe = onSnapshot(customStatusRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setCustomStatus(docSnap.data()?.customStatus || null);
+            } else {
+                setCustomStatus(null);
+            }
+        }, () => setCustomStatus(null));
+        return () => unsubscribe();
+    }, [db, fixtureId]);
 
     const applyCustomNamesToFixture = useCallback((fixtureToUpdate: Fixture | null, names: { [key: string]: Map<number, string> }) => {
         if (!fixtureToUpdate) return null;
@@ -687,14 +703,15 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     isOpen={!!renameItem}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
                     item={renameItem}
-                    onSave={(newName) => handleSaveRename(renameItem.type, renameItem.id, newName, renameItem.originalName)}
+                    onSave={(type, id, newName) => handleSaveRename(type, id, newName, renameItem.originalName)}
                 />
             )}
 
             <div className="flex-1 overflow-y-auto p-1">
                 <MatchHeaderCard 
                     fixture={fixture} 
-                    navigate={navigate} 
+                    navigate={navigate}
+                    customStatus={customStatus} 
                 />
                 <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-5 rounded-lg h-auto p-1 bg-card">

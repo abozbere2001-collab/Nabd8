@@ -17,7 +17,7 @@ const getRelativeDay = (date: Date) => {
 };
 
 // Live Timer Component
-export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureType, large?: boolean, customStatus?: string | null }) => {
+export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixture: FixtureType, large?: boolean, customStatus?: string | null }) => {
     const { status, date } = fixture.fixture;
     const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
     const live = isMatchLive(status);
@@ -53,6 +53,13 @@ export const LiveMatchStatus = ({ fixture, large = false }: { fixture: FixtureTy
     const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
 
     const renderStatus = () => {
+        if (customStatus) {
+             return {
+                main: customStatus,
+                sub: getRelativeDay(fixtureDate),
+                isLive: false
+            };
+        }
         if (live) {
             return {
                 main: `${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`,

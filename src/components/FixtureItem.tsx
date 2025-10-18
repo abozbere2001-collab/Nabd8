@@ -9,7 +9,7 @@ import type { Fixture as FixtureType } from '@/lib/types';
 import { useAdmin } from '@/firebase/provider';
 import { LiveMatchStatus } from './LiveMatchStatus';
 
-export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean }) => {
+export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, customStatus }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean, customStatus?: string | null }) => {
     const { isAdmin } = useAdmin();
     const hasCommentsFeature = commentsEnabled || isAdmin;
 
@@ -43,11 +43,11 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
          <main className="flex items-start justify-between gap-2">
-            <AwayTeamDisplay />
-            <div className="flex flex-col items-center justify-center min-w-[70px] pt-1 text-center">
-                <LiveMatchStatus fixture={fixture} />
-            </div>
             <HomeTeamDisplay />
+            <div className="flex flex-col items-center justify-center min-w-[70px] pt-1 text-center">
+                <LiveMatchStatus fixture={fixture} customStatus={customStatus}/>
+            </div>
+            <AwayTeamDisplay />
          </main>
         </div>
 

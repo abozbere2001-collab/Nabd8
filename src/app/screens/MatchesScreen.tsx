@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
-import type { Fixture as FixtureType, Favorites, MatchDetails } from '@/lib/types';
+import type { Fixture as FixtureType, Favorites, MatchDetails, MatchCustomization } from '@/lib/types';
 import { GlobalPredictionsScreen } from './GlobalPredictionsScreen';
 import { FixtureItem } from '@/components/FixtureItem';
 import { isMatchLive } from '@/lib/matchStatus';
@@ -40,6 +40,7 @@ const FixturesList = ({
     favoritedLeagueIds,
     favoritedTeamIds,
     commentedMatches,
+    customStatuses,
     navigate,
 }: { 
     fixtures: FixtureType[], 
@@ -49,6 +50,7 @@ const FixturesList = ({
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
     commentedMatches: { [key: number]: MatchDetails },
+    customStatuses: { [key: number]: MatchCustomization },
     navigate: ScreenProps['navigate'],
 }) => {
     
@@ -137,6 +139,7 @@ const FixturesList = ({
                                 fixture={f} 
                                 navigate={navigate}
                                 commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled}
+                                customStatus={customStatuses[f.fixture.id]?.customStatus}
                             />
                         ))}
                     </div>
@@ -163,6 +166,7 @@ const FixturesList = ({
                                     fixture={f} 
                                     navigate={navigate}
                                     commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled} 
+                                    customStatus={customStatuses[f.fixture.id]?.customStatus}
                                 />
                             ))}
                         </div>
@@ -255,7 +259,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [loading, setLoading] = useState(true);
     
   const [commentedMatches, setCommentedMatches] = useState<{ [key: number]: MatchDetails }>({});
-
+  const [customStatuses, setCustomStatuses] = useState<{ [key: number]: MatchCustomization }>({});
 
   useEffect(() => {
     if (!user || !db) {
@@ -289,7 +293,24 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         const permissionError = new FirestorePermissionError({ path: 'matches', operation: 'list' });
         errorEmitter.emit('permission-error', permissionError);
     });
-    return () => unsubscribe();
+
+     const customStatusCollectionRef = collection(db, 'matchCustomizations');
+     const unsubscribeCustomStatus = onSnapshot(customStatusCollectionRef, (snapshot) => {
+        const statuses: { [key: number]: MatchCustomization } = {};
+        snapshot.forEach(doc => {
+            statuses[Number(doc.id)] = doc.data() as MatchCustomization;
+        });
+        setCustomStatuses(statuses);
+     }, (error) => {
+        const permissionError = new FirestorePermissionError({ path: 'matchCustomizations', operation: 'list' });
+        errorEmitter.emit('permission-error', permissionError);
+     });
+
+
+    return () => {
+        unsubscribe();
+        unsubscribeCustomStatus();
+    }
   }, [db]);
   
   const fetchAndProcessData = useCallback(async (dateKey: string, isLive: boolean) => {
@@ -429,6 +450,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
                     commentedMatches={commentedMatches}
+                    customStatuses={customStatuses}
                     navigate={navigate}
                 />
             </TabsContent>
@@ -441,6 +463,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
                     commentedMatches={commentedMatches}
+                    customStatuses={customStatuses}
                     navigate={navigate}
                 />
             </TabsContent>
