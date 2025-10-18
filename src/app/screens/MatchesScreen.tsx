@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -243,11 +242,11 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     );
 }
 
-type TabName = 'predictions' | 'my-results';
+type TabName = 'my-results' | 'predictions';
 
 const tabs: {id: TabName, label: string}[] = [
-    { id: 'predictions', label: 'التوقعات' },
     { id: 'my-results', label: 'نتائجي' },
+    { id: 'predictions', label: 'التوقعات' },
 ];
 
 // Main Screen Component
@@ -255,7 +254,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const { user } = useAuth();
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
-  const [activeTab, setActiveTab] = useState<TabName>('predictions');
+  const [activeTab, setActiveTab] = useState<TabName>('my-results');
   
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   
@@ -401,7 +400,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   
   useEffect(() => {
-      if (activeTab === 'my-results' && isVisible && selectedDateKey) {
+      if (activeTab !== 'my-results') {
+        return;
+      }
+      if (isVisible && selectedDateKey) {
           if (myResultsCache.has(selectedDateKey)) {
               setMyResultsLoading(false);
               return;
@@ -481,9 +483,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-
-    
-
-    
-
-    

@@ -755,7 +755,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     return (
         <div className="flex h-full flex-col bg-background">
              <ScreenHeader 
-                title="" 
+                title={fixture.league.name} 
                 onBack={goBack} 
                 canGoBack={canGoBack} 
             />
@@ -797,3 +797,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
