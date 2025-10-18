@@ -1,14 +1,16 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, Gem } from 'lucide-react';
+import { Check, Gem, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { purchaseSubscription } from '@/lib/revenuecat-client';
+import { useAuth } from '@/firebase/provider';
 
 const proFeatures = [
     "تجربة خالية من الإعلانات تمامًا",
@@ -20,12 +22,14 @@ const proFeatures = [
 const subscriptionPlans = [
     {
         name: "شهري",
+        identifier: "monthly",
         price: "4.99",
         description: "فاتورة كل شهر، ألغِ في أي وقت.",
         isPopular: false,
     },
     {
         name: "سنوي",
+        identifier: "yearly",
         price: "49.99",
         description: "وفر 20% مع الخطة السنوية.",
         isPopular: true,
@@ -35,14 +39,40 @@ const subscriptionPlans = [
 
 export function GoProScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { toast } = useToast();
+  const { setProUser } = useAuth();
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
-  const handleSubscribe = (planName: string) => {
-    // This is where you would later integrate with a payment provider like Stripe or RevenueCat.
-    // For now, we just show a toast message.
-    toast({
-        title: "قريبًا!",
-        description: `ميزة الاشتراك في الخطة الـ ${planName} قيد التطوير.`,
-    });
+  const handleSubscribe = async (planIdentifier: string, planName: string) => {
+    setLoadingPlan(planIdentifier);
+    try {
+        const isSuccess = await purchaseSubscription(planIdentifier);
+
+        if (isSuccess) {
+            // In a real app, this would be handled by a backend webhook.
+            // For prototyping, we set it directly after the mock purchase succeeds.
+            await setProUser(true);
+            
+            toast({
+                title: "🎉 تمت الترقية بنجاح!",
+                description: `أصبحت الآن من مستخدمي نبض الملاعب برو.`,
+            });
+            goBack(); // Go back to settings screen
+        } else {
+             toast({
+                variant: 'destructive',
+                title: "فشلت عملية الشراء",
+                description: "حدث خطأ ما أثناء محاولة إتمام عملية الشراء.",
+             });
+        }
+    } catch (error: any) {
+         toast({
+            variant: 'destructive',
+            title: "خطأ",
+            description: error.message || "فشلت عملية الشراء. يرجى المحاولة مرة أخرى.",
+        });
+    } finally {
+        setLoadingPlan(null);
+    }
   }
 
   return (
@@ -86,8 +116,8 @@ export function GoProScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         <p className="text-muted-foreground text-sm">/ {plan.name === 'شهري' ? 'شهر' : 'سنة'}</p>
                     </CardContent>
                     <CardFooter>
-                         <Button className="w-full" onClick={() => handleSubscribe(plan.name)}>
-                            اشترك الآن
+                         <Button className="w-full" onClick={() => handleSubscribe(plan.identifier, plan.name)} disabled={!!loadingPlan}>
+                            {loadingPlan === plan.identifier ? <Loader2 className="h-4 w-4 animate-spin"/> : 'اشترك الآن'}
                         </Button>
                     </CardFooter>
                 </Card>
