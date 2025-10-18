@@ -28,7 +28,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 
-type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country';
+type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'status';
 
 
 const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerType, navigate: ScreenProps['navigate'], onRename: () => void, isAdmin: boolean }) => {
@@ -233,9 +233,9 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                         <p className="font-semibold">{event.player.name}</p>
                                         {event.type === 'subst' && event.assist.name ? (
                                              <div className={cn("flex items-center gap-1 text-xs text-muted-foreground", isHomeEvent ? "flex-row-reverse" : "")}>
-                                                <ArrowDown className="h-3 w-3 text-red-500"/>
+                                                <ArrowUp className="h-3 w-3 text-green-500"/>
                                                 <span>{event.assist.name}</span>
-                                                <ArrowUp className="h-3 w-3 text-green-500 ml-2 mr-2" />
+                                                <ArrowDown className="h-3 w-3 text-red-500 ml-2 mr-2" />
                                                 <span>{event.player.name}</span>
                                              </div>
                                         ) : (
@@ -351,8 +351,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                 <h3 className="text-center text-base font-bold mb-2">الاحتياط والتبديلات</h3>
                 <div className="bg-card/50 space-y-2 mb-4 rounded-lg p-2" style={{backgroundColor: '#000000'}}>
                     {substitutionEvents.map((event, index) => {
-                        const playerIn = event.assist; // Player coming IN
-                        const playerOut = event.player; // Player going OUT
+                        const playerIn = event.player;
+                        const playerOut = event.assist;
 
                         return (
                              <div key={index} className="p-2">
@@ -600,12 +600,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         }
     }, [fixtureId, fixture]);
     
-    // Fetch initial data
     useEffect(() => {
         fetchData(true);
-    }, [fixtureId]); // Only run on initial load based on fixtureId
+    }, [fixtureId]); 
     
-    // Apply custom names when they are fetched or fixture data changes
     useEffect(() => {
         const fetchAndApplyNames = async () => {
              if (!db || !fixture) return;
@@ -642,15 +640,16 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const handleSaveRename = (type: RenameType, id: number, newName: string, originalName?: string) => {
         if (!renameItem || !db) return;
 
-        const collectionName = `${type}Customizations`;
+        const isStatusRename = type === 'status';
+        const collectionName = isStatusRename ? 'matchCustomizations' : `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
-        const data = { customName: newName };
+        const data = { customStatus: newName };
 
         if(newName && newName !== originalName) {
             setDoc(docRef, data)
                 .then(() => {
-                    toast({ title: "نجاح", description: `تم تحديث اسم ${type === 'player' ? 'اللاعب' : 'المدرب'}.` });
-                    fetchData(false); // Refetch data to show updated name
+                    toast({ title: "نجاح", description: `تم تحديث ${isStatusRename ? 'الحالة' : 'الاسم'}.` });
+                    if (!isStatusRename) fetchData(false);
                 })
                 .catch(serverError => {
                     const permissionError = new FirestorePermissionError({
@@ -661,17 +660,14 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     errorEmitter.emit('permission-error', permissionError);
                 });
         } else {
-            // If new name is empty or same as original, delete the custom name doc
             deleteDoc(docRef).then(() => {
-                 toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` });
-                 fetchData(false);
+                 toast({ title: "نجاح", description: `تمت إزالة ${isStatusRename ? 'الحالة' : 'الاسم'} المخصص.` });
+                 if (!isStatusRename) fetchData(false);
             }).catch(serverError => {
                  const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
                  errorEmitter.emit('permission-error', permissionError);
             });
         }
-
-
         setRenameItem(null);
     };
 
@@ -696,14 +692,29 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
 
     return (
         <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title="" onBack={goBack} canGoBack={canGoBack} />
+             <ScreenHeader 
+                title="" 
+                onBack={goBack} 
+                canGoBack={canGoBack} 
+                actions={
+                    isAdmin ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenRename('status', fixture.fixture.id, customStatus || '')}
+                        >
+                            <Pencil className="h-5 w-5" />
+                        </Button>
+                    ) : null
+                }
+            />
             
             {renameItem && (
                 <RenameDialog
                     isOpen={!!renameItem}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
                     item={renameItem}
-                    onSave={(type, id, newName) => handleSaveRename(type, id, newName, renameItem.originalName)}
+                    onSave={(type, id, newName) => handleSaveRename(type, id as number, newName, renameItem.originalName)}
                 />
             )}
 

@@ -22,6 +22,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
     const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
     const live = isMatchLive(status);
     const fixtureDate = new Date(date);
+    const hasStarted = status.short !== 'NS' && status.short !== 'TBD' && status.short !== 'PST';
 
     useEffect(() => {
         let interval: NodeJS.Timeout | null = null;
@@ -53,7 +54,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
     const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
 
     const renderStatus = () => {
-        if (customStatus) {
+        if (customStatus && !hasStarted) {
              return {
                 main: customStatus,
                 sub: getRelativeDay(fixtureDate),
