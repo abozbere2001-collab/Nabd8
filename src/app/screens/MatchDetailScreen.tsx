@@ -234,7 +234,7 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                     </div>
                                     <div className={cn("flex-1 text-sm", isHomeEvent ? "text-right" : "text-left")}>
                                         {event.type === 'subst' && event.assist.name ? (
-                                             <div className={cn("flex flex-col gap-1 text-xs", isHomeEvent ? "items-end" : "items-start")}>
+                                             <div className={cn("flex flex-col gap-1 text-xs")}>
                                                 <div className='flex items-center gap-1 font-semibold text-green-500'><ArrowUp className="h-3 w-3"/><span>{playerIn.name}</span></div>
                                                 <div className='flex items-center gap-1 font-semibold text-red-500'><ArrowDown className="h-3 w-3"/><span>{playerOut.name}</span></div>
                                              </div>
@@ -350,58 +350,55 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             
             {renderPitch(activeLineup)}
             
-            <div className="bg-background">
-                <h3 className="text-center text-base font-bold mb-2">الاحتياط والتبديلات</h3>
-                <div className="bg-card/50 space-y-2 mb-4 rounded-lg p-2" style={{backgroundColor: '#000000'}}>
-                    {substitutionEvents.map((event, index) => {
-                        const playerOut = event.player;
-                        const playerIn = event.assist;
+            <Card>
+                <CardContent className="p-3 text-center">
+                    <h3 className="font-bold text-sm mb-2">المدرب</h3>
+                    <div className="relative inline-flex flex-col items-center gap-1">
+                        <Avatar className="h-12 w-12">
+                            <AvatarImage src={activeLineup.coach.photo} />
+                            <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
+                        {isAdmin && (
+                            <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name, activeLineup.coach.name);}}>
+                                <Pencil className="h-3 w-3" />
+                            </Button>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
 
-                        return (
-                             <div key={index} className="p-2">
-                                <div className="flex items-center justify-between">
-                                     <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
-                                        <ArrowUp className="h-4 w-4" />
-                                        <div className="flex flex-col items-start">
-                                            <span className="truncate">{playerIn.name}</span>
+            {substitutionEvents.length > 0 && (
+                <div className="space-y-3">
+                    <h3 className="text-center text-base font-bold">التبديلات</h3>
+                    <Card>
+                        <CardContent className="p-2 space-y-1">
+                            {substitutionEvents.map((event, index) => {
+                                const playerOut = event.player;
+                                const playerIn = event.assist;
+                                return (
+                                    <div key={index} className="flex items-center justify-between p-1 text-xs">
+                                        <div className='font-bold w-10 text-center'>{event.time.elapsed}'</div>
+                                        <div className='flex-1 flex items-center justify-end gap-1 font-semibold text-green-500'>
+                                            <span>{playerIn.name}</span>
+                                            <ArrowUp className="h-3 w-3"/>
+                                        </div>
+                                        <div className='flex-1 flex items-center justify-start gap-1 font-semibold text-red-500 ml-4'>
+                                            <ArrowDown className="h-3 w-3"/>
+                                            <span>{playerOut.name}</span>
                                         </div>
                                     </div>
-
-                                    <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
-
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
-                                        <ArrowDown className="h-4 w-4" />
-                                        <div className="flex flex-col items-end">
-                                            <span className="truncate">{playerOut.name}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
+                                );
+                            })}
+                        </CardContent>
+                    </Card>
                 </div>
+            )}
             
+            <div className="space-y-4 pt-4">
+                <h3 className="text-center text-base font-bold">الاحتياط</h3>
                 <Card>
-                    <CardContent className="p-3 text-center">
-                        <h3 className="font-bold text-sm mb-2">المدرب</h3>
-                        <div className="relative inline-flex flex-col items-center gap-1">
-                            <Avatar className="h-12 w-12">
-                                <AvatarImage src={activeLineup.coach.photo} />
-                                <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
-                            {isAdmin && (
-                                <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name, activeLineup.coach.name);}}>
-                                    <Pencil className="h-3 w-3" />
-                                </Button>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                 <div className="space-y-4 pt-4">
-                    <h3 className="text-center text-base font-bold">الاحتياط</h3>
-                    <div className="bg-card/50 grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg p-2">
+                    <CardContent className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {activeLineup.substitutes.map(p => (
                             <div key={p.player.id || p.player.name} className="p-2 cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                                 <div className="flex items-center gap-3">
@@ -413,8 +410,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                                 </div>
                             </div>
                         ))}
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );
@@ -797,7 +794,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
-    
-
-    
