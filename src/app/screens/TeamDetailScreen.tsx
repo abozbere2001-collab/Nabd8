@@ -129,7 +129,7 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
     
     return (
         <div className="space-y-2">
-            {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={(isOpen) => !isOpen && setRenameItem(null)} item={{...renameItem, type: 'player'}} onSave={(newName) => handleSaveRename('player', renameItem.id, newName, renameItem.originalName)} />}
+            {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={(isOpen) => !isOpen && setRenameItem(null)} item={{...renameItem, type: 'player'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name, renameItem.originalName)} />}
             {players.map(player => (
                 <Card key={player.id} className="p-2">
                     <div className="flex items-center gap-3">
@@ -279,7 +279,6 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[40px]">#</TableHead>
                                 <TableHead>الفريق</TableHead>
                                 <TableHead className="text-center">لعب</TableHead>
                                 <TableHead className="text-center">ف</TableHead>
@@ -291,9 +290,9 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                         <TableBody>
                             {processedStandings.map(s => (
                                 <TableRow key={s.team.id} className={cn(s.team.id === teamId && 'bg-primary/10')}>
-                                    <TableCell>{s.rank}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
+                                            <span className="font-semibold">{s.rank}</span>
                                             <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
                                             <span className="font-semibold">{s.team.name}</span>
                                         </div>

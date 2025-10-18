@@ -417,13 +417,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[120px] text-right"></TableHead>
-                            <TableHead className="text-center">نقاط</TableHead>
-                            <TableHead className="text-center">خ</TableHead>
-                            <TableHead className="text-center">ت</TableHead>
-                            <TableHead className="text-center">ف</TableHead>
+                            <TableHead className="w-1/2 text-right">الفريق</TableHead>
                             <TableHead className="text-center">لعب</TableHead>
-                            <TableHead className="text-right w-1/2">الفريق</TableHead>
+                            <TableHead className="text-center">ف</TableHead>
+                            <TableHead className="text-center">ت</TableHead>
+                            <TableHead className="text-center">خ</TableHead>
+                            <TableHead className="text-center">نقاط</TableHead>
+                            <TableHead className="w-[120px] text-left"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -431,28 +431,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const isFavoritedTeam = !!favorites?.teams?.[s.team.id];
                             return (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                                <TableCell onClick={e => e.stopPropagation()}>
-                                     <div className='flex items-center justify-start opacity-80'>
-                                        {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('team', s.team.id, s.team)}>
-                                            <Pencil className="h-4 w-4 text-muted-foreground" />
-                                        </Button>}
-                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleFavorite('team', {...s.team, name: getDisplayName('team', s.team.id, s.team.name)})}>
-                                            <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
-                                        </Button>
-                                     </div>
-                                </TableCell>
-                                <TableCell className="text-center font-bold">{s.points}</TableCell>
-                                <TableCell className="text-center">{s.all.lose}</TableCell>
-                                <TableCell className="text-center">{s.all.draw}</TableCell>
-                                <TableCell className="text-center">{s.all.win}</TableCell>
-                                <TableCell className="text-center">{s.all.played}</TableCell>
                                 <TableCell className="font-medium">
                                     <div className="flex items-center gap-2 justify-end">
-                                        
-                                        <p className="truncate">
-                                            {getDisplayName('team', s.team.id, s.team.name)}
-                                            {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {s.team.id})</span>}
-                                        </p>
+                                        <span>{s.rank}</span>
                                         <div className="relative">
                                             <Avatar className="h-6 w-6">
                                                 <AvatarImage src={s.team.logo} alt={s.team.name} />
@@ -460,8 +441,26 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             </Avatar>
                                             {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(s.team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
                                         </div>
-                                        <span>{s.rank}</span>
+                                        <p className="truncate">
+                                            {getDisplayName('team', s.team.id, s.team.name)}
+                                            {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {s.team.id})</span>}
+                                        </p>
                                     </div>
+                                </TableCell>
+                                <TableCell className="text-center">{s.all.played}</TableCell>
+                                <TableCell className="text-center">{s.all.win}</TableCell>
+                                <TableCell className="text-center">{s.all.draw}</TableCell>
+                                <TableCell className="text-center">{s.all.lose}</TableCell>
+                                <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                <TableCell onClick={e => e.stopPropagation()}>
+                                     <div className='flex items-center justify-end opacity-80'>
+                                        {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('team', s.team.id, s.team)}>
+                                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                                        </Button>}
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleFavorite('team', {...s.team, name: getDisplayName('team', s.team.id, s.team.name)})}>
+                                            <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
+                                        </Button>
+                                     </div>
                                 </TableCell>
                             </TableRow>
                         )})}
@@ -478,34 +477,15 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="text-right">اللاعب</TableHead>
-                            <TableHead className="text-right">الفريق</TableHead>
+                            <TableHead className="w-[90px] text-right"></TableHead>
                             <TableHead className="text-center">الأهداف</TableHead>
-                            <TableHead className="text-left w-[90px]"></TableHead>
+                            <TableHead className="text-right">الفريق</TableHead>
+                            <TableHead className="text-right">اللاعب</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {topScorers.map(({ player, statistics }) => (
                             <TableRow key={player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
-                                <TableCell>
-                                    <div className="flex items-center gap-3 justify-end">
-                                        <div className="relative">
-                                            <Avatar className="h-10 w-10">
-                                                <AvatarImage src={player.photo} alt={player.name} />
-                                                <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
-                                            </Avatar>
-                                            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(player.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
-                                        </div>
-                                        <p className="font-semibold">
-                                            {getDisplayName('player', player.id, player.name)}
-                                            {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {player.id})</span>}
-                                        </p>
-                                    </div>
-                                </TableCell>
-                                <TableCell onClick={(e) => { e.stopPropagation(); navigate('TeamDetails', { teamId: statistics[0]?.team.id })}}>
-                                     <p className="text-xs text-muted-foreground text-right">{getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name)}</p>
-                                </TableCell>
-                                <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
                                 <TableCell>
                                     <div className='flex items-center justify-start opacity-80' onClick={e => e.stopPropagation()}>
                                         {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('player', player.id, player)}>
@@ -515,6 +495,25 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             <Star className={cn("h-5 w-5", favorites?.players?.[player.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                         </Button>
                                      </div>
+                                </TableCell>
+                                <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
+                                <TableCell onClick={(e) => { e.stopPropagation(); navigate('TeamDetails', { teamId: statistics[0]?.team.id })}}>
+                                     <p className="text-xs text-muted-foreground text-right">{getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name)}</p>
+                                </TableCell>
+                                <TableCell>
+                                    <div className="flex items-center gap-3 justify-end">
+                                        <p className="font-semibold">
+                                            {getDisplayName('player', player.id, player.name)}
+                                            {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {player.id})</span>}
+                                        </p>
+                                        <div className="relative">
+                                            <Avatar className="h-10 w-10">
+                                                <AvatarImage src={player.photo} alt={player.name} />
+                                                <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
+                                            </Avatar>
+                                            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(player.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                                        </div>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
