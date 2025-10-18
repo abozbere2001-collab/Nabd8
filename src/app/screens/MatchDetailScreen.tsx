@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'status';
 
@@ -234,9 +235,9 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                         {event.type === 'subst' && event.assist.name ? (
                                              <div className={cn("flex items-center gap-1 text-xs text-muted-foreground", isHomeEvent ? "flex-row-reverse" : "")}>
                                                 <ArrowUp className="h-3 w-3 text-green-500"/>
-                                                <span>{event.assist.name}</span>
-                                                <ArrowDown className="h-3 w-3 text-red-500 ml-2 mr-2" />
                                                 <span>{event.player.name}</span>
+                                                <ArrowDown className="h-3 w-3 text-red-500 ml-2 mr-2" />
+                                                <span>{event.assist.name}</span>
                                              </div>
                                         ) : (
                                             <p className="text-xs text-muted-foreground">{event.detail}</p>
@@ -357,19 +358,19 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                         return (
                              <div key={index} className="p-2">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-red-500">
-                                        <ArrowDown className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
+                                        <ArrowUp className="h-4 w-4" />
                                         <div className="flex flex-col items-start">
-                                            <span className="truncate">{playerIn.name}</span>
+                                            <span className="truncate">{playerOut.name}</span>
                                         </div>
                                     </div>
 
                                     <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
 
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-green-500">
-                                        <ArrowUp className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
+                                        <ArrowDown className="h-4 w-4" />
                                         <div className="flex flex-col items-end">
-                                            <span className="truncate">{playerOut.name}</span>
+                                            <span className="truncate">{playerIn.name}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -524,35 +525,66 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         return () => unsubscribe();
     }, [db, fixtureId]);
 
-    const applyCustomNamesToFixture = useCallback((fixtureToUpdate: Fixture | null, names: { [key: string]: Map<number, string> }) => {
-        if (!fixtureToUpdate) return null;
-        return {
-            ...fixtureToUpdate,
-            league: {
-                ...fixtureToUpdate.league,
-                name: names.league?.get(fixtureToUpdate.league.id) || fixtureToUpdate.league.name,
-            },
-            teams: {
-                home: { ...fixtureToUpdate.teams.home, name: names.team?.get(fixtureToUpdate.teams.home.id) || fixtureToUpdate.teams.home.name },
-                away: { ...fixtureToUpdate.teams.away, name: names.team?.get(fixtureToUpdate.teams.away.id) || fixtureToUpdate.teams.away.name },
-            }
-        };
-    }, []);
+    const getDisplayName = useCallback((type: 'team' | 'player' | 'league' | 'coach', id: number, defaultName: string) => {
+      const firestoreMap = customNames[type];
+      const customName = firestoreMap?.get(id);
+      if (customName) return customName;
+
+      if(type === 'team' || type === 'league') {
+          const hardcodedMap = hardcodedTranslations[type === 'team' ? 'teams' : 'leagues'];
+          const hardcodedName = hardcodedMap[id];
+          if(hardcodedName) return hardcodedName;
+      }
+      
+      return defaultName;
+    }, [customNames]);
+
+    const applyCustomNames = useCallback((data: any, type: string) => {
+        if (!data) return data;
+        if (Array.isArray(data)) {
+            return data.map(item => applyCustomNames(item, type));
+        }
+
+        const applyToPlayer = (player: PlayerType) => {
+             if (!player || !player.id) return player;
+             return {...player, name: getDisplayName('player', player.id, player.name) };
+        }
+
+        if (type === 'fixture' && data.fixture) {
+            data.league.name = getDisplayName('league', data.league.id, data.league.name);
+            data.teams.home.name = getDisplayName('team', data.teams.home.id, data.teams.home.name);
+            data.teams.away.name = getDisplayName('team', data.teams.away.id, data.teams.away.name);
+        } else if (type === 'lineups' && data.team) {
+            data.coach.name = getDisplayName('coach', data.coach.id, data.coach.name);
+            data.startXI = data.startXI.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
+            data.substitutes = data.substitutes.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
+        } else if (type === 'events' && data.player) {
+            data.player.name = getDisplayName('player', data.player.id!, data.player.name);
+            if(data.assist.id) data.assist.name = getDisplayName('player', data.assist.id, data.assist.name!);
+        } else if (type === 'statistics' && data.team) {
+            data.team.name = getDisplayName('team', data.team.id, data.team.name);
+        } else if (type === 'standings' && data.team) {
+            data.team.name = getDisplayName('team', data.team.id, data.team.name);
+        }
+
+        return data;
+
+    }, [getDisplayName]);
+
 
     const fetchData = useCallback(async (isInitialLoad: boolean) => {
         if (!fixtureId) return;
         if (isInitialLoad) setLoading(true);
 
         try {
-             if (isInitialLoad && !fixture) {
+            if (isInitialLoad && !fixture) {
                  const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
                  const fixtureData = await fixtureRes.json();
                  const currentFixture = fixtureData.response?.[0];
                  if (!currentFixture) throw new Error("Fixture not found");
-                 setFixture(currentFixture);
+                 setFixture(applyCustomNames(currentFixture, 'fixture'));
             }
            
-
             const [eventsRes, statisticsRes, lineupsRes, playersRes] = await Promise.all([
                 fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
                 fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
@@ -564,9 +596,9 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             const statisticsData = await statisticsRes.json();
             const lineupsData = await lineupsRes.json();
             const playersData = await playersRes.json();
-
-            setEvents(eventsData.response || []);
-            setStatistics(statisticsData.response || []);
+            
+            setEvents(applyCustomNames(eventsData.response || [], 'events'));
+            setStatistics(applyCustomNames(statisticsData.response || [], 'statistics'));
             
             let finalLineups = lineupsData.response || [];
             const detailedPlayers = playersData.response || [];
@@ -576,7 +608,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                  finalLineups = mergePlayerData(finalLineups, allPlayersFromFixture);
             }
 
-            setLineups(finalLineups);
+            setLineups(applyCustomNames(finalLineups, 'lineups'));
             
              setFixture(prevFixture => {
                 if (!prevFixture) return null;
@@ -587,7 +619,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     fetch(`/api/football/standings?league=${currentLeagueId}&season=${matchSeason}`)
                         .then(res => res.json())
                         .then(standingsData => {
-                             setStandings(standingsData?.response?.[0]?.league?.standings[0] || []);
+                             setStandings(applyCustomNames(standingsData?.response?.[0]?.league?.standings[0] || [], 'standings'));
                         });
                 }
                 return prevFixture;
@@ -598,38 +630,35 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         } finally {
             if (isInitialLoad) setLoading(false);
         }
-    }, [fixtureId, fixture]);
-    
-    useEffect(() => {
-        fetchData(true);
-    }, [fixtureId]); 
+    }, [fixtureId, fixture, applyCustomNames]);
     
     useEffect(() => {
         const fetchAndApplyNames = async () => {
-             if (!db || !fixture) return;
-
+             if (!db) return;
              try {
-                const [teamsSnapshot, leaguesSnapshot] = await Promise.all([
+                const [teamsSnapshot, leaguesSnapshot, playersSnapshot, coachSnapshot] = await Promise.all([
                     getDocs(collection(db, 'teamCustomizations')),
-                    getDocs(collection(db, 'leagueCustomizations'))
+                    getDocs(collection(db, 'leagueCustomizations')),
+                    getDocs(collection(db, 'playerCustomizations')),
+                    getDocs(collection(db, 'coachCustomizations')),
                 ]);
-                const teamNames = new Map();
-                teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-                const leagueNames = new Map();
-                leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+                const names: {[key: string]: Map<number, string>} = {
+                    team: new Map(), league: new Map(), player: new Map(), coach: new Map()
+                };
+                teamsSnapshot.forEach(doc => names.team.set(Number(doc.id), doc.data().customName));
+                leaguesSnapshot.forEach(doc => names.league.set(Number(doc.id), doc.data().customName));
+                playersSnapshot.forEach(doc => names.player.set(Number(doc.id), doc.data().customName));
+                coachSnapshot.forEach(doc => names.coach.set(Number(doc.id), doc.data().customName));
                 
-                const fetchedCustomNames = { team: teamNames, league: leagueNames };
-                setCustomNames(fetchedCustomNames);
-
-                setFixture(currentFixture => applyCustomNamesToFixture(currentFixture, fetchedCustomNames));
+                setCustomNames(names);
 
             } catch (e) {
                 console.error("Error fetching custom names:", e);
             }
         };
 
-        fetchAndApplyNames();
-    }, [db, fixture?.fixture.id, applyCustomNamesToFixture]);
+        fetchAndApplyNames().then(() => fetchData(true));
+    }, [fixtureId]); // Only depends on fixtureId to run once at the start
 
 
     
@@ -744,3 +773,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
