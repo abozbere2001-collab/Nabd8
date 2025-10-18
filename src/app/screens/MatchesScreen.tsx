@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -242,11 +243,11 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     );
 }
 
-type TabName = 'my-results' | 'predictions';
+type TabName = 'predictions' | 'my-results';
 
 const tabs: {id: TabName, label: string}[] = [
-    { id: 'my-results', label: 'نتائجي' },
     { id: 'predictions', label: 'التوقعات' },
+    { id: 'my-results', label: 'نتائجي' },
 ];
 
 // Main Screen Component
@@ -254,11 +255,12 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const { user } = useAuth();
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
-  const [activeTab, setActiveTab] = useState<TabName>('my-results');
+  const [activeTab, setActiveTab] = useState<TabName>('predictions');
   
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   
   useEffect(() => {
+    // Set initial date only once
     if (!selectedDateKey) {
       setSelectedDateKey(formatDateKey(new Date()));
     }
@@ -271,7 +273,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [customStatuses, setCustomStatuses] = useState<{ [key: number]: MatchCustomization }>({});
 
   const fetchAndProcessData = useCallback(async (dateKey: string, abortSignal: AbortSignal) => {
-    if (activeTab !== 'my-results') {
+    if (activeTab !== 'my-results' || !db) {
         setMyResultsLoading(false);
         return;
     };

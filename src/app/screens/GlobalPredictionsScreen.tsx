@@ -849,6 +849,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     <AlertDialogContent className="max-w-2xl w-full">
                        <AlertDialogHeader>
                             <AlertDialogTitle>بطاقة توقعات {selectedUser?.userName}</AlertDialogTitle>
+                            <AlertDialogDescription>عرض توقعات الموسم الخاصة بالمستخدم.</AlertDialogDescription>
                        </AlertDialogHeader>
                         {selectedUser && <UserPredictionSummary userScore={selectedUser} />}
                          <AlertDialogFooter>

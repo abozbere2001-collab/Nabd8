@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from './ui/textarea';
 
-type ItemType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach';
+type ItemType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
 
 interface RenameDialogProps {
   isOpen: boolean;
@@ -62,6 +62,7 @@ export function RenameDialog({
     continent: 'القارة',
     country: 'الدولة',
     coach: 'المدرب',
+    status: 'الحالة',
   };
 
   const hasNoteField = item?.type === 'team';
@@ -72,20 +73,18 @@ export function RenameDialog({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>تعديل {itemTypeDisplay}</DialogTitle>
-           {hasNoteField && (
-             <DialogDescription>
-                يمكنك تعديل الاسم المخصص وإضافة ملاحظة إدارية خاصة.
-             </DialogDescription>
-           )}
+           <DialogDescription>
+             {hasNoteField ? "يمكنك تعديل الاسم المخصص وإضافة ملاحظة إدارية خاصة." : `أدخل القيمة الجديدة لـ ${itemTypeDisplay}.`}
+           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="name">الاسم المخصص</Label>
+            <Label htmlFor="name">{item?.type === 'status' ? 'الحالة المخصصة' : 'الاسم المخصص'}</Label>
             <Input
               id="name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder={`الاسم الأصلي: ${item?.originalName || item?.name}`}
+              placeholder={item?.type === 'status' ? 'مثال: مؤجلة' : `الاسم الأصلي: ${item?.originalName || item?.name}`}
             />
           </div>
           {hasNoteField && (

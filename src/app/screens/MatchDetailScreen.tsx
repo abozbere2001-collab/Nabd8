@@ -86,7 +86,7 @@ const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerTyp
 };
 
 
-const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture, navigate: ScreenProps['navigate'], customStatus: string | null | undefined }) => {
+const MatchHeaderCard = ({ fixture, navigate, customStatus, onRename, isAdmin }: { fixture: Fixture, navigate: ScreenProps['navigate'], customStatus: string | null | undefined, onRename: () => void, isAdmin: boolean }) => {
     return (
         <Card className="mb-4 bg-card/80 backdrop-blur-sm">
             <CardContent className="p-4">
@@ -102,8 +102,18 @@ const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture
                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
                         <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
-                     <div className="flex flex-col items-center justify-center min-w-[120px] text-center">
+                     <div className="relative flex flex-col items-center justify-center min-w-[120px] text-center">
                         <LiveMatchStatus fixture={fixture} customStatus={customStatus} large />
+                         {isAdmin && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 mt-1"
+                                onClick={onRename}
+                            >
+                                <Pencil className="h-3 w-3" />
+                            </Button>
+                        )}
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
@@ -748,17 +758,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 title="" 
                 onBack={goBack} 
                 canGoBack={canGoBack} 
-                actions={
-                    isAdmin ? (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenRename('status', fixture.fixture.id, customStatus || '')}
-                        >
-                            <Pencil className="h-5 w-5" />
-                        </Button>
-                    ) : null
-                }
             />
             
             {renameItem && (
@@ -775,6 +774,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     fixture={fixture} 
                     navigate={navigate}
                     customStatus={customStatus} 
+                    onRename={() => handleOpenRename('status', fixture.fixture.id, customStatus || '')}
+                    isAdmin={isAdmin}
                 />
                 <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-5 rounded-lg h-auto p-1 bg-card">
