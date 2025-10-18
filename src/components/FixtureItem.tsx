@@ -22,7 +22,7 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
          <main className="grid grid-cols-[1fr_auto_1fr] items-center justify-between gap-2">
-            {/* الفريق الضيف (على اليسار في الواجهة العربية) */}
+            {/* Away Team */}
             <div className="flex items-center gap-2 truncate justify-start text-left">
                 <Avatar className={'h-6 w-6'}>
                     <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
@@ -31,23 +31,23 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
                 <span className="font-semibold text-xs truncate">{fixture.teams.away.name}</span>
             </div>
 
-            {/* النتيجة والوقت في المنتصف */}
+            {/* Status */}
             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
                 <LiveMatchStatus fixture={fixture} />
             </div>
 
-            {/* الفريق المضيف (على اليمين في الواجهة العربية) */}
+            {/* Home Team */}
             <div className="flex items-center gap-2 truncate justify-end text-right">
-                <span className="font-semibold text-xs truncate">{fixture.teams.home.name}</span>
                 <Avatar className={'h-6 w-6'}>
                     <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
                     <AvatarFallback>{fixture.teams.home.name?.charAt(0) || ''}</AvatarFallback>
                 </Avatar>
+                <span className="font-semibold text-xs truncate">{fixture.teams.home.name}</span>
             </div>
          </main>
         </div>
 
-         <div className="absolute top-1 right-1 flex items-center gap-1">
+         <div className="absolute top-1 left-1 flex items-center gap-1">
             {hasCommentsFeature && (
                 <CommentsButton
                   matchId={fixture.fixture.id}
