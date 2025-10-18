@@ -235,8 +235,8 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                         {event.type === 'subst' && event.assist.name ? (
                                              <div className={cn("flex items-center gap-1 text-xs", isHomeEvent ? "flex-row-reverse" : "")}>
                                                 <div className='flex flex-col'>
-                                                    <div className='flex items-center gap-1 text-red-500'><ArrowDown className="h-3 w-3"/><span>{playerIn.name}</span></div>
-                                                    <div className='flex items-center gap-1 text-green-500'><ArrowUp className="h-3 w-3"/><span>{playerOut.name}</span></div>
+                                                     <div className='flex items-center gap-1 font-semibold text-red-500'><ArrowDown className="h-3 w-3"/><span>{playerIn.name}</span></div>
+                                                    <div className='flex items-center gap-1 font-semibold text-green-500'><ArrowUp className="h-3 w-3"/><span>{playerOut.name}</span></div>
                                                 </div>
                                              </div>
                                         ) : (
@@ -562,7 +562,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             data.startXI = data.startXI.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
             data.substitutes = data.substitutes.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
         } else if (type === 'events' && data.player) {
-            data.player.name = getDisplayName('player', data.player.id!, data.player.name);
+            if(data.player.id) data.player.name = getDisplayName('player', data.player.id, data.player.name);
             if(data.assist.id) data.assist.name = getDisplayName('player', data.assist.id, data.assist.name!);
         } else if (type === 'statistics' && data.team) {
             data.team.name = getDisplayName('team', data.team.id, data.team.name);
@@ -676,8 +676,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         const isStatusRename = type === 'status';
         const collectionName = isStatusRename ? 'matchCustomizations' : `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
-        const data = { customName: newName };
-
+        
         if(isStatusRename) {
              const statusData = { customStatus: newName };
              if(newName.trim()) {
@@ -696,6 +695,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     });
              }
         } else {
+            const data = { customName: newName };
             if(newName && newName !== originalName) {
                 setDoc(docRef, data)
                     .then(() => {
