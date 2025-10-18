@@ -146,12 +146,10 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
         
         if (actualHome === null || actualAway === null) return "bg-card text-foreground";
 
-        // Exact score prediction
         if (actualHome === predHome && actualAway === predAway) {
             return "bg-green-500/20 text-green-500";
         }
 
-        // Correct outcome (winner or draw)
         const actualWinner = actualHome > actualAway ? 'home' : actualHome < actualAway ? 'away' : 'draw';
         const predWinner = predHome > predAway ? 'home' : predHome < predAway ? 'away' : 'draw';
         
@@ -159,31 +157,24 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
             return "bg-yellow-500/20 text-yellow-500";
         }
 
-        // Incorrect prediction
         return "bg-destructive/20 text-destructive";
     };
     
     const getPointsColor = () => {
         if (!isMatchFinished || userPrediction?.points === undefined) return 'text-primary';
-        if (userPrediction.points === 5) return 'text-green-500'; // Correct score
-        if (userPrediction.points === 3) return 'text-yellow-500'; // Correct winner
-        return 'text-destructive'; // Wrong prediction
+        if (userPrediction.points === 5) return 'text-green-500';
+        if (userPrediction.points === 3) return 'text-yellow-500';
+        return 'text-destructive';
     };
 
     useEffect(() => {
-        // Only save if the fields are not empty and a change was made
         if (debouncedHome !== '' && debouncedAway !== '' && (debouncedHome !== userPrediction?.homeGoals?.toString() || debouncedAway !== userPrediction?.awayGoals?.toString())) {
             onSave(debouncedHome, debouncedAway);
         }
     }, [debouncedHome, debouncedAway, onSave, userPrediction]);
 
-    const handleHomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setHomeValue(e.target.value);
-    }
-
-    const handleAwayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setAwayValue(e.target.value);
-    }
+    const handleHomeChange = (e: React.ChangeEvent<HTMLInputElement>) => setHomeValue(e.target.value);
+    const handleAwayChange = (e: React.ChangeEvent<HTMLInputElement>) => setAwayValue(e.target.value);
     
     useEffect(() => {
         setHomeValue(userPrediction?.homeGoals?.toString() ?? '');
@@ -194,11 +185,9 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
         <Card>
             <CardContent className="p-3">
                 <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-1 justify-end truncate">
-                        <span className="font-semibold truncate">{fixture.teams.home.name}</span>
-                        <Avatar className="h-8 w-8">
-                            <AvatarImage src={fixture.teams.home.logo} />
-                        </Avatar>
+                    <div className="flex flex-col items-center gap-1 flex-1 justify-end truncate">
+                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                        <span className="font-semibold text-xs text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                     <div className="flex items-center gap-1">
                         <Input 
@@ -228,11 +217,9 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                             disabled={isPredictionDisabled}
                         />
                     </div>
-                    <div className="flex items-center gap-2 flex-1 truncate">
-                        <Avatar className="h-8 w-8">
-                            <AvatarImage src={fixture.teams.away.logo} />
-                        </Avatar>
-                        <span className="font-semibold truncate">{fixture.teams.away.name}</span>
+                    <div className="flex flex-col items-center gap-1 flex-1 truncate">
+                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                        <span className="font-semibold text-xs text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                 </div>
                  <div className="text-center text-xs text-muted-foreground mt-2">
@@ -261,12 +248,10 @@ const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
     const predHome = prediction.homeGoals;
     const predAway = prediction.awayGoals;
 
-    // Exact score
     if (actualHome === predHome && actualAway === predAway) {
         return 5;
     }
 
-    // Correct outcome (winner or draw)
     const actualWinner = actualHome > actualAway ? 'home' : actualHome < actualAway ? 'away' : 'draw';
     const predWinner = predHome > predAway ? 'home' : predHome < predAway ? 'away' : 'draw';
     
@@ -345,7 +330,6 @@ const UserPredictionSummary = ({ userScore }: { userScore: UserScore | null }) =
         const fetchInitialData = async () => {
             setLoading(true);
             try {
-                // Determine which collection to query based on whether we are viewing our own profile or someone else's
                 const currentUser = getAuth().currentUser;
                 const isOwnProfile = currentUser ? currentUser.uid === userId : false;
 
@@ -462,7 +446,6 @@ const UserPredictionSummary = ({ userScore }: { userScore: UserScore | null }) =
       <Card className="mb-4 overflow-hidden">
         <CardContent className="p-4">
           <div className="flex flex-row-reverse gap-4">
-             {/* User Info Section */}
             <div className="flex flex-col items-center justify-center space-y-2 pr-4 border-r-2 border-dashed border-border">
               <Avatar className="h-16 w-16 border-2 border-primary">
                 <AvatarImage src={userProfile?.photoURL || userScore.userPhoto} />
@@ -475,7 +458,6 @@ const UserPredictionSummary = ({ userScore }: { userScore: UserScore | null }) =
               </div>
             </div>
 
-            {/* Predictions Grid */}
             <div className="flex-1 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 text-center">
               {uniquePredictions.map(pred => {
                 const champion = pred.predictedChampionId ? teams.get(pred.predictedChampionId) : null;
@@ -487,7 +469,6 @@ const UserPredictionSummary = ({ userScore }: { userScore: UserScore | null }) =
                   <div key={pred.leagueId} className="p-2 border rounded-lg bg-card-foreground/5 flex flex-col items-center justify-start h-full">
                     <p className="font-bold text-[10px] mb-1 h-8 leading-tight">{pred.leagueName}</p>
                     <div className="flex flex-col items-center justify-center flex-1 space-y-2">
-                      {/* Champion */}
                       <div className="flex flex-col items-center">
                         <Trophy className="h-4 w-4 text-yellow-500 mb-1" />
                         <Avatar className="h-8 w-8 border">
@@ -495,7 +476,6 @@ const UserPredictionSummary = ({ userScore }: { userScore: UserScore | null }) =
                         </Avatar>
                         <p className="text-[10px] mt-1 truncate w-20">{championName}</p>
                       </div>
-                      {/* Top Scorer */}
                       <div className="flex flex-col items-center">
                         <FootballIcon className="h-4 w-4 mb-1" />
                          <Avatar className="h-8 w-8 border">
@@ -515,7 +495,6 @@ const UserPredictionSummary = ({ userScore }: { userScore: UserScore | null }) =
 };
 
 
-// --- Main Screen ---
 export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
     const { isAdmin } = useAdmin();
     const { user } = useAuth();
@@ -709,7 +688,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         setPredictions({});
     
         try {
-            // 1. Get fixture IDs for the selected date
             const dailyDocRef = doc(db, 'dailyGlobalPredictions', dateKey);
             const docSnap = await getDoc(dailyDocRef);
             
@@ -726,14 +704,12 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 return;
             }
     
-            // 2. Fetch fixture details from API
             const res = await fetch(`/api/football/fixtures?ids=${fixtureIds.join('-')}`);
             if (!res.ok) throw new Error('Failed to fetch fixtures');
             const data = await res.json();
             const fetchedFixtures = data.response || [];
             setSelectedMatches(fetchedFixtures);
     
-            // 3. Fetch user's predictions ONLY for these specific fixtures
             if (fixtureIds.length > 0 && user) {
                 const predsRef = collection(db, 'predictions');
                 const userPredsQuery = query(predsRef, where('userId', '==', user.uid), where('fixtureId', 'in', fixtureIds));
@@ -938,3 +914,4 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
