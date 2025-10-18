@@ -336,7 +336,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     <Accordion type="multiple" className="w-full space-y-4" >
                         {Object.entries(sortedGroupedCompetitions).map(([continent, content]) => (
                              <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card/50">
-                                <div className="flex items-center px-4 py-3">
+                                <div className="flex items-center px-4 py-3 h-12">
                                     <AccordionTrigger className="hover:no-underline flex-1">
                                         <h3 className="text-lg font-bold">{getName('continent', continent, continent)}</h3>
                                     </AccordionTrigger>
@@ -350,7 +350,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                             <ul className="flex flex-col">{
                                                 (content.leagues as ManagedCompetitionType[]).map(comp => 
                                                     <li key={comp.leagueId} 
-                                                        className="flex w-full items-center justify-between p-3 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
+                                                        className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
                                                         onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
                                                     >
                                                         <div className="flex items-center gap-3">
@@ -375,7 +375,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                         <Accordion type="multiple" className="w-full space-y-2">
                                             {Object.entries(content as CompetitionsByCountry).map(([country, { flag, leagues }]) => (
                                                  <AccordionItem value={country} key={country} className="rounded-lg border bg-card/50">
-                                                    <div className="flex items-center px-4 py-3">
+                                                    <div className="flex items-center px-4 py-3 h-12">
                                                         <AccordionTrigger className="hover:no-underline flex-1">
                                                           <div className="flex items-center gap-3">
                                                               {flag && <img src={flag} alt={country} className="h-5 w-7 object-contain" />}
@@ -387,7 +387,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                     <AccordionContent className="p-1">
                                                         <ul className="flex flex-col">{leagues.map(comp => 
                                                             <li key={comp.leagueId} 
-                                                                className="flex w-full items-center justify-between p-3 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
+                                                                className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
                                                                 onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
                                                             >
                                                                 <div className="flex items-center gap-3">
@@ -433,3 +433,5 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
+    

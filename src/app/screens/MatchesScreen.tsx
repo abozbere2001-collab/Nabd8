@@ -127,7 +127,7 @@ const FixturesList = ({
         <div className="space-y-4">
             {activeTab === 'my-results' && favoriteTeamMatches.length > 0 && (
                  <div>
-                    <div className="font-semibold text-foreground py-1 px-3 rounded-md bg-card border flex items-center gap-2 text-xs">
+                    <div className="font-semibold text-foreground py-1 px-3 rounded-md bg-card border flex items-center gap-2 text-xs h-8">
                         <Star className="h-4 w-4 text-yellow-400" />
                         <span className="truncate">مباريات فرقك المفضلة</span>
                     </div>
@@ -150,7 +150,7 @@ const FixturesList = ({
                 return (
                     <div key={`${league.id}-${league.name}`}>
                         <div 
-                            className="font-bold text-foreground py-2 px-3 rounded-md bg-card border flex items-center gap-2 cursor-pointer"
+                            className="font-bold text-foreground py-2 px-3 rounded-md bg-card border flex items-center gap-2 cursor-pointer h-10"
                             onClick={() => navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo })}
                         >
                             <Avatar className="h-5 w-5">
@@ -473,6 +473,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    
 
     
 

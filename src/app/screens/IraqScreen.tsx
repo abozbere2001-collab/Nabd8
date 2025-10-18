@@ -89,7 +89,7 @@ function OurLeagueTab({
     return (
         <Tabs defaultValue="matches" className="w-full">
             <div className="sticky top-0 bg-background z-10 border-b -mx-4 px-4">
-                <TabsList className="grid w-full grid-cols-3 rounded-none h-auto p-0 border-t flex-row-reverse">
+                <TabsList className="grid w-full grid-cols-3 rounded-none h-12 p-0 border-t flex-row-reverse">
                     <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'>الهدافين</TabsTrigger>
                     <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'>الترتيب</TabsTrigger>
                     <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>المباريات</TabsTrigger>
@@ -269,7 +269,7 @@ function OurBallTab({ navigate, isAdmin }: { navigate: ScreenProps['navigate'], 
             {teams.map(team => {
                 const displayName = customTeamNames.get(team.teamId) || team.name;
                 return (
-                    <div key={team.teamId} className="p-3 rounded-lg border bg-card flex items-center gap-3">
+                    <div key={team.teamId} className="p-3 rounded-lg border bg-card flex items-center gap-3 h-16">
                         <div onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: team.teamId, teamName: displayName })} className="flex-1 flex items-center gap-3 cursor-pointer">
                             <Avatar className="h-10 w-10">
                                 <AvatarImage src={team.logo} alt={displayName} />
@@ -442,7 +442,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
         <Tabs defaultValue="our-league" className="w-full">
           <div className="sticky top-0 bg-background z-10">
-            <TabsList className="grid w-full grid-cols-2 flex-row-reverse">
+            <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-12">
               <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
               <TabsTrigger value="our-league">دورينا</TabsTrigger>
             </TabsList>
@@ -465,3 +465,5 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
