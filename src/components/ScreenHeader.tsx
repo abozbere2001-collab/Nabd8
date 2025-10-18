@@ -2,6 +2,7 @@
 "use client";
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface ScreenHeaderProps {
   title: string;
@@ -13,7 +14,11 @@ interface ScreenHeaderProps {
 
 export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActions }: ScreenHeaderProps) {
   return (
-    <header data-id={`screen-header-${title.replace(/\s+/g, '-').toLowerCase()}`} className="relative flex h-14 flex-shrink-0 items-center justify-between bg-card p-2 z-30">
+    <header data-id={`screen-header-${title.replace(/\s+/g, '-').toLowerCase()}`} 
+    className={cn(
+        "relative flex h-12 flex-shrink-0 items-center justify-between p-2 z-30",
+        "bg-card text-card-foreground rounded-b-lg mb-1 mx-1 shadow-md border-x border-b"
+    )}>
       <div className="flex items-center">
          {canGoBack && (
             <Button
