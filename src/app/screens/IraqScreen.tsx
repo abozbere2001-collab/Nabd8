@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -29,12 +28,30 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
+import { isMatchLive } from '@/lib/matchStatus';
+import { cn } from '@/lib/utils';
 
 const IRAQI_LEAGUE_ID = 542;
+
+// --- Helper Components ---
+const FixtureGroup = ({ title, fixtures, navigate, titleClassName }: { title: string, fixtures: Fixture[], navigate: ScreenProps['navigate'], titleClassName?: string }) => {
+    if (fixtures.length === 0) return null;
+
+    return (
+        <div className="mb-4">
+            <h2 className={cn("text-md font-bold mb-2 px-2 text-primary", titleClassName)}>{title}</h2>
+            <div className="space-y-2">
+                {fixtures.map(fixture => (
+                    <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />
+                ))}
+            </div>
+        </div>
+    );
+};
+
 
 function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onManage: () => void, isAdmin: boolean}) {
     if (!match.isEnabled) return null;
@@ -87,6 +104,28 @@ function OurLeagueTab({
     loading: boolean,
     isAdmin: boolean
 }) {
+
+     const categorizedFixtures = useMemo(() => {
+        const live: Fixture[] = [];
+        const upcoming: Fixture[] = [];
+        const finished: Fixture[] = [];
+
+        fixtures.forEach(fixture => {
+            if (isMatchLive(fixture.fixture.status)) {
+                live.push(fixture);
+            } else if (['TBD', 'NS', 'PST'].includes(fixture.fixture.status.short)) {
+                upcoming.push(fixture);
+            } else {
+                finished.push(fixture);
+            }
+        });
+        
+        finished.sort((a, b) => b.fixture.timestamp - a.fixture.timestamp);
+        upcoming.sort((a, b) => a.fixture.timestamp - b.fixture.timestamp);
+        
+        return { live, upcoming, finished };
+    }, [fixtures]);
+
     return (
         <Tabs defaultValue="matches" className="w-full">
             <div className="sticky top-0 bg-background z-10 border-b -mx-4 px-4">
@@ -98,16 +137,16 @@ function OurLeagueTab({
             </div>
             <TabsContent value="matches" className="p-4 mt-0 -mx-4">
              {loading ? (
-                <div className="space-y-4">
-                    {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+                <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
             ) : fixtures.length > 0 ? (
-                <div className="space-y-3">
-                    {fixtures.map((fixture) => (
-                        <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />
-                    ))}
-                </div>
-            ) : <p className="pt-4 text-center text-muted-foreground">لا توجد مباريات متاحة لهذا الموسم.</p>}
+                <>
+                    <FixtureGroup title="مباشر" fixtures={categorizedFixtures.live} navigate={navigate} titleClassName="text-red-500 animate-pulse" />
+                    <FixtureGroup title="القادمة" fixtures={categorizedFixtures.upcoming} navigate={navigate} />
+                    <FixtureGroup title="المنتهية" fixtures={categorizedFixtures.finished} navigate={navigate} />
+                </>
+            ) : <p className="pt-8 text-center text-muted-foreground">لا توجد مباريات متاحة لهذا الموسم.</p>}
           </TabsContent>
           <TabsContent value="standings" className="p-0 mt-0 -mx-4">
             {loading ? (
@@ -479,5 +518,3 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    

@@ -1,83 +1,36 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2 } from 'lucide-react';
 import type { Fixture } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { FixtureItem } from '@/components/FixtureItem';
 import { CURRENT_SEASON } from '@/lib/constants';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { isMatchLive } from '@/lib/matchStatus';
+import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 // --- Type Definitions ---
-interface GroupedFixtures {
-    [competitionName: string]: {
-        league: Fixture['league'];
-        fixtures: Fixture[];
-    };
-}
-
 interface CategorizedFixtures {
-    live: GroupedFixtures;
-    upcoming: GroupedFixtures;
-    finished: GroupedFixtures;
+    live: Fixture[];
+    upcoming: Fixture[];
+    finished: Fixture[];
 }
 
 // --- Helper Functions ---
-const groupAndSortFixtures = (fixtures: Fixture[]): GroupedFixtures => {
-    const grouped = fixtures.reduce((acc, fixture) => {
-        const leagueName = fixture.league.name;
-        if (!acc[leagueName]) {
-            acc[leagueName] = { league: fixture.league, fixtures: [] };
-        }
-        acc[leagueName].fixtures.push(fixture);
-        return acc;
-    }, {} as GroupedFixtures);
-
-    // Sort fixtures within each league by date
-    Object.values(grouped).forEach(group => {
-        group.fixtures.sort((a, b) => a.fixture.timestamp - b.fixture.timestamp);
-    });
-
-    return grouped;
-};
-
-// --- Sub-components ---
-const FixtureGroup = ({ title, groupedFixtures, navigate, titleClassName }: { title: string, groupedFixtures: GroupedFixtures, navigate: ScreenProps['navigate'], titleClassName?: string }) => {
-    const sortedCompetitions = useMemo(() => Object.keys(groupedFixtures).sort((a, b) => a.localeCompare(b)), [groupedFixtures]);
-    
-    if (Object.keys(groupedFixtures).length === 0) return null;
+const FixtureGroup = ({ title, fixtures, navigate, titleClassName }: { title: string, fixtures: Fixture[], navigate: ScreenProps['navigate'], titleClassName?: string }) => {
+    if (fixtures.length === 0) return null;
 
     return (
-        <div className="mb-6">
-            <h2 className={`text-lg font-bold mb-3 px-2 ${titleClassName}`}>{title}</h2>
-            <Accordion type="multiple" className="w-full space-y-3" defaultValue={sortedCompetitions}>
-                 {sortedCompetitions.map(competitionName => {
-                    const { league, fixtures } = groupedFixtures[competitionName];
-                    return (
-                        <AccordionItem value={competitionName} key={league.id} className="border-none">
-                             <AccordionTrigger className="p-2 rounded-md bg-card border hover:no-underline">
-                                <div className="flex items-center gap-2">
-                                    <Avatar className="h-5 w-5">
-                                        <AvatarImage src={league.logo} alt={league.name} />
-                                    </Avatar>
-                                    <span className="font-bold text-sm truncate">{competitionName}</span>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="p-0 pt-1 space-y-1">
-                                {fixtures.map(fixture => (
-                                    <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />
-                                ))}
-                            </AccordionContent>
-                        </AccordionItem>
-                    )
-                })}
-            </Accordion>
+        <div className="mb-4">
+            <h2 className={cn("text-md font-bold mb-2 px-2 text-primary", titleClassName)}>{title}</h2>
+            <div className="space-y-2">
+                {fixtures.map(fixture => (
+                    <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />
+                ))}
+            </div>
         </div>
     );
 };
@@ -122,9 +75,9 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
                 upcoming.sort((a, b) => a.fixture.timestamp - b.fixture.timestamp);
 
                 setCategorizedFixtures({
-                    live: groupAndSortFixtures(live),
-                    upcoming: groupAndSortFixtures(upcoming),
-                    finished: groupAndSortFixtures(finished),
+                    live: live,
+                    upcoming: upcoming,
+                    finished: finished,
                 });
 
             } catch (error) {
@@ -149,14 +102,18 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
                     <div className="flex items-center justify-center h-64">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
-                ) : categorizedFixtures && (Object.keys(categorizedFixtures.live).length > 0 || Object.keys(categorizedFixtures.upcoming).length > 0 || Object.keys(categorizedFixtures.finished).length > 0) ? (
+                ) : categorizedFixtures && (categorizedFixtures.live.length > 0 || categorizedFixtures.upcoming.length > 0 || categorizedFixtures.finished.length > 0) ? (
                     <>
-                        <FixtureGroup title="مباشر" groupedFixtures={categorizedFixtures.live} navigate={navigate} titleClassName="text-red-500 animate-pulse" />
-                        <FixtureGroup title="القادمة" groupedFixtures={categorizedFixtures.upcoming} navigate={navigate} />
-                        <FixtureGroup title="المنتهية" groupedFixtures={categorizedFixtures.finished} navigate={navigate} />
+                        <FixtureGroup title="مباشر" fixtures={categorizedFixtures.live} navigate={navigate} titleClassName="text-red-500 animate-pulse" />
+                        <FixtureGroup title="القادمة" fixtures={categorizedFixtures.upcoming} navigate={navigate} />
+                        <FixtureGroup title="المنتهية" fixtures={categorizedFixtures.finished} navigate={navigate} />
                     </>
                 ) : (
-                    <p className="pt-4 text-center text-muted-foreground">لا توجد مباريات متاحة لهذا الفريق.</p>
+                    <Card className="mt-4">
+                        <CardContent className="p-6">
+                            <p className="text-center text-muted-foreground">لا توجد مباريات متاحة لهذا الفريق.</p>
+                        </CardContent>
+                    </Card>
                 )}
             </div>
         </div>
