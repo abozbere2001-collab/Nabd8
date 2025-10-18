@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { BottomNav } from '@/components/BottomNav';
 import { MatchesScreen } from './screens/MatchesScreen';
 import { CompetitionsScreen } from './screens/CompetitionsScreen';
@@ -156,6 +156,7 @@ export function AppContentWrapper() {
   });
 
   const { showSplashAd, showBannerAd } = useAd();
+  const keyCounter = useRef(1);
   
   const goBack = useCallback(() => {
     setNavigationState(prevState => {
@@ -178,7 +179,7 @@ export function AppContentWrapper() {
   }, []);
 
   const navigate = useCallback((screen: ScreenKey, props?: Record<string, any>) => {
-      const newKey = `${screen}-${Date.now()}`;
+      const newKey = `${screen}-${keyCounter.current++}`;
       const newItem = { key: newKey, screen, props };
 
       setNavigationState(prevState => {
