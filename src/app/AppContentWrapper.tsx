@@ -183,13 +183,10 @@ export function AppContentWrapper() {
 
       setNavigationState(prevState => {
           if (mainTabs.includes(screen)) {
+              // If it's a main tab, just switch to it. Don't reset its stack.
               return {
                   ...prevState,
                   activeTab: screen,
-                  stacks: {
-                      ...prevState.stacks,
-                      [screen]: [newItem] // Reset stack for main tabs
-                  }
               };
           }
           
