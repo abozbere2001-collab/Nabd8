@@ -8,7 +8,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Sun, Moon, Laptop, Gem, UserCog } from 'lucide-react';
+import { Sun, Moon, Laptop, Gem, UserCog, Globe } from 'lucide-react';
 import { useAuth, useAdmin } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -61,6 +61,31 @@ export function GeneralSettingsScreen({ navigate, goBack, canGoBack, headerActio
             </RadioGroup>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Globe className="h-6 w-6" />
+              <div>
+                <CardTitle>{"لغة التطبيق"}</CardTitle>
+                <CardDescription>{"اختر لغة العرض."}</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <RadioGroup defaultValue="ar" className="grid grid-cols-2 gap-2 sm:gap-4">
+              <Label htmlFor="ar" className="flex items-center justify-center gap-2 rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">
+                <RadioGroupItem value="ar" id="ar" />
+                {"العربية"}
+              </Label>
+              <Label htmlFor="en" className="flex items-center justify-center gap-2 rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">
+                <RadioGroupItem value="en" id="en" />
+                {"English"}
+              </Label>
+            </RadioGroup>
+            <p className="text-xs text-muted-foreground mt-4 text-center">ملاحظة: تغيير اللغة قيد التطوير حاليًا.</p>
+          </CardContent>
+        </Card>
         
         <Card>
            <CardHeader>
@@ -91,5 +116,3 @@ export function GeneralSettingsScreen({ navigate, goBack, canGoBack, headerActio
     </div>
   );
 }
-
-    
