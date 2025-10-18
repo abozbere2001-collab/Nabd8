@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, Trophy, Award, Info, Shield, User, X } from 'lucide-react';
+import { Loader2, Trophy, Award, Info, Shield, User, X, Trash2 } from 'lucide-react';
 import { format, isPast, subDays, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore, useAdmin } from '@/firebase/provider';
@@ -36,9 +36,11 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
   AlertDialogClose,
+  AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { PREMIER_LEAGUE_ID, LALIGA_ID, SERIE_A_ID, BUNDESLIGA_ID, CHAMPIONS_LEAGUE_ID, CURRENT_SEASON } from '@/lib/constants';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
+import { Label } from '@/components/ui/label';
 
 
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -344,7 +346,7 @@ const UserPredictionSummary = ({ userScore }: { userScore: UserScore | null }) =
                 const predictionCollectionName = isOwnProfile ? "seasonPredictions" : "publicSeasonPredictions";
                 
                 const [predsSnapshot, userDoc, teamsCustomSnap, playersCustomSnap] = await Promise.all([
-                    getDocs(query(collection(db, predictionCollectionName), where("userId", "==", userId), where("season", "==", CURRENT_SEASON))),
+                    getDocs(query(collection(db, "seasonPredictions"), where("userId", "==", userId), where("season", "==", CURRENT_SEASON))),
                     getDoc(doc(db, 'users', userId)),
                     getDocs(collection(db, 'teamCustomizations')),
                     getDocs(collection(db, 'playerCustomizations'))
@@ -526,6 +528,13 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     const [calculatingPoints, setCalculatingPoints] = useState(false);
     
     const LEADERBOARD_PAGE_SIZE = 100;
+    const FULL_RESET_PIN = '1990';
+    
+    const [isResetAlertOpen, setResetAlertOpen] = useState(false);
+    const [resetPin, setResetPin] = useState('');
+    const [isResetting, setIsResetting] = useState(false);
+    const pressTimer = useRef<NodeJS.Timeout | null>(null);
+
 
     const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
 
@@ -629,6 +638,53 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
             toast({ variant: 'destructive', title: 'خطأ', description: error.message || 'فشل احتساب النقاط.' });
         } finally {
             setCalculatingPoints(false);
+        }
+    };
+    
+    const handleFullReset = async () => {
+        if (!db || !user) return;
+        setIsResetting(true);
+        toast({ title: 'بدء إعادة التعيين الكاملة...', description: 'قد تستغرق هذه العملية بعض الوقت.' });
+    
+        const collectionsToDelete = ['predictions', 'seasonPredictions', 'leaderboard', 'users'];
+        try {
+            for (const collectionName of collectionsToDelete) {
+                const collectionRef = collection(db, collectionName);
+                const snapshot = await getDocs(collectionRef);
+                const batch = writeBatch(db);
+    
+                snapshot.docs.forEach(doc => {
+                    // Do not delete the admin's own user document
+                    if (collectionName === 'users' && doc.id === user.uid) {
+                        return;
+                    }
+                    batch.delete(doc.ref);
+                });
+    
+                await batch.commit();
+            }
+            toast({ title: 'نجاح', description: 'تم حذف جميع بيانات التوقعات والمستخدمين بنجاح.' });
+            setResetAlertOpen(false);
+            setResetPin('');
+        } catch (error) {
+            console.error("Error during full reset:", error);
+             const permissionError = new FirestorePermissionError({ path: `multiple collections`, operation: 'delete' });
+             errorEmitter.emit('permission-error', permissionError);
+             toast({ variant: 'destructive', title: 'خطأ', description: 'فشلت عملية إعادة التعيين.' });
+        } finally {
+            setIsResetting(false);
+        }
+    };
+    
+    const handleResetPress = () => {
+        pressTimer.current = setTimeout(() => {
+            setResetAlertOpen(true);
+        }, 1000); // 1 second long press
+    };
+
+    const handleResetRelease = () => {
+        if (pressTimer.current) {
+            clearTimeout(pressTimer.current);
         }
     };
 
@@ -802,6 +858,38 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
+                
+                 <AlertDialog open={isResetAlertOpen} onOpenChange={setResetAlertOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                             <AlertDialogTitle>إعادة تعيين كاملة</AlertDialogTitle>
+                             <AlertDialogDescription>
+                                هذا الإجراء سيقوم بحذف جميع بيانات المستخدمين والتوقعات. لا يمكن التراجع عن هذا. للبدء، أدخل الرمز السري.
+                             </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="space-y-2">
+                             <Label htmlFor="pin">الرمز السري</Label>
+                             <Input 
+                                id="pin"
+                                type="password"
+                                value={resetPin}
+                                onChange={(e) => setResetPin(e.target.value)}
+                                placeholder="أدخل الرمز 1990"
+                             />
+                        </div>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={handleFullReset}
+                                disabled={isResetting || resetPin !== FULL_RESET_PIN}
+                                className="bg-destructive hover:bg-destructive/90"
+                            >
+                                {isResetting ? <Loader2 className="h-4 w-4 animate-spin"/> : "حذف كل شيء"}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                 </AlertDialog>
+
                 <Tabs defaultValue="predictions" className="w-full">
                     <div className="sticky top-0 bg-background z-10 border-b">
                        <TabsList className="grid w-full grid-cols-3">
@@ -852,11 +940,21 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                     <TabsContent value="leaderboard" className="p-4 mt-0 space-y-4">
                          {isAdmin && (
                             <Card>
-                                <CardContent className="p-4">
+                                <CardContent className="p-4 flex gap-2">
                                     <Button onClick={handleCalculatePoints} disabled={calculatingPoints} className="w-full">
                                         {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin" /> : "احتساب نقاط الأمس"}
                                     </Button>
-                                    <p className='text-xs text-muted-foreground text-center mt-2'>هذا الإجراء يقوم بحساب نقاط مباريات الأمس المنتهية فقط.</p>
+                                    <Button 
+                                        variant="destructive" 
+                                        className="w-full"
+                                        onMouseDown={handleResetPress}
+                                        onMouseUp={handleResetRelease}
+                                        onTouchStart={handleResetPress}
+                                        onTouchEnd={handleResetRelease}
+                                    >
+                                        <Trash2 className="ml-2 h-4 w-4" />
+                                        إعادة تعيين
+                                    </Button>
                                 </CardContent>
                             </Card>
                          )}
@@ -934,9 +1032,4 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
-
-
-
-
-
 
