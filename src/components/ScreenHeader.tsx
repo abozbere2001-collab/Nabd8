@@ -37,7 +37,7 @@ export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActio
       </div>
 
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-        <span className="font-bold text-sm font-headline">نبض الملاعب</span>
+        <span className="font-bold text-sm font-headline text-primary">نبض الملاعب</span>
       </div>
       <div data-id="screen-header-actions" className="flex items-center gap-1">
         {actions}

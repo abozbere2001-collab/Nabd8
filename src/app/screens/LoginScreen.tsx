@@ -61,7 +61,7 @@ export function LoginScreen({ goBack }: ScreenProps) {
         )}
         
         <NabdAlMalaebLogo className="h-24 w-24 mb-4" />
-        <h1 className="text-3xl font-bold mb-2 font-headline">مرحباً بك مجدداً</h1>
+        <h1 className="text-3xl font-bold mb-2 font-headline text-primary">نبض الملاعب</h1>
         <p className="text-muted-foreground mb-8">سجل دخولك باستخدام جوجل للمتابعة.</p>
         
         <div className="w-full max-w-xs space-y-4">

@@ -119,7 +119,7 @@ export const SplashScreenAd = () => {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
        <NabdAlMalaebLogo className="h-24 w-24 mb-4" />
-       <h2 className="text-xl font-bold">مرحباً بك مجدداً في نبض الملاعب</h2>
+       <h2 className="text-xl font-bold text-primary">مرحباً بك مجدداً في نبض الملاعب</h2>
        <p className="text-muted-foreground">استمتع بتجربتك الكروية</p>
        
        <div className="absolute bottom-10 flex items-center gap-2">

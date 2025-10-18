@@ -28,7 +28,7 @@ const HAS_SEEN_WELCOME_KEY = 'goalstack_has_seen_welcome';
 const LoadingSplashScreen = () => (
     <div className="flex flex-col items-center justify-center h-screen bg-background text-center">
         <NabdAlMalaebLogo className="h-24 w-24 mb-4" />
-        <h1 className="text-2xl font-bold font-headline mb-8">نبض الملاعب</h1>
+        <h1 className="text-2xl font-bold font-headline mb-8 text-primary">نبض الملاعب</h1>
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
 );
