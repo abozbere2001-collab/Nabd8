@@ -10,21 +10,23 @@ import { LiveMatchStatus } from './LiveMatchStatus';
 
 const HomeTeamDisplay = ({ team }: { team: FixtureType['teams']['home'] }) => (
     <div className="flex items-center gap-2 justify-end truncate">
-        <span className="font-semibold text-xs truncate text-right">{team.name}</span>
+        {/* الشعار أولاً ثم الاسم ليظهر الشعار على يسار الاسم في RTL */}
         <Avatar className={'h-6 w-6'}>
             <AvatarImage src={team.logo} alt={team.name} />
             <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
         </Avatar>
+        <span className="font-semibold text-xs truncate text-right">{team.name}</span>
     </div>
 );
 
 const AwayTeamDisplay = ({ team }: { team: FixtureType['teams']['away'] }) => (
     <div className="flex items-center gap-2 justify-start truncate">
+        {/* الاسم أولاً ثم الشعار ليظهر الشعار على يمين الاسم في RTL */}
+        <span className="font-semibold text-xs truncate text-left">{team.name}</span>
         <Avatar className={'h-6 w-6'}>
             <AvatarImage src={team.logo} alt={team.name} />
             <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
         </Avatar>
-        <span className="font-semibold text-xs truncate text-left">{team.name}</span>
     </div>
 );
 
@@ -42,15 +44,11 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
          <main className="grid grid-cols-[1fr_auto_1fr] items-center justify-between gap-1">
-            {/* Away Team on the left */}
+            {/* الترتيب الصحيح: المضيف يمينًا، الضيف يسارًا */}
             <AwayTeamDisplay team={fixture.teams.away} />
-            
-            {/* Status in the middle */}
             <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
                 <LiveMatchStatus fixture={fixture} />
             </div>
-
-            {/* Home Team on the right */}
             <HomeTeamDisplay team={fixture.teams.home} />
          </main>
         </div>
