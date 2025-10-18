@@ -28,6 +28,12 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'status';
 
@@ -350,7 +356,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             
             {renderPitch(activeLineup)}
             
-            <Card>
+             <Card>
                 <CardContent className="p-3 text-center">
                     <h3 className="font-bold text-sm mb-2">المدرب</h3>
                     <div className="relative inline-flex flex-col items-center gap-1">
@@ -369,15 +375,15 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
             </Card>
 
             {substitutionEvents.length > 0 && (
-                <div className="space-y-3">
-                    <h3 className="text-center text-base font-bold">التبديلات</h3>
-                    <Card>
-                        <CardContent className="p-2 space-y-1">
+                <Accordion type="single" collapsible className="w-full" defaultValue='item-1'>
+                    <AccordionItem value="item-1" className="border-none">
+                        <AccordionTrigger className="text-base font-bold justify-center p-2 bg-card rounded-md border hover:no-underline">التبديلات</AccordionTrigger>
+                        <AccordionContent className="p-0 pt-2 space-y-1">
                             {substitutionEvents.map((event, index) => {
-                                const playerOut = event.player;
-                                const playerIn = event.assist;
+                                const playerIn = event.assist; // Player coming in
+                                const playerOut = event.player; // Player going out
                                 return (
-                                    <div key={index} className="flex items-center justify-between p-1 text-xs">
+                                    <div key={index} className="flex items-center justify-between p-2 text-xs bg-card rounded-lg border">
                                         <div className='font-bold w-10 text-center'>{event.time.elapsed}'</div>
                                         <div className='flex-1 flex items-center justify-end gap-1 font-semibold text-green-500'>
                                             <span>{playerIn.name}</span>
@@ -390,28 +396,30 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                                     </div>
                                 );
                             })}
-                        </CardContent>
-                    </Card>
-                </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
             )}
             
-            <div className="space-y-4 pt-4">
-                <h3 className="text-center text-base font-bold">الاحتياط</h3>
-                <Card>
-                    <CardContent className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {activeLineup.substitutes.map(p => (
-                            <div key={p.player.id || p.player.name} className="p-2 cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
-                                <div className="flex items-center gap-3">
-                                    <PlayerCard player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />
-                                    <div className="flex-1 text-right">
-                                        <p className="font-semibold text-sm">{p.player.name}</p>
-                                        <p className="text-xs text-muted-foreground">{p.player.position}</p>
-                                    </div>
+            <div className="pt-4">
+                <h3 className="text-center text-base font-bold mb-2">الاحتياط</h3>
+                <div className="space-y-1">
+                    {activeLineup.substitutes.map(p => (
+                        <Card key={p.player.id || p.player.name} className="p-2 cursor-pointer bg-card/50" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                            <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                    <AvatarImage src={p.player.photo} />
+                                    <AvatarFallback>{p.player.name?.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 text-right">
+                                    <p className="font-semibold text-sm">{p.player.name}</p>
+                                    <p className="text-xs text-muted-foreground">{p.player.position}</p>
                                 </div>
+                                {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {e.stopPropagation(); onRename('player', p.player.id, p.player.name, p.player.name)}}><Pencil className="h-4 w-4" /></Button>}
                             </div>
-                        ))}
-                    </CardContent>
-                </Card>
+                        </Card>
+                    ))}
+                </div>
             </div>
         </div>
     );
