@@ -256,13 +256,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [favorites, setFavorites] = useState<Favorites>({userId: ''});
   const [activeTab, setActiveTab] = useState<TabName>('my-results');
   
-  // Initialize state to null to prevent hydration mismatch
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   
-  // Set the date only on the client-side
   useEffect(() => {
-    setSelectedDateKey(formatDateKey(new Date()));
-  }, []);
+    if (!selectedDateKey) {
+      setSelectedDateKey(formatDateKey(new Date()));
+    }
+  }, [selectedDateKey]);
 
   const [myResultsCache, setMyResultsCache] = useState<Map<string, FixtureType[]>>(new Map());
   const [myResultsLoading, setMyResultsLoading] = useState(true);
@@ -271,6 +271,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [customStatuses, setCustomStatuses] = useState<{ [key: number]: MatchCustomization }>({});
 
   const fetchAndProcessData = useCallback(async (dateKey: string, abortSignal: AbortSignal) => {
+    if (activeTab !== 'my-results') {
+        setMyResultsLoading(false);
+        return;
+    };
+    
     setMyResultsLoading(true);
       
       try {
@@ -337,7 +342,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             setMyResultsLoading(false);
           }
       }
-  }, [db]);
+  }, [db, activeTab]);
 
 
   useEffect(() => {
@@ -474,6 +479,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    
 
     
 
