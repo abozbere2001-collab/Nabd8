@@ -233,7 +233,7 @@ const TimelineTabContent = ({ events, homeTeamId, highlightsOnly }: { events: Ma
                                         <p className="font-semibold">{event.player.name}</p>
                                         {event.type === 'subst' && event.assist.name ? (
                                              <div className={cn("flex items-center gap-1 text-xs text-muted-foreground", isHomeEvent ? "flex-row-reverse" : "")}>
-                                                {isHomeEvent ? <ArrowUp className="h-3 w-3 text-green-500"/> : <ArrowDown className="h-3 w-3 text-red-500"/>}
+                                                <ArrowUp className="h-3 w-3 text-green-500"/>
                                                 <span>تبديل بـ {event.assist.name}</span>
                                              </div>
                                         ) : (
@@ -349,14 +349,14 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
                 <h3 className="text-center text-base font-bold mb-2">الاحتياط والتبديلات</h3>
                 <div className="bg-card/50 space-y-2 mb-4 rounded-lg p-2" style={{backgroundColor: '#000000'}}>
                     {substitutionEvents.map((event, index) => {
-                        const playerOut = event.player;
-                        const playerIn = event.assist;
+                        const playerIn = event.player;
+                        const playerOut = event.assist;
 
                         return (
                              <div key={index} className="p-2">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-red-500">
-                                        <ArrowDown className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 text-green-500">
+                                        <ArrowUp className="h-4 w-4" />
                                         <div className="flex flex-col items-start">
                                             <span className="truncate">{playerIn.name}</span>
                                         </div>
@@ -364,8 +364,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
 
                                     <div className="font-bold text-sm text-muted-foreground w-1/5 text-center">{event.time.elapsed}'</div>
 
-                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-green-500">
-                                        <ArrowUp className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 font-semibold w-2/5 flex-row-reverse text-red-500">
+                                        <ArrowDown className="h-4 w-4" />
                                         <div className="flex flex-col items-end">
                                             <span className="truncate">{playerOut.name}</span>
                                         </div>

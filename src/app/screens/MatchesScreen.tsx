@@ -22,6 +22,7 @@ import type { Fixture as FixtureType, Favorites, MatchDetails } from '@/lib/type
 import { GlobalPredictionsScreen } from './GlobalPredictionsScreen';
 import { FixtureItem } from '@/components/FixtureItem';
 import { isMatchLive } from '@/lib/matchStatus';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 interface GroupedFixtures {
     [leagueName: string]: {
@@ -308,7 +309,17 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         const teamNames = new Map<number, string>();
         teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
 
-        const names = { leagues: leagueNames, teams: teamNames };
+        const getDisplayName = (type: 'team' | 'league', id: number, defaultName: string) => {
+            const firestoreMap = type === 'team' ? teamNames : leagueNames;
+            const customName = firestoreMap.get(id);
+            if (customName) return customName;
+
+            const hardcodedMap = type === 'team' ? hardcodedTranslations.teams : hardcodedTranslations.leagues;
+            const hardcodedName = hardcodedMap[id];
+            if(hardcodedName) return hardcodedName;
+
+            return defaultName;
+        };
 
         const url = isLive ? `/api/football/fixtures?live=all` : `/api/football/fixtures?date=${dateKey}`;
         const response = await fetch(url);
@@ -320,16 +331,16 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             ...fixture,
             league: {
                 ...fixture.league,
-                name: names.leagues.get(fixture.league.id) || fixture.league.name
+                name: getDisplayName('league', fixture.league.id, fixture.league.name)
             },
             teams: {
                 home: {
                     ...fixture.teams.home,
-                    name: names.teams.get(fixture.teams.home.id) || fixture.teams.home.name
+                    name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name)
                 },
                 away: {
                     ...fixture.teams.away,
-                    name: names.teams.get(fixture.teams.away.id) || fixture.teams.away.name
+                    name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name)
                 }
             }
         }));

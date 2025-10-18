@@ -94,7 +94,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const getName = useCallback((type: 'league' | 'country' | 'continent', id: string | number, defaultName: string) => {
         // Prioritize custom name from Firestore
-        const firestoreMap = customNames[type === 'league' ? 'leagues' : type === 'country' ? 'countries' : 'continents'];
+        const firestoreMap = type === 'league' ? customNames.leagues : type === 'country' ? customNames.countries : customNames.continents;
         const customName = firestoreMap?.get(id as any);
         if (customName) return customName;
 

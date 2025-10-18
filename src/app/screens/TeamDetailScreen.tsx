@@ -22,6 +22,7 @@ import type { Team, Player, Fixture, Standing, TeamStatistics } from '@/lib/type
 import { CURRENT_SEASON } from '@/lib/constants';
 import { FixtureItem } from '@/components/FixtureItem';
 import { Skeleton } from '@/components/ui/skeleton';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 interface TeamData {
     team: Team;
@@ -224,7 +225,15 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
     const getDisplayName = useCallback((type: 'team' | 'league', id: number, defaultName: string) => {
         if (!customNames) return defaultName;
         const key = `${type}s` as 'teams' | 'leagues';
-        return customNames[key]?.get(id) || defaultName;
+        const firestoreMap = customNames[key];
+        const customName = firestoreMap.get(id);
+        if (customName) return customName;
+
+        const hardcodedMap = hardcodedTranslations[key];
+        const hardcodedName = hardcodedMap[id];
+        if (hardcodedName) return hardcodedName;
+
+        return defaultName;
     }, [customNames]);
     
     

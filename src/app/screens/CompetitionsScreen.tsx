@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -18,6 +19,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 // --- MAIN SCREEN COMPONENT ---
 export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
@@ -53,8 +55,15 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
 
      const getDisplayName = useCallback((type: 'league' | 'team', id: number, defaultName: string) => {
         const key = `${type}s` as 'leagues' | 'teams';
-        const map = customNames[key] as Map<number, string>;
-        return map?.get(id) || defaultName;
+        const firestoreMap = customNames[key];
+        const customName = firestoreMap.get(id);
+        if (customName) return customName;
+
+        const hardcodedMap = hardcodedTranslations[key];
+        const hardcodedName = hardcodedMap[id];
+        if (hardcodedName) return hardcodedName;
+
+        return defaultName;
     }, [customNames]);
 
 
