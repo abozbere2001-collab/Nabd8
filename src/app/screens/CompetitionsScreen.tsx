@@ -60,7 +60,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         if (customName) return customName;
 
         const hardcodedMap = hardcodedTranslations[key];
-        const hardcodedName = hardcodedMap[id];
+        const hardcodedName = hardcodedMap[id as any];
         if (hardcodedName) return hardcodedName;
 
         return defaultName;

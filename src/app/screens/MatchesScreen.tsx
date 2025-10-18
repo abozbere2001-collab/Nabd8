@@ -376,10 +376,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   
   useEffect(() => {
-    if (activeTab === 'my-results') {
+    if (activeTab === 'my-results' && isVisible) {
         fetchAndProcessData(selectedDateKey, false);
     }
-  }, [selectedDateKey, activeTab, fetchAndProcessData]);
+  }, [selectedDateKey, activeTab, isVisible, fetchAndProcessData]);
 
   useEffect(() => {
     if (activeTab === 'live' && isVisible) {

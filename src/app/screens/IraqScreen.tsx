@@ -236,15 +236,17 @@ function OurBallTab({ navigate, isAdmin }: { navigate: ScreenProps['navigate'], 
     const { toast } = useToast();
     const [customTeamNames, setCustomTeamNames] = useState<Map<number, string>>(new Map());
 
+    const fetchCustomNames = useCallback(async () => {
+        if (!db) return;
+        const snapshot = await getDocs(collection(db, 'teamCustomizations'));
+        const names = new Map<number, string>();
+        snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
+        setCustomTeamNames(names);
+    }, [db]);
+
+
     useEffect(() => {
         if (!db) return;
-
-        const fetchCustomNames = async () => {
-            const snapshot = await getDocs(collection(db, 'teamCustomizations'));
-            const names = new Map<number, string>();
-            snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
-            setCustomTeamNames(names);
-        };
 
         const favsRef = collection(db, 'adminFavorites');
         const unsubscribe = onSnapshot(favsRef, async (snapshot) => {
@@ -263,7 +265,7 @@ function OurBallTab({ navigate, isAdmin }: { navigate: ScreenProps['navigate'], 
         });
 
         return () => unsubscribe();
-    }, [db]);
+    }, [db, fetchCustomNames]);
 
     const handleDelete = (teamId: number) => {
         if (!db || !isAdmin) return;
@@ -475,7 +477,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 isAdmin={isAdmin} 
               />
             ))}
-            {isAdmin && (
+            {isAdmin && pinnedMatches.filter(m => m.isEnabled).length === 0 && (
                 <Button className="w-full my-2" onClick={() => navigate('ManagePinnedMatch', { matchId: null })}>
                     <Pin className="ml-2 h-4 w-4" />
                     إضافة مباراة للتثبيت
