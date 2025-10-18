@@ -201,87 +201,36 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
  const handleSearch = useCallback(async (query: string) => {
     const trimmedQuery = query.trim();
     if (!trimmedQuery || trimmedQuery.length < 2) {
-        setSearchResults([]);
-        return;
+      setSearchResults([]);
+      return;
     }
     setLoading(true);
-    const resultsMap = new Map<string, SearchResult>();
 
     try {
-        const isArabic = /[\u0600-\u06FF]/.test(trimmedQuery);
-        
-        const fetchAndSet = async (id: number, type: 'team' | 'league') => {
-            const key = `${type}-${id}`;
-            if (resultsMap.has(key)) return;
-            const endpoint = type === 'team' ? 'teams' : 'leagues';
-            try {
-                const res = await fetch(`/api/football/${endpoint}?id=${id}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.response?.[0]) {
-                        resultsMap.set(key, { ...data.response[0], type });
-                    }
-                }
-            } catch (e) { console.error(`Failed to fetch ${type} with id ${id}`, e); }
-        };
+      const [teamsData, leaguesData] = await Promise.all([
+        fetch(`/api/football/teams?search=${trimmedQuery}`).then(res => res.json()),
+        fetch(`/api/football/leagues?search=${trimmedQuery}`).then(res => res.json()),
+      ]);
 
-        if (isArabic) {
-            const normalizedQuery = normalizeArabic(trimmedQuery);
-            const localSearchPromises: Promise<void>[] = [];
-
-            // Search Firestore custom names
-            customNames.teams.forEach((name, id) => {
-                if (normalizeArabic(name).includes(normalizedQuery)) {
-                    localSearchPromises.push(fetchAndSet(id, 'team'));
-                }
-            });
-            customNames.leagues.forEach((name, id) => {
-                if (normalizeArabic(name).includes(normalizedQuery)) {
-                    localSearchPromises.push(fetchAndSet(id, 'league'));
-                }
-            });
-
-            // Search hardcoded translations
-            for (const id in hardcodedTranslations.teams) {
-                const name = hardcodedTranslations.teams[id as any];
-                if (normalizeArabic(name).includes(normalizedQuery)) {
-                     localSearchPromises.push(fetchAndSet(Number(id), 'team'));
-                }
-            }
-             for (const id in hardcodedTranslations.leagues) {
-                const name = hardcodedTranslations.leagues[id as any];
-                if (normalizeArabic(name).includes(normalizedQuery)) {
-                     localSearchPromises.push(fetchAndSet(Number(id), 'league'));
-                }
-            }
-            await Promise.all(localSearchPromises);
-
-        } else { // English search - API only
-            const [teamsData, leaguesData] = await Promise.all([
-                fetch(`/api/football/teams?search=${trimmedQuery}`).then(res => res.json()),
-                fetch(`/api/football/leagues?search=${trimmedQuery}`).then(res => res.json()),
-            ]);
-
-            teamsData.response?.forEach((r: TeamResult) => {
-                if (!resultsMap.has(`team-${r.team.id}`)) resultsMap.set(`team-${r.team.id}`, { ...r, type: 'team' });
-            });
-            leaguesData.response?.forEach((r: LeagueResult) => {
-                if (!resultsMap.has(`league-${r.league.id}`)) resultsMap.set(`league-${r.league.id}`, { ...r, type: 'league' });
-            });
-        }
-        
-        const allResults = Array.from(resultsMap.values());
-        const localizedResults = applyCustomNamesToResults(allResults);
-        setSearchResults(localizedResults);
+      const combinedResults: SearchResult[] = [];
+      if (teamsData.response) {
+        teamsData.response.forEach((r: TeamResult) => combinedResults.push({ ...r, type: 'team' }));
+      }
+      if (leaguesData.response) {
+        leaguesData.response.forEach((r: LeagueResult) => combinedResults.push({ ...r, type: 'league' }));
+      }
+      
+      const localizedResults = applyCustomNamesToResults(combinedResults);
+      setSearchResults(localizedResults);
 
     } catch (error) {
-        console.error("API Search Error: ", error);
-        toast({variant: 'destructive', title: 'خطأ في البحث', description: 'فشل الاتصال بالخادم.'});
-        setSearchResults([]);
+      console.error("API Search Error: ", error);
+      toast({variant: 'destructive', title: 'خطأ في البحث', description: 'فشل الاتصال بالخادم.'});
+      setSearchResults([]);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-  }, [customNames.teams, customNames.leagues, toast, applyCustomNamesToResults]);
+  }, [applyCustomNamesToResults, toast]);
 
 
   useEffect(() => {
@@ -479,5 +428,3 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
-
-    
