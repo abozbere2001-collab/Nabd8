@@ -1,9 +1,11 @@
 
 "use client";
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NabdAlMalaebLogo } from './icons/NabdAlMalaebLogo';
+import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 interface ScreenHeaderProps {
   title: string;
@@ -21,6 +23,25 @@ export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActio
   ];
 
   const showCentralTitle = !screensWithoutCentralTitle.includes(title);
+  const { toast } = useToast();
+
+  const handleCopyLogs = () => {
+    try {
+      const logs = logger.getFormattedLogs();
+      navigator.clipboard.writeText(logs);
+      toast({
+        title: "تم نسخ السجلات",
+        description: "يمكنك الآن لصقها في المحادثة.",
+      });
+    } catch (e) {
+      console.error("Failed to copy logs: ", e);
+      toast({
+        variant: "destructive",
+        title: "فشل نسخ السجلات",
+      });
+    }
+  };
+
 
   return (
     <header data-id={`screen-header-${title.replace(/\s+/g, '-').toLowerCase()}`} 
@@ -51,6 +72,9 @@ export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActio
       )}
 
       <div data-id="screen-header-actions" className="flex items-center gap-1">
+         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyLogs}>
+            <Bug className="h-5 w-5 text-muted-foreground" />
+        </Button>
         {actions}
       </div>
     </header>
