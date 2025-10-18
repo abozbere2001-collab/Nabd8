@@ -151,7 +151,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                         </ScrollArea>
 
                         <Tabs defaultValue="teams" className="w-full px-4">
-                             <TabsList className="grid w-full grid-cols-3 bg-card text-card-foreground">
+                             <TabsList className="grid w-full grid-cols-3 bg-card text-card-foreground h-9">
                                 <TabsTrigger value="players"><PlayerIcon className="ml-1 h-4 w-4"/>اللاعبين</TabsTrigger>
                                 <TabsTrigger value="competitions"><Trophy className="ml-1 h-4 w-4"/>البطولات</TabsTrigger>
                                 <TabsTrigger value="teams"><Users className="ml-1 h-4 w-4"/>الفرق</TabsTrigger>

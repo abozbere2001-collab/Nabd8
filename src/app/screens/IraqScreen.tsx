@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -89,7 +90,7 @@ function OurLeagueTab({
     return (
         <Tabs defaultValue="matches" className="w-full">
             <div className="sticky top-0 bg-background z-10 border-b -mx-4 px-4">
-                <TabsList className="grid w-full grid-cols-3 rounded-none h-12 p-0 border-t flex-row-reverse">
+                <TabsList className="grid w-full grid-cols-3 rounded-none h-10 p-0 border-t flex-row-reverse bg-card">
                     <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'>الهدافين</TabsTrigger>
                     <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'>الترتيب</TabsTrigger>
                     <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>المباريات</TabsTrigger>
@@ -442,7 +443,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
         <Tabs defaultValue="our-league" className="w-full">
           <div className="sticky top-0 bg-background z-10">
-            <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-12">
+            <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-10 bg-card">
               <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
               <TabsTrigger value="our-league">دورينا</TabsTrigger>
             </TabsList>
@@ -465,5 +466,3 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
