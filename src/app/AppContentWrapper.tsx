@@ -111,8 +111,8 @@ export const ProfileButton = () => {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
+                <Button variant="ghost" className="relative h-7 w-7 rounded-full">
+                    <Avatar className="h-7 w-7">
                         <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
                         <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
                     </Avatar>
@@ -256,5 +256,3 @@ export function AppContentWrapper() {
         </main>
   );
 }
-
-    

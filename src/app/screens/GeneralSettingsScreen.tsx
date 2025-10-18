@@ -104,9 +104,9 @@ export function GeneralSettingsScreen({ navigate, goBack, canGoBack, headerActio
                     الترقية إلى النسخة الإحترافية
                 </Button>
             )}
-             {!isAdmin && (
+             {process.env.NODE_ENV === 'development' && !isAdmin && (
                 <Button onClick={handleMakeAdmin} className="w-full">
-                    {"ترقية إلى حساب مدير"}
+                    {"ترقية إلى حساب مدير (للتطوير)"}
                 </Button>
             )}
           </CardContent>
