@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -21,7 +20,6 @@ import { ProfileButton } from '../AppContentWrapper';
 import type { Fixture as FixtureType, Favorites, MatchDetails, MatchCustomization } from '@/lib/types';
 import { GlobalPredictionsScreen } from './GlobalPredictionsScreen';
 import { FixtureItem } from '@/components/FixtureItem';
-import { isMatchLive } from '@/lib/matchStatus';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 interface GroupedFixtures {
@@ -105,14 +103,10 @@ const FixturesList = ({
         );
     }
     
-    const noMatches = activeTab === 'my-results' 
-        ? favoriteTeamMatches.length === 0 && Object.keys(groupedOtherFixtures).length === 0
-        : fixtures.length === 0;
+    const noMatches = fixtures.length === 0;
 
     if (noMatches) {
-        const message = activeTab === 'live' 
-            ? "لا توجد مباريات مباشرة حاليًا."
-            : activeTab === 'my-results'
+        const message = activeTab === 'my-results'
             ? "لا توجد مباريات لمفضلاتك هذا اليوم."
             : "لا توجد مباريات لهذا اليوم.";
         return (
@@ -243,7 +237,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     );
 }
 
-type TabName = 'my-results' | 'live' | 'predictions';
+type TabName = 'my-results' | 'predictions';
 
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: ScreenProps & { isVisible: boolean }) {
@@ -254,23 +248,25 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
   
-  const [myResultsFixtures, setMyResultsFixtures] = useState<FixtureType[]>([]);
-  const [liveFixtures, setLiveFixtures] = useState<FixtureType[]>([]);
-  
+  const [myResultsCache, setMyResultsCache] = useState<Map<string, FixtureType[]>>(new Map());
   const [myResultsLoading, setMyResultsLoading] = useState(true);
-  const [liveLoading, setLiveLoading] = useState(true);
     
   const [commentedMatches, setCommentedMatches] = useState<{ [key: number]: MatchDetails }>({});
   const [customStatuses, setCustomStatuses] = useState<{ [key: number]: MatchCustomization }>({});
 
-  const fetchAndProcessData = useCallback(async (dateKey: string, isLive: boolean, abortSignal: AbortSignal) => {
-      if (!db) {
-          if (isLive) setLiveLoading(false); else setMyResultsLoading(false);
-          return;
-      };
-      
-      if (isLive) setLiveLoading(true); else setMyResultsLoading(true);
+  const fetchAndProcessData = useCallback(async (dateKey: string, abortSignal: AbortSignal) => {
+    if (myResultsCache.has(dateKey)) {
+        setMyResultsLoading(false);
+        return;
+    }
+    
+    setMyResultsLoading(true);
 
+    if (!db) {
+      setMyResultsLoading(false);
+      return;
+    };
+      
       try {
         const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
             getDocs(collection(db, 'leagueCustomizations')),
@@ -296,7 +292,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             return defaultName;
         };
 
-        const url = isLive ? `/api/football/fixtures?live=all` : `/api/football/fixtures?date=${dateKey}`;
+        const url = `/api/football/fixtures?date=${dateKey}`;
         const response = await fetch(url, { signal: abortSignal });
         if (!response.ok) throw new Error(`Failed to fetch fixtures`);
         
@@ -322,24 +318,20 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                 }
             }
         }));
-
-        if (isLive) {
-            setLiveFixtures(processedFixtures);
-        } else {
-            setMyResultsFixtures(processedFixtures);
-        }
+        
+        setMyResultsCache(prev => new Map(prev).set(dateKey, processedFixtures));
 
       } catch (error) {
           if ((error as Error).name !== 'AbortError') {
             console.error("Failed to fetch and process data:", error);
-            if (isLive) setLiveFixtures([]); else setMyResultsFixtures([]);
+            setMyResultsCache(prev => new Map(prev).set(dateKey, []));
           }
       } finally {
           if (!abortSignal.aborted) {
-              if (isLive) setLiveLoading(false); else setMyResultsLoading(false);
+            setMyResultsLoading(false);
           }
       }
-  }, [db]);
+  }, [db, myResultsCache]);
 
 
   useEffect(() => {
@@ -398,24 +390,10 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   useEffect(() => {
       if (activeTab === 'my-results' && isVisible) {
         const controller = new AbortController();
-        fetchAndProcessData(selectedDateKey, false, controller.signal);
+        fetchAndProcessData(selectedDateKey, controller.signal);
         return () => controller.abort();
       }
   }, [selectedDateKey, activeTab, isVisible, fetchAndProcessData]);
-
-  useEffect(() => {
-    if (activeTab === 'live' && isVisible) {
-        const controller = new AbortController();
-        fetchAndProcessData(selectedDateKey, true, controller.signal);
-        const interval = setInterval(() => {
-            fetchAndProcessData(selectedDateKey, true, new AbortController().signal);
-        }, 60000); // 1 minute
-        return () => {
-            clearInterval(interval);
-            controller.abort();
-        };
-    }
-  }, [activeTab, isVisible, selectedDateKey, fetchAndProcessData]);
 
 
   const handleDateChange = (dateKey: string) => {
@@ -431,6 +409,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const favoritedTeamIds = useMemo(() => favorites?.teams ? Object.keys(favorites.teams).map(Number) : [], [favorites.teams]);
   const favoritedLeagueIds = useMemo(() => favorites?.leagues ? Object.keys(favorites.leagues).map(Number) : [], [favorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
+  
+  const currentFixtures = myResultsCache.get(selectedDateKey) || [];
     
   return (
     <div className="flex h-full flex-col bg-background">
@@ -464,22 +444,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             
             <TabsContent value="my-results" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0" hidden={activeTab !== 'my-results'}>
                 <FixturesList 
-                    fixtures={myResultsFixtures}
+                    fixtures={currentFixtures}
                     loading={myResultsLoading}
-                    activeTab={activeTab}
-                    favoritedLeagueIds={favoritedLeagueIds}
-                    favoritedTeamIds={favoritedTeamIds}
-                    hasAnyFavorites={hasAnyFavorites}
-                    commentedMatches={commentedMatches}
-                    customStatuses={customStatuses}
-                    navigate={navigate}
-                />
-            </TabsContent>
-            
-            <TabsContent value="live" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0" hidden={activeTab !== 'live'}>
-                 <FixturesList 
-                    fixtures={liveFixtures}
-                    loading={liveLoading}
                     activeTab={activeTab}
                     favoritedLeagueIds={favoritedLeagueIds}
                     favoritedTeamIds={favoritedTeamIds}
@@ -497,7 +463,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-
-    
-
-    
