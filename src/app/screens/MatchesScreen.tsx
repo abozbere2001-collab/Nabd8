@@ -18,9 +18,9 @@ import { Button } from '@/components/ui/button';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import type { Fixture as FixtureType, Favorites, MatchDetails, MatchCustomization } from '@/lib/types';
-import { GlobalPredictionsScreen } from './GlobalPredictionsScreen';
 import { FixtureItem } from '@/components/FixtureItem';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
+import { GlobalPredictionsScreen } from './GlobalPredictionsScreen';
 
 interface GroupedFixtures {
     [leagueName: string]: {
@@ -30,7 +30,7 @@ interface GroupedFixtures {
 }
 
 // Fixtures List Component
-const FixturesList = ({ 
+const FixturesList = React.memo(({ 
     fixtures, 
     loading,
     activeTab, 
@@ -169,7 +169,13 @@ const FixturesList = ({
             })}
         </div>
     );
-};
+});
+FixturesList.displayName = 'FixturesList';
+
+
+const GlobalPredictionsTab = React.memo(GlobalPredictionsScreen);
+GlobalPredictionsTab.displayName = 'GlobalPredictionsTab';
+
 
 // Date Scroller
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -239,6 +245,11 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
 
 type TabName = 'my-results' | 'predictions';
 
+const tabs: {id: TabName, label: string}[] = [
+    { id: 'my-results', label: 'نتائجي' },
+    { id: 'predictions', label: 'التوقعات' },
+];
+
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: ScreenProps & { isVisible: boolean }) {
   const { user } = useAuth();
@@ -255,17 +266,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [customStatuses, setCustomStatuses] = useState<{ [key: number]: MatchCustomization }>({});
 
   const fetchAndProcessData = useCallback(async (dateKey: string, abortSignal: AbortSignal) => {
-    if (myResultsCache.has(dateKey)) {
-        setMyResultsLoading(false);
-        return;
-    }
-    
     setMyResultsLoading(true);
-
-    if (!db) {
-      setMyResultsLoading(false);
-      return;
-    };
       
       try {
         const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
@@ -331,7 +332,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             setMyResultsLoading(false);
           }
       }
-  }, [db, myResultsCache]);
+  }, [db]);
 
 
   useEffect(() => {
@@ -389,11 +390,15 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   useEffect(() => {
       if (activeTab === 'my-results' && isVisible) {
-        const controller = new AbortController();
-        fetchAndProcessData(selectedDateKey, controller.signal);
-        return () => controller.abort();
+          if (myResultsCache.has(selectedDateKey)) {
+              setMyResultsLoading(false);
+              return;
+          }
+          const controller = new AbortController();
+          fetchAndProcessData(selectedDateKey, controller.signal);
+          return () => controller.abort();
       }
-  }, [selectedDateKey, activeTab, isVisible, fetchAndProcessData]);
+  }, [selectedDateKey, activeTab, isVisible, fetchAndProcessData, myResultsCache]);
 
 
   const handleDateChange = (dateKey: string) => {
@@ -432,8 +437,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col min-h-0">
             <div className="flex flex-col border-b bg-card">
                  <TabsList className="grid w-full grid-cols-2">
-                     <TabsTrigger value="predictions">التوقعات</TabsTrigger>
-                     <TabsTrigger value="my-results">نتائجي</TabsTrigger>
+                    {tabs.map(tab => (
+                        <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
+                    ))}
                  </TabsList>
                  {activeTab === 'my-results' && (
                      <div className="py-2 px-2">
@@ -457,9 +463,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             </TabsContent>
 
             <TabsContent value="predictions" className="flex-1 overflow-y-auto p-0 mt-0" hidden={activeTab !== 'predictions'}>
-                <GlobalPredictionsScreen navigate={navigate} goBack={goBack} canGoBack={canGoBack} />
+                <GlobalPredictionsTab navigate={navigate} goBack={goBack} canGoBack={canGoBack} />
             </TabsContent>
         </Tabs>
     </div>
   );
 }
+
+    
