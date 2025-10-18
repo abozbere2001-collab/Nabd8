@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -17,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
-import type { Fixture as FixtureType, Favorites, MatchDetails, MatchCustomization } from '@/lib/types';
+import type { Fixture as FixtureType, Favorites, MatchDetails } from '@/lib/types';
 import { FixtureItem } from '@/components/FixtureItem';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { GlobalPredictionsScreen } from './GlobalPredictionsScreen';
@@ -38,7 +39,6 @@ const FixturesList = React.memo(({
     favoritedLeagueIds,
     favoritedTeamIds,
     commentedMatches,
-    customStatuses,
     navigate,
 }: { 
     fixtures: FixtureType[], 
@@ -48,7 +48,6 @@ const FixturesList = React.memo(({
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
     commentedMatches: { [key: number]: MatchDetails },
-    customStatuses: { [key: number]: MatchCustomization },
     navigate: ScreenProps['navigate'],
 }) => {
     
@@ -133,7 +132,6 @@ const FixturesList = React.memo(({
                                 fixture={f} 
                                 navigate={navigate}
                                 commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled}
-                                customStatus={customStatuses[f.fixture.id]?.customStatus}
                             />
                         ))}
                     </div>
@@ -160,7 +158,6 @@ const FixturesList = React.memo(({
                                     fixture={f} 
                                     navigate={navigate}
                                     commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled} 
-                                    customStatus={customStatuses[f.fixture.id]?.customStatus}
                                 />
                             ))}
                         </div>
@@ -259,8 +256,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   
   useEffect(() => {
-    // Set initial date only once
-    if (!selectedDateKey) {
+    // Set initial date only once, and only on the client
+    if (!selectedDateKey && typeof window !== 'undefined') {
       setSelectedDateKey(formatDateKey(new Date()));
     }
   }, [selectedDateKey]);
@@ -269,13 +266,18 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [myResultsLoading, setMyResultsLoading] = useState(true);
     
   const [commentedMatches, setCommentedMatches] = useState<{ [key: number]: MatchDetails }>({});
-  const [customStatuses, setCustomStatuses] = useState<{ [key: number]: MatchCustomization }>({});
 
   const fetchAndProcessData = useCallback(async (dateKey: string, abortSignal: AbortSignal) => {
-    if (activeTab !== 'my-results' || !db) {
+    // DO NOT run this fetch if the active tab is not 'my-results'
+    if (activeTab !== 'my-results') {
         setMyResultsLoading(false);
         return;
     };
+    
+    if (!db) {
+        setMyResultsLoading(false);
+        return;
+    }
     
     setMyResultsLoading(true);
       
@@ -379,23 +381,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         errorEmitter.emit('permission-error', permissionError);
     });
 
-     const customStatusCollectionRef = collection(db, 'matchCustomizations');
-     const unsubscribeCustomStatus = onSnapshot(customStatusCollectionRef, (snapshot) => {
-        const statuses: { [key: number]: MatchCustomization } = {};
-        snapshot.forEach(doc => {
-            statuses[Number(doc.id)] = doc.data() as MatchCustomization;
-        });
-        setCustomStatuses(statuses);
-     }, (error) => {
-        const permissionError = new FirestorePermissionError({ path: 'matchCustomizations', operation: 'list' });
-        errorEmitter.emit('permission-error', permissionError);
-     });
-
-
-    return () => {
-        unsubscribe();
-        unsubscribeCustomStatus();
-    }
+    return () => unsubscribe();
   }, [db]);
   
   
@@ -471,7 +457,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
                     commentedMatches={commentedMatches}
-                    customStatuses={customStatuses}
                     navigate={navigate}
                 />
             </TabsContent>
@@ -483,3 +468,4 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+

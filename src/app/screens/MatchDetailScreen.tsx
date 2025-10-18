@@ -35,7 +35,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 
-type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'status';
+type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country';
 
 
 const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerType, navigate: ScreenProps['navigate'], onRename: () => void, isAdmin: boolean }) => {
@@ -86,7 +86,7 @@ const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerTyp
 };
 
 
-const MatchHeaderCard = ({ fixture, navigate, customStatus, onRename, isAdmin }: { fixture: Fixture, navigate: ScreenProps['navigate'], customStatus: string | null | undefined, onRename: () => void, isAdmin: boolean }) => {
+const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
     return (
         <Card className="mb-4 bg-card/80 backdrop-blur-sm">
             <CardContent className="p-4">
@@ -103,17 +103,7 @@ const MatchHeaderCard = ({ fixture, navigate, customStatus, onRename, isAdmin }:
                         <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="relative flex flex-col items-center justify-center min-w-[120px] text-center">
-                        <LiveMatchStatus fixture={fixture} customStatus={customStatus} large />
-                         {isAdmin && (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 mt-1"
-                                onClick={onRename}
-                            >
-                                <Pencil className="h-3 w-3" />
-                            </Button>
-                        )}
+                        <LiveMatchStatus fixture={fixture} large />
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
@@ -525,20 +515,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [loading, setLoading] = useState(!initialFixture);
     const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> }>({});
-    const [customStatus, setCustomStatus] = useState<string | null>(null);
-
-     useEffect(() => {
-        if (!db || !fixtureId) return;
-        const customStatusRef = doc(db, 'matchCustomizations', String(fixtureId));
-        const unsubscribe = onSnapshot(customStatusRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setCustomStatus(docSnap.data()?.customStatus || null);
-            } else {
-                setCustomStatus(null);
-            }
-        }, () => setCustomStatus(null));
-        return () => unsubscribe();
-    }, [db, fixtureId]);
 
     const getDisplayName = useCallback((type: 'team' | 'player' | 'league' | 'coach', id: number, defaultName: string) => {
       const firestoreMap = customNames[type];
@@ -686,48 +662,28 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         if (!renameItem || !db) return;
 
         const { originalName } = renameItem;
-        const isStatusRename = type === 'status';
-        const collectionName = isStatusRename ? 'matchCustomizations' : `${type}Customizations`;
+        const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
         
-        if(isStatusRename) {
-             const statusData = { customStatus: newName };
-             if(newName.trim()) {
-                 setDoc(docRef, statusData)
-                    .then(() => toast({ title: "نجاح", description: `تم تحديث الحالة.` }))
-                    .catch(serverError => {
-                        const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: statusData });
-                        errorEmitter.emit('permission-error', permissionError);
-                    });
-             } else {
-                 deleteDoc(docRef)
-                    .then(() => toast({ title: "نجاح", description: `تمت إزالة الحالة المخصصة.` }))
-                    .catch(serverError => {
-                        const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
-                        errorEmitter.emit('permission-error', permissionError);
-                    });
-             }
-        } else {
-            const data = { customName: newName };
-            if(newName && newName !== originalName) {
-                setDoc(docRef, data)
-                    .then(() => {
-                        toast({ title: "نجاح", description: `تم تحديث الاسم.` });
-                        fetchData(false);
-                    })
-                    .catch(serverError => {
-                        const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
-                        errorEmitter.emit('permission-error', permissionError);
-                    });
-            } else {
-                deleteDoc(docRef).then(() => {
-                     toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` });
-                     fetchData(false);
-                }).catch(serverError => {
-                     const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
-                     errorEmitter.emit('permission-error', permissionError);
+        const data = { customName: newName };
+        if(newName && newName !== originalName) {
+            setDoc(docRef, data)
+                .then(() => {
+                    toast({ title: "نجاح", description: `تم تحديث الاسم.` });
+                    fetchData(false);
+                })
+                .catch(serverError => {
+                    const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
+                    errorEmitter.emit('permission-error', permissionError);
                 });
-            }
+        } else {
+            deleteDoc(docRef).then(() => {
+                 toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` });
+                 fetchData(false);
+            }).catch(serverError => {
+                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
+                 errorEmitter.emit('permission-error', permissionError);
+            });
         }
 
         setRenameItem(null);
@@ -773,9 +729,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 <MatchHeaderCard 
                     fixture={fixture} 
                     navigate={navigate}
-                    customStatus={customStatus} 
-                    onRename={() => handleOpenRename('status', fixture.fixture.id, customStatus || '')}
-                    isAdmin={isAdmin}
                 />
                 <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-5 rounded-lg h-auto p-1 bg-card">
