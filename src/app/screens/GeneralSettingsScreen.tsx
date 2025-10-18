@@ -91,3 +91,5 @@ export function GeneralSettingsScreen({ navigate, goBack, canGoBack, headerActio
     </div>
   );
 }
+
+    

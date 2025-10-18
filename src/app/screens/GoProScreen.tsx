@@ -97,3 +97,5 @@ export function GoProScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
