@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FixedSizeList as List } from 'react-window';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 interface SeasonTeamSelectionScreenProps extends ScreenProps {
     leagueId: number;
@@ -68,7 +69,15 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
             try {
                 const res = await fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`);
                 const data = await res.json();
-                setTeams(data.response || []);
+                const rawTeams = data.response || [];
+                const translatedTeams = rawTeams.map((teamData: { team: Team }) => ({
+                    ...teamData,
+                    team: {
+                        ...teamData.team,
+                        name: hardcodedTranslations.teams[teamData.team.id] || teamData.team.name,
+                    }
+                }));
+                setTeams(translatedTeams);
             } catch (e) {
                 console.error('Failed to fetch teams:', e);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل الفرق.' });

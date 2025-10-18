@@ -18,6 +18,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { FixedSizeList as List } from 'react-window';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 
 interface SeasonPlayerSelectionScreenProps extends ScreenProps {
@@ -86,7 +87,14 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
                     if (data.response) {
                         data.response.forEach((playerResponse: PlayerResponse) => {
                             if (!playerMap.has(playerResponse.player.id)) {
-                                playerMap.set(playerResponse.player.id, playerResponse);
+                                const translatedPlayer = {
+                                    ...playerResponse,
+                                    player: {
+                                        ...playerResponse.player,
+                                        name: hardcodedTranslations.players[playerResponse.player.id] || playerResponse.player.name
+                                    }
+                                };
+                                playerMap.set(playerResponse.player.id, translatedPlayer);
                             }
                         });
                     }

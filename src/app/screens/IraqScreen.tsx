@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -33,6 +32,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 const IRAQI_LEAGUE_ID = 542;
 
@@ -360,8 +360,21 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       const fixturesData = await fixturesRes.json();
       const standingsData = await standingsRes.json();
       
-      setFixtures(fixturesData.response || []);
-      setStandings(standingsData.response?.[0]?.league?.standings?.[0] || []);
+      const translatedFixtures = (fixturesData.response || []).map((fixture: Fixture) => ({
+          ...fixture,
+          teams: {
+            home: { ...fixture.teams.home, name: hardcodedTranslations.teams[fixture.teams.home.id] || fixture.teams.home.name },
+            away: { ...fixture.teams.away, name: hardcodedTranslations.teams[fixture.teams.away.id] || fixture.teams.away.name },
+          }
+      }));
+      
+      const translatedStandings = (standingsData.response?.[0]?.league?.standings?.[0] || []).map((s: Standing) => ({
+        ...s,
+        team: { ...s.team, name: hardcodedTranslations.teams[s.team.id] || s.team.name }
+      }));
+
+      setFixtures(translatedFixtures);
+      setStandings(translatedStandings);
 
     } catch (error) {
       console.error("Failed to fetch Iraqi league details:", error);
@@ -466,3 +479,5 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    

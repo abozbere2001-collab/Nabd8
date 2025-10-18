@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 // --- Helper Functions & Components ---
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
@@ -127,6 +128,34 @@ interface GroupedFixtures {
     }
 }
 
+const leagueOrder: { [key: string]: number } = {
+  // Top 5
+  "La Liga": 1, "Premier League": 2, "Ligue 1": 3, "Bundesliga": 4, "Serie A": 5, 
+  "الدوري الإسباني": 1, "الدوري الإنجليزي الممتاز": 2, "الدوري الفرنسي": 3, "الدوري الألماني": 4, "الدوري الإيطالي": 5,
+
+  // Other European
+  "Eredivisie": 6, "دوري الهولندي": 6,
+
+  // Arab Leagues
+  "Iraq Stars League": 7, "دوري نجوم العراق": 7,
+  "Saudi Professional League": 8, "دوري المحترفين السعودي": 8,
+
+  // Continental Club
+  "UEFA Champions League": 20, "دوري أبطال أوروبا": 20,
+  "UEFA Europa League": 21, "الدوري الأوروبي": 21,
+  "AFC Champions League": 22, "دوري أبطال آسيا": 22,
+  "CAF Champions League": 23, "دوري أبطال أفريقيا": 23,
+  "Copa Libertadores": 24, "كأس ليبرتادوريس": 24,
+
+  // National Team Comps
+  "World Cup": 30, "كأس العالم": 30,
+  "Euro Championship": 31, "بطولة أمم أوروبا": 31,
+  "Africa Cup of Nations": 32, "كأس الأمم الأفريقية": 32,
+  "AFC Asian Cup": 33, "كأس آسيا": 33,
+  "Copa America": 34, "كوبا أمريكا": 34,
+};
+
+
 // --- Main Screen Component ---
 export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const [selectedDateKey, setSelectedDateKey] = useState(formatDateKey(new Date()));
@@ -149,7 +178,22 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack }: Scree
                     throw new Error('Failed to fetch fixtures');
                 }
                 const data = await res.json();
-                setAllFixtures(data.response || []);
+                
+                // Apply hardcoded translations here
+                const rawFixtures = data.response || [];
+                const translatedFixtures = rawFixtures.map((fixture: Fixture) => ({
+                    ...fixture,
+                    league: {
+                        ...fixture.league,
+                        name: hardcodedTranslations.leagues[fixture.league.id] || fixture.league.name,
+                    },
+                    teams: {
+                        home: { ...fixture.teams.home, name: hardcodedTranslations.teams[fixture.teams.home.id] || fixture.teams.home.name },
+                        away: { ...fixture.teams.away, name: hardcodedTranslations.teams[fixture.teams.away.id] || fixture.teams.away.name },
+                    }
+                }));
+
+                setAllFixtures(translatedFixtures);
             } catch (error) {
                 console.error("Error fetching fixtures:", error);
                 toast({
@@ -257,7 +301,16 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack }: Scree
         }, {} as GroupedFixtures);
     }, [allFixtures]);
 
-    const sortedLeagues = useMemo(() => Object.keys(groupedFixtures).sort((a,b) => a.localeCompare(b)), [groupedFixtures]);
+    const sortedLeagues = useMemo(() => {
+        return Object.keys(groupedFixtures).sort((a, b) => {
+            const orderA = leagueOrder[a] || 999;
+            const orderB = leagueOrder[b] || 999;
+            if (orderA !== orderB) {
+                return orderA - orderB;
+            }
+            return a.localeCompare(b);
+        });
+    }, [groupedFixtures]);
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -269,7 +322,7 @@ export function AdminMatchSelectionScreen({ navigate, goBack, canGoBack }: Scree
                 {loading ? (
                     Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)
                 ) : sortedLeagues.length > 0 ? (
-                    <Accordion type="multiple" className="w-full space-y-4">
+                    <Accordion type="multiple" className="w-full space-y-4" defaultValue={sortedLeagues}>
                         {sortedLeagues.map(leagueName => {
                             const { league, fixtures } = groupedFixtures[leagueName];
                             return (
