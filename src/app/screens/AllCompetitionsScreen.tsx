@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -8,7 +9,7 @@ import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, onSnapshot, query, updateDoc, deleteField, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot, query, updateDoc, deleteField, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -17,6 +18,7 @@ import type { Favorites, ManagedCompetition as ManagedCompetitionType } from '@/
 import { SearchSheet } from '@/components/SearchSheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 // --- TYPE DEFINITIONS ---
 interface CompetitionsByCountry {
@@ -72,31 +74,6 @@ const countryToContinent: { [key: string]: string } = {
     "Other": "Other"
 };
 
-const defaultContinentTranslations: { [key: string]: string } = {
-  "World": "العالم", "Europe": "أوروبا", "Asia": "آسيا", "Africa": "أفريقيا", 
-  "South America": "أمريكا الجنوبية", "North America": "أمريكا الشمالية", 
-  "Oceania": "أوقيانوسيا", "Other": "أخرى"
-};
-
-const defaultCountryTranslations: { [key: string]: string } = {
-    "England": "إنجلترا", "Spain": "إسبانيا", "Germany": "ألمانيا", "Italy": "إيطاليا", "France": "فرنسا",
-    "Netherlands": "هولندا", "Portugal": "البرتغال", "Belgium": "بلجيكا", "Russia": "روسيا", "Turkey": "تركيا",
-    "Greece": "اليونان", "Switzerland": "سويسرا", "Austria": "النمسا", "Denmark": "الدنمارك", "Scotland": "اسكتلندا",
-    "Sweden": "السويد", "Norway": "النرويج", "Poland": "بولندا", "Ukraine": "أوكرانيا", "Czech-Republic": "التشيك",
-    "Croatia": "كرواتيا", "Romania": "رومانيا", "Serbia": "صربيا", "Hungary": "المجر", "Finland": "فنلندا",
-    "Ireland": "أيرلندا", "Northern-Ireland": "أيرلندا الشمالية", "Wales": "ويلز", "Iceland": "أيسلندا",
-    "Saudi-Arabia": "السعودية", "Japan": "اليابان", "South-Korea": "كوريا الجنوبية", "China": "الصين", "Qatar": "قطر",
-    "UAE": "الإمارات", "Iran": "إيران", "Iraq": "العراق", "Uzbekistan": "أوزبكستان", "Australia": "أستراليا",
-    "Jordan": "الأردن", "Syria": "سوريا", "Lebanon": "لبنان", "Oman": "عمان", "Kuwait": "الكويت", "Bahrain": "البحرين",
-    "India": "الهند", "Palestine": "فلسطين",
-    "Egypt": "مصر", "Morocco": "المغرب", "Tunisia": "تونس", "Algeria": "الجزائر", "Nigeria": "نيجيريا",
-    "Senegal": "السنغال", "Ghana": "غانا", "Ivory-Coast": "ساحل العاج", "Cameroon": "الكاميرون", "South-Africa": "جنوب أفريقيا",
-    "Sudan": "السودان", "Libya": "ليبيا",
-    "USA": "أمريكا", "Mexico": "المكسيك", "Canada": "كندا", "Costa-Rica": "كوستاريكا",
-    "Brazil": "البرازيل", "Argentina": "الأرجنتين", "Colombia": "كولومبيا", "Chile": "تشيلي",
-    "Uruguay": "أوروغواي", "Peru": "بيرو", "Ecuador": "الإكوادور", "Paraguay": "باراغواي", "Venezuela": "فنزويلا", "Bolivia": "بوليفيا"
-};
-
 const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "North America", "Oceania", "Other"];
 const WORLD_LEAGUES_KEYWORDS = ["world", "uefa", "champions league", "europa", "copa libertadores", "copa sudamericana", "caf champions", "afc champions", "conmebol", "concacaf"];
 
@@ -116,22 +93,15 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> }>({ leagues: new Map(), countries: new Map(), continents: new Map() });
 
     const getName = useCallback((type: 'league' | 'country' | 'continent', id: string | number, defaultName: string) => {
-        const key = `${type}s` as keyof typeof customNames;
-        const map = customNames[key] as Map<string|number, string>;
-        
         // Prioritize custom name from Firestore
-        const customName = map?.get(id);
-        if (customName) {
-            return customName;
-        }
-        
+        const firestoreMap = customNames[type === 'league' ? 'leagues' : type === 'country' ? 'countries' : 'continents'];
+        const customName = firestoreMap?.get(id as any);
+        if (customName) return customName;
+
         // Fallback to hardcoded translations
-        if (type === 'continent' && defaultContinentTranslations[defaultName]) {
-            return defaultContinentTranslations[defaultName];
-        }
-        if (type === 'country' && defaultCountryTranslations[defaultName]) {
-            return defaultCountryTranslations[defaultName];
-        }
+        const hardcodedMap = hardcodedTranslations[type === 'league' ? 'leagues' : type === 'country' ? 'countries' : 'continents'];
+        const hardcodedName = hardcodedMap[id as any];
+        if(hardcodedName) return hardcodedName;
 
         // Return the original default name if no translation found
         return defaultName;
@@ -457,7 +427,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 isOpen={!!renameItem}
                 onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
                 item={renameItem}
-                onSave={handleSaveRename}
+                onSave={(type, id, newName) => handleSaveRename(type, id, newName)}
             />}
             <AddCompetitionDialog isOpen={isAddOpen} onOpenChange={setAddOpen} />
         </div>

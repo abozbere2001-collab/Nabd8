@@ -25,6 +25,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
 import { POPULAR_TEAMS, POPULAR_LEAGUES } from '@/lib/popular-data';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 interface TeamResult {
   team: { id: number; name: string; logo: string; national?: boolean; };
@@ -154,8 +155,17 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   }, [db, isAdmin]);
 
   const getDisplayName = useCallback((type: 'team' | 'league', id: number, defaultName: string) => {
-      const key = `${type}s` as 'teams' | 'leagues';
-      return customNames[key]?.get(id) || defaultName;
+      // Prioritize custom name from Firestore
+      const firestoreMap = type === 'team' ? customNames.teams : customNames.leagues;
+      const customName = firestoreMap.get(id);
+      if (customName) return customName;
+
+      // Fallback to hardcoded translations
+      const hardcodedMap = type === 'team' ? hardcodedTranslations.teams : hardcodedTranslations.leagues;
+      const hardcodedName = hardcodedMap[id];
+      if(hardcodedName) return hardcodedName;
+
+      return defaultName;
   }, [customNames]);
 
   useEffect(() => {
@@ -220,6 +230,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             const normalizedQuery = normalizeArabic(trimmedQuery);
             const customNamePromises: Promise<void>[] = [];
 
+            // Search Firestore custom names
             customNames.teams.forEach((name, id) => {
                 if (normalizeArabic(name).includes(normalizedQuery)) {
                     customNamePromises.push(fetchAndSet(id, 'team'));
@@ -230,9 +241,23 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
                     customNamePromises.push(fetchAndSet(id, 'league'));
                 }
             });
+
+            // Search hardcoded translations
+            for (const id in hardcodedTranslations.teams) {
+                const name = hardcodedTranslations.teams[id];
+                if (normalizeArabic(name).includes(normalizedQuery)) {
+                     customNamePromises.push(fetchAndSet(Number(id), 'team'));
+                }
+            }
+             for (const id in hardcodedTranslations.leagues) {
+                const name = hardcodedTranslations.leagues[id];
+                if (normalizeArabic(name).includes(normalizedQuery)) {
+                     customNamePromises.push(fetchAndSet(Number(id), 'league'));
+                }
+            }
             await Promise.all(customNamePromises);
 
-        } else {
+        } else { // English search
             const [teamsData, leaguesData] = await Promise.all([
                 fetch(`/api/football/teams?search=${trimmedQuery}`).then(res => res.json()),
                 fetch(`/api/football/leagues?search=${trimmedQuery}`).then(res => res.json()),
