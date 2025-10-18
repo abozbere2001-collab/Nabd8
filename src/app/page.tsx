@@ -13,6 +13,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 
 export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'AllCompetitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'PlayerDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails' | 'NotificationSettings' | 'GeneralSettings' | 'ManagePinnedMatch' | 'PrivacyPolicy' | 'TermsOfService' | 'Welcome' | 'FavoriteSelection' | 'GoPro';
 
@@ -23,6 +24,15 @@ export type ScreenProps = {
 };
 
 const HAS_SEEN_WELCOME_KEY = 'goalstack_has_seen_welcome';
+
+const LoadingSplashScreen = () => (
+    <div className="flex flex-col items-center justify-center h-screen bg-background text-center">
+        <NabdAlMalaebLogo className="h-24 w-24 mb-4" />
+        <h1 className="text-2xl font-bold font-headline mb-8">نبض الملاعب</h1>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+);
+
 
 const AppFlow = () => {
     const { user, isUserLoading } = useUser();
@@ -46,7 +56,6 @@ const AppFlow = () => {
                 return;
             }
             
-            // User is logged in, check if they completed favorite selection
             if (!db) return;
             const userDocRef = doc(db, 'users', user.uid);
             try {
@@ -59,13 +68,12 @@ const AppFlow = () => {
                         setFlowState('favorite_selection');
                     }
                 } else {
-                    // User doc might not be created yet, show selection screen as fallback
                     setFlowState('favorite_selection');
                 }
             } catch (error) {
                  const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
                  errorEmitter.emit('permission-error', permissionError);
-                 setFlowState('app'); // Fail gracefully to app
+                 setFlowState('app');
             }
         };
 
@@ -75,9 +83,7 @@ const AppFlow = () => {
 
     const handleWelcomeComplete = () => {
         localStorage.setItem(HAS_SEEN_WELCOME_KEY, 'true');
-        // After welcome, the user is either logged in or needs to log in.
-        // The useEffect will re-evaluate and move to 'favorite_selection' or 'login'.
-        setFlowState('loading'); // Re-trigger useEffect
+        setFlowState('loading'); 
     }
 
     const handleFavoriteSelectionComplete = async () => {
@@ -89,17 +95,13 @@ const AppFlow = () => {
         } catch (error) {
             const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { onboardingComplete: true } });
             errorEmitter.emit('permission-error', permissionError);
-            setFlowState('app'); // Fail gracefully
+            setFlowState('app'); 
         }
     };
     
     switch (flowState) {
         case 'loading':
-             return (
-                <div className="flex items-center justify-center h-screen bg-background">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            );
+             return <LoadingSplashScreen />;
         case 'welcome':
             return <WelcomeScreen onOnboardingComplete={handleWelcomeComplete} />;
         case 'login':
@@ -113,11 +115,7 @@ const AppFlow = () => {
                 </AdProvider>
             );
         default:
-             return (
-                <div className="flex items-center justify-center h-screen bg-background">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            );
+             return <LoadingSplashScreen />;
     }
 };
 

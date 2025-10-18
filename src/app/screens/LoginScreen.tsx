@@ -42,7 +42,6 @@ export function LoginScreen({ goBack }: ScreenProps) {
       if (user) {
         await handleNewUser(user, db);
       }
-      // The onAuthStateChanged listener in the provider will handle app state change.
     } catch (e: any) {
       handleAuthError(e);
     } finally {
@@ -52,7 +51,6 @@ export function LoginScreen({ goBack }: ScreenProps) {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title="تسجيل الدخول" onBack={goBack} canGoBack={false} />
       <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
         {error && (
           <Alert variant="destructive" className="mb-6 text-right">
@@ -62,8 +60,8 @@ export function LoginScreen({ goBack }: ScreenProps) {
           </Alert>
         )}
         
-        <NabdAlMalaebLogo className="h-24 w-24 mb-8" />
-        <h1 className="text-2xl font-bold mb-2">مرحباً بك في نبض الملاعب</h1>
+        <NabdAlMalaebLogo className="h-24 w-24 mb-4" />
+        <h1 className="text-3xl font-bold mb-2 font-headline">مرحباً بك مجدداً</h1>
         <p className="text-muted-foreground mb-8">سجل دخولك باستخدام جوجل للمتابعة.</p>
         
         <div className="w-full max-w-xs space-y-4">

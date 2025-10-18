@@ -3,6 +3,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { NabdAlMalaebLogo } from './icons/NabdAlMalaebLogo';
 
 interface ScreenHeaderProps {
   title: string;
@@ -31,11 +32,13 @@ export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActio
             <ArrowLeft className="h-4 w-4" />
             </Button>
         )}
-         <div className='font-bold text-md px-2'>{title}</div>
+         {/* Title is passed for data-id but not rendered if it's "المزيد" etc to avoid crowding */}
+         {(title && title !== "المزيد" && title !== "أخبار" && title !== "اختياراتي" && title !== "العراق") && <div className='font-bold text-md px-2'>{title}</div>}
       </div>
 
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1">
-        {secondaryActions}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+        <NabdAlMalaebLogo className="h-6" />
+        <span className="font-bold text-sm font-headline">نبض الملاعب</span>
       </div>
       <div data-id="screen-header-actions" className="flex items-center gap-1">
         {actions}
