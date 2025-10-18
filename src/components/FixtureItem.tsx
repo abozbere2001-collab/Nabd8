@@ -9,22 +9,22 @@ import { useAdmin } from '@/firebase/provider';
 import { LiveMatchStatus } from './LiveMatchStatus';
 
 const HomeTeamDisplay = ({ team }: { team: FixtureType['teams']['home'] }) => (
-    <div className="flex items-center justify-end gap-2">
-        <span className="font-semibold text-xs truncate text-right flex-1">{team.name}</span>
-        <Avatar className={'h-6 w-6 flex-shrink-0'}>
+    <div className="flex flex-col items-center gap-1 flex-1 truncate">
+        <Avatar className={'h-8 w-8 flex-shrink-0'}>
             <AvatarImage src={team.logo} alt={team.name} />
             <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
         </Avatar>
+        <span className="font-semibold text-xs truncate text-center w-full">{team.name}</span>
     </div>
 );
 
 const AwayTeamDisplay = ({ team }: { team: FixtureType['teams']['away'] }) => (
-    <div className="flex items-center justify-start gap-2">
-        <Avatar className={'h-6 w-6 flex-shrink-0'}>
+    <div className="flex flex-col items-center gap-1 flex-1 truncate">
+        <Avatar className={'h-8 w-8 flex-shrink-0'}>
             <AvatarImage src={team.logo} alt={team.name} />
             <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
         </Avatar>
-        <span className="font-semibold text-xs truncate text-left flex-1">{team.name}</span>
+        <span className="font-semibold text-xs truncate text-center w-full">{team.name}</span>
     </div>
 );
 
@@ -38,12 +38,12 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled }: {
         className="relative rounded-lg bg-card border text-sm transition-all duration-300 flex flex-col justify-between"
       >
         <div
-            className="flex-1 p-2 cursor-pointer"
+            className="flex-1 p-3 cursor-pointer"
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
-         <main className="grid grid-cols-[1fr_auto_1fr] items-center justify-between gap-2">
+         <main className="flex items-start justify-between gap-2">
             <HomeTeamDisplay team={fixture.teams.home} />
-            <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
+            <div className="flex flex-col items-center justify-center min-w-[70px] pt-1 text-center">
                 <LiveMatchStatus fixture={fixture} />
             </div>
             <AwayTeamDisplay team={fixture.teams.away} />
