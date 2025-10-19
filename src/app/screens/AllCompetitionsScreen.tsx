@@ -171,11 +171,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const handleFavorite = useCallback((type: 'star' | 'heart', item: ManagedCompetitionType) => {
         const itemId = item.leagueId;
-        const isStar = type === 'star';
         
-        const newFavorites = { ...favorites };
+        const currentFavorites = favorites;
+        const newFavorites = { ...currentFavorites };
 
-        if (isStar) {
+        if (type === 'star') {
             if (!newFavorites.leagues) newFavorites.leagues = {};
             const isFavorited = !!newFavorites.leagues?.[itemId];
             if (isFavorited) {
@@ -187,7 +187,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     logo: item.logo
                 };
             }
-        } else { // Heart
+        } else { // Heart for "Our League"
             const isOurLeague = newFavorites.ourLeagueId === itemId;
             if (isOurLeague) {
                 delete newFavorites.ourLeagueId;
@@ -196,37 +196,35 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
         }
         
-        setFavorites(newFavorites);
+        setFavorites(newFavorites); // Optimistic update
 
         if (user && db) {
             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
             let updateData: any;
-            if(isStar) {
-                const fieldPath = `leagues.${itemId}`;
-                const isFavorited = !!favorites.leagues?.[itemId];
-                if(isFavorited) { // It was already favorited, so this action is to unfavorite
-                     updateData = { [fieldPath]: deleteField() };
-                } else {
-                     updateData = { leagues: { [itemId]: { name: item.name, logo: item.logo, leagueId: itemId } } };
+            if (type === 'star') {
+                const isFavorited = !!currentFavorites.leagues?.[itemId];
+                if (isFavorited) { // Action is to unfavorite
+                     updateData = { [`leagues.${itemId}`]: deleteField() };
+                } else { // Action is to favorite
+                     updateData = { leagues: { ...currentFavorites.leagues, [itemId]: { name: item.name, logo: item.logo, leagueId: itemId } } };
                 }
-            } else {
-                const isOurLeague = favorites.ourLeagueId === itemId;
-                if(isOurLeague) { // This action is to un-select
+            } else { // Heart
+                const isOurLeague = currentFavorites.ourLeagueId === itemId;
+                if (isOurLeague) { // Action is to deselect
                     updateData = { ourLeagueId: deleteField() };
-                } else {
+                } else { // Action is to select
                     updateData = { ourLeagueId: itemId };
                 }
             }
 
             setDoc(favRef, updateData, { merge: true }).catch(serverError => {
+                setFavorites(currentFavorites); // Revert on error
                 const permissionError = new FirestorePermissionError({
                     path: favRef.path,
                     operation: 'update',
                     requestResourceData: updateData
                 });
                 errorEmitter.emit('permission-error', permissionError);
-                // Revert optimistic update on error
-                setFavorites(favorites);
             });
         } else {
             // Guest user, save to local storage
@@ -386,9 +384,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                             <ul className="flex flex-col">{
                                                 (content.leagues as ManagedCompetitionType[]).map(comp => 
                                                     <li key={comp.leagueId} 
-                                                        className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
+                                                        className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group"
                                                     >
-                                                        <div className="flex items-center gap-3 flex-1 min-w-0" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
+                                                        <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
                                                             <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
                                                             <span className="text-sm truncate">{comp.name}</span>
                                                         </div>
@@ -473,5 +471,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
+    
+
 
     

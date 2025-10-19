@@ -243,20 +243,22 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     fetchData();
   }, [leagueId, initialTitle, season, fetchAllCustomNames]);
 
+  const firstUpcomingMatchIndex = useMemo(() => {
+    return fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
+  }, [fixtures]);
+
   useEffect(() => {
-    if (!loading && fixtures.length > 0 && fixturesListRef.current) {
-        const firstUpcomingIndex = fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
-        if (firstUpcomingIndex !== -1 && firstUpcomingMatchRef.current) {
-            setTimeout(() => {
-                if (firstUpcomingMatchRef.current && fixturesListRef.current) {
-                    const listTop = fixturesListRef.current.offsetTop;
-                    const itemTop = firstUpcomingMatchRef.current.offsetTop;
-                    fixturesListRef.current.scrollTop = itemTop - listTop;
-                }
-            }, 300);
-        }
+    if (!loading && fixtures.length > 0 && fixturesListRef.current && firstUpcomingMatchIndex !== -1) {
+        setTimeout(() => {
+            const itemElement = fixturesListRef.current?.children[firstUpcomingMatchIndex] as HTMLDivElement;
+            if (itemElement && fixturesListRef.current) {
+                const listTop = fixturesListRef.current.offsetTop;
+                const itemTop = itemElement.offsetTop;
+                fixturesListRef.current.scrollTop = itemTop - listTop;
+            }
+        }, 300);
     }
-  }, [loading, fixtures]);
+  }, [loading, fixtures, firstUpcomingMatchIndex]);
 
   const handleFavorite = (type: 'league' | 'team' | 'player', item: any) => {
     if (!user || !db) return;
@@ -426,9 +428,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 
-  const firstUpcomingMatchIndex = useMemo(() => {
-    return fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
-  }, [fixtures]);
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -446,10 +445,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
              <div className="bg-card rounded-b-lg border-x border-b shadow-md">
               <SeasonSelector season={season} onSeasonChange={setSeason} isAdmin={isAdmin} />
               <TabsList className="grid w-full grid-cols-4 rounded-none h-12 p-0 bg-transparent">
-                <TabsTrigger value="matches" className='rounded-none data-[state=active]:shadow-none'>المباريات</TabsTrigger>
-                <TabsTrigger value="standings" className='rounded-none data-[state=active]:shadow-none'>الترتيب</TabsTrigger>
-                <TabsTrigger value="scorers" className='rounded-none data-[state=active]:shadow-none'>الهدافين</TabsTrigger>
-                <TabsTrigger value="teams" className='rounded-none data-[state=active]:shadow-none'>الفرق</TabsTrigger>
+                <TabsTrigger value="matches">المباريات</TabsTrigger>
+                <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                <TabsTrigger value="scorers">الهدافين</TabsTrigger>
+                <TabsTrigger value="teams">الفرق</TabsTrigger>
               </TabsList>
              </div>
           </div>
@@ -462,7 +461,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 ) : fixtures.length > 0 ? (
                     <div className="space-y-3 p-1">
                         {fixtures.map((fixture, index) => (
-                           <div key={fixture.fixture.id} ref={index === firstUpcomingMatchIndex ? firstUpcomingMatchRef : null}>
+                           <div key={fixture.fixture.id}>
                                 <FixtureItem fixture={fixture} navigate={navigate} />
                            </div>
                         ))}
@@ -571,7 +570,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
                     {teams.map(({ team }) => {
                         const displayName = getDisplayName('team', team.id, team.name);
-                        const isFavoritedTeam = !!favorites?.teams?.[team.id];
+                        const isOurBallTeam = !!favorites?.ourBallTeams?.[team.id];
                         return (
                         <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
                             <div className='relative'>
@@ -588,8 +587,14 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team)}}>
                                     <Pencil className="h-4 w-4 text-muted-foreground" />
                                 </Button>}
-                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('team', {...team, name: displayName});}}>
-                                    <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {
+                                    e.stopPropagation();
+                                    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+                                    const fieldPath = `ourBallTeams.${team.id}`;
+                                    const updateData = isOurBallTeam ? { [fieldPath]: deleteField() } : { [fieldPath]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
+                                    setDoc(favRef, updateData, { merge: true }).catch(err => console.error(err));
+                                }}>
+                                    <Heart className={cn("h-5 w-5", isOurBallTeam ? "text-red-500 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
                             </div>
                         </div>
@@ -608,3 +613,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
     
 
+
+
+    

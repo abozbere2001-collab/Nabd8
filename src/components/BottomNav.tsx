@@ -94,3 +94,5 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
     </div>
   );
 }
+
+    
