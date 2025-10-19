@@ -8,6 +8,8 @@ import {
   signInWithPopup,
   updateProfile,
   type User, 
+  linkWithCredential,
+  signInAnonymously as firebaseSignInAnonymously
 } from "firebase/auth";
 import { doc, setDoc, getDoc, Firestore, writeBatch } from 'firebase/firestore';
 import type { UserProfile, UserScore, Favorites } from './types';
@@ -31,7 +33,7 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
                 photoURL: photoURL,
                 isProUser: false,
                 isAnonymous: user.isAnonymous,
-                onboardingComplete: false, // Onboarding is not complete on initial creation
+                onboardingComplete: false,
             };
 
             const leaderboardEntry: UserScore = {
@@ -65,8 +67,8 @@ export const signInWithGoogle = async (): Promise<User> => {
 
     // --- Data Migration Logic ---
     const localFavorites = getLocalFavorites();
-    if (db && (localFavorites.teams || localFavorites.leagues)) {
-        await handleNewUser(user, db); // Ensure user doc exists
+    if (db && (Object.keys(localFavorites.teams || {}).length > 0 || Object.keys(localFavorites.leagues || {}).length > 0)) {
+        await handleNewUser(user, db); 
         
         const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
         
@@ -86,7 +88,7 @@ export const signInWithGoogle = async (): Promise<User> => {
 
             await setDoc(favRef, dataToSet, { merge: true });
 
-            clearLocalFavorites(); // Clear local data after successful migration
+            clearLocalFavorites();
         } catch (error) {
             const permissionError = new FirestorePermissionError({
               path: favRef.path,
@@ -94,13 +96,11 @@ export const signInWithGoogle = async (): Promise<User> => {
               requestResourceData: localFavorites,
             });
             errorEmitter.emit('permission-error', permissionError);
-            // We don't clear local favorites if migration fails
         }
     } else if (db) {
          await handleNewUser(user, db);
     }
-    // -------------------------
-
+    
     return user;
 };
 
@@ -113,13 +113,11 @@ export const signOut = (): Promise<void> => {
 export const updateUserDisplayName = async (user: User, newDisplayName: string): Promise<void> => {
     if (!user) throw new Error("User not authenticated.");
 
-    // Update Firebase Auth profile first
     await updateProfile(user, { displayName: newDisplayName });
 
     const userRef = doc(db, 'users', user.uid);
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
     
-    // Update users collection
     const userProfileUpdateData = { displayName: newDisplayName };
     setDoc(userRef, userProfileUpdateData, { merge: true })
         .catch((serverError) => {
@@ -131,7 +129,6 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
             errorEmitter.emit('permission-error', permissionError);
         });
 
-    // Update leaderboard collection
     const leaderboardUpdateData = { userName: newDisplayName };
     setDoc(leaderboardRef, leaderboardUpdateData, { merge: true })
         .catch((serverError) => {

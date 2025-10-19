@@ -315,9 +315,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
         let rawFixtures: FixtureType[] = data.response || [];
 
-        // If user has no favorites, show popular leagues by default on 'my-results'
-        const favs = user ? favorites : getLocalFavorites();
-        const hasFavs = (favs?.teams && Object.keys(favs.teams).length > 0) || (favs?.leagues && Object.keys(favs.leagues).length > 0);
+        // If user has no favorites (guest or registered), show popular leagues by default on 'my-results'
+        const currentFavorites = user ? favorites : getLocalFavorites();
+        const hasFavs = (currentFavorites?.teams && Object.keys(currentFavorites.teams).length > 0) || (currentFavorites?.leagues && Object.keys(currentFavorites.leagues).length > 0);
         
         if (activeTab === 'my-results' && !hasFavs) {
             rawFixtures = rawFixtures.filter(f => popularLeagueIds.has(f.league.id));
@@ -412,7 +412,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const handleTabChange = (value: string) => {
     const tabValue = value as TabName;
     setActiveTab(tabValue);
-    // If switching to a matches tab and there's no data, trigger a fetch.
     if ((tabValue === 'my-results' || tabValue === 'all-matches') && selectedDateKey && !matchesCache.has(selectedDateKey)) {
         const controller = new AbortController();
         fetchAndProcessData(selectedDateKey, controller.signal);
@@ -491,4 +490,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-

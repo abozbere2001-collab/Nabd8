@@ -54,7 +54,8 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
   const [selectedLeagues, setSelectedLeagues] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    // Pre-populate selections from local storage if they exist
+    // This component is now used for both guests and new registered users.
+    // For registered users, local favorites might exist if they used the app as a guest first.
     const localFavs = getLocalFavorites();
     if (localFavs.teams) {
       setSelectedTeams(new Set(Object.keys(localFavs.teams).map(Number)));
@@ -78,21 +79,14 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
   }, []);
   
   const handleContinue = async () => {
-    if (!user || !db) {
-        onOnboardingComplete(); // Should not happen in this flow, but as a fallback
-        return;
-    };
-    
-    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    const favoritesData: Partial<Favorites> = {
-        userId: user.uid,
+    const favoritesToSave: Partial<Favorites> = {
         teams: {},
         leagues: {}
     };
 
     POPULAR_TEAMS.forEach(team => {
-        if (selectedTeams.has(team.id) && favoritesData.teams) {
-            favoritesData.teams[team.id] = {
+        if (selectedTeams.has(team.id) && favoritesToSave.teams) {
+            favoritesToSave.teams[team.id] = {
                 teamId: team.id,
                 name: team.name,
                 logo: team.logo,
@@ -102,29 +96,35 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
     });
 
     POPULAR_LEAGUES.forEach(league => {
-        if (selectedLeagues.has(league.id) && favoritesData.leagues) {
-            favoritesData.leagues[league.id] = {
+        if (selectedLeagues.has(league.id) && favoritesToSave.leagues) {
+            favoritesToSave.leagues[league.id] = {
                 leagueId: league.id,
                 name: league.name,
                 logo: league.logo,
             };
         }
     });
-
-    try {
-        await setDoc(favRef, favoritesData, { merge: true });
-        // Clear local favorites as they are now migrated
-        clearLocalFavorites();
-    } catch (error) {
-         const permissionError = new FirestorePermissionError({
-            path: favRef.path,
-            operation: 'create',
-            requestResourceData: favoritesData
-        });
-        errorEmitter.emit('permission-error', permissionError);
-    } finally {
-        onOnboardingComplete();
+    
+    if (user && db) {
+        // Registered user: save to Firestore
+        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        try {
+            await setDoc(favRef, { ...favoritesToSave, userId: user.uid }, { merge: true });
+            clearLocalFavorites();
+        } catch (error) {
+             const permissionError = new FirestorePermissionError({
+                path: favRef.path,
+                operation: 'create',
+                requestResourceData: favoritesToSave
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    } else {
+        // Guest user: save to localStorage
+        setLocalFavorites(favoritesToSave);
     }
+    
+    onOnboardingComplete();
   };
 
   return (
