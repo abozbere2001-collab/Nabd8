@@ -48,7 +48,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             setCustomNames({ leagues: leagueNames, teams: teamNames });
 
         } catch (error) {
-            console.warn("Could not fetch custom names. This may be expected for guests.", error);
+            // This is expected for guests or users without permissions
         }
     }, [db]);
 
@@ -70,25 +70,32 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         setLoading(true);
         fetchAllCustomNames();
         
+        let unsubscribe: (() => void) | null = null;
+        
         if (user && db) {
             const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const unsubscribe = onSnapshot(docRef, (doc) => {
+            unsubscribe = onSnapshot(docRef, (doc) => {
                 const favs = (doc.data() as Favorites) || { userId: user.uid };
                 setFavorites(favs);
                 setLoading(false);
             }, (error) => {
-                if (user) {
+                 if (user && error.code === 'permission-denied') {
+                    setFavorites(getLocalFavorites());
+                } else if(user) {
                   const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
                   errorEmitter.emit('permission-error', permissionError);
                 }
                 setLoading(false);
             });
-            return () => unsubscribe();
         } else {
             // Guest user, read from local storage
             setFavorites(getLocalFavorites());
             setLoading(false);
         }
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
     }, [user, db, fetchAllCustomNames]);
 
 
