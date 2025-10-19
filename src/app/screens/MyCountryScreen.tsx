@@ -35,6 +35,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { isMatchLive } from '@/lib/matchStatus';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
+import { cn } from '@/lib/utils';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 const IRAQI_LEAGUE_ID = 542;
 
@@ -300,37 +302,89 @@ function OurLeagueTab({
     );
 }
 
-function OurBallTab({ navigate, ourBallTeams }: { navigate: ScreenProps['navigate'], ourBallTeams: Team[] }) {
-    const { user, db } = useAuth();
-    const { toast } = useToast();
-    const [deletingId, setDeletingId] = useState<number | null>(null);
+const TeamFixturesList = ({ teamId, navigate }: { teamId: number; navigate: ScreenProps['navigate'] }) => {
+    const [fixtures, setFixtures] = useState<Fixture[]>([]);
+    const [loading, setLoading] = useState(true);
+    const listRef = useRef<HTMLDivElement>(null);
+    const firstUpcomingMatchRef = useRef<HTMLDivElement>(null);
 
-    const handleDelete = (teamId: number) => {
-        if (deletingId) return;
-        setDeletingId(teamId);
-
-        if (user && db) {
-            const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const updateData = { [`ourBallTeams.${teamId}`]: deleteField() };
-            updateDoc(docRef, updateData)
-                .catch(error => {
-                    const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: updateData });
-                    errorEmitter.emit('permission-error', permissionError);
-                    toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الفريق.' });
-                })
-                .finally(() => {
-                    setDeletingId(null);
-                });
-        } else {
-            const currentFavorites = getLocalFavorites();
-            if (currentFavorites.ourBallTeams) {
-                delete currentFavorites.ourBallTeams[teamId];
-                setLocalFavorites(currentFavorites);
-            }
-            setDeletingId(null);
+    useEffect(() => {
+        if (!teamId) {
+            setFixtures([]);
+            setLoading(false);
+            return;
         }
-    };
+        
+        setLoading(true);
+        const fetchFixtures = async () => {
+            try {
+                const res = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
+                const data = await res.json();
+                const sortedFixtures = (data.response || []).sort((a: Fixture, b: Fixture) => a.fixture.timestamp - b.fixture.timestamp);
+                setFixtures(sortedFixtures);
+            } catch (error) {
+                console.error("Error fetching fixtures:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchFixtures();
+    }, [teamId]);
     
+    useEffect(() => {
+        if (!loading && fixtures.length > 0 && listRef.current) {
+            const firstUpcomingIndex = fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
+            if (firstUpcomingIndex !== -1 && firstUpcomingMatchRef.current) {
+                setTimeout(() => {
+                    if (firstUpcomingMatchRef.current && listRef.current) {
+                        const listTop = listRef.current.offsetTop;
+                        const itemTop = firstUpcomingMatchRef.current.offsetTop;
+                        listRef.current.scrollTop = itemTop - listTop;
+                    }
+                }, 100);
+            }
+        }
+    }, [loading, fixtures]);
+    
+    if(loading) {
+        return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>;
+    }
+    
+    if(fixtures.length === 0) {
+        return <p className="text-center text-muted-foreground p-8">لا توجد مباريات متاحة لهذا الفريق.</p>
+    }
+
+    return (
+        <div ref={listRef} className="h-full overflow-y-auto space-y-3 px-4 pb-4">
+            {fixtures.map((fixture, index) => {
+                const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || new Date(fixture.fixture.timestamp * 1000) > new Date();
+                const isFirstUpcoming = isUpcomingOrLive && !fixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
+                            
+                return (
+                    <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
+                        <FixtureItem fixture={fixture} navigate={navigate} />
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
+
+function OurBallTab({ navigate, ourBallTeams, user, db }: { navigate: ScreenProps['navigate'], ourBallTeams: Team[], user: any, db: any }) {
+    const { toast } = useToast();
+    const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (ourBallTeams.length > 0 && !selectedTeamId) {
+            setSelectedTeamId(ourBallTeams[0].id);
+        } else if (ourBallTeams.length === 0) {
+            setSelectedTeamId(null);
+        }
+    }, [ourBallTeams, selectedTeamId]);
+    
+
     if (ourBallTeams.length === 0) {
         return (
             <div className="text-center text-muted-foreground py-10 px-4">
@@ -340,45 +394,36 @@ function OurBallTab({ navigate, ourBallTeams }: { navigate: ScreenProps['navigat
             </div>
         );
     }
-
+    
     return (
-        <div className="space-y-3 pt-4">
-            {ourBallTeams.map((team, index) => {
-                return (
-                    <div key={`${team.id}-${index}`} className="p-3 rounded-lg border bg-card flex items-center gap-3 h-16">
-                        <div onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: team.id, teamName: team.name })} className="flex-1 flex items-center gap-3 cursor-pointer">
-                            <Avatar className="h-10 w-10">
-                                <AvatarImage src={team.logo} alt={team.name} />
+        <div className="flex flex-col h-full pt-4">
+            <ScrollArea className="w-full whitespace-nowrap border-b">
+                <div className="flex w-max space-x-4 px-4 pb-3 flex-row-reverse">
+                    {ourBallTeams.map((team, index) => (
+                        <div
+                            key={`${team.id}-${index}`}
+                            className={cn(
+                                "flex flex-col items-center gap-1 w-16 text-center cursor-pointer transition-opacity opacity-60",
+                                selectedTeamId === team.id && "opacity-100"
+                            )}
+                            onClick={() => setSelectedTeamId(team.id)}
+                        >
+                            <Avatar className={cn(
+                                "h-12 w-12 border-2",
+                                selectedTeamId === team.id ? "border-primary" : "border-border"
+                            )}>
+                                <AvatarImage src={team.logo} />
                                 <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
                             </Avatar>
-                            <div>
-                                <p className="font-bold">{team.name}</p>
-                            </div>
+                            <span className="text-xs font-medium truncate w-full">{team.name}</span>
                         </div>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" disabled={deletingId === team.id} onClick={(e) => e.stopPropagation()}>
-                                    {deletingId === team.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        سيتم حذف فريق "{team.name}" من قائمة "كرتنا".
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(team.id)} className="bg-destructive hover:bg-destructive/90">
-                                        حذف
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </div>
-                );
-            })}
+                    ))}
+                </div>
+                 <ScrollBar orientation="horizontal" className="h-1.5" />
+            </ScrollArea>
+             <div className="flex-1 overflow-y-auto mt-4">
+                {selectedTeamId && <TeamFixturesList teamId={selectedTeamId} navigate={navigate} />}
+             </div>
         </div>
     );
 }
@@ -394,31 +439,43 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     
     useEffect(() => {
         setLoading(true);
+        let unsubscribe: (() => void) | null = null;
+
         if (user && db) {
             const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const unsubscribe = onSnapshot(favsRef, (docSnap) => {
+            unsubscribe = onSnapshot(favsRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
                 setLoading(false);
             }, (error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-                setFavorites({});
+                setFavorites({}); // Fallback for permission errors
                 setLoading(false);
             });
-            return () => unsubscribe();
         } else {
             // Guest user
             setFavorites(getLocalFavorites());
             setLoading(false);
         }
+        
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+
     }, [user, db]);
 
     const ourLeagueData = useMemo(() => {
         const leagueId = favorites?.ourLeagueId;
-        const leagueDetails = favorites?.leagues?.[leagueId!];
-        if (leagueId && leagueDetails) {
+        if (!leagueId) return null;
+        
+        // Try to get details from favorites object first
+        const leagueDetails = favorites?.leagues?.[leagueId];
+        if (leagueDetails) {
             return { id: leagueId, name: leagueDetails.name, logo: leagueDetails.logo };
         }
-        return null;
+        
+        // Fallback for cases where it might just be an ID
+        return { id: leagueId, name: 'الدوري المفضل', logo: '' };
+
     }, [favorites]);
 
 
@@ -436,7 +493,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         return () => unsub();
     }, [db]);
     
-    const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}), [favorites.ourBallTeams]);
+    const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}).sort((a,b) => a.name.localeCompare(b.name)), [favorites.ourBallTeams]);
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -455,24 +512,26 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                     </div>
                 }
             />
-            <div className="flex-1 overflow-y-auto px-4">
-                {pinnedMatches.map(match => (
-                    <PinnedMatchCard
-                        key={match.id}
-                        match={match}
-                        onManage={() => navigate('ManagePinnedMatch', { matchId: match.id })}
-                        isAdmin={isAdmin}
-                    />
-                ))}
-                {isAdmin && pinnedMatches.filter(m => m.isEnabled).length === 0 && (
-                    <Button className="w-full my-2" onClick={() => navigate('ManagePinnedMatch', { matchId: null })}>
-                        <Pin className="ml-2 h-4 w-4" />
-                        إضافة مباراة للتثبيت
-                    </Button>
-                )}
+            <div className="flex-1 flex flex-col min-h-0">
+                 <div className="px-4 pt-4">
+                    {pinnedMatches.map(match => (
+                        <PinnedMatchCard
+                            key={match.id}
+                            match={match}
+                            onManage={() => navigate('ManagePinnedMatch', { matchId: match.id })}
+                            isAdmin={isAdmin}
+                        />
+                    ))}
+                    {isAdmin && pinnedMatches.filter(m => m.isEnabled).length === 0 && (
+                        <Button className="w-full mb-2" onClick={() => navigate('ManagePinnedMatch', { matchId: null })}>
+                            <Pin className="ml-2 h-4 w-4" />
+                            إضافة مباراة للتثبيت
+                        </Button>
+                    )}
+                 </div>
 
-                <Tabs defaultValue="our-league" className="w-full">
-                    <div className="sticky top-0 bg-background z-10 px-1 pt-1 -mx-4">
+                <Tabs defaultValue="our-ball" className="w-full flex-1 flex flex-col min-h-0">
+                    <div className="sticky top-0 bg-background z-10 px-1 pt-1">
                         <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
                             <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-11 bg-transparent p-0">
                                 <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
@@ -480,7 +539,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                             </TabsList>
                         </div>
                     </div>
-                    <TabsContent value="our-league" className="pt-4">
+                    <TabsContent value="our-league" className="pt-4 px-4 flex-1">
                         {loading ? (
                              <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
                         ) : (
@@ -490,11 +549,11 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                             />
                         )}
                     </TabsContent>
-                    <TabsContent value="our-ball" className="pt-0">
+                    <TabsContent value="our-ball" className="pt-0 flex-1 flex flex-col min-h-0">
                          {loading ? (
                              <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
                          ) : (
-                            <OurBallTab navigate={navigate} ourBallTeams={ourBallTeams} />
+                            <OurBallTab navigate={navigate} ourBallTeams={ourBallTeams} user={user} db={db} />
                          )}
                     </TabsContent>
                 </Tabs>
