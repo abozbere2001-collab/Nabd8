@@ -8,9 +8,14 @@ import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/firebase-client';
-import type { ScreenProps } from '@/app/page';
 
-export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+interface LoginScreenProps {
+  onLoginSuccess: () => void;
+  goBack: () => void;
+  canGoBack: boolean;
+}
+
+export function LoginScreen({ onLoginSuccess, goBack, canGoBack }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +39,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     try {
       await signInWithGoogle();
       // Auth state listener in AppFlow will handle navigation.
+      onLoginSuccess();
     } catch (e: any) {
       handleAuthError(e);
     }

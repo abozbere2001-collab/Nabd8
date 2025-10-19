@@ -99,7 +99,7 @@ const AppFlow = () => {
         setFlowState('app');
     };
     
-    const handleWelcomeChoice = (choice: 'google' | 'guest') => {
+    const handleWelcomeChoice = (choice: 'login' | 'guest') => {
         if (choice === 'guest') {
              setFlowState('favorite_selection');
         } else {
@@ -107,8 +107,12 @@ const AppFlow = () => {
         }
     };
 
-    const goBackToApp = () => {
-        setFlowState('app');
+    const handleLoginSuccess = () => {
+        setFlowState('loading'); // Will trigger re-check in useEffect
+    }
+
+    const goBackToWelcome = () => {
+        setFlowState('welcome');
     }
     
     switch (flowState) {
@@ -117,7 +121,7 @@ const AppFlow = () => {
         case 'welcome':
             return <WelcomeScreen onChoice={handleWelcomeChoice} />;
         case 'login':
-            return <LoginScreen navigate={() => {}} goBack={goBackToApp} canGoBack={true} />;
+            return <LoginScreen onLoginSuccess={handleLoginSuccess} goBack={goBackToWelcome} canGoBack={true} />;
         case 'favorite_selection':
             return <FavoriteSelectionScreen onOnboardingComplete={handleOnboardingComplete} />;
         case 'app':

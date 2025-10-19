@@ -6,7 +6,7 @@ import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 
 interface WelcomeScreenProps {
-  onChoice: (choice: 'google' | 'guest') => void;
+  onChoice: (choice: 'login' | 'guest') => void;
 }
 
 export function WelcomeScreen({ onChoice }: WelcomeScreenProps) {
@@ -20,7 +20,7 @@ export function WelcomeScreen({ onChoice }: WelcomeScreenProps) {
         
         <div className="w-full max-w-xs space-y-4">
             <Button 
-              onClick={() => onChoice('google')} 
+              onClick={() => onChoice('login')} 
               className="w-full" 
               size="lg"
             >
