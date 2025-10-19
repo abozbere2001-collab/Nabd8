@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -155,14 +156,16 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                             <ScrollBar orientation="horizontal" className="h-1.5 mt-2" />
                         </ScrollArea>
 
-                        <Tabs defaultValue="teams" className="w-full px-4">
-                             <TabsList className="grid w-full grid-cols-3 bg-card text-card-foreground h-9">
-                                <TabsTrigger value="players"><PlayerIcon className="ml-1 h-4 w-4"/>اللاعبين</TabsTrigger>
-                                <TabsTrigger value="competitions"><Trophy className="ml-1 h-4 w-4"/>البطولات</TabsTrigger>
-                                <TabsTrigger value="teams"><Users className="ml-1 h-4 w-4"/>الفرق</TabsTrigger>
-                            </TabsList>
+                        <Tabs defaultValue="teams" className="w-full px-1">
+                             <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
+                                <TabsList className="grid w-full grid-cols-3 bg-transparent h-11 p-0">
+                                    <TabsTrigger value="players" className="data-[state=active]:shadow-none"><PlayerIcon className="ml-1 h-4 w-4"/>اللاعبين</TabsTrigger>
+                                    <TabsTrigger value="competitions" className="data-[state=active]:shadow-none"><Trophy className="ml-1 h-4 w-4"/>البطولات</TabsTrigger>
+                                    <TabsTrigger value="teams" className="data-[state=active]:shadow-none"><Users className="ml-1 h-4 w-4"/>الفرق</TabsTrigger>
+                                </TabsList>
+                            </div>
                             
-                            <TabsContent value="teams" className="mt-4">
+                            <TabsContent value="teams" className="mt-4 px-3">
                                 <div className="grid grid-cols-4 gap-4">
                                      <div className="h-[76px] w-full">
                                          <SearchSheet navigate={navigate} initialItemType="teams">
@@ -186,7 +189,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                 </div>
                             </TabsContent>
                             
-                            <TabsContent value="competitions" className="mt-4">
+                            <TabsContent value="competitions" className="mt-4 px-3">
                                 <div className="grid grid-cols-4 gap-4">
                                     <div className="h-[76px] w-full">
                                         <SearchSheet navigate={navigate} initialItemType="leagues">
@@ -210,7 +213,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                 </div>
                             </TabsContent>
 
-                            <TabsContent value="players" className="mt-4">
+                            <TabsContent value="players" className="mt-4 px-3">
                                 <div className="grid grid-cols-4 gap-4">
                                      <div className="h-[76px] w-full">
                                         <div className="flex flex-col items-center justify-center gap-2 text-center p-2 rounded-2xl border-2 border-dashed border-muted-foreground/50 h-full w-full cursor-pointer hover:bg-accent/50 transition-colors">

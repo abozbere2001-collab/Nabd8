@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
@@ -110,12 +111,14 @@ function OurLeagueTab({
 
     return (
         <Tabs defaultValue="matches" className="w-full">
-            <div className="sticky top-0 bg-background z-10 border-b -mx-4 px-4">
-                <TabsList className="grid w-full grid-cols-3 rounded-none h-9 p-0 border-t flex-row-reverse bg-card">
-                    <TabsTrigger value="scorers" className='rounded-none data-[state=active]:rounded-md'>الهدافين</TabsTrigger>
-                    <TabsTrigger value="standings" className='rounded-none data-[state=active]:rounded-md'>الترتيب</TabsTrigger>
-                    <TabsTrigger value="matches" className='rounded-none data-[state=active]:rounded-md'>المباريات</TabsTrigger>
-                </TabsList>
+            <div className="sticky top-0 bg-background z-10 -mx-4 px-1">
+                <div className="bg-card text-card-foreground rounded-t-lg border-x border-t shadow-md">
+                    <TabsList className="grid w-full grid-cols-3 rounded-none h-11 p-0 flex-row-reverse bg-transparent">
+                        <TabsTrigger value="scorers" className='data-[state=active]:shadow-none'>الهدافين</TabsTrigger>
+                        <TabsTrigger value="standings" className='data-[state=active]:shadow-none'>الترتيب</TabsTrigger>
+                        <TabsTrigger value="matches" className='data-[state=active]:shadow-none'>المباريات</TabsTrigger>
+                    </TabsList>
+                </div>
             </div>
             <TabsContent value="matches" className="mt-0 -mx-4">
                 <div ref={listRef} className="h-full overflow-y-auto p-4 space-y-3">
@@ -487,11 +490,13 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         )}
 
         <Tabs defaultValue="our-league" className="w-full">
-          <div className="sticky top-0 bg-background z-10">
-            <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-9 bg-card">
-              <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
-              <TabsTrigger value="our-league">دورينا</TabsTrigger>
-            </TabsList>
+          <div className="sticky top-0 bg-background z-10 px-1 pt-1">
+             <div className="bg-card text-card-foreground rounded-t-lg border-x border-t shadow-md">
+                <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-11 bg-transparent p-0">
+                  <TabsTrigger value="our-ball" className="data-[state=active]:shadow-none">كرتنا</TabsTrigger>
+                  <TabsTrigger value="our-league" className="data-[state=active]:shadow-none">دورينا</TabsTrigger>
+                </TabsList>
+             </div>
           </div>
           <TabsContent value="our-league" className="pt-0">
             <OurLeagueTab 

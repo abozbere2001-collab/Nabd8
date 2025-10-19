@@ -892,16 +892,18 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                  </AlertDialog>
 
                 <Tabs defaultValue="predictions" className="w-full">
-                    <div className="sticky top-0 bg-background z-10 border-b">
-                       <TabsList className="grid w-full grid-cols-3">
-                           <TabsTrigger value="prizes">الجوائز</TabsTrigger>
-                           <TabsTrigger value="leaderboard">الترتيب</TabsTrigger>
-                           <TabsTrigger value="predictions">التصويت</TabsTrigger>
-                       </TabsList>
+                    <div className="sticky top-0 bg-background z-10 px-1 pt-1">
+                        <div className="bg-card text-card-foreground rounded-t-lg border-x border-t shadow-md">
+                           <TabsList className="grid w-full grid-cols-3 bg-transparent p-0 h-11">
+                               <TabsTrigger value="prizes" className="data-[state=active]:shadow-none">الجوائز</TabsTrigger>
+                               <TabsTrigger value="leaderboard" className="data-[state=active]:shadow-none">الترتيب</TabsTrigger>
+                               <TabsTrigger value="predictions" className="data-[state=active]:shadow-none">التصويت</TabsTrigger>
+                           </TabsList>
+                        </div>
                     </div>
 
                     <TabsContent value="predictions" className="mt-0 space-y-6">
-                         <div className="border-b bg-card py-2">
+                         <div className="bg-card py-2 border-x border-b rounded-b-lg mb-1 mx-1 shadow-md">
                             <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
                         </div>
                         <div className="p-4 space-y-4">
