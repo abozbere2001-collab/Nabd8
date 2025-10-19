@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -155,21 +156,21 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   }, [customNames]);
 
   useEffect(() => {
-    let unsub: () => void = () => {};
-    if (user && db) {
-        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        unsub = onSnapshot(favDocRef, (doc) => {
-            setFavorites(doc.data() as Favorites || { userId: user.uid });
-        }, (error) => {
-            const permissionError = new FirestorePermissionError({
-                path: favDocRef.path,
-                operation: 'get',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        });
-    } else {
+    if (!user || !db) {
         setFavorites(getLocalFavorites());
+        return;
     }
+    const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+    const unsub = onSnapshot(favDocRef, (doc) => {
+        setFavorites(doc.data() as Favorites || { userId: user.uid });
+    }, (error) => {
+        if (error.code === 'permission-denied') return;
+        const permissionError = new FirestorePermissionError({
+            path: favDocRef.path,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
     return () => unsub();
   }, [user, db]);
 
@@ -350,7 +351,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     if (!renameItem) return;
     
     // User adding a note via heart button
-    if (type === 'team' && renameItem.originalData) {
+    if (type === 'team' && renameItem.originalData && !isAdmin) {
         const team = renameItem.originalData as Team;
         updateFavorites(team, 'heart', false, newNote);
         setRenameItem(null);
@@ -631,3 +632,4 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   );
 }
     
+
