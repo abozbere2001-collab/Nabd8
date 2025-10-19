@@ -7,7 +7,7 @@ import { Button } from './ui/button';
 import { NabdAlMalaebLogo } from './icons/NabdAlMalaebLogo';
 import { X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isToday, isBefore, addMonths, parseISO, format } from 'date-fns';
+import { isToday, isBefore, addDays, parseISO, format } from 'date-fns';
 
 // --- Ad Context ---
 interface AdContextType {
@@ -20,7 +20,7 @@ interface AdContextType {
 const AdContext = createContext<AdContextType | undefined>(undefined);
 
 const FIRST_USE_DATE_KEY = 'goalstack_first_use_date';
-const SPLASH_AD_LAST_SHOWN_KEY = 'goalstack_splash_ad_last_shown';
+const SPLASH_AD_SHOWN_SESSION_KEY = 'goalstack_splash_ad_shown_session';
 const BANNER_AD_DISMISSED_KEY = 'goalstack_banner_ad_dismissed_session';
 
 export const AdProvider = ({ children }: { children: React.ReactNode }) => {
@@ -37,11 +37,10 @@ export const AdProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const lastShownDate = localStorage.getItem(SPLASH_AD_LAST_SHOWN_KEY);
-
-    if (lastShownDate === todayStr) {
-      setShouldShowSplash(false); // Already shown today
+    // Check if splash ad has already been shown in this session
+    const splashAdShownInSession = sessionStorage.getItem(SPLASH_AD_SHOWN_SESSION_KEY) === 'true';
+    if (splashAdShownInSession) {
+      setShouldShowSplash(false);
       return;
     }
     
@@ -53,11 +52,11 @@ export const AdProvider = ({ children }: { children: React.ReactNode }) => {
       setShouldShowSplash(false);
     } else {
       const firstUseDate = parseISO(firstUseDateStr);
-      // Change addMonths to 2 to show after two months
-      const twoMonthsLater = addMonths(firstUseDate, 2);
+      // Change addMonths to addDays(5) to show after 5 days
+      const fiveDaysLater = addDays(firstUseDate, 5);
       
-      // Show the ad only if two months have passed since first use.
-      if (isBefore(new Date(), twoMonthsLater)) {
+      // Show the ad only if five days have passed since first use.
+      if (isBefore(new Date(), fiveDaysLater)) {
         setShouldShowSplash(false);
       } else {
         setShouldShowSplash(true);
@@ -67,8 +66,8 @@ export const AdProvider = ({ children }: { children: React.ReactNode }) => {
 
   const setSplashAdShown = () => {
     if (typeof window !== 'undefined') {
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
-        localStorage.setItem(SPLASH_AD_LAST_SHOWN_KEY, todayStr);
+        // Mark that the ad has been shown for this session
+        sessionStorage.setItem(SPLASH_AD_SHOWN_SESSION_KEY, 'true');
     }
     setShouldShowSplash(false);
   }
