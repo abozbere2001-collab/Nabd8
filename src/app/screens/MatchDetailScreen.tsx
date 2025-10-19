@@ -86,7 +86,7 @@ const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerTyp
 };
 
 
-const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
+const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture, navigate: ScreenProps['navigate'], customStatus: string | null }) => {
     return (
         <Card className="mb-4 bg-card/80 backdrop-blur-sm">
             <CardContent className="p-4">
@@ -103,7 +103,7 @@ const MatchHeaderCard = ({ fixture, navigate }: { fixture: Fixture, navigate: Sc
                         <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="relative flex flex-col items-center justify-center min-w-[120px] text-center">
-                        <LiveMatchStatus fixture={fixture} large />
+                        <LiveMatchStatus fixture={fixture} large customStatus={customStatus} />
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
@@ -529,6 +529,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const [loading, setLoading] = useState(!initialFixture);
     const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> }>({});
+    const [customStatus, setCustomStatus] = useState<string | null>(null);
 
     const getDisplayName = useCallback((type: 'team' | 'player' | 'league' | 'coach', id: number, defaultName: string) => {
       const firestoreMap = customNames[type];
@@ -666,7 +667,20 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         fetchAndApplyNames().then(() => fetchData(true));
     }, [fixtureId, db, fetchData]);
 
+    useEffect(() => {
+        if (!db || !fixtureId) return;
 
+        const customStatusRef = doc(db, 'matchCustomizations', String(fixtureId));
+        const unsub = onSnapshot(customStatusRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setCustomStatus(docSnap.data().customStatus);
+            } else {
+                setCustomStatus(null);
+            }
+        });
+        return () => unsub();
+
+    }, [db, fixtureId]);
     
     const handleOpenRename = (type: RenameType, id: number, name: string, originalName?: string) => {
         setRenameItem({ type, id, name, originalName: originalName || name });
@@ -703,6 +717,24 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         setRenameItem(null);
     };
 
+     const handleSaveStatus = (newName: string) => {
+        if(!db) return;
+        const docRef = doc(db, 'matchCustomizations', String(fixtureId));
+        const data = { customStatus: newName };
+        if(newName && newName.trim().length > 0) {
+             setDoc(docRef, data, { merge: true }).catch(err => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
+                errorEmitter.emit('permission-error', permissionError);
+             });
+        } else {
+             deleteDoc(docRef).catch(err => {
+                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
+                errorEmitter.emit('permission-error', permissionError);
+             });
+        }
+        setRenameItem(null);
+    };
+
 
     if (loading && !fixture) {
         return (
@@ -721,6 +753,20 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             </div>
         );
     }
+    
+    const secondaryActions = (
+        <div className="flex items-center gap-1">
+          {isAdmin && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setRenameItem({ type: 'status', id: fixtureId, name: customStatus || '', originalName: '' })}
+            >
+              <Pencil className="h-5 w-5" />
+            </Button>
+          )}
+        </div>
+    );
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -728,6 +774,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 title={fixture.league.name} 
                 onBack={goBack} 
                 canGoBack={canGoBack} 
+                actions={secondaryActions}
             />
             
             {renameItem && (
@@ -735,7 +782,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     isOpen={!!renameItem}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
                     item={renameItem}
-                    onSave={(type, id, name) => handleSaveRename(type, id, name)}
+                    onSave={(type, id, name) => type === 'status' ? handleSaveStatus(name) : handleSaveRename(type, id, name)}
                 />
             )}
 
@@ -743,6 +790,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 <MatchHeaderCard 
                     fixture={fixture} 
                     navigate={navigate}
+                    customStatus={customStatus}
                 />
                 <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-5 rounded-lg h-auto p-1 bg-card">
@@ -764,3 +812,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
