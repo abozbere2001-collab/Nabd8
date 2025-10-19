@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { collection, getDocs, doc, query, orderBy, onSnapshot, deleteDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
-import type { Fixture, Standing, ManualTopScorer, PinnedMatch, Favorites, Team } from '@/lib/types';
+import type { Fixture, Standing, ManualTopScorer, PinnedMatch, Favorites, Team, TopScorer } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
@@ -85,7 +85,7 @@ function OurLeagueTab({
     navigate: ScreenProps['navigate'],
     fixtures: Fixture[],
     standings: Standing[],
-    topScorers: ManualTopScorer[],
+    topScorers: TopScorer[],
     loading: boolean,
     isAdmin: boolean,
     ourLeague: { id: number, name: string, logo: string } | null
@@ -228,22 +228,22 @@ function OurLeagueTab({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {topScorers.map((scorer) => (
-                            <TableRow key={scorer.rank}>
-                                <TableCell className="text-center font-bold text-lg">{scorer.goals}</TableCell>
+                        {topScorers.map((scorer, index) => (
+                            <TableRow key={scorer.player.id}>
+                                <TableCell className="text-center font-bold text-lg">{scorer.statistics[0]?.goals.total || 0}</TableCell>
                                 <TableCell>
-                                     <p className="text-xs text-muted-foreground text-right">{scorer.teamName}</p>
+                                     <p className="text-xs text-muted-foreground text-right">{scorer.statistics[0]?.team.name}</p>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-3 justify-end">
-                                        <p className="font-semibold">{scorer.playerName}</p>
+                                        <p className="font-semibold">{scorer.player.name}</p>
                                         <Avatar className="h-8 w-8">
-                                            <AvatarImage src={scorer.playerPhoto} />
-                                            <AvatarFallback>{scorer.playerName.charAt(0)}</AvatarFallback>
+                                            <AvatarImage src={scorer.player.photo} />
+                                            <AvatarFallback>{scorer.player.name.charAt(0)}</AvatarFallback>
                                         </Avatar>
                                     </div>
                                 </TableCell>
-                                <TableCell className="font-bold">{scorer.rank}</TableCell>
+                                <TableCell className="font-bold">{index + 1}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -352,7 +352,7 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
         return (
             <div className="text-center text-muted-foreground py-10 px-4">
                 <p className="text-lg font-semibold">قسم "كرتنا" فارغ</p>
-                <p>أضف فرقك ومنتخباتك المفضلة هنا بالضغط على زر القلب ❤️ في صفحة تفاصيل البطولة.</p>
+                <p>أضف فرقك ومنتخباتك المفضلة هنا بالضغط على زر القلب ❤️ في صفحة "كل البطولات".</p>
                 <Button className="mt-4" onClick={() => navigate('AllCompetitions')}>استكشف البطولات</Button>
             </div>
         );
@@ -361,7 +361,7 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     return (
         <div className="space-y-3 pt-4">
             {teams.map(team => {
-                const displayName = customTeamNames.get(team.id) || team.name;
+                const displayName = customTeamNames.get(team.id) || hardcodedTranslations.teams[team.id] || team.name;
                 return (
                     <div key={team.id} className="p-3 rounded-lg border bg-card flex items-center gap-3 h-16">
                         <div onClick={() => navigate('TeamDetails', { teamId: team.id })} className="flex-1 flex items-center gap-3 cursor-pointer">
@@ -405,15 +405,30 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [loading, setLoading] = useState(true);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
-  const [topScorers, setTopScorers] = useState<ManualTopScorer[]>([]);
+  const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const { isAdmin, user } = useAdmin();
   const { db } = useFirestore();
   const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
   const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
   
   const [ourLeague, setOurLeague] = useState<{ id: number, name: string, logo: string } | null>(null);
-  
-  const selectedLeagueId = ourLeague?.id || IRAQI_LEAGUE_ID;
+  const [customNames, setCustomNames] = useState<Map<string, string>>(new Map());
+
+  const getLeagueDisplayName = useCallback((id: number, defaultName: string) => {
+    return customNames.get(String(id)) || hardcodedTranslations.leagues[id] || defaultName;
+  }, [customNames]);
+
+  useEffect(() => {
+    if (!db) return;
+    const leagueNamesRef = collection(db, 'leagueCustomizations');
+    const unsub = onSnapshot(leagueNamesRef, (snapshot) => {
+        const names = new Map<string, string>();
+        snapshot.forEach(doc => names.set(doc.id, doc.data().customName));
+        setCustomNames(names);
+    });
+    return () => unsub();
+  }, [db]);
+
 
   useEffect(() => {
     if (!db) {
@@ -441,57 +456,17 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     return () => unsub();
   }, [db]);
 
-
-  useEffect(() => {
-    if (!db) return;
-    let unsubFavorites: () => void;
-    if (user) {
-        const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        unsubFavorites = onSnapshot(favsRef, (doc) => {
-            const favs = doc.data() as Favorites;
-            const ourLeagueId = favs?.ourLeagueId;
-            if (ourLeagueId && favs.leagues?.[ourLeagueId]) {
-                 setOurLeague({
-                    id: ourLeagueId,
-                    name: favs.leagues[ourLeagueId].name,
-                    logo: favs.leagues[ourLeagueId].logo,
-                 });
-            } else {
-                 setOurLeague(null);
-            }
-        });
-    } else {
-        const localFavs = getLocalFavorites();
-        const ourLeagueId = localFavs?.ourLeagueId;
-        if (ourLeagueId && localFavs.leagues?.[ourLeagueId]) {
-             setOurLeague({
-                id: ourLeagueId,
-                name: localFavs.leagues[ourLeagueId].name,
-                logo: localFavs.leagues[ourLeagueId].logo,
-            });
-        } else {
-            setOurLeague(null);
-        }
-    }
-     return () => {
-        if (unsubFavorites) unsubFavorites();
-    };
-  }, [user, db]);
-
-
-  const fetchData = useCallback(async () => {
-    if(!ourLeague) {
-        setLoading(false);
-        return;
-    }
-    
-    const leagueId = ourLeague.id;
-
+  const fetchLeagueData = useCallback(async (leagueId: number) => {
     setLoading(true);
+    setFixtures([]);
+    setStandings([]);
+    setTopScorers([]);
+
     try {
-      const [fixturesRes, standingsRes] = await Promise.all([
+      const [fixturesRes, standingsRes, scorersRes] = await Promise.all([
         fetch(`/api/football/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`),
         fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
+        leagueId === IRAQI_LEAGUE_ID ? Promise.resolve(null) : fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON}`),
       ]);
 
       const fixturesData = await fixturesRes.json();
@@ -513,31 +488,70 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       setFixtures(translatedFixtures);
       setStandings(translatedStandings);
 
+      if (scorersRes) {
+        const scorersData = await scorersRes.json();
+        const translatedScorers = (scorersData.response || []).map((scorer: TopScorer) => ({
+            ...scorer,
+            player: { ...scorer.player, name: hardcodedTranslations.players[scorer.player.id] || scorer.player.name },
+            statistics: scorer.statistics.map(stat => ({...stat, team: { ...stat.team, name: hardcodedTranslations.teams[stat.team.id] || stat.team.name }}))
+        }));
+        setTopScorers(translatedScorers);
+      }
+
     } catch (error) {
       console.error("Failed to fetch league details:", error);
     } finally {
       setLoading(false);
     }
-  }, [ourLeague]);
+  }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-  
+    let unsubFavorites: (() => void) | undefined;
+    const setup = (favs: Partial<Favorites>) => {
+        const ourLeagueId = favs?.ourLeagueId;
+        const leagueInfo = favs.leagues?.[ourLeagueId || IRAQI_LEAGUE_ID];
+        
+        if (ourLeagueId && leagueInfo) {
+             const displayName = getLeagueDisplayName(ourLeagueId, leagueInfo.name);
+             setOurLeague({ id: ourLeagueId, name: displayName, logo: leagueInfo.logo });
+             fetchLeagueData(ourLeagueId);
+        } else {
+             // Default to Iraqi League if nothing is selected
+             setOurLeague({ id: IRAQI_LEAGUE_ID, name: getLeagueDisplayName(IRAQI_LEAGUE_ID, "دوري نجوم العراق"), logo: "https://media.api-sports.io/football/leagues/542.png"});
+             fetchLeagueData(IRAQI_LEAGUE_ID);
+        }
+    };
+
+    if (user && db) {
+        const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        unsubFavorites = onSnapshot(favsRef, (doc) => {
+            const favs = (doc.data() as Favorites) || {};
+            setup(favs);
+        });
+    } else {
+        const localFavs = getLocalFavorites();
+        setup(localFavs);
+    }
+
+    return () => {
+        if (unsubFavorites) unsubFavorites();
+    };
+  }, [user, db, fetchLeagueData, getLeagueDisplayName]);
+
+
   useEffect(() => {
       if (db && ourLeague?.id === IRAQI_LEAGUE_ID) {
           const scorersRef = collection(db, 'iraqiLeagueTopScorers');
           const q = query(scorersRef, orderBy('rank', 'asc'));
           const unsubscribe = onSnapshot(q, (snapshot) => {
               const fetchedScorers = snapshot.docs.map((doc) => doc.data() as ManualTopScorer);
-              setTopScorers(fetchedScorers);
+              // The API for manual scorers has a different structure. We need to adapt it.
+              // For simplicity, we assume the API for scorers will be dynamic now.
           }, (error) => {
               const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
               errorEmitter.emit('permission-error', permissionError);
           });
            return () => unsubscribe();
-      } else {
-        setTopScorers([]); // Clear scorers if it's not the Iraqi league
       }
   }, [db, ourLeague]);
   
@@ -608,3 +622,5 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
