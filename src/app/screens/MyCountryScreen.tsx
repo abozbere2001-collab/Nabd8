@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
@@ -30,7 +29,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { isMatchLive } from '@/lib/matchStatus';
@@ -373,7 +371,6 @@ const TeamFixturesList = ({ teamId, navigate }: { teamId: number; navigate: Scre
 
 
 function OurBallTab({ navigate, ourBallTeams, user, db }: { navigate: ScreenProps['navigate'], ourBallTeams: Team[], user: any, db: any }) {
-    const { toast } = useToast();
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
 
     useEffect(() => {
@@ -389,7 +386,7 @@ function OurBallTab({ navigate, ourBallTeams, user, db }: { navigate: ScreenProp
         return (
             <div className="text-center text-muted-foreground py-10 px-4">
                 <p className="text-lg font-semibold">قسم "كرتنا" فارغ</p>
-                <p>أضف فرقك ومنتخباتك المفضلة هنا بالضغط على زر القلب ❤️ في صفحة "كل البطولات".</p>
+                <p>أضف فرقك ومنتخباتك المفضلة هنا بالضغط على القلب ❤️ في صفحة "كل البطولات".</p>
                 <Button className="mt-4" onClick={() => navigate('AllCompetitions')}>استكشف البطولات</Button>
             </div>
         );
@@ -467,13 +464,11 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         const leagueId = favorites?.ourLeagueId;
         if (!leagueId) return null;
         
-        // Try to get details from favorites object first
         const leagueDetails = favorites?.leagues?.[leagueId];
         if (leagueDetails) {
             return { id: leagueId, name: leagueDetails.name, logo: leagueDetails.logo };
         }
         
-        // Fallback for cases where it might just be an ID
         return { id: leagueId, name: 'الدوري المفضل', logo: '' };
 
     }, [favorites]);
@@ -562,3 +557,4 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     );
 }
 
+    
