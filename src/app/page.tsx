@@ -49,48 +49,57 @@ const AppFlow = () => {
             }
 
             if (user) {
-                if (user.isAnonymous) {
-                    const guestOnboardingComplete = localStorage.getItem(GUEST_ONBOARDING_COMPLETE_KEY) === 'true';
-                    if (guestOnboardingComplete) {
-                        setFlowState('app');
-                    } else {
-                        setFlowState('favorite_selection');
-                    }
-                    return;
-                }
+                // This logic runs for both anonymous and registered users.
+                // For registered users, it's crucial to check if their profile exists in Firestore.
+                if (!db) return; // Wait for db to be available
 
-                // Registered user
-                if (!db) return;
                 const userDocRef = doc(db, 'users', user.uid);
                 try {
                     const userDoc = await getDoc(userDocRef);
-                    if (userDoc.exists() && userDoc.data().onboardingComplete) {
-                        setFlowState('app');
+                    if (userDoc.exists() && (userDoc.data().onboardingComplete || user.isAnonymous)) {
+                        // User has an existing profile and has completed onboarding, or is a returning guest.
+                         if (user.isAnonymous) {
+                            const guestOnboardingComplete = localStorage.getItem(GUEST_ONBOARDING_COMPLETE_KEY) === 'true';
+                            if (guestOnboardingComplete) {
+                                setFlowState('app');
+                            } else {
+                                setFlowState('favorite_selection');
+                            }
+                         } else {
+                             setFlowState('app');
+                         }
                     } else {
-                        await handleNewUser(user, db);
+                        // This is a new registered user or one who hasn't completed onboarding.
+                        if (!userDoc.exists()) {
+                            await handleNewUser(user, db);
+                        }
                         setFlowState('favorite_selection');
                     }
                 } catch (error) {
+                    // This error is critical if it happens for a logged-in user.
+                    // It likely means rules are blocking the read. We must inform the user/developer.
                     if (!(error instanceof FirestorePermissionError)) {
                         const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
                         errorEmitter.emit('permission-error', permissionError);
                     }
-                     setFlowState('login'); // Fallback to login on error
-                }
-            } else {
-                // No user is logged in. Check if they have completed guest onboarding before.
-                const guestOnboardingComplete = localStorage.getItem(GUEST_ONBOARDING_COMPLETE_KEY) === 'true';
-                if (guestOnboardingComplete) {
-                    setFlowState('app'); // If they have, treat them as a guest and show the app.
-                    return;
+                    // Fallback to login on error, as we can't determine the user's state.
+                    setFlowState('login');
                 }
 
-                // If not, check if they have seen the welcome screen.
+            } else {
+                // No user is logged in.
+                const guestOnboardingComplete = localStorage.getItem(GUEST_ONBOARDING_COMPLETE_KEY) === 'true';
+                if (guestOnboardingComplete) {
+                    // They've used the app as a guest before. Let them in.
+                    setFlowState('app');
+                    return;
+                }
+                
                 const welcomeSeen = localStorage.getItem(WELCOME_SEEN_KEY) === 'true';
                 if (welcomeSeen) {
-                    setFlowState('login'); // Go directly to login if welcome has been seen
+                    setFlowState('login');
                 } else {
-                    setFlowState('welcome'); // Show welcome for the very first time
+                    setFlowState('welcome');
                 }
             }
         };
@@ -103,6 +112,7 @@ const AppFlow = () => {
         if (user && db && !user.isAnonymous) {
              const userDocRef = doc(db, 'users', user.uid);
              try {
+                // Set onboarding as complete in their Firestore document.
                 await setDoc(userDocRef, { onboardingComplete: true }, { merge: true });
             } catch (error) {
                 const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { onboardingComplete: true } });
@@ -127,13 +137,12 @@ const AppFlow = () => {
     // This function is passed to LoginScreen to be called on successful authentication
     const handleLoginSuccess = () => {
         // The useEffect hook will automatically re-evaluate the user's status 
-        // and navigate them to the correct screen ('app' or 'favorite_selection').
-        // We just need to trigger a loading state to allow the hook to run.
+        // and navigate them to the correct screen. We just need to trigger a re-check.
         setFlowState('loading'); 
     }
 
     const goBackToWelcome = () => {
-        localStorage.removeItem(WELCOME_SEEN_KEY); // Allow showing welcome again if they go back
+        localStorage.removeItem(WELCOME_SEEN_KEY);
         setFlowState('welcome');
     }
     
