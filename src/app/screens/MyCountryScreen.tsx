@@ -35,14 +35,6 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { isMatchLive } from '@/lib/matchStatus';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
-const IRAQI_LEAGUE_ID = 542;
-const IRAQI_LEAGUE_DEFAULT_DATA = { 
-    id: IRAQI_LEAGUE_ID, 
-    name: "دوري نجوم العراق", 
-    logo: "https://media.api-sports.io/football/leagues/542.png" 
-};
-
-
 function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onManage: () => void, isAdmin: boolean}) {
     if (!match.isEnabled) return null;
 
@@ -211,7 +203,7 @@ function OurLeagueTab({
             ): <p className="pt-4 text-center text-muted-foreground">جدول الترتيب غير متاح حاليًا.</p>}
           </TabsContent>
            <TabsContent value="scorers" className="p-0 mt-0 -mx-4">
-            {isAdmin && ourLeague?.id === IRAQI_LEAGUE_ID && (
+            {isAdmin && ourLeague?.id === 542 && (
                 <div className="p-4">
                     <Button className="w-full" onClick={() => navigate('ManageTopScorers')}>
                         <Users className="ml-2 h-4 w-4" />
@@ -410,50 +402,50 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user, db } = useAuth();
     const { isAdmin } = useAdmin();
     const [loading, setLoading] = useState(true);
+    const [ourLeagueId, setOurLeagueId] = useState<number | null>(null);
+    const [ourLeague, setOurLeague] = useState<{ id: number; name: string; logo: string } | null>(null);
+    
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
     const [standings, setStandings] = useState<Standing[]>([]);
     const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
     const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
     
-    const [ourLeagueId, setOurLeagueId] = useState<number | null>(null);
-    const [ourLeague, setOurLeague] = useState<{ id: number; name: string; logo: string } | null>(null);
-
     const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>, players: Map<number, string>}>({leagues: new Map(), teams: new Map(), players: new Map() });
     
-    const fetchAllCustomNames = useCallback(async () => {
-        if (!db) return;
-        try {
-            const [leaguesSnapshot, teamsSnapshot, playersSnapshot] = await Promise.all([
-                getDocs(collection(db, 'leagueCustomizations')),
-                getDocs(collection(db, 'teamCustomizations')),
-                getDocs(collection(db, 'playerCustomizations'))
-            ]);
-            const leagueNames = new Map<number, string>();
-            leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
-            const teamNames = new Map<number, string>();
-            teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-            const playerNames = new Map<number, string>();
-            playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
-            setCustomNames({ leagues: leagueNames, teams: teamNames, players: playerNames });
-        } catch (e) { console.warn("Could not fetch custom names", e); }
-    }, [db]);
-    
-    useEffect(() => {
-        fetchAllCustomNames();
-    }, [fetchAllCustomNames]);
-
     const getDisplayName = useCallback((type: 'league' | 'team' | 'player', id: number, defaultName: string) => {
         const key = `${type}s` as 'leagues' | 'teams' | 'players';
         const hardcodedName = hardcodedTranslations[key]?.[id];
         const customName = customNames[key]?.get(id);
         return customName || hardcodedName || defaultName;
     }, [customNames]);
+    
+    // Effect to fetch custom names once
+    useEffect(() => {
+        const fetchAllCustomNames = async () => {
+            if (!db) return;
+            try {
+                const [leaguesSnapshot, teamsSnapshot, playersSnapshot] = await Promise.all([
+                    getDocs(collection(db, 'leagueCustomizations')),
+                    getDocs(collection(db, 'teamCustomizations')),
+                    getDocs(collection(db, 'playerCustomizations'))
+                ]);
+                const leagueNames = new Map<number, string>();
+                leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+                const teamNames = new Map<number, string>();
+                teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+                const playerNames = new Map<number, string>();
+                playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
+                setCustomNames({ leagues: leagueNames, teams: teamNames, players: playerNames });
+            } catch (e) { console.warn("Could not fetch custom names", e); }
+        };
+        fetchAllCustomNames();
+    }, [db]);
 
+    // Effect to listen for favorite league changes
     useEffect(() => {
         const handleFavorites = (favs: Partial<Favorites>) => {
-            const leagueId = favs?.ourLeagueId;
-            setOurLeagueId(leagueId || null); // Set to null if not selected
+            setOurLeagueId(favs?.ourLeagueId || null);
         };
 
         if (user && db) {
@@ -467,6 +459,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         }
     }, [user, db]);
 
+    // Effect to fetch league data when ourLeagueId changes
     useEffect(() => {
         if (ourLeagueId === null) {
             setOurLeague(null);
@@ -489,17 +482,34 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 const fixturesData = await fixturesRes.json();
                 const standingsData = await standingsRes.json();
                 const scorersData = await scorersRes.json();
+                
+                const leagueInfoFromFixtures = fixturesData?.response?.[0]?.league;
+                const leagueInfoFromStandings = standingsData?.response?.[0]?.league;
 
-                const leagueInfo = fixturesData?.response?.[0]?.league || standingsData?.response?.[0]?.league || scorersData?.response?.[0]?.league || null;
+                const leagueInfo = leagueInfoFromFixtures || leagueInfoFromStandings;
+                
                 if (leagueInfo) {
-                    setOurLeague({
+                     setOurLeague({
                         id: leagueInfo.id,
                         name: getDisplayName('league', leagueInfo.id, leagueInfo.name),
                         logo: leagueInfo.logo,
                     });
                 } else {
-                    setOurLeague(null);
+                    // Fallback to fetch league info if other calls are empty
+                    const leagueRes = await fetch(`/api/football/leagues?id=${ourLeagueId}`);
+                    const leagueData = await leagueRes.json();
+                    const leagueInfoFromLeagueEndpoint = leagueData?.response?.[0];
+                     if(leagueInfoFromLeagueEndpoint) {
+                        setOurLeague({
+                            id: leagueInfoFromLeagueEndpoint.league.id,
+                            name: getDisplayName('league', leagueInfoFromLeagueEndpoint.league.id, leagueInfoFromLeagueEndpoint.league.name),
+                            logo: leagueInfoFromLeagueEndpoint.league.logo,
+                        });
+                     } else {
+                        setOurLeague(null);
+                     }
                 }
+
 
                 const translatedFixtures = (fixturesData.response || []).map((fixture: Fixture) => ({
                     ...fixture,
@@ -535,6 +545,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         fetchLeagueData();
     }, [ourLeagueId, getDisplayName]);
 
+    // Effect for Pinned Matches
     useEffect(() => {
         if (!db) { setLoadingPinnedMatches(false); return; }
         setLoadingPinnedMatches(true);
