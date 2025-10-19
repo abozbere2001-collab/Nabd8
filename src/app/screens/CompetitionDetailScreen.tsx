@@ -360,6 +360,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       });
   }
 
+  const firstUpcomingMatchIndex = useMemo(() => {
+    return fixtures.findIndex(f => isMatchLive(f.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(f.fixture.status.short));
+  }, [fixtures]);
 
   const secondaryActions = (
     <div className="flex items-center gap-1">
@@ -439,15 +442,11 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     </div>
                 ) : fixtures.length > 0 ? (
                     <div className="space-y-3 p-1">
-                        {fixtures.map((fixture, index) => {
-                            const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(fixture.fixture.status.short);
-                            const isFirstUpcoming = isUpcomingOrLive && !fixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(f.fixture.status.short));
-                            return (
-                                <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
-                                    <FixtureItem fixture={fixture} navigate={navigate} />
-                                </div>
-                            );
-                        })}
+                        {fixtures.map((fixture, index) => (
+                           <div key={fixture.fixture.id} ref={index === firstUpcomingMatchIndex ? firstUpcomingMatchRef : null}>
+                                <FixtureItem fixture={fixture} navigate={navigate} />
+                           </div>
+                        ))}
                     </div>
                 ) : <p className="pt-4 text-center text-muted-foreground">لا توجد مباريات لهذا الموسم.</p>}
              </div>
@@ -461,7 +460,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[120px] text-left"></TableHead>
+                            <TableHead className="w-auto"></TableHead>
                             <TableHead className="text-center">نقاط</TableHead>
                             <TableHead className="text-center">خ</TableHead>
                             <TableHead className="text-center">ت</TableHead>
@@ -613,4 +612,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+    
+
     
