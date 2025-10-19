@@ -25,6 +25,7 @@ export type ScreenProps = {
 };
 
 const GUEST_ONBOARDING_COMPLETE_KEY = 'goalstack_guest_onboarding_complete';
+const WELCOME_SEEN_KEY = 'goalstack_welcome_seen';
 
 const LoadingSplashScreen = () => (
     <div className="flex flex-col items-center justify-center h-screen bg-background text-center">
@@ -77,8 +78,13 @@ const AppFlow = () => {
                      setFlowState('login'); // Fallback to login on error
                 }
             } else {
-                // No user is logged in at all, show welcome screen.
-                setFlowState('welcome');
+                // No user is logged in. Check if they have seen the welcome screen.
+                const welcomeSeen = localStorage.getItem(WELCOME_SEEN_KEY) === 'true';
+                if (welcomeSeen) {
+                    setFlowState('login'); // Go directly to login if welcome has been seen
+                } else {
+                    setFlowState('welcome'); // Show welcome for the very first time
+                }
             }
         };
 
@@ -102,6 +108,7 @@ const AppFlow = () => {
     };
     
     const handleWelcomeChoice = async (choice: 'login' | 'guest') => {
+        localStorage.setItem(WELCOME_SEEN_KEY, 'true');
         if (choice === 'guest') {
             setFlowState('favorite_selection');
         } else {
@@ -118,6 +125,7 @@ const AppFlow = () => {
     }
 
     const goBackToWelcome = () => {
+        localStorage.removeItem(WELCOME_SEEN_KEY); // Allow showing welcome again if they go back
         setFlowState('welcome');
     }
     
