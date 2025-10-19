@@ -408,7 +408,8 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
 }
 
 export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
-    const { user, db, isAdmin } = useFirebase();
+    const { user, db } = useFirestore();
+    const { isAdmin } = useAdmin();
     const [loading, setLoading] = useState(true);
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
     const [standings, setStandings] = useState<Standing[]>([]);
@@ -417,144 +418,126 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
 
     const [ourLeague, setOurLeague] = useState<{ id: number; name: string; logo: string } | null>(null);
-    const [customNames, setCustomNames] = useState<{leagues: Map<string, string>, teams: Map<string, string>, players: Map<string, string>}>({leagues: new Map(), teams: new Map(), players: new Map() });
-
-    const getDisplayName = useCallback((type: 'league' | 'team' | 'player', id: number, defaultName: string) => {
-        const key = `${type}s` as 'leagues' | 'teams' | 'players';
-        return customNames[key]?.get(String(id)) || hardcodedTranslations[key]?.[id] || defaultName;
-    }, [customNames]);
+    const [ourLeagueId, setOurLeagueId] = useState<number | null>(null);
+    const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>, players: Map<number, string>}>({leagues: new Map(), teams: new Map(), players: new Map() });
     
-
-    const fetchLeagueData = useCallback(async (leagueId: number) => {
-        setLoading(true);
-        setFixtures([]);
-        setStandings([]);
-        setTopScorers([]);
-
-        try {
-            const [fixturesRes, standingsRes, scorersRes] = await Promise.all([
-                fetch(`/api/football/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`),
-                fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
-                fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON}`),
-            ]);
-
-            const fixturesData = await fixturesRes.json();
-            const standingsData = await standingsRes.json();
-            const scorersData = await scorersRes.json();
-
-            const translatedFixtures = (fixturesData.response || []).map((fixture: Fixture) => ({
-                ...fixture,
-                teams: {
-                    home: { ...fixture.teams.home, name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name) },
-                    away: { ...fixture.teams.away, name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name) },
-                }
-            }));
-            
-            const translatedStandings = (standingsData.response?.[0]?.league?.standings?.[0] || []).map((s: Standing) => ({
-                ...s,
-                team: { ...s.team, name: getDisplayName('team', s.team.id, s.team.name) }
-            }));
-            
-            const translatedScorers = (scorersData.response || []).map((scorer: TopScorer) => ({
-                ...scorer,
-                player: { ...scorer.player, name: getDisplayName('player', scorer.player.id, scorer.player.name) },
-                statistics: scorer.statistics.map(stat => ({...stat, team: { ...stat.team, name: getDisplayName('team', stat.team.id, stat.team.name) }}))
-            }));
-
-            setFixtures(translatedFixtures);
-            setStandings(translatedStandings);
-            setTopScorers(translatedScorers);
-            
-        } catch (error) {
-            console.error("Failed to fetch league details:", error);
-        } finally {
-            setLoading(false);
-        }
-    }, [getDisplayName]);
-    
+    // Step 1: Fetch all custom names once.
     useEffect(() => {
-        const fetchCustomNamesAndLeague = async () => {
-            if (!db) { // Handle case where db is not ready
-                setLoading(true);
-                return;
-            }
-
+        const fetchAllCustomNames = async () => {
+            if (!db) return;
             try {
                 const [leaguesSnapshot, teamsSnapshot, playersSnapshot] = await Promise.all([
                     getDocs(collection(db, 'leagueCustomizations')),
                     getDocs(collection(db, 'teamCustomizations')),
                     getDocs(collection(db, 'playerCustomizations'))
                 ]);
-
                 const leagueNames = new Map<string, string>();
                 leaguesSnapshot.forEach(doc => leagueNames.set(doc.id, doc.data().customName));
-                
                 const teamNames = new Map<string, string>();
                 teamsSnapshot.forEach(doc => teamNames.set(doc.id, doc.data().customName));
-                
                 const playerNames = new Map<string, string>();
                 playersSnapshot.forEach(doc => playerNames.set(doc.id, doc.data().customName));
-
                 setCustomNames({ leagues: leagueNames, teams: teamNames, players: playerNames });
-            } catch (e) {
-                console.warn("Could not fetch custom names", e);
-            }
+            } catch (e) { console.warn("Could not fetch custom names", e); }
         };
-
-        fetchCustomNamesAndLeague();
+        fetchAllCustomNames();
     }, [db]);
 
+    const getDisplayName = useCallback((type: 'league' | 'team' | 'player', id: number, defaultName: string) => {
+        const key = `${type}s` as 'leagues' | 'teams' | 'players';
+        return customNames[key]?.get(String(id)) || hardcodedTranslations[key]?.[id] || defaultName;
+    }, [customNames]);
 
+    // Step 2: Listen for user's favorite league choice.
     useEffect(() => {
-        let unsubFavorites: (() => void) | undefined;
-    
-        const setupOurLeague = (favorites: Partial<Favorites>) => {
-            const ourLeagueId = favorites?.ourLeagueId;
-            const leagueFromFavorites = ourLeagueId ? favorites.leagues?.[ourLeagueId] : undefined;
-    
-            let leagueToDisplay;
-    
-            if (leagueFromFavorites) {
-                leagueToDisplay = {
-                    id: leagueFromFavorites.leagueId,
-                    name: getDisplayName('league', leagueFromFavorites.leagueId, leagueFromFavorites.name),
-                    logo: leagueFromFavorites.logo,
-                };
+        const setupLeagueChoiceListener = () => {
+            const handleFavorites = (favs: Partial<Favorites>) => {
+                const leagueId = favs?.ourLeagueId;
+                if (leagueId && favs.leagues?.[leagueId]) {
+                    const favLeague = favs.leagues[leagueId];
+                    setOurLeague({
+                        id: favLeague.leagueId,
+                        name: getDisplayName('league', favLeague.leagueId, favLeague.name),
+                        logo: favLeague.logo,
+                    });
+                    setOurLeagueId(favLeague.leagueId);
+                } else {
+                    setOurLeague({
+                        ...IRAQI_LEAGUE_DEFAULT_DATA,
+                        name: getDisplayName('league', IRAQI_LEAGUE_ID, IRAQI_LEAGUE_DEFAULT_DATA.name),
+                    });
+                    setOurLeagueId(IRAQI_LEAGUE_ID);
+                }
+            };
+
+            if (user && db) {
+                const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+                return onSnapshot(favsRef, (doc) => {
+                    handleFavorites(doc.data() as Favorites || {});
+                });
             } else {
-                leagueToDisplay = {
-                    ...IRAQI_LEAGUE_DEFAULT_DATA,
-                    name: getDisplayName('league', IRAQI_LEAGUE_ID, IRAQI_LEAGUE_DEFAULT_DATA.name),
-                };
+                // Handle guest user
+                handleFavorites(getLocalFavorites());
             }
-    
-            setOurLeague(leagueToDisplay);
-            fetchLeagueData(leagueToDisplay.id);
         };
-    
-        if (user && db) {
-            const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            unsubFavorites = onSnapshot(favsRef, (doc) => {
-                const favs = (doc.data() as Favorites) || {};
-                setupOurLeague(favs);
-            });
-        } else {
-            // Guest user
-            const localFavs = getLocalFavorites();
-            setupOurLeague(localFavs);
-        }
-    
-        return () => {
-            if (unsubFavorites) unsubFavorites();
-        };
-    }, [user, db, customNames, getDisplayName, fetchLeagueData]); 
-    
 
-    // Pinned Matches listener
+        const unsubscribe = setupLeagueChoiceListener();
+        return () => { if (unsubscribe) unsubscribe(); };
+    }, [user, db, getDisplayName]);
+
+    // Step 3: Fetch data whenever the chosen league ID changes.
     useEffect(() => {
-        if (!db) {
-            setLoadingPinnedMatches(false);
-            return;
-        }
+        if (!ourLeagueId) return;
+
+        const fetchLeagueData = async () => {
+            setLoading(true);
+            try {
+                const [fixturesRes, standingsRes, scorersRes] = await Promise.all([
+                    fetch(`/api/football/fixtures?league=${ourLeagueId}&season=${CURRENT_SEASON}`),
+                    fetch(`/api/football/standings?league=${ourLeagueId}&season=${CURRENT_SEASON}`),
+                    fetch(`/api/football/players/topscorers?league=${ourLeagueId}&season=${CURRENT_SEASON}`),
+                ]);
+
+                const fixturesData = await fixturesRes.json();
+                const standingsData = await standingsRes.json();
+                const scorersData = await scorersRes.json();
+
+                const translatedFixtures = (fixturesData.response || []).map((fixture: Fixture) => ({
+                    ...fixture,
+                    teams: {
+                        home: { ...fixture.teams.home, name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name) },
+                        away: { ...fixture.teams.away, name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name) },
+                    },
+                    league: { ...fixture.league, name: getDisplayName('league', fixture.league.id, fixture.league.name)}
+                }));
+                
+                const translatedStandings = (standingsData.response?.[0]?.league?.standings?.[0] || []).map((s: Standing) => ({
+                    ...s,
+                    team: { ...s.team, name: getDisplayName('team', s.team.id, s.team.name) }
+                }));
+                
+                const translatedScorers = (scorersData.response || []).map((scorer: TopScorer) => ({
+                    ...scorer,
+                    player: { ...scorer.player, name: getDisplayName('player', scorer.player.id, scorer.player.name) },
+                    statistics: scorer.statistics.map(stat => ({...stat, team: { ...stat.team, name: getDisplayName('team', stat.team.id, stat.team.name) }}))
+                }));
+
+                setFixtures(translatedFixtures);
+                setStandings(translatedStandings);
+                setTopScorers(translatedScorers);
+            } catch (error) {
+                console.error("Failed to fetch league details:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchLeagueData();
+    }, [ourLeagueId, getDisplayName]);
+
+    // Pinned Matches listener (independent)
+    useEffect(() => {
+        if (!db) { setLoadingPinnedMatches(false); return; }
         setLoadingPinnedMatches(true);
         const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
         const q = query(pinnedMatchesRef);
