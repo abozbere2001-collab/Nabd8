@@ -23,7 +23,7 @@ export function LoginScreen({ goBack }: ScreenProps) {
     let errorMessage = e.message || 'حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.';
 
     if (e.code === 'auth/unauthorized-domain') {
-        errorMessage = `النطاق غير مصرح به. يرجى التأكد من إضافة نطاق التطبيق إلى قائمة النطاقات المصرح بها في إعدادات Firebase Authentication`;
+        errorMessage = `النطاق الذي تستخدمه غير مصرح به. يرجى إضافته إلى قائمة النطاقات المصرح بها في إعدادات Firebase Authentication.`;
     } else if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
         errorMessage = 'تم إلغاء عملية تسجيل الدخول.';
     } else if (e.code === 'auth/account-exists-with-different-credential') {
