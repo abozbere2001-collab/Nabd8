@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Bell, LogOut, User, Search, Trophy, Settings as SettingsIcon, FileText, FileBadge } from 'lucide-react';
+import { ChevronLeft, LogOut, User, Search, Trophy, Settings as SettingsIcon, FileText, FileBadge } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { useToast } from '@/hooks/use-toast';
 import { signOut as firebaseSignOut } from '@/lib/firebase-client';
@@ -28,7 +28,6 @@ export function SettingsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const mainSettingsItems = [
       { label: "الملف الشخصي", icon: User, action: (navigate: ScreenProps['navigate']) => navigate('Profile') },
       { label: "كل البطولات", icon: Trophy, action: (navigate: ScreenProps['navigate']) => navigate('AllCompetitions') },
-      { label: "إشعارات", icon: Bell, action: (navigate: ScreenProps['navigate']) => navigate('Notifications') },
       { label: "الإعدادات العامة", icon: SettingsIcon, action: (navigate: ScreenProps['navigate']) => navigate('GeneralSettings')},
   ];
 

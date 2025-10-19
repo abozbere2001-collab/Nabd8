@@ -35,7 +35,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 
-type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country';
+type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'status';
 
 
 const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerType, navigate: ScreenProps['navigate'], onRename: () => void, isAdmin: boolean }) => {
@@ -212,6 +212,8 @@ const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { ev
         const message = highlightsOnly ? "لا توجد أهداف أو بطاقات حمراء." : "لا توجد أحداث رئيسية في المباراة بعد.";
         return <p className="text-center text-muted-foreground p-8">{message}</p>;
     }
+    
+    const sortedEvents = [...filteredEvents].sort((a, b) => b.time.elapsed - a.time.elapsed);
 
     const getEventIcon = (event: MatchEvent) => {
         if (event.type === 'Goal') return <FootballIcon className="w-5 h-5 text-green-500" />;
@@ -220,8 +222,6 @@ const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { ev
         if (event.type === 'subst') return <Users className="w-4 h-4 text-blue-500" />;
         return <Clock className="w-5 h-5 text-muted-foreground" />;
     };
-    
-    const sortedEvents = [...filteredEvents].sort((a, b) => b.time.elapsed - a.time.elapsed);
 
     return (
         <div className="space-y-6 pt-4">
@@ -705,7 +705,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     errorEmitter.emit('permission-error', permissionError);
                 });
         } else {
-            deleteDoc(docRef).then(() => {
+             deleteDoc(docRef).then(() => {
                  toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` });
                  fetchData(false);
             }).catch(serverError => {
@@ -760,7 +760,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setRenameItem({ type: 'status' as any, id: fixtureId, name: customStatus || '', originalName: '' })}
+              onClick={() => setRenameItem({ type: 'status', id: fixtureId, name: customStatus || '', originalName: '' })}
             >
               <Pencil className="h-5 w-5" />
             </Button>
@@ -796,19 +796,23 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     <TabsList className="grid w-full grid-cols-5 rounded-lg h-auto p-1 bg-card">
                         <TabsTrigger value="details">تفاصيل</TabsTrigger>
                         <TabsTrigger value="odds">احتمالات</TabsTrigger>
+                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
                         <TabsTrigger value="events">مُجريات</TabsTrigger>
                         <TabsTrigger value="lineups">التشكيل</TabsTrigger>
-                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                        
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="odds" className="mt-4"><OddsTab fixtureId={fixture.fixture.id} /></TabsContent>
+                    <TabsContent value="standings" className="mt-4">
+                        <StandingsTab standings={standings} fixture={fixture} navigate={navigate} />
+                    </TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} /></TabsContent>
                     <TabsContent value="lineups" className="mt-4">
                         <LineupsTab lineups={lineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={(type, id, name, originalName) => handleOpenRename(type, id, name, originalName)}/>
                     </TabsContent>
-                    <TabsContent value="standings" className="mt-4"><StandingsTab standings={standings} fixture={fixture} navigate={navigate} /></TabsContent>
                 </Tabs>
             </div>
         </div>
     );
 }
+

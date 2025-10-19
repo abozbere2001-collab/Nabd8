@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
-import type { Fixture as FixtureType, Favorites, MatchDetails } from '@/lib/types';
+import type { Fixture as FixtureType, Favorites } from '@/lib/types';
 import { FixtureItem } from '@/components/FixtureItem';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { GlobalPredictionsScreen } from './GlobalPredictionsScreen';
@@ -42,7 +42,6 @@ const FixturesList = React.memo(({
     hasAnyFavorites,
     favoritedLeagueIds,
     favoritedTeamIds,
-    commentedMatches,
     navigate,
 }: { 
     fixtures: FixtureType[], 
@@ -51,7 +50,6 @@ const FixturesList = React.memo(({
     hasAnyFavorites: boolean,
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
-    commentedMatches: { [key: number]: MatchDetails },
     navigate: ScreenProps['navigate'],
 }) => {
     
@@ -136,7 +134,6 @@ const FixturesList = React.memo(({
                                 key={f.fixture.id} 
                                 fixture={f} 
                                 navigate={navigate}
-                                commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled}
                             />
                         ))}
                     </div>
@@ -162,7 +159,6 @@ const FixturesList = React.memo(({
                                     key={f.fixture.id} 
                                     fixture={f} 
                                     navigate={navigate}
-                                    commentsEnabled={commentedMatches[f.fixture.id]?.commentsEnabled} 
                                 />
                             ))}
                         </div>
@@ -270,8 +266,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [matchesCache, setMatchesCache] = useState<Map<string, FixtureType[]>>(new Map());
   const [loading, setLoading] = useState(true);
     
-  const [commentedMatches, setCommentedMatches] = useState<{ [key: number]: MatchDetails }>({});
-  
   const [customNamesCache, setCustomNamesCache] = useState<{leagues: Map<number, string>, teams: Map<number, string>} | null>(null);
 
   const fetchAndProcessData = useCallback(async (dateKey: string, abortSignal: AbortSignal) => {
@@ -371,23 +365,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         setFavorites({});
     }
   }, [user, db]);
-
-  useEffect(() => {
-    if (!db) return;
-    const matchesCollectionRef = collection(db, 'matches');
-    const unsubscribe = onSnapshot(matchesCollectionRef, (snapshot) => {
-        const matches: { [key: number]: MatchDetails } = {};
-        snapshot.forEach(doc => {
-            matches[Number(doc.id)] = doc.data() as MatchDetails;
-        });
-        setCommentedMatches(matches);
-    }, (error) => {
-        const permissionError = new FirestorePermissionError({ path: 'matches', operation: 'list' });
-        errorEmitter.emit('permission-error', permissionError);
-    });
-
-    return () => unsubscribe();
-  }, [db]);
   
   
   useEffect(() => {
@@ -476,7 +453,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favoritedLeagueIds={favoritedLeagueIds}
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
-                    commentedMatches={commentedMatches}
                     navigate={navigate}
                 />
             </TabsContent>

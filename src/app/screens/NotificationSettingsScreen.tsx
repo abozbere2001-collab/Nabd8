@@ -15,7 +15,7 @@ import type { Favorites } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Newspaper, MessageSquare } from 'lucide-react';
+import { Newspaper } from 'lucide-react';
 
 export function NotificationSettingsScreen({ navigate, goBack, canGoBack, headerActions }: ScreenProps) {
   const { user } = useAuth();
@@ -63,7 +63,7 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
             leagues: {},
             teams: {},
             players: {},
-            notificationsEnabled: { news: true, comments: true }
+            notificationsEnabled: { news: true }
         };
         setFavorites(defaultFavs);
       }
@@ -94,7 +94,7 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
         currentStatus = favorites.leagues?.[itemId as number]?.notificationsEnabled ?? true;
     } else { // general notifications like news, comments
         fieldPath = `notificationsEnabled.${itemId}`;
-        currentStatus = favorites.notificationsEnabled?.[itemId as 'news' | 'comments'] ?? true;
+        currentStatus = favorites.notificationsEnabled?.[itemId as 'news'] ?? true;
     }
     
     const newStatus = !currentStatus;
@@ -173,17 +173,6 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
                         id="notif-news"
                         checked={favorites?.notificationsEnabled?.news ?? true}
                         onCheckedChange={() => handleToggleNotification('general', 'news')}
-                    />
-                </div>
-                 <div className="flex items-center justify-between p-3">
-                    <div className="flex items-center gap-3">
-                        <MessageSquare className="h-6 w-6 text-primary" />
-                        <Label htmlFor="notif-comments" className="font-semibold cursor-pointer">إشعارات التفاعلات</Label>
-                    </div>
-                    <Switch
-                        id="notif-comments"
-                        checked={favorites?.notificationsEnabled?.comments ?? true}
-                        onCheckedChange={() => handleToggleNotification('general', 'comments')}
                     />
                 </div>
             </CardContent>

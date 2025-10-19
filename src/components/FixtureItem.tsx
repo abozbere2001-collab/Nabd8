@@ -4,14 +4,12 @@
 import React from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
-import { CommentsButton } from '@/components/CommentsButton';
 import type { Fixture as FixtureType } from '@/lib/types';
 import { useAdmin } from '@/firebase/provider';
 import { LiveMatchStatus } from './LiveMatchStatus';
 
-export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, customStatus }: { fixture: FixtureType, navigate: ScreenProps['navigate'], commentsEnabled?: boolean, customStatus?: string | null }) => {
+export const FixtureItem = React.memo(({ fixture, navigate, customStatus }: { fixture: FixtureType, navigate: ScreenProps['navigate'], customStatus?: string | null }) => {
     const { isAdmin } = useAdmin();
-    const hasCommentsFeature = commentsEnabled || isAdmin;
 
     const HomeTeamDisplay = () => (
         <div className="flex flex-col items-center gap-1 flex-1 truncate">
@@ -50,17 +48,6 @@ export const FixtureItem = React.memo(({ fixture, navigate, commentsEnabled, cus
             <HomeTeamDisplay />
          </main>
         </div>
-
-         <div className="absolute top-1 right-1 flex items-center gap-1">
-            {hasCommentsFeature && (
-                <CommentsButton
-                  matchId={fixture.fixture.id}
-                  navigate={navigate}
-                  commentsEnabled={commentsEnabled}
-                  size="icon"
-                />
-            )}
-         </div>
       </div>
     );
 });

@@ -190,38 +190,7 @@ export interface AdminFavorite {
 }
 
 export interface MatchDetails {
-  commentsEnabled: boolean;
-}
-
-export interface Like {
-  userId: string;
-  timestamp: any;
-}
-
-export interface MatchComment {
-  id: string;
-  userId: string;
-  userName: string;
-  userPhoto: string;
-  text: string;
-  timestamp: any; // RTDB ServerTimestamp
-  parentId?: string | null;
-  replies: MatchComment[];
-  likes: { [key: string]: Like };
-}
-
-export interface Notification {
-  id?: string;
-  recipientId: string;
-  senderId: string;
-  senderName: string;
-  senderPhoto: string;
-  type: 'like' | 'reply' | 'goal' | 'news';
-  matchId: number;
-  commentId: string;
-  commentText: string;
-  read: boolean;
-  timestamp: any; // Firestore ServerTimestamp
+  // This interface can be expanded with other admin-managed match properties
 }
 
 export interface Prediction {
@@ -313,5 +282,3 @@ export interface PinnedMatch {
 export interface MatchCustomization {
   customStatus: string;
 }
-
-    

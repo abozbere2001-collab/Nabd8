@@ -13,8 +13,6 @@ import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
 import { TeamDetailScreen } from './screens/TeamDetailScreen';
 import { PlayerDetailScreen } from './screens/PlayerDetailScreen';
 import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
-import { CommentsScreen } from './screens/CommentsScreen';
-import { NotificationsScreen } from './screens/NotificationsScreen';
 import { GlobalPredictionsScreen } from './screens/GlobalPredictionsScreen';
 import { AdminMatchSelectionScreen } from './screens/AdminMatchSelectionScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
@@ -60,8 +58,6 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   TeamDetails: { component: TeamDetailScreen },
   PlayerDetails: { component: PlayerDetailScreen },
   AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen },
-  Comments: { component: CommentsScreen },
-  Notifications: { component: NotificationsScreen },
   GlobalPredictions: { component: GlobalPredictionsScreen },
   AdminMatchSelection: { component: AdminMatchSelectionScreen },
   Profile: { component: ProfileScreen },
