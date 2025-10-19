@@ -445,7 +445,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 setLoading(false);
             }, (error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-                setFavorites({}); // Fallback for permission errors
+                setFavorites(getLocalFavorites()); // Fallback for permission errors
                 setLoading(false);
             });
         } else {
@@ -469,6 +469,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             return { id: leagueId, name: leagueDetails.name, logo: leagueDetails.logo };
         }
         
+        // This part is a fallback, might need to fetch from API if details aren't in favorites.
         return { id: leagueId, name: 'الدوري المفضل', logo: '' };
 
     }, [favorites]);
@@ -556,5 +557,3 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
-
-    
