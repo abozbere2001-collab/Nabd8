@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
@@ -420,7 +421,6 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         return customName || hardcodedName || defaultName;
     }, [customNames]);
     
-    // Effect to fetch custom names once
     useEffect(() => {
         const fetchAllCustomNames = async () => {
             if (!db) return;
@@ -442,52 +442,48 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         fetchAllCustomNames();
     }, [db]);
 
-    // Effect to listen for favorite league changes
     useEffect(() => {
-        const handleFavorites = (favs: Partial<Favorites>) => {
-            setOurLeagueId(favs?.ourLeagueId || null);
+        const handleFavoritesChange = (favs: Partial<Favorites>) => {
+            setOurLeagueId(favs.ourLeagueId || null);
         };
 
         if (user && db) {
             const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
             const unsubscribe = onSnapshot(favsRef, (doc) => {
-                handleFavorites(doc.data() as Favorites || {});
+                handleFavoritesChange(doc.data() as Favorites || {});
             });
             return () => unsubscribe();
         } else {
-            handleFavorites(getLocalFavorites());
+            handleFavoritesChange(getLocalFavorites());
         }
     }, [user, db]);
 
-    // Effect to fetch league data when ourLeagueId changes
     useEffect(() => {
-        if (ourLeagueId === null) {
-            setOurLeague(null);
-            setFixtures([]);
-            setStandings([]);
-            setTopScorers([]);
-            setLoading(false);
-            return;
-        }
-
         const fetchLeagueData = async () => {
+            if (ourLeagueId === null) {
+                setOurLeague(null);
+                setFixtures([]);
+                setStandings([]);
+                setTopScorers([]);
+                setLoading(false);
+                return;
+            }
+
             setLoading(true);
             try {
-                const [fixturesRes, standingsRes, scorersRes] = await Promise.all([
+                const [fixturesRes, standingsRes, scorersRes, leagueRes] = await Promise.all([
                     fetch(`/api/football/fixtures?league=${ourLeagueId}&season=${CURRENT_SEASON}`),
                     fetch(`/api/football/standings?league=${ourLeagueId}&season=${CURRENT_SEASON}`),
                     fetch(`/api/football/players/topscorers?league=${ourLeagueId}&season=${CURRENT_SEASON}`),
+                    fetch(`/api/football/leagues?id=${ourLeagueId}`)
                 ]);
 
                 const fixturesData = await fixturesRes.json();
                 const standingsData = await standingsRes.json();
                 const scorersData = await scorersRes.json();
+                const leagueData = await leagueRes.json();
                 
-                const leagueInfoFromFixtures = fixturesData?.response?.[0]?.league;
-                const leagueInfoFromStandings = standingsData?.response?.[0]?.league;
-
-                const leagueInfo = leagueInfoFromFixtures || leagueInfoFromStandings;
-                
+                const leagueInfo = leagueData?.response?.[0]?.league;
                 if (leagueInfo) {
                      setOurLeague({
                         id: leagueInfo.id,
@@ -495,21 +491,8 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         logo: leagueInfo.logo,
                     });
                 } else {
-                    // Fallback to fetch league info if other calls are empty
-                    const leagueRes = await fetch(`/api/football/leagues?id=${ourLeagueId}`);
-                    const leagueData = await leagueRes.json();
-                    const leagueInfoFromLeagueEndpoint = leagueData?.response?.[0];
-                     if(leagueInfoFromLeagueEndpoint) {
-                        setOurLeague({
-                            id: leagueInfoFromLeagueEndpoint.league.id,
-                            name: getDisplayName('league', leagueInfoFromLeagueEndpoint.league.id, leagueInfoFromLeagueEndpoint.league.name),
-                            logo: leagueInfoFromLeagueEndpoint.league.logo,
-                        });
-                     } else {
-                        setOurLeague(null);
-                     }
+                    setOurLeague(null);
                 }
-
 
                 const translatedFixtures = (fixturesData.response || []).map((fixture: Fixture) => ({
                     ...fixture,
@@ -545,7 +528,6 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         fetchLeagueData();
     }, [ourLeagueId, getDisplayName]);
 
-    // Effect for Pinned Matches
     useEffect(() => {
         if (!db) { setLoadingPinnedMatches(false); return; }
         setLoadingPinnedMatches(true);
@@ -630,3 +612,5 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
+
+  

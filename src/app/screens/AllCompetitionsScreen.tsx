@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -171,63 +172,50 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const handleFavorite = useCallback((type: 'star' | 'heart', item: ManagedCompetitionType) => {
         const itemId = item.leagueId;
-        
-        const currentFavorites = favorites;
+        const currentFavorites = user ? favorites : getLocalFavorites();
+        const isCurrentlyFavorited = type === 'star' ? !!currentFavorites.leagues?.[itemId] : currentFavorites.ourLeagueId === itemId;
         const newFavorites = { ...currentFavorites };
 
         if (type === 'star') {
             if (!newFavorites.leagues) newFavorites.leagues = {};
-            const isFavorited = !!newFavorites.leagues?.[itemId];
-            if (isFavorited) {
+            if (isCurrentlyFavorited) {
                 delete newFavorites.leagues[itemId];
             } else {
                 newFavorites.leagues[itemId] = { 
-                    name: getName('league', itemId, item.name),
+                    name: item.name,
                     leagueId: itemId,
                     logo: item.logo
                 };
             }
-        } else { // Heart for "Our League"
-            const isOurLeague = newFavorites.ourLeagueId === itemId;
-            if (isOurLeague) {
+        } else { // 'heart'
+            if (isCurrentlyFavorited) {
                 delete newFavorites.ourLeagueId;
             } else {
                 newFavorites.ourLeagueId = itemId;
             }
         }
         
-        setFavorites(newFavorites); // Optimistic update
+        setFavorites(newFavorites);
 
         if (user && db) {
             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
             let updateData: any;
             if (type === 'star') {
-                const isFavorited = !!currentFavorites.leagues?.[itemId];
-                if (isFavorited) { // Action is to unfavorite
-                     updateData = { [`leagues.${itemId}`]: deleteField() };
-                } else { // Action is to favorite
-                     updateData = { leagues: { ...currentFavorites.leagues, [itemId]: { name: item.name, logo: item.logo, leagueId: itemId } } };
-                }
-            } else { // Heart
-                const isOurLeague = currentFavorites.ourLeagueId === itemId;
-                if (isOurLeague) { // Action is to deselect
-                    updateData = { ourLeagueId: deleteField() };
-                } else { // Action is to select
-                    updateData = { ourLeagueId: itemId };
-                }
+                 updateData = isCurrentlyFavorited
+                    ? { [`leagues.${itemId}`]: deleteField() }
+                    : { leagues: newFavorites.leagues };
+            } else {
+                 updateData = isCurrentlyFavorited
+                    ? { ourLeagueId: deleteField() }
+                    : { ourLeagueId: newFavorites.ourLeagueId };
             }
 
             setDoc(favRef, updateData, { merge: true }).catch(serverError => {
                 setFavorites(currentFavorites); // Revert on error
-                const permissionError = new FirestorePermissionError({
-                    path: favRef.path,
-                    operation: 'update',
-                    requestResourceData: updateData
-                });
+                const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update' });
                 errorEmitter.emit('permission-error', permissionError);
             });
         } else {
-            // Guest user, save to local storage
             setLocalFavorites(newFavorites);
         }
     }, [user, db, favorites, getName]);
@@ -476,3 +464,5 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     
+
+  
