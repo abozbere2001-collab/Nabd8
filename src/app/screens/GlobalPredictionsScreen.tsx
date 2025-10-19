@@ -693,60 +693,47 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     };
 
 
-    useEffect(() => {
+    const fetchLeaderboard = useCallback(async (loadMore = false) => {
         if (!db) return;
-        setLoadingLeaderboard(true);
-        setHasMore(true);
+
+        setLoadingLeaderboard(!loadMore);
+        if (loadMore) setLoadingMore(true);
 
         const leaderboardRef = collection(db, 'leaderboard');
-        const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), limit(LEADERBOARD_PAGE_SIZE));
-
-        const unsubscribeLeaderboard = onSnapshot(q, (snapshot) => {
-            const scores: UserScore[] = [];
-            snapshot.forEach((doc, index) => {
-                scores.push({...(doc.data() as UserScore), rank: index + 1 });
-            });
-            
-            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-            setLeaderboard(scores);
-            setLastVisible(lastDoc);
-            setHasMore(snapshot.docs.length === LEADERBOARD_PAGE_SIZE);
-            setLoadingLeaderboard(false);
-        }, (error) => {
-            const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
-            setLoadingLeaderboard(false);
-        });
-
-        return () => {
-            unsubscribeLeaderboard();
-        }
-    }, [db]);
-    
-    const fetchMoreLeaderboard = async () => {
-        if (!db || !lastVisible || !hasMore || loadingMore) return;
-        setLoadingMore(true);
+        const constraints = [orderBy('totalPoints', 'desc'), limit(LEADERBOARD_PAGE_SIZE)];
         
-        const leaderboardRef = collection(db, 'leaderboard');
-        const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), startAfter(lastVisible), limit(LEADERBOARD_PAGE_SIZE));
+        if (loadMore && lastVisible) {
+            constraints.push(startAfter(lastVisible));
+        }
 
+        const q = query(leaderboardRef, ...constraints);
+        
         try {
             const snapshot = await getDocs(q);
-            let currentRank = (leaderboard.length) + 1;
-            const newScores = snapshot.docs.map(doc => ({...doc.data() as UserScore, rank: currentRank++}));
+            let currentRank = loadMore ? leaderboard.length + 1 : 1;
+            const newScores = snapshot.docs.map(doc => ({ ...(doc.data() as UserScore), rank: currentRank++ }));
+            
             const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-
-            setLeaderboard(prev => [...prev, ...newScores]);
+            
+            setLeaderboard(prev => loadMore ? [...prev, ...newScores] : newScores);
             setLastVisible(lastDoc);
             setHasMore(snapshot.docs.length === LEADERBOARD_PAGE_SIZE);
         } catch (error) {
-             const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
-             errorEmitter.emit('permission-error', permissionError);
+            const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
         } finally {
-            setLoadingMore(false);
+             setLoadingLeaderboard(false);
+             if (loadMore) setLoadingMore(false);
         }
-    }
+    }, [db, lastVisible, leaderboard.length]);
 
+    useEffect(() => {
+        fetchLeaderboard(false);
+    }, [fetchLeaderboard]);
+    
+    const fetchMoreLeaderboard = () => {
+        fetchLeaderboard(true);
+    };
 
     const fetchDailyMatchesAndPredictions = useCallback(async (dateKey: string) => {
         if (!db || !user) {
@@ -781,7 +768,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 ...fixture,
                 teams: {
                     home: { ...fixture.teams.home, name: hardcodedTranslations.teams[fixture.teams.home.id] || fixture.teams.home.name },
-                    away: { ...fixture.teams.away, name: hardcodedTranslations.teams.away.id || fixture.teams.away.name },
+                    away: { ...fixture.teams.away, name: hardcodedTranslations.teams[fixture.teams.away.id] || fixture.teams.away.name },
                 },
                 league: {
                     ...fixture.league,
@@ -1046,4 +1033,5 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
 
 
+    
     
