@@ -42,18 +42,6 @@ type SearchResult = (TeamResult & { type: 'team' }) | (LeagueResult & { type: 'l
 
 type RenameType = 'league' | 'team';
 
-const normalizeArabic = (text: string) => {
-  if (!text) return '';
-  return text
-    .replace(/[\u064B-\u0652]/g, "") // Remove harakat
-    .replace(/[أإآ]/g, "ا")
-    .replace(/ة/g, "ه")
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-};
-
-
 const ItemRow = ({ item, itemType, isFavorited, onFavoriteToggle, onResultClick, onRename, isAdmin }: { item: Item, itemType: ItemType, isFavorited: boolean, onFavoriteToggle: (item: Item) => void, onResultClick: () => void, onRename: () => void, isAdmin: boolean }) => {
   return (
     <div className="flex items-center gap-2 p-1.5 border-b last:border-b-0 hover:bg-accent/50 rounded-md">
@@ -154,12 +142,10 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   }, [db, isAdmin]);
 
   const getDisplayName = useCallback((type: 'team' | 'league', id: number, defaultName: string) => {
-      // Prioritize custom name from Firestore
       const firestoreMap = type === 'team' ? customNames.teams : customNames.leagues;
       const customName = firestoreMap.get(id);
       if (customName) return customName;
 
-      // Fallback to hardcoded translations
       const hardcodedMap = type === 'team' ? hardcodedTranslations.teams : hardcodedTranslations.leagues;
       const hardcodedName = hardcodedMap[id as any];
       if(hardcodedName) return hardcodedName;
