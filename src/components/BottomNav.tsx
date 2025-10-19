@@ -1,5 +1,4 @@
 
-
 "use client";
 import { Star, Newspaper, MoreHorizontal, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,7 +20,7 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
   const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
     { key: 'Matches', label: "المباريات", icon: Shield },
     { key: 'Competitions', label: "اختياراتي", icon: Star },
-    { key: 'Iraq', label: "بلدي", icon: FootballIcon },
+    { key: 'MyCountry', label: "بلدي", icon: FootballIcon },
     { key: 'News', label: "أخبار", icon: Newspaper },
     { key: 'Settings', label: "المزيد", icon: MoreHorizontal },
   ];
@@ -57,7 +56,7 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
       <nav className="flex h-full items-center justify-around px-2 max-w-md mx-auto">
         {navItems.map(({ key, label, icon: Icon }) => {
           const isActive = activeScreen === key;
-          const isIraqTab = key === 'Iraq';
+          const isMyCountryTab = key === 'MyCountry';
 
           const NavButton = (
              <button
@@ -76,7 +75,7 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
             </button>
           );
 
-          if (isIraqTab) {
+          if (isMyCountryTab) {
             return (
               <Popover key={key} open={showTour} onOpenChange={handleTourOpenChange}>
                 <PopoverTrigger asChild>

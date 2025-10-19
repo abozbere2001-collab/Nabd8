@@ -156,6 +156,12 @@ export interface TeamStatistics {
 
 export interface Favorites {
   userId: string;
+  ourLeagueId?: number;
+  ourBallTeams?: { [key:number]: {
+    teamId: number;
+    name: string;
+    logo: string;
+  }};
   leagues?: { [key: number]: {
     name: string;
     logo: string;

@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Star, Pencil, Plus, Search } from 'lucide-react';
+import { Star, Pencil, Plus, Search, Heart } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -169,38 +169,60 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         return () => unsubscribe();
     }, [db, fetchAllCustomNames]);
 
-    const handleFavorite = useCallback(async (item: ManagedCompetitionType) => {
+    const handleFavorite = useCallback((type: 'star' | 'heart', item: ManagedCompetitionType) => {
         const itemId = item.leagueId;
-        const payload = { 
-            name: getName('league', itemId, item.name),
-            leagueId: itemId,
-            logo: item.logo
-        };
-
+        const isStar = type === 'star';
+        
         const newFavorites = { ...favorites };
-        if (!newFavorites.leagues) newFavorites.leagues = {};
 
-        const isFavorited = !!newFavorites.leagues?.[itemId];
-
-        if (isFavorited) {
-            delete newFavorites.leagues[itemId];
-        } else {
-            newFavorites.leagues[itemId] = payload;
+        if (isStar) {
+            if (!newFavorites.leagues) newFavorites.leagues = {};
+            const isFavorited = !!newFavorites.leagues?.[itemId];
+            if (isFavorited) {
+                delete newFavorites.leagues[itemId];
+            } else {
+                newFavorites.leagues[itemId] = { 
+                    name: getName('league', itemId, item.name),
+                    leagueId: itemId,
+                    logo: item.logo
+                };
+            }
+        } else { // Heart
+            const isOurLeague = newFavorites.ourLeagueId === itemId;
+            if (isOurLeague) {
+                delete newFavorites.ourLeagueId;
+            } else {
+                newFavorites.ourLeagueId = itemId;
+            }
         }
+        
         setFavorites(newFavorites);
 
         if (user && db) {
             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const fieldPath = `leagues.${itemId}`;
-            const operation = isFavorited
-                ? updateDoc(favRef, { [fieldPath]: deleteField() })
-                : setDoc(favRef, { leagues: { [itemId]: payload } }, { merge: true });
+            let updateData: any;
+            if(isStar) {
+                const fieldPath = `leagues.${itemId}`;
+                const isFavorited = !!favorites.leagues?.[itemId];
+                if(isFavorited) { // It was already favorited, so this action is to unfavorite
+                     updateData = { [fieldPath]: deleteField() };
+                } else {
+                     updateData = { leagues: { [itemId]: { name: item.name, logo: item.logo, leagueId: itemId } } };
+                }
+            } else {
+                const isOurLeague = favorites.ourLeagueId === itemId;
+                if(isOurLeague) { // This action is to un-select
+                    updateData = { ourLeagueId: deleteField() };
+                } else {
+                    updateData = { ourLeagueId: itemId };
+                }
+            }
 
-            operation.catch(serverError => {
+            setDoc(favRef, updateData, { merge: true }).catch(serverError => {
                 const permissionError = new FirestorePermissionError({
                     path: favRef.path,
                     operation: 'update',
-                    requestResourceData: { leagues: { [itemId]: payload } }
+                    requestResourceData: updateData
                 });
                 errorEmitter.emit('permission-error', permissionError);
                 // Revert optimistic update on error
@@ -365,19 +387,21 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                 (content.leagues as ManagedCompetitionType[]).map(comp => 
                                                     <li key={comp.leagueId} 
                                                         className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
-                                                        onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
                                                     >
-                                                        <div className="flex items-center gap-3">
-                                                        <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
-                                                        <span className="text-sm">{comp.name}</span>
+                                                        <div className="flex items-center gap-3 flex-1 min-w-0" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
+                                                            <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+                                                            <span className="text-sm truncate">{comp.name}</span>
                                                         </div>
-                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('heart', comp); }}>
+                                                                <Heart className={favorites.ourLeagueId === comp.leagueId ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                            </Button>
                                                             {isAdmin && (
                                                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'league', id: comp.leagueId, name: comp.name, originalName: managedCompetitions.find(c => c.leagueId === comp.leagueId)?.name }) }}>
                                                                     <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                                 </Button>
                                                             )}
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp); }}>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('star', comp); }}>
                                                                 <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                             </Button>
                                                         </div>
@@ -401,20 +425,22 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                     <AccordionContent className="p-1">
                                                         <ul className="flex flex-col">{leagues.map(comp => 
                                                             <li key={comp.leagueId} 
-                                                                className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group cursor-pointer"
-                                                                onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}
+                                                                className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group"
                                                             >
-                                                                <div className="flex items-center gap-3">
-                                                                <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
-                                                                <span className="text-sm">{comp.name}</span>
+                                                                <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
+                                                                    <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+                                                                    <span className="text-sm truncate">{comp.name}</span>
                                                                 </div>
-                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('heart', comp); }}>
+                                                                        <Heart className={favorites.ourLeagueId === comp.leagueId ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                                    </Button>
                                                                     {isAdmin && (
                                                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'league', id: comp.leagueId, name: comp.name, originalName: managedCompetitions.find(c => c.leagueId === comp.leagueId)?.name }) }}>
                                                                             <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                                         </Button>
                                                                     )}
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp); }}>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('star', comp); }}>
                                                                         <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                                     </Button>
                                                                 </div>

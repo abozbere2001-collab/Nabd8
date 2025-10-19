@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
@@ -9,13 +8,13 @@ import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { collection, getDocs, doc, query, orderBy, onSnapshot, deleteDoc } from 'firebase/firestore';
-import { useFirestore, useAdmin } from '@/firebase/provider';
-import type { Fixture, Standing, AdminFavorite, ManualTopScorer, PinnedMatch } from '@/lib/types';
+import { collection, getDocs, doc, query, orderBy, onSnapshot, deleteDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
+import type { Fixture, Standing, AdminFavorite, ManualTopScorer, PinnedMatch, Favorites } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
-import { Users, Search, Pin, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Users, Search, Pin, Edit, Trash2, Loader2, Heart } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { FixtureItem } from '@/components/FixtureItem';
@@ -35,6 +34,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { isMatchLive } from '@/lib/matchStatus';
+import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
 const IRAQI_LEAGUE_ID = 542;
 
@@ -113,9 +113,9 @@ function OurLeagueTab({
              <div className="sticky top-0 bg-background z-10 -mx-4 px-1">
                 <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
                     <TabsList className="grid w-full grid-cols-3 rounded-none h-11 p-0 flex-row-reverse bg-transparent">
-                        <TabsTrigger value="scorers" className='data-[state=active]:shadow-none'>الهدافين</TabsTrigger>
-                        <TabsTrigger value="standings" className='data-[state=active]:shadow-none'>الترتيب</TabsTrigger>
-                        <TabsTrigger value="matches" className='data-[state=active]:shadow-none'>المباريات</TabsTrigger>
+                        <TabsTrigger value="scorers">الهدافين</TabsTrigger>
+                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                        <TabsTrigger value="matches">المباريات</TabsTrigger>
                     </TabsList>
                 </div>
             </div>
@@ -232,63 +232,85 @@ function OurLeagueTab({
     );
 }
 
-function OurBallTab({ navigate, isAdmin }: { navigate: ScreenProps['navigate'], isAdmin: boolean }) {
-    const [teams, setTeams] = useState<AdminFavorite[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [deletingId, setDeletingId] = useState<number | null>(null);
+function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
+    const { user } = useAuth();
     const { db } = useFirestore();
     const { toast } = useToast();
+    const [teams, setTeams] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<number | null>(null);
     const [customTeamNames, setCustomTeamNames] = useState<Map<number, string>>(new Map());
-
-    const fetchCustomNames = useCallback(async () => {
-        if (!db) return;
-        const snapshot = await getDocs(collection(db, 'teamCustomizations'));
-        const names = new Map<number, string>();
-        snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
-        setCustomTeamNames(names);
-    }, [db]);
-
 
     useEffect(() => {
         if (!db) return;
+        let unsubscribe: (() => void) | null = null;
+        
+        const fetchCustomNames = async () => {
+            const snapshot = await getDocs(collection(db, 'teamCustomizations'));
+            const names = new Map<number, string>();
+            snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
+            return names;
+        };
 
-        const favsRef = collection(db, 'adminFavorites');
-        const unsubscribe = onSnapshot(favsRef, async (snapshot) => {
+        const setupListener = async () => {
             setLoading(true);
-            await fetchCustomNames();
-            const fetchedTeams: AdminFavorite[] = [];
-            snapshot.forEach((doc) => {
-                fetchedTeams.push(doc.data() as AdminFavorite);
-            });
-            setTeams(fetchedTeams);
-            setLoading(false);
-        }, (error) => {
-            const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
-            setLoading(false);
-        });
+            const names = await fetchCustomNames();
+            setCustomTeamNames(names);
 
-        return () => unsubscribe();
-    }, [db, fetchCustomNames]);
+            if (user && db) {
+                const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+                unsubscribe = onSnapshot(favsRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const favs = snapshot.data() as Favorites;
+                        setTeams(Object.values(favs.ourBallTeams || {}));
+                    } else {
+                        setTeams([]);
+                    }
+                    setLoading(false);
+                }, (error) => {
+                    const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'get' });
+                    errorEmitter.emit('permission-error', permissionError);
+                    setLoading(false);
+                });
+            } else {
+                setTeams(Object.values(getLocalFavorites().ourBallTeams || {}));
+                setLoading(false);
+            }
+        };
+
+        setupListener();
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, [user, db]);
 
     const handleDelete = (teamId: number) => {
-        if (!db || !isAdmin) return;
+        if (deletingId) return;
         setDeletingId(teamId);
-        const docRef = doc(db, 'adminFavorites', String(teamId));
-        deleteDoc(docRef)
-            .then(() => {
-                toast({ title: 'نجاح', description: 'تم حذف الفريق من قائمة كرتنا.' });
-            })
-            .catch(error => {
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
-                errorEmitter.emit('permission-error', permissionError);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الفريق.' });
-            })
-            .finally(() => {
-                setDeletingId(null);
-            });
-    };
 
+        if (user && db) {
+            const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            updateDoc(docRef, { [`ourBallTeams.${teamId}`]: deleteField() })
+                .catch(error => {
+                    const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'update' });
+                    errorEmitter.emit('permission-error', permissionError);
+                    toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الفريق.' });
+                })
+                .finally(() => {
+                    setDeletingId(null);
+                });
+        } else {
+            const currentFavorites = getLocalFavorites();
+            if (currentFavorites.ourBallTeams) {
+                delete currentFavorites.ourBallTeams[teamId];
+                setLocalFavorites(currentFavorites);
+                setTeams(Object.values(currentFavorites.ourBallTeams));
+            }
+            setDeletingId(null);
+        }
+    };
+    
     if (loading) {
         return (
              <div className="space-y-4 pt-4">
@@ -298,7 +320,13 @@ function OurBallTab({ navigate, isAdmin }: { navigate: ScreenProps['navigate'], 
     }
 
     if (teams.length === 0) {
-        return <p className="pt-4 text-center text-muted-foreground">لم يتم إضافة فرق خاصة من قبل المدير بعد.</p>
+        return (
+            <div className="text-center text-muted-foreground py-10 px-4">
+                <p className="text-lg font-semibold">قسم "كرتنا" فارغ</p>
+                <p>أضف فرقك ومنتخباتك المفضلة هنا بالضغط على زر القلب ❤️ في صفحة تفاصيل البطولة.</p>
+                <Button className="mt-4" onClick={() => navigate('AllCompetitions')}>استكشف البطولات</Button>
+            </div>
+        );
     }
 
     return (
@@ -307,39 +335,36 @@ function OurBallTab({ navigate, isAdmin }: { navigate: ScreenProps['navigate'], 
                 const displayName = customTeamNames.get(team.teamId) || team.name;
                 return (
                     <div key={team.teamId} className="p-3 rounded-lg border bg-card flex items-center gap-3 h-16">
-                        <div onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: team.teamId, teamName: displayName })} className="flex-1 flex items-center gap-3 cursor-pointer">
+                        <div onClick={() => navigate('TeamDetails', { teamId: team.teamId, teamName: displayName })} className="flex-1 flex items-center gap-3 cursor-pointer">
                             <Avatar className="h-10 w-10">
                                 <AvatarImage src={team.logo} alt={displayName} />
                                 <AvatarFallback>{displayName.substring(0, 2)}</AvatarFallback>
                             </Avatar>
                             <div>
                                 <p className="font-bold">{displayName}</p>
-                                <p className="text-xs text-muted-foreground">{team.note}</p>
                             </div>
                         </div>
-                        {isAdmin && (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" disabled={deletingId === team.teamId} onClick={(e) => e.stopPropagation()}>
-                                        {deletingId === team.teamId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            سيتم حذف فريق "{displayName}" من قائمة "كرتنا". لا يمكن التراجع عن هذا الإجراء.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDelete(team.teamId)} className="bg-destructive hover:bg-destructive/90">
-                                            حذف
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        )}
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" disabled={deletingId === team.teamId} onClick={(e) => e.stopPropagation()}>
+                                    {deletingId === team.teamId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        سيتم حذف فريق "{displayName}" من قائمة "كرتنا".
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(team.teamId)} className="bg-destructive hover:bg-destructive/90">
+                                        حذف
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     </div>
                 );
             })}
@@ -347,7 +372,7 @@ function OurBallTab({ navigate, isAdmin }: { navigate: ScreenProps['navigate'], 
     );
 }
 
-export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [loading, setLoading] = useState(true);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
@@ -481,8 +506,8 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
            <div className="sticky top-0 bg-background z-10 px-1 pt-1 -mx-4">
                 <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
                     <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-11 bg-transparent p-0">
-                      <TabsTrigger value="our-ball" className="data-[state=active]:shadow-none">كرتنا</TabsTrigger>
-                      <TabsTrigger value="our-league" className="data-[state=active]:shadow-none">دورينا</TabsTrigger>
+                      <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
+                      <TabsTrigger value="our-league">دورينا</TabsTrigger>
                     </TabsList>
                 </div>
             </div>
@@ -497,7 +522,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             />
           </TabsContent>
           <TabsContent value="our-ball" className="pt-0">
-             <OurBallTab navigate={navigate} isAdmin={isAdmin} />
+             <OurBallTab navigate={navigate} />
           </TabsContent>
         </Tabs>
       </div>

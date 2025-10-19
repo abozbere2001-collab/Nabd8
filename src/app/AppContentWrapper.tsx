@@ -6,7 +6,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { MatchesScreen } from './screens/MatchesScreen';
 import { CompetitionsScreen } from './screens/CompetitionsScreen';
 import { AllCompetitionsScreen } from './screens/AllCompetitionsScreen';
-import { IraqScreen } from './screens/IraqScreen';
+import { MyCountryScreen } from './screens/IraqScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
@@ -53,7 +53,7 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
   Competitions: { component: CompetitionsScreen },
   AllCompetitions: { component: AllCompetitionsScreen },
-  Iraq: { component: IraqScreen },
+  MyCountry: { component: MyCountryScreen },
   News: { component: NewsScreen },
   Settings: { component: SettingsScreen },
   CompetitionDetails: { component: CompetitionDetailScreen },
@@ -82,7 +82,7 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
 };
 
 
-const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'Iraq', 'News', 'Settings'];
+const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'MyCountry', 'News', 'Settings'];
 
 type StackItem = {
   key: string;
@@ -159,7 +159,7 @@ export function AppContentWrapper() {
     stacks: {
         'Matches': [{ key: 'Matches-0', screen: 'Matches' }],
         'Competitions': [{ key: 'Competitions-0', screen: 'Competitions' }],
-        'Iraq': [{ key: 'Iraq-0', screen: 'Iraq' }],
+        'MyCountry': [{ key: 'MyCountry-0', screen: 'MyCountry' }],
         'News': [{ key: 'News-0', screen: 'News' }],
         'Settings': [{ key: 'Settings-0', screen: 'Settings' }],
     },
