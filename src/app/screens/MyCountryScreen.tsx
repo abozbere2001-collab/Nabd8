@@ -36,6 +36,12 @@ import { isMatchLive } from '@/lib/matchStatus';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
 const IRAQI_LEAGUE_ID = 542;
+const IRAQI_LEAGUE_DEFAULT_DATA = { 
+    id: IRAQI_LEAGUE_ID, 
+    name: "دوري نجوم العراق", 
+    logo: "https://media.api-sports.io/football/leagues/542.png" 
+};
+
 
 function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onManage: () => void, isAdmin: boolean}) {
     if (!match.isEnabled) return null;
@@ -402,225 +408,232 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
 }
 
 export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
-  const [loading, setLoading] = useState(true);
-  const [fixtures, setFixtures] = useState<Fixture[]>([]);
-  const [standings, setStandings] = useState<Standing[]>([]);
-  const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
-  const { isAdmin, user } = useAdmin();
-  const { db } = useFirestore();
-  const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
-  const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
-  
-  const [ourLeague, setOurLeague] = useState<{ id: number, name: string, logo: string } | null>(null);
-  const [customNames, setCustomNames] = useState<Map<string, string>>(new Map());
+    const { user, db, isAdmin } = useFirebase();
+    const [loading, setLoading] = useState(true);
+    const [fixtures, setFixtures] = useState<Fixture[]>([]);
+    const [standings, setStandings] = useState<Standing[]>([]);
+    const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
+    const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
+    const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
 
-  const getLeagueDisplayName = useCallback((id: number, defaultName: string) => {
-    return customNames.get(String(id)) || hardcodedTranslations.leagues[id] || defaultName;
-  }, [customNames]);
+    const [ourLeague, setOurLeague] = useState<{ id: number; name: string; logo: string } | null>(null);
+    const [customNames, setCustomNames] = useState<{leagues: Map<string, string>, teams: Map<string, string>, players: Map<string, string>}>({leagues: new Map(), teams: new Map(), players: new Map() });
 
-  useEffect(() => {
-    if (!db) return;
-    const leagueNamesRef = collection(db, 'leagueCustomizations');
-    const unsub = onSnapshot(leagueNamesRef, (snapshot) => {
-        const names = new Map<string, string>();
-        snapshot.forEach(doc => names.set(doc.id, doc.data().customName));
-        setCustomNames(names);
-    });
-    return () => unsub();
-  }, [db]);
-
-
-  useEffect(() => {
-    if (!db) {
-        setLoadingPinnedMatches(false);
-        return;
-    };
+    const getDisplayName = useCallback((type: 'league' | 'team' | 'player', id: number, defaultName: string) => {
+        const key = `${type}s` as 'leagues' | 'teams' | 'players';
+        return customNames[key]?.get(String(id)) || hardcodedTranslations[key]?.[id] || defaultName;
+    }, [customNames]);
     
-    setLoadingPinnedMatches(true);
-    const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
-    const q = query(pinnedMatchesRef);
-    const unsub = onSnapshot(q, (snapshot) => {
-        const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch));
-        setPinnedMatches(matches);
-        setLoadingPinnedMatches(false);
-    }, (serverError) => {
-        const permissionError = new FirestorePermissionError({
-            path: pinnedMatchesRef.path,
-            operation: 'list'
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        setPinnedMatches([]);
-        setLoadingPinnedMatches(false);
-    });
 
-    return () => unsub();
-  }, [db]);
+    const fetchLeagueData = useCallback(async (leagueId: number) => {
+        setLoading(true);
+        setFixtures([]);
+        setStandings([]);
+        setTopScorers([]);
 
-  const fetchLeagueData = useCallback(async (leagueId: number) => {
-    setLoading(true);
-    setFixtures([]);
-    setStandings([]);
-    setTopScorers([]);
+        try {
+            const [fixturesRes, standingsRes, scorersRes] = await Promise.all([
+                fetch(`/api/football/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`),
+                fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
+                fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON}`),
+            ]);
 
-    try {
-      const [fixturesRes, standingsRes, scorersRes] = await Promise.all([
-        fetch(`/api/football/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`),
-        fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
-        leagueId === IRAQI_LEAGUE_ID ? Promise.resolve(null) : fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON}`),
-      ]);
+            const fixturesData = await fixturesRes.json();
+            const standingsData = await standingsRes.json();
+            const scorersData = await scorersRes.json();
 
-      const fixturesData = await fixturesRes.json();
-      const standingsData = await standingsRes.json();
-      
-      const translatedFixtures = (fixturesData.response || []).map((fixture: Fixture) => ({
-          ...fixture,
-          teams: {
-            home: { ...fixture.teams.home, name: hardcodedTranslations.teams[fixture.teams.home.id] || fixture.teams.home.name },
-            away: { ...fixture.teams.away, name: hardcodedTranslations.teams[fixture.teams.away.id] || fixture.teams.away.name },
-          }
-      }));
-      
-      const translatedStandings = (standingsData.response?.[0]?.league?.standings?.[0] || []).map((s: Standing) => ({
-        ...s,
-        team: { ...s.team, name: hardcodedTranslations.teams[s.team.id] || s.team.name }
-      }));
+            const translatedFixtures = (fixturesData.response || []).map((fixture: Fixture) => ({
+                ...fixture,
+                teams: {
+                    home: { ...fixture.teams.home, name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name) },
+                    away: { ...fixture.teams.away, name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name) },
+                }
+            }));
+            
+            const translatedStandings = (standingsData.response?.[0]?.league?.standings?.[0] || []).map((s: Standing) => ({
+                ...s,
+                team: { ...s.team, name: getDisplayName('team', s.team.id, s.team.name) }
+            }));
+            
+            const translatedScorers = (scorersData.response || []).map((scorer: TopScorer) => ({
+                ...scorer,
+                player: { ...scorer.player, name: getDisplayName('player', scorer.player.id, scorer.player.name) },
+                statistics: scorer.statistics.map(stat => ({...stat, team: { ...stat.team, name: getDisplayName('team', stat.team.id, stat.team.name) }}))
+            }));
 
-      setFixtures(translatedFixtures);
-      setStandings(translatedStandings);
+            setFixtures(translatedFixtures);
+            setStandings(translatedStandings);
+            setTopScorers(translatedScorers);
+            
+        } catch (error) {
+            console.error("Failed to fetch league details:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [getDisplayName]);
+    
+    useEffect(() => {
+        const fetchCustomNamesAndLeague = async () => {
+            if (!db) { // Handle case where db is not ready
+                setLoading(true);
+                return;
+            }
 
-      if (scorersRes) {
-        const scorersData = await scorersRes.json();
-        const translatedScorers = (scorersData.response || []).map((scorer: TopScorer) => ({
-            ...scorer,
-            player: { ...scorer.player, name: hardcodedTranslations.players[scorer.player.id] || scorer.player.name },
-            statistics: scorer.statistics.map(stat => ({...stat, team: { ...stat.team, name: hardcodedTranslations.teams[stat.team.id] || stat.team.name }}))
-        }));
-        setTopScorers(translatedScorers);
-      }
+            try {
+                const [leaguesSnapshot, teamsSnapshot, playersSnapshot] = await Promise.all([
+                    getDocs(collection(db, 'leagueCustomizations')),
+                    getDocs(collection(db, 'teamCustomizations')),
+                    getDocs(collection(db, 'playerCustomizations'))
+                ]);
 
-    } catch (error) {
-      console.error("Failed to fetch league details:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+                const leagueNames = new Map<string, string>();
+                leaguesSnapshot.forEach(doc => leagueNames.set(doc.id, doc.data().customName));
+                
+                const teamNames = new Map<string, string>();
+                teamsSnapshot.forEach(doc => teamNames.set(doc.id, doc.data().customName));
+                
+                const playerNames = new Map<string, string>();
+                playersSnapshot.forEach(doc => playerNames.set(doc.id, doc.data().customName));
 
-  useEffect(() => {
-    let unsubFavorites: (() => void) | undefined;
-    const setup = (favs: Partial<Favorites>) => {
-        const ourLeagueId = favs?.ourLeagueId;
-        const leagueInfo = favs.leagues?.[ourLeagueId || IRAQI_LEAGUE_ID];
-        
-        if (ourLeagueId && leagueInfo) {
-             const displayName = getLeagueDisplayName(ourLeagueId, leagueInfo.name);
-             setOurLeague({ id: ourLeagueId, name: displayName, logo: leagueInfo.logo });
-             fetchLeagueData(ourLeagueId);
+                setCustomNames({ leagues: leagueNames, teams: teamNames, players: playerNames });
+            } catch (e) {
+                console.warn("Could not fetch custom names", e);
+            }
+        };
+
+        fetchCustomNamesAndLeague();
+    }, [db]);
+
+
+    useEffect(() => {
+        let unsubFavorites: (() => void) | undefined;
+    
+        const setupOurLeague = (favorites: Partial<Favorites>) => {
+            const ourLeagueId = favorites?.ourLeagueId;
+            const leagueFromFavorites = ourLeagueId ? favorites.leagues?.[ourLeagueId] : undefined;
+    
+            let leagueToDisplay;
+    
+            if (leagueFromFavorites) {
+                leagueToDisplay = {
+                    id: leagueFromFavorites.leagueId,
+                    name: getDisplayName('league', leagueFromFavorites.leagueId, leagueFromFavorites.name),
+                    logo: leagueFromFavorites.logo,
+                };
+            } else {
+                leagueToDisplay = {
+                    ...IRAQI_LEAGUE_DEFAULT_DATA,
+                    name: getDisplayName('league', IRAQI_LEAGUE_ID, IRAQI_LEAGUE_DEFAULT_DATA.name),
+                };
+            }
+    
+            setOurLeague(leagueToDisplay);
+            fetchLeagueData(leagueToDisplay.id);
+        };
+    
+        if (user && db) {
+            const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            unsubFavorites = onSnapshot(favsRef, (doc) => {
+                const favs = (doc.data() as Favorites) || {};
+                setupOurLeague(favs);
+            });
         } else {
-             // Default to Iraqi League if nothing is selected
-             setOurLeague({ id: IRAQI_LEAGUE_ID, name: getLeagueDisplayName(IRAQI_LEAGUE_ID, "دوري نجوم العراق"), logo: "https://media.api-sports.io/football/leagues/542.png"});
-             fetchLeagueData(IRAQI_LEAGUE_ID);
+            // Guest user
+            const localFavs = getLocalFavorites();
+            setupOurLeague(localFavs);
         }
-    };
-
-    if (user && db) {
-        const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        unsubFavorites = onSnapshot(favsRef, (doc) => {
-            const favs = (doc.data() as Favorites) || {};
-            setup(favs);
-        });
-    } else {
-        const localFavs = getLocalFavorites();
-        setup(localFavs);
-    }
-
-    return () => {
-        if (unsubFavorites) unsubFavorites();
-    };
-  }, [user, db, fetchLeagueData, getLeagueDisplayName]);
-
-
-  useEffect(() => {
-      if (db && ourLeague?.id === IRAQI_LEAGUE_ID) {
-          const scorersRef = collection(db, 'iraqiLeagueTopScorers');
-          const q = query(scorersRef, orderBy('rank', 'asc'));
-          const unsubscribe = onSnapshot(q, (snapshot) => {
-              const fetchedScorers = snapshot.docs.map((doc) => doc.data() as ManualTopScorer);
-              // The API for manual scorers has a different structure. We need to adapt it.
-              // For simplicity, we assume the API for scorers will be dynamic now.
-          }, (error) => {
-              const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
-              errorEmitter.emit('permission-error', permissionError);
-          });
-           return () => unsubscribe();
-      }
-  }, [db, ourLeague]);
-  
-  return (
-    <div className="flex h-full flex-col bg-background">
-      <ScreenHeader 
-        title={"بلدي"} 
-        onBack={goBack} 
-        canGoBack={canGoBack} 
-        actions={
-          <div className="flex items-center gap-1">
-              <SearchSheet navigate={navigate}>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
-                      <Search className="h-5 w-5" />
-                  </Button>
-              </SearchSheet>
-              <ProfileButton/>
-          </div>
-        }
-      />
-      <div className="flex-1 overflow-y-auto px-4">
-        {loadingPinnedMatches ? (
-            <Skeleton className="h-28 w-full mb-4" />
-        ) : (
-          <>
-            {pinnedMatches.map(match => (
-              <PinnedMatchCard 
-                key={match.id} 
-                match={match} 
-                onManage={() => navigate('ManagePinnedMatch', { matchId: match.id })} 
-                isAdmin={isAdmin} 
-              />
-            ))}
-            {isAdmin && pinnedMatches.filter(m => m.isEnabled).length === 0 && (
-                <Button className="w-full my-2" onClick={() => navigate('ManagePinnedMatch', { matchId: null })}>
-                    <Pin className="ml-2 h-4 w-4" />
-                    إضافة مباراة للتثبيت
-                </Button>
-            )}
-          </>
-        )}
-
-        <Tabs defaultValue="our-league" className="w-full">
-           <div className="sticky top-0 bg-background z-10 px-1 pt-1 -mx-4">
-                <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
-                    <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-11 bg-transparent p-0">
-                      <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
-                      <TabsTrigger value="our-league">دورينا</TabsTrigger>
-                    </TabsList>
-                </div>
-            </div>
-          <TabsContent value="our-league" className="pt-4">
-            <OurLeagueTab 
-                navigate={navigate} 
-                fixtures={fixtures}
-                standings={standings}
-                topScorers={topScorers}
-                loading={loading}
-                isAdmin={isAdmin}
-                ourLeague={ourLeague}
-            />
-          </TabsContent>
-          <TabsContent value="our-ball" className="pt-0">
-             <OurBallTab navigate={navigate} />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
-  );
-}
-
     
+        return () => {
+            if (unsubFavorites) unsubFavorites();
+        };
+    }, [user, db, customNames, getDisplayName, fetchLeagueData]); 
+    
+
+    // Pinned Matches listener
+    useEffect(() => {
+        if (!db) {
+            setLoadingPinnedMatches(false);
+            return;
+        }
+        setLoadingPinnedMatches(true);
+        const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
+        const q = query(pinnedMatchesRef);
+        const unsub = onSnapshot(q, (snapshot) => {
+            const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch));
+            setPinnedMatches(matches);
+            setLoadingPinnedMatches(false);
+        }, (serverError) => {
+            const permissionError = new FirestorePermissionError({ path: pinnedMatchesRef.path, operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
+            setLoadingPinnedMatches(false);
+        });
+        return () => unsub();
+    }, [db]);
+
+    return (
+        <div className="flex h-full flex-col bg-background">
+            <ScreenHeader
+                title={"بلدي"}
+                onBack={goBack}
+                canGoBack={canGoBack}
+                actions={
+                    <div className="flex items-center gap-1">
+                        <SearchSheet navigate={navigate}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <Search className="h-5 w-5" />
+                            </Button>
+                        </SearchSheet>
+                        <ProfileButton />
+                    </div>
+                }
+            />
+            <div className="flex-1 overflow-y-auto px-4">
+                {loadingPinnedMatches ? (
+                    <Skeleton className="h-28 w-full mb-4" />
+                ) : (
+                    <>
+                        {pinnedMatches.map(match => (
+                            <PinnedMatchCard
+                                key={match.id}
+                                match={match}
+                                onManage={() => navigate('ManagePinnedMatch', { matchId: match.id })}
+                                isAdmin={isAdmin}
+                            />
+                        ))}
+                        {isAdmin && pinnedMatches.filter(m => m.isEnabled).length === 0 && (
+                            <Button className="w-full my-2" onClick={() => navigate('ManagePinnedMatch', { matchId: null })}>
+                                <Pin className="ml-2 h-4 w-4" />
+                                إضافة مباراة للتثبيت
+                            </Button>
+                        )}
+                    </>
+                )}
+
+                <Tabs defaultValue="our-league" className="w-full">
+                    <div className="sticky top-0 bg-background z-10 px-1 pt-1 -mx-4">
+                        <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
+                            <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-11 bg-transparent p-0">
+                                <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
+                                <TabsTrigger value="our-league">دورينا</TabsTrigger>
+                            </TabsList>
+                        </div>
+                    </div>
+                    <TabsContent value="our-league" className="pt-4">
+                        <OurLeagueTab
+                            navigate={navigate}
+                            fixtures={fixtures}
+                            standings={standings}
+                            topScorers={topScorers}
+                            loading={loading}
+                            isAdmin={isAdmin}
+                            ourLeague={ourLeague}
+                        />
+                    </TabsContent>
+                    <TabsContent value="our-ball" className="pt-0">
+                        <OurBallTab navigate={navigate} />
+                    </TabsContent>
+                </Tabs>
+            </div>
+        </div>
+    );
+}
