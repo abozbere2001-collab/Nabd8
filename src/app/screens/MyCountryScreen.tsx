@@ -400,9 +400,9 @@ function OurBallTab({ navigate, ourBallTeams, user, db }: { navigate: ScreenProp
         <div className="flex flex-col h-full pt-4">
             <ScrollArea className="w-full whitespace-nowrap border-b">
                 <div className="flex w-max space-x-4 px-4 pb-3 flex-row-reverse">
-                    {ourBallTeams.map((team, index) => (
+                    {ourBallTeams.map((team) => (
                         <div
-                            key={`${team.id}-${index}`}
+                            key={team.id}
                             className={cn(
                                 "flex flex-col items-center gap-1 w-16 text-center cursor-pointer transition-opacity opacity-60",
                                 selectedTeamId === team.id && "opacity-100"
@@ -448,14 +448,14 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
                 setLoading(false);
             }, (error) => {
-                if (user) { // Only emit error if a user is actually logged in
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
+                if (user) { 
+                    const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'get' });
+                    errorEmitter.emit('permission-error', permissionError);
                 }
-                setFavorites(getLocalFavorites()); // Fallback for permission errors
+                setFavorites(getLocalFavorites());
                 setLoading(false);
             });
         } else {
-            // Guest user
             setFavorites(getLocalFavorites());
             setLoading(false);
         }
@@ -470,13 +470,8 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         const leagueId = favorites?.ourLeagueId;
         if (!leagueId) return null;
         
-        // Data might come from the 'leagues' map within favorites
         const leagueDetails = favorites?.leagues?.[leagueId];
-        if (leagueDetails) {
-            return { id: leagueId, name: leagueDetails.name, logo: leagueDetails.logo };
-        }
-        
-        return null;
+        return leagueDetails ? { id: leagueId, name: leagueDetails.name, logo: leagueDetails.logo } : null;
 
     }, [favorites]);
 

@@ -106,21 +106,23 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [customNames]);
 
     useEffect(() => {
-        if (!user || !db) {
+        let unsubscribe: (() => void) | null = null;
+        if (user && db) {
+            const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            unsubscribe = onSnapshot(docRef, (doc) => {
+                setFavorites(doc.data() as Favorites || { userId: user.uid });
+            }, (error) => {
+                if (user) { 
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'get' }));
+                }
+                setFavorites(getLocalFavorites());
+            });
+        } else {
             setFavorites(getLocalFavorites());
-            return;
         }
-        
-        const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const unsubscribe = onSnapshot(docRef, (doc) => {
-            setFavorites(doc.data() as Favorites || { userId: user.uid });
-        }, (error) => {
-            if (user) { // Only emit error if a user is actually logged in
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'get' }));
-            }
-            setFavorites(getLocalFavorites()); // Fallback to local
-        });
-        return () => unsubscribe();
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
     }, [user, db]);
 
     const fetchAllCustomNames = useCallback(async () => {
@@ -451,4 +453,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
-
