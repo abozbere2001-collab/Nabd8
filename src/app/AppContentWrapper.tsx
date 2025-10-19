@@ -232,9 +232,13 @@ export function AppContentWrapper() {
                 const isActiveTab = navigationState.activeTab === tabKey;
             
                 return (
-                    <div key={tabKey} className={cn("absolute inset-0 flex flex-col", isActiveTab ? "z-10" : "-z-10")}>
+                    <div 
+                        key={tabKey} 
+                        className="absolute inset-0 flex flex-col"
+                        style={{ display: isActiveTab ? 'flex' : 'none' }}
+                    >
                         {stack.map((stackItem, index) => {
-                            const isVisible = isActiveTab && index === stack.length - 1;
+                            const isVisible = index === stack.length - 1;
                             const Component = screenConfig[stackItem.screen]?.component;
                             if (!Component) return null;
                             
@@ -247,9 +251,14 @@ export function AppContentWrapper() {
                             };
 
                             return (
-                                <div key={stackItem.key} className={cn("absolute inset-0 flex flex-col transition-transform duration-300", 
-                                    isVisible ? "z-10 transform-none" : "z-0 -translate-x-full"
-                                )}>
+                                <div 
+                                    key={stackItem.key} 
+                                    className="absolute inset-0 flex flex-col"
+                                    style={{ 
+                                        display: isVisible ? 'flex' : 'none',
+                                        zIndex: isVisible ? 10 : 0
+                                    }}
+                                >
                                     <Component {...screenProps} />
                                 </div>
                             )
