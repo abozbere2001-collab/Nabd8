@@ -78,7 +78,14 @@ const AppFlow = () => {
                      setFlowState('login'); // Fallback to login on error
                 }
             } else {
-                // No user is logged in. Check if they have seen the welcome screen.
+                // No user is logged in. Check if they have completed guest onboarding before.
+                const guestOnboardingComplete = localStorage.getItem(GUEST_ONBOARDING_COMPLETE_KEY) === 'true';
+                if (guestOnboardingComplete) {
+                    setFlowState('app'); // If they have, treat them as a guest and show the app.
+                    return;
+                }
+
+                // If not, check if they have seen the welcome screen.
                 const welcomeSeen = localStorage.getItem(WELCOME_SEEN_KEY) === 'true';
                 if (welcomeSeen) {
                     setFlowState('login'); // Go directly to login if welcome has been seen
@@ -102,6 +109,7 @@ const AppFlow = () => {
                 errorEmitter.emit('permission-error', permissionError);
             }
         } else {
+            // This is a guest user completing onboarding.
             localStorage.setItem(GUEST_ONBOARDING_COMPLETE_KEY, 'true');
         }
         setFlowState('app');
