@@ -30,6 +30,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { isMatchLive } from '@/lib/matchStatus';
@@ -308,29 +309,35 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
 
     useEffect(() => {
         let unsubscribe: (() => void) | null = null;
-        setLoading(true);
+        
+        const setupListener = async () => {
+            setLoading(true);
 
-        if (user && db) {
-            // User is logged in, fetch from Firestore
-            const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            unsubscribe = onSnapshot(favsRef, (snapshot) => {
-                if (snapshot.exists()) {
-                    const favs = snapshot.data() as Favorites;
-                    setTeams(Object.values(favs.ourBallTeams || {}));
-                } else {
-                    setTeams([]);
-                }
+            if (user && db) {
+                const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+                unsubscribe = onSnapshot(favsRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const favs = snapshot.data() as Favorites;
+                        setTeams(Object.values(favs.ourBallTeams || {}));
+                    } else {
+                        setTeams([]);
+                    }
+                    setLoading(false);
+                }, (error) => {
+                    // Only emit a global error for actual permission issues, not for logged-out state
+                    if(user) {
+                        const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'get' });
+                        errorEmitter.emit('permission-error', permissionError);
+                    }
+                    setLoading(false);
+                });
+            } else {
+                setTeams(Object.values(getLocalFavorites().ourBallTeams || {}));
                 setLoading(false);
-            }, (error) => {
-                const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'get' });
-                errorEmitter.emit('permission-error', permissionError);
-                setLoading(false);
-            });
-        } else {
-            // Guest user, read from local storage
-            setTeams(Object.values(getLocalFavorites().ourBallTeams || {}));
-            setLoading(false);
-        }
+            }
+        };
+
+        setupListener();
 
         return () => {
             if (unsubscribe) unsubscribe();
@@ -428,7 +435,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user, db } = useAuth();
     const { isAdmin } = useAdmin();
     
-    const [ourLeagueId, setOurLeagueId] = useState<number | undefined>(IRAQI_LEAGUE_ID);
+    const [ourLeagueId, setOurLeagueId] = useState<number | null>(null);
     const [ourLeagueData, setOurLeagueData] = useState<{ id: number; name: string; logo: string; } | null>(null);
     const [loadingLeague, setLoadingLeague] = useState(true);
 
@@ -437,28 +444,31 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     
     useEffect(() => {
         let isMounted = true;
-        setLoadingLeague(true);
-
-        const listenToFavorites = () => {
+        
+        const setupListener = () => {
             if (user && db) {
                 const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
                 return onSnapshot(favsRef, (docSnap) => {
                     if (!isMounted) return;
                     const favs = (docSnap.data() as Favorites) || {};
-                    setOurLeagueId(favs.ourLeagueId); // Can be undefined
+                    setOurLeagueId(favs.ourLeagueId ?? null);
                 }, (error) => {
-                    if (!isMounted) return;
-                     const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'get' });
-                     errorEmitter.emit('permission-error', permissionError);
-                     setOurLeagueId(undefined); 
+                     if (isMounted) {
+                        setOurLeagueId(null);
+                        if (user) {
+                             const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'get' });
+                             errorEmitter.emit('permission-error', permissionError);
+                        }
+                     }
                 });
             } else {
                 const favs = getLocalFavorites();
-                if (isMounted) setOurLeagueId(favs.ourLeagueId);
+                if(isMounted) setOurLeagueId(favs.ourLeagueId ?? null);
                 return () => {};
             }
         };
-        const unsubscribe = listenToFavorites();
+
+        const unsubscribe = setupListener();
         return () => {
             isMounted = false;
             unsubscribe();
@@ -470,7 +480,10 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         setLoadingLeague(true);
         
         const fetchLeagueDetails = async () => {
+             // If ourLeagueId is null (not just undefined), it means user chose no league.
+             // If ourLeagueId is undefined, it means we are still figuring it out, default to Iraqi league.
             const leagueToFetch = ourLeagueId === undefined ? IRAQI_LEAGUE_ID : ourLeagueId;
+            
             if (leagueToFetch === null) {
                 if(isMounted) {
                     setOurLeagueData(null);
@@ -585,3 +598,11 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
+
+    
+
+    
+
+
+
+    

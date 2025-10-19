@@ -106,21 +106,21 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [customNames]);
 
     useEffect(() => {
-        if (!user || !db) {
+        if (user && db) {
+            const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const unsubscribe = onSnapshot(docRef, (doc) => {
+                setFavorites(doc.data() as Favorites || { userId: user.uid });
+            }, (error) => {
+                if (error.code !== 'permission-denied') {
+                    const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
+                    errorEmitter.emit('permission-error', permissionError);
+                }
+                setFavorites(getLocalFavorites()); // Fallback to local
+            });
+            return () => unsubscribe();
+        } else {
             setFavorites(getLocalFavorites());
-            return;
         }
-
-        const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const unsubscribe = onSnapshot(docRef, (doc) => {
-            setFavorites(doc.data() as Favorites || { userId: user.uid });
-        }, (error) => {
-            if (error.code !== 'permission-denied') {
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
-                errorEmitter.emit('permission-error', permissionError);
-            }
-        });
-        return () => unsubscribe();
     }, [user, db]);
 
     const fetchAllCustomNames = useCallback(async () => {
@@ -175,12 +175,12 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const currentFavorites = user && db ? favorites : getLocalFavorites();
         const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
 
-        let updateData: any = {};
+        let updateData: any;
         
         if (type === 'star') {
             const isCurrentlyFavorited = !!newFavorites.leagues?.[itemId];
             if (isCurrentlyFavorited) {
-                delete newFavorites.leagues[itemId];
+                if (newFavorites.leagues) delete newFavorites.leagues[itemId];
                 updateData = { [`leagues.${itemId}`]: deleteField() };
             } else {
                 if (!newFavorites.leagues) newFavorites.leagues = {};
@@ -203,7 +203,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
         if (user && db) {
             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            setDoc(favRef, updateData, { merge: true }).catch(serverError => {
+            updateDoc(favRef, updateData).catch(serverError => {
                 setFavorites(currentFavorites); // Revert on error
                 const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
                 errorEmitter.emit('permission-error', permissionError);
@@ -451,3 +451,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
+
+    

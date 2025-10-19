@@ -29,6 +29,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { CURRENT_SEASON } from '@/lib/constants';
 import {
@@ -156,22 +157,22 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   }, [customNames]);
 
   useEffect(() => {
-    if (!user || !db) {
-        setFavorites(getLocalFavorites());
-        return;
-    }
-    const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    const unsub = onSnapshot(favDocRef, (doc) => {
-        setFavorites(doc.data() as Favorites || { userId: user.uid });
-    }, (error) => {
-        if (error.code === 'permission-denied') return;
-        const permissionError = new FirestorePermissionError({
-            path: favDocRef.path,
-            operation: 'get',
+    if (user && db) {
+        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const unsub = onSnapshot(favDocRef, (doc) => {
+            setFavorites(doc.data() as Favorites || { userId: user.uid });
+        }, (error) => {
+            if (error.code === 'permission-denied') {
+                setFavorites(getLocalFavorites()); // Fallback for guests or permission issues
+                return;
+            }
+            const permissionError = new FirestorePermissionError({ path: favDocRef.path, operation: 'get' });
+            errorEmitter.emit('permission-error', permissionError);
         });
-        errorEmitter.emit('permission-error', permissionError);
-    });
-    return () => unsub();
+        return () => unsub();
+    } else {
+        setFavorites(getLocalFavorites());
+    }
   }, [user, db]);
 
  useEffect(() => {
@@ -272,8 +273,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             : !!favorites?.ourBallTeams?.[team.id];
 
         if (type === 'heart' && !isCurrentlyFavorited) {
-             const note = favorites?.ourBallTeams?.[team.id]?.note || '';
-             setRenameItem({ id: team.id, name: team.name, note, type: 'team', originalData: team });
+             const userNote = (favorites?.ourBallTeams?.[team.id] as any)?.note || '';
+             setRenameItem({ id: team.id, name: team.name, note: userNote, type: 'team', originalData: team });
         } else {
              updateFavorites(team, type, isCurrentlyFavorited);
         }
@@ -306,19 +307,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
         if (user && db) {
             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const dataToSave: any = { 
-                teamId: team.id, 
-                name: team.name, 
-                logo: team.logo, 
-                type: team.national ? 'National' : 'Club'
-            };
-            if (type === 'heart' && note) {
-                dataToSave.note = note;
-            }
             
-            const updateData = { [`${field}.${team.id}`]: isCurrentlyFavorited ? deleteField() : dataToSave };
-            
-            setDoc(favRef, updateData, { merge: true }).catch(serverError => {
+            const updateData = isCurrentlyFavorited 
+                ? { [`${field}.${team.id}`]: deleteField() }
+                : { [`${field}.${team.id}`]: newFavorites[field][team.id] };
+
+            updateDoc(favRef, updateData).catch(serverError => {
                 setFavorites(currentFavorites); // Revert on error
                 const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
                 errorEmitter.emit('permission-error', permissionError);
@@ -333,7 +327,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
     if (type === 'team') {
         const currentName = getDisplayName('team', id, originalData.name);
-        const userNote = favorites?.ourBallTeams?.[id]?.note || '';
+        const userNote = (favorites?.ourBallTeams?.[id] as any)?.note || '';
         const adminNote = isAdmin ? customNames.adminNotes.get(id) || '' : '';
         
         setRenameItem({ id, name: currentName, note: isAdmin ? adminNote : userNote, type, originalData });
@@ -350,32 +344,35 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const handleSaveRename = async (type: RenameType, id: string | number, newName: string, newNote?: string) => {
     if (!renameItem) return;
     
-    // User adding a note via heart button
-    if (type === 'team' && renameItem.originalData && !isAdmin) {
+    // User adding/editing a note via heart button
+    if (type === 'team' && renameItem.originalData) {
         const team = renameItem.originalData as Team;
-        updateFavorites(team, 'heart', false, newNote);
-        setRenameItem(null);
-        return;
+        const isHearted = !!favorites?.ourBallTeams?.[team.id];
+        updateFavorites(team, 'heart', isHearted, newNote);
     }
     
     // Admin rename logic
     if (isAdmin && db) {
-        const batch = writeBatch(db);
         const originalName = renameItem.originalData?.name;
         const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
         if (newName && newName !== originalName) {
-            batch.set(docRef, { customName: newName });
+            const data = { customName: newName };
+            setDoc(docRef, data).then(() => {
+                fetchAllCustomNames();
+                toast({ title: 'نجاح', description: 'تم حفظ الاسم المخصص.' });
+            }).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
+                errorEmitter.emit('permission-error', permissionError);
+            });
         } else {
-            batch.delete(docRef);
-        }
-         try {
-            await batch.commit();
-            toast({ title: 'نجاح', description: 'تم حفظ التغييرات بنجاح.' });
-            await fetchAllCustomNames(); // Refetch all names to update UI
-        } catch (serverError) {
-             const permissionError = new FirestorePermissionError({ path: `batch write for ${type} ${id}`, operation: 'write' });
-             errorEmitter.emit('permission-error', permissionError);
+             deleteDoc(docRef).then(() => {
+                fetchAllCustomNames();
+                toast({ title: 'نجاح', description: 'تمت إزالة الاسم المخصص.' });
+             }).catch(serverError => {
+                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
+                 errorEmitter.emit('permission-error', permissionError);
+             });
         }
     }
     
@@ -607,13 +604,15 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             <span className="font-semibold text-sm">
                                 {displayName}
                             </span>
-                            <div className="absolute top-1 left-1 flex opacity-80">
+                             <div className="absolute top-1 right-1 flex">
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {
                                     e.stopPropagation();
                                     handleFavoriteToggle(team, 'heart');
                                 }}>
                                     <Heart className={cn("h-5 w-5", isOurBallTeam ? "text-red-500 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
+                            </div>
+                            <div className="absolute top-1 left-1 flex">
                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {
                                     e.stopPropagation();
                                     handleFavoriteToggle(team, 'star');
@@ -631,4 +630,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+    
+
     
