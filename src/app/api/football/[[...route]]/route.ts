@@ -40,40 +40,6 @@ export async function GET(
       ...cacheOptions
     } as RequestInit);
 
-    // Special handling for odds to include history
-    if (routePath.includes('odds') && apiResponse.ok) {
-        const oddsData = await apiResponse.json();
-        const fixtureId = searchParams.get('fixture');
-        if (fixtureId) {
-            const historyUrl = `https://${API_FOOTBALL_HOST}/odds/history?fixture=${fixtureId}&bookmaker=8&bet=1`;
-            const historyResponse = await fetch(historyUrl, {
-                 headers: {
-                    'x-rapidapi-host': API_FOOTBALL_HOST,
-                    'x-rapidapi-key': API_FOOTBALL_KEY,
-                 },
-                 next: { revalidate: isVolatileRequest ? 60 : 3600 }
-            });
-            if (historyResponse.ok) {
-                const historyData = await historyResponse.json();
-                oddsData.odds_history = historyData.response.reduce((acc: any, item: any) => {
-                    if (!acc[item.fixture.id]) {
-                        acc[item.fixture.id] = {};
-                    }
-                    if (!acc[item.fixture.id][item.bookmaker.id]) {
-                        acc[item.fixture.id][item.bookmaker.id] = {};
-                    }
-                     if (!acc[item.fixture.id][item.bookmaker.id][item.bet.id]) {
-                        acc[item.fixture.id][item.bookmaker.id][item.bet.id] = [];
-                    }
-                    acc[item.fixture.id][item.bookmaker.id][item.bet.id].push(item);
-                    return acc;
-                }, {});
-            }
-        }
-        return NextResponse.json(oddsData);
-    }
-
-
     const responseBodyText = await apiResponse.text();
 
     if (!apiResponse.ok) {
