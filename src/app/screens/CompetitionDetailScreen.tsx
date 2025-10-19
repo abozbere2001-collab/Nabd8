@@ -632,4 +632,3 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   );
 }
     
-
