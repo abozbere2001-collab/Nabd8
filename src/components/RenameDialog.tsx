@@ -67,23 +67,26 @@ export function RenameDialog({
     status: 'الحالة',
   };
 
-  const hasNoteField = item?.type === 'team';
   const itemTypeDisplay = item ? itemTypeMap[item.type] : 'العنصر';
+  const isTeamAndUser = item?.type === 'team' && !isAdmin;
+  const isTeamAndAdmin = item?.type === 'team' && isAdmin;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>تعديل {itemTypeDisplay}</DialogTitle>
+          <DialogTitle>
+             {isTeamAndUser ? `ملاحظة على ${item.name}` : `تعديل ${itemTypeDisplay}`}
+          </DialogTitle>
            <DialogDescription>
+             {isTeamAndUser && "أضف ملاحظة شخصية على هذا الفريق. ستظهر هذه الملاحظة لك فقط."}
+             {isTeamAndAdmin && "يمكنك تعديل الاسم المخصص للفريق وإضافة ملاحظة إدارية."}
              {isAdmin && item?.type !== 'team' && `أدخل القيمة الجديدة لـ ${itemTypeDisplay}.`}
-             {isAdmin && item?.type === 'team' && "يمكنك تعديل الاسم المخصص وإضافة ملاحظة إدارية."}
-             {!isAdmin && item?.type === 'team' && "أضف ملاحظة شخصية على هذا الفريق."}
            </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           
-          {isAdmin && (
+          {isAdmin && !isTeamAndUser && (
             <div className="grid w-full items-center gap-1.5">
                 <Label htmlFor="name">{item?.type === 'status' ? 'الحالة المخصصة' : 'الاسم المخصص'}</Label>
                 <Input
@@ -95,14 +98,14 @@ export function RenameDialog({
             </div>
           )}
 
-          {hasNoteField && (
+          {item?.type === 'team' && (
             <div className="grid w-full items-center gap-1.5">
                 <Label htmlFor="note">ملاحظة</Label>
                 <Textarea 
                     id="note"
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
-                    placeholder={isAdmin ? "ملاحظة إدارية (تظهر للمدراء فقط)" : "اكتب ملاحظتك الشخصية هنا..."}
+                    placeholder={isAdmin ? "ملاحظة (تظهر للجميع)" : "اكتب ملاحظتك الشخصية هنا..."}
                 />
             </div>
           )}
@@ -121,3 +124,4 @@ export function RenameDialog({
     </Dialog>
   );
 }
+

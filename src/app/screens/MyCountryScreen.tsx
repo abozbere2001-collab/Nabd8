@@ -431,7 +431,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user, db } = useAuth();
     const { isAdmin } = useAdmin();
     
-    const [ourLeagueId, setOurLeagueId] = useState<number | null>(null);
+    const [ourLeagueId, setOurLeagueId] = useState<number | undefined>(undefined);
     const [ourLeagueData, setOurLeagueData] = useState<{ id: number; name: string; logo: string; } | null>(null);
     const [loadingLeague, setLoadingLeague] = useState(true);
 
@@ -446,14 +446,14 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 return onSnapshot(favsRef, (docSnap) => {
                     if (!isMounted) return;
                     const favs = (docSnap.data() as Favorites) || {};
-                    setOurLeagueId(favs.ourLeagueId ?? IRAQI_LEAGUE_ID);
+                    setOurLeagueId(favs.ourLeagueId);
                 }, () => {
                     if (!isMounted) return;
-                    setOurLeagueId(IRAQI_LEAGUE_ID);
+                    setOurLeagueId(undefined); // Default to undefined
                 });
             } else {
                 const favs = getLocalFavorites();
-                setOurLeagueId(favs.ourLeagueId ?? IRAQI_LEAGUE_ID);
+                setOurLeagueId(favs.ourLeagueId);
                 return () => {};
             }
         };
@@ -469,7 +469,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         setLoadingLeague(true);
         
         const fetchLeagueDetails = async () => {
-            if (ourLeagueId === null) {
+            if (ourLeagueId === undefined) {
                  if (isMounted) {
                     setOurLeagueData(null);
                     setLoadingLeague(false);
@@ -587,3 +587,4 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     
 
     
+
