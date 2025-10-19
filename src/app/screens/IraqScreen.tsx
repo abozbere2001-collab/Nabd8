@@ -202,7 +202,8 @@ function OurLeagueTab({
                         <TableRow>
                              <TableHead className="text-center">الأهداف</TableHead>
                              <TableHead className="text-right">الفريق</TableHead>
-                             <TableHead className="text-right">اللاعب</TableHead>
+                             <TableHead className="flex-1 text-right">اللاعب</TableHead>
+                             <TableHead className="text-right w-8">#</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -221,6 +222,7 @@ function OurLeagueTab({
                                         </Avatar>
                                     </div>
                                 </TableCell>
+                                <TableCell className="font-bold">{scorer.rank}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

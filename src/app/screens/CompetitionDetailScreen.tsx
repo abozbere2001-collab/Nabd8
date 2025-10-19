@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
@@ -39,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { isMatchLive } from '@/lib/matchStatus';
 
 
 type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach';
@@ -91,6 +92,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const [teams, setTeams] = useState<{team: Team}[]>([]);
   const [customNames, setCustomNames] = useState<{ teams: Map<number, string>, players: Map<number, string>, adminNotes: Map<number, string> }>({ teams: new Map(), players: new Map(), adminNotes: new Map() });
   const [season, setSeason] = useState<number>(CURRENT_SEASON);
+  
+  const fixturesListRef = useRef<HTMLDivElement>(null);
+  const firstUpcomingMatchRef = useRef<HTMLDivElement>(null);
 
   
   const fetchAllCustomNames = useCallback(async () => {
@@ -189,7 +193,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         const teamsData = await teamsRes.json();
         
         if(fixturesData.response) {
-            setFixtures(fixturesData.response);
+            const sortedFixtures = [...fixturesData.response].sort((a,b) => a.fixture.timestamp - b.fixture.timestamp);
+            setFixtures(sortedFixtures);
             if(!initialTitle && fixturesData.response.length > 0) {
                  setDisplayTitle(fixturesData.response[0].league.name);
             }
@@ -206,6 +211,18 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     }
     fetchData();
   }, [leagueId, initialTitle, fetchAllCustomNames, season]);
+
+  useEffect(() => {
+    if (!loading && fixtures.length > 0 && fixturesListRef.current && firstUpcomingMatchRef.current) {
+        setTimeout(() => {
+            if (fixturesListRef.current && firstUpcomingMatchRef.current) {
+                const listTop = fixturesListRef.current.offsetTop;
+                const itemTop = firstUpcomingMatchRef.current.offsetTop;
+                fixturesListRef.current.scrollTop = itemTop - listTop;
+            }
+        }, 100);
+    }
+  }, [loading, fixtures]);
 
   const handleFavorite = (type: 'league' | 'team' | 'player', item: any) => {
     if (!user || !db) return;
@@ -398,17 +415,25 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
              </div>
           </div>
           <TabsContent value="matches" className="p-0 mt-0">
-             {loading ? (
-                <div className="space-y-4 p-4">
-                    {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
-                </div>
-            ) : fixtures.length > 0 ? (
-                <div className="space-y-3 p-1">
-                    {fixtures.map((fixture) => (
-                       <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />
-                    ))}
-                </div>
-            ) : <p className="pt-4 text-center text-muted-foreground">لا توجد مباريات لهذا الموسم.</p>}
+             <div ref={fixturesListRef} className="h-full overflow-y-auto">
+                {loading ? (
+                    <div className="space-y-4 p-4">
+                        {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+                    </div>
+                ) : fixtures.length > 0 ? (
+                    <div className="space-y-3 p-1">
+                        {fixtures.map((fixture, index) => {
+                            const isUpcoming = !isMatchLive(fixture.fixture.status) && !['FT', 'AET', 'PEN', 'PST'].includes(fixture.fixture.status.short);
+                            const isFirstUpcoming = isUpcoming && !fixtures.slice(0, index).some(f => !isMatchLive(f.fixture.status) && !['FT', 'AET', 'PEN', 'PST'].includes(f.fixture.status.short));
+                            return (
+                                <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
+                                    <FixtureItem fixture={fixture} navigate={navigate} />
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : <p className="pt-4 text-center text-muted-foreground">لا توجد مباريات لهذا الموسم.</p>}
+             </div>
           </TabsContent>
           <TabsContent value="standings" className="p-0 mt-0">
             {loading ? (
@@ -480,9 +505,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     <TableHeader>
                         <TableRow>
                             <TableHead className="w-[90px] text-left"></TableHead>
-                            <TableHead className="text-right">اللاعب</TableHead>
-                            <TableHead className="text-right">الفريق</TableHead>
                             <TableHead className="text-center">الأهداف</TableHead>
+                            <TableHead className="text-right">الفريق</TableHead>
+                            <TableHead className="flex-1 text-right">اللاعب</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -497,6 +522,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             <Star className={cn("h-5 w-5", favorites?.players?.[player.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                         </Button>
                                      </div>
+                                </TableCell>
+                                <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
+                                <TableCell onClick={(e) => { e.stopPropagation(); navigate('TeamDetails', { teamId: statistics[0]?.team.id })}}>
+                                     <p className="text-xs text-muted-foreground text-right">{getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name)}</p>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-3 justify-end">
@@ -513,10 +542,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                         </div>
                                     </div>
                                 </TableCell>
-                                <TableCell onClick={(e) => { e.stopPropagation(); navigate('TeamDetails', { teamId: statistics[0]?.team.id })}}>
-                                     <p className="text-xs text-muted-foreground text-right">{getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name)}</p>
-                                </TableCell>
-                                <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
