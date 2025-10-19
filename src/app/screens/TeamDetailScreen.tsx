@@ -146,7 +146,7 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
                         </div>
                         {player.number && (
                            <div className="relative flex items-center justify-center text-primary-foreground">
-                               <Shirt className="h-10 w-10 text-primary" />
+                               <Shirt className="h-10 w-10 text-primary fill-primary" />
                                <span className="absolute text-xs font-bold">{player.number}</span>
                            </div>
                         )}
