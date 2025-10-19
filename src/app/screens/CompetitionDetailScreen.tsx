@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { isMatchLive } from '@/lib/matchStatus';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 
 type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach';
@@ -90,7 +91,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const [standings, setStandings] = useState<Standing[]>([]);
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const [teams, setTeams] = useState<{team: Team}[]>([]);
-  const [customNames, setCustomNames] = useState<{ teams: Map<number, string>, players: Map<number, string>, adminNotes: Map<number, string> }>({ teams: new Map(), players: new Map(), adminNotes: new Map() });
+  const [customNames, setCustomNames] = useState<{ teams: Map<number, string>, players: Map<number, string>, adminNotes: Map<number, string> } | null>(null);
   const [season, setSeason] = useState<number>(CURRENT_SEASON);
   
   const fixturesListRef = useRef<HTMLDivElement>(null);
@@ -98,7 +99,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   
   const fetchAllCustomNames = useCallback(async () => {
-    if (!db) return;
+    if (!db) {
+        setCustomNames({ teams: new Map(), players: new Map(), adminNotes: new Map() });
+        return;
+    };
     try {
         const [teamsSnapshot, playersSnapshot, adminFavsSnapshot] = await Promise.all([
             getDocs(collection(db, 'teamCustomizations')),
@@ -117,15 +121,24 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
         setCustomNames({ teams: teamNames, players: playerNames, adminNotes: adminNotes });
     } catch (error) {
-        // This might fail for regular users, which is okay. Admin features will be hidden.
         console.warn("Could not fetch custom names, this is expected for non-admins:", error);
+        setCustomNames({ teams: new Map(), players: new Map(), adminNotes: new Map() });
     }
   }, [db, isAdmin]);
   
 
   const getDisplayName = useCallback((type: 'team' | 'player', id: number, defaultName: string) => {
+    if (!customNames) return defaultName;
     const key = `${type}s` as 'teams' | 'players';
-    return customNames[key]?.get(id) || defaultName;
+    const firestoreMap = customNames[key];
+    const customName = firestoreMap.get(id);
+    if (customName) return customName;
+    
+    const hardcodedKey = type === 'team' ? 'teams' : 'players';
+    const hardcodedName = hardcodedTranslations[hardcodedKey]?.[id];
+    if (hardcodedName) return hardcodedName;
+
+    return defaultName;
   }, [customNames]);
 
   
@@ -159,11 +172,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             if (doc.exists()) {
                 setDisplayTitle(doc.data().customName);
             } else {
-                setDisplayTitle(initialTitle);
+                 const hardcodedName = hardcodedTranslations.leagues[leagueId];
+                 setDisplayTitle(hardcodedName || initialTitle);
             }
         }, (error) => {
             console.warn("Could not listen to league customizations, this is expected for non-admins:", error);
-            setDisplayTitle(initialTitle);
+            const hardcodedName = hardcodedTranslations.leagues[leagueId];
+            setDisplayTitle(hardcodedName || initialTitle);
         });
         return () => unsub();
     }
@@ -177,9 +192,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         return;
       }
       setLoading(true);
-      try {
-        await fetchAllCustomNames();
+      await fetchAllCustomNames();
 
+      try {
         const [fixturesRes, standingsRes, scorersRes, teamsRes] = await Promise.all([
           fetch(`/api/football/fixtures?league=${leagueId}&season=${season}`),
           fetch(`/api/football/standings?league=${leagueId}&season=${season}`),
@@ -196,7 +211,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             const sortedFixtures = [...fixturesData.response].sort((a,b) => a.fixture.timestamp - b.fixture.timestamp);
             setFixtures(sortedFixtures);
             if(!initialTitle && fixturesData.response.length > 0) {
-                 setDisplayTitle(fixturesData.response[0].league.name);
+                 const hardcodedName = hardcodedTranslations.leagues[fixturesData.response[0].league.id];
+                 setDisplayTitle(hardcodedName || fixturesData.response[0].league.name);
             }
         }
         if (standingsData.response[0]?.league?.standings[0]) setStandings(standingsData.response[0].league.standings[0]);
@@ -210,12 +226,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       }
     }
     fetchData();
-  }, [leagueId, initialTitle, fetchAllCustomNames, season]);
+  }, [leagueId, initialTitle, season, fetchAllCustomNames]);
 
   useEffect(() => {
-    if (!loading && fixtures.length > 0 && fixturesListRef.current && firstUpcomingMatchRef.current) {
+    if (!loading && fixtures.length > 0 && fixturesListRef.current) {
         setTimeout(() => {
-            if (fixturesListRef.current && firstUpcomingMatchRef.current) {
+             if (firstUpcomingMatchRef.current && fixturesListRef.current) {
                 const listTop = fixturesListRef.current.offsetTop;
                 const itemTop = firstUpcomingMatchRef.current.offsetTop;
                 fixturesListRef.current.scrollTop = itemTop - listTop;
@@ -263,6 +279,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   };
   
   const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
+    if (!customNames) return;
     const currentName = getDisplayName(type as 'team'|'player', id, originalData.name);
     const note = type === 'team' ? customNames.adminNotes.get(id) : undefined;
     setRenameItem({ id, name: currentName, note, type, originalName: originalData.name });
@@ -416,7 +433,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
           </div>
           <TabsContent value="matches" className="p-0 mt-0">
              <div ref={fixturesListRef} className="h-full overflow-y-auto">
-                {loading ? (
+                {loading || customNames === null ? (
                     <div className="space-y-4 p-4">
                         {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
                     </div>
@@ -436,7 +453,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
              </div>
           </TabsContent>
           <TabsContent value="standings" className="p-0 mt-0">
-            {loading ? (
+            {loading || customNames === null ? (
                  <div className="space-y-px p-4">
                     {Array.from({ length: 18 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
                 </div>
@@ -496,7 +513,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             ): <p className="pt-4 text-center text-muted-foreground">الترتيب غير متاح حالياً.</p>}
           </TabsContent>
            <TabsContent value="scorers" className="p-0 mt-0">
-            {loading ? (
+            {loading || customNames === null ? (
                 <div className="space-y-px p-4">
                     {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
@@ -508,10 +525,11 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             <TableHead className="text-center">الأهداف</TableHead>
                             <TableHead className="text-right">الفريق</TableHead>
                             <TableHead className="flex-1 text-right">اللاعب</TableHead>
+                            <TableHead className="w-8 text-right">#</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {topScorers.map(({ player, statistics }) => (
+                        {topScorers.map(({ player, statistics }, index) => (
                             <TableRow key={player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
                                 <TableCell>
                                     <div className='flex items-center justify-start opacity-80' onClick={e => e.stopPropagation()}>
@@ -542,6 +560,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                         </div>
                                     </div>
                                 </TableCell>
+                                <TableCell className="font-bold">{index + 1}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -549,7 +568,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             ) : <p className="pt-4 text-center text-muted-foreground">قائمة الهدافين غير متاحة.</p>}
           </TabsContent>
           <TabsContent value="teams" className="mt-0">
-            {loading ? (
+            {loading || customNames === null ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
                     {Array.from({ length: 12 }).map((_, i) => (
                         <div key={i} className="flex flex-col items-center gap-2 rounded-lg border bg-card p-4">
@@ -562,6 +581,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
                     {teams.map(({ team }) => {
                         const isFavoritedTeam = !!favorites?.teams?.[team.id];
+                        const displayName = getDisplayName('team', team.id, team.name);
                         return (
                         <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
                             <div className='relative'>
@@ -572,14 +592,14 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
                             </div>
                             <span className="font-semibold text-sm">
-                                {getDisplayName('team', team.id, team.name)}
+                                {displayName}
                                 {isAdmin && <span className="block text-xs text-muted-foreground">(ID: {team.id})</span>}
                             </span>
                             <div className="absolute top-1 left-1 flex opacity-80">
                                 {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team)}}>
                                     <Pencil className="h-4 w-4 text-muted-foreground" />
                                 </Button>}
-                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('team', {...team, name: getDisplayName('team', team.id, team.name)});}}>
+                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('team', {...team, name: displayName});}}>
                                     <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
                             </div>

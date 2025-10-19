@@ -49,7 +49,6 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
 
     useEffect(() => {
         if (!loading && firstUpcomingMatchRef.current && listRef.current) {
-            // Delay to allow DOM to settle
             setTimeout(() => {
                  if (firstUpcomingMatchRef.current && listRef.current) {
                     const listTop = listRef.current.offsetTop;

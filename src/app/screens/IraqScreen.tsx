@@ -98,7 +98,6 @@ function OurLeagueTab({
 
     useEffect(() => {
         if (!loading && firstUpcomingMatchRef.current && listRef.current) {
-            // Delay to allow DOM to settle
             setTimeout(() => {
                 if (firstUpcomingMatchRef.current && listRef.current) {
                     const listTop = listRef.current.offsetTop;
@@ -429,21 +428,8 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           const scorersRef = collection(db, 'iraqiLeagueTopScorers');
           const q = query(scorersRef, orderBy('rank', 'asc'));
           const unsubscribe = onSnapshot(q, (snapshot) => {
-              const fetchedScorers = snapshot.docs.map((doc) => doc.data() as Omit<ManualTopScorer, 'rank'>);
-
-              fetchedScorers.sort((a, b) => {
-                  if (a.goals !== b.goals) {
-                      return b.goals - a.goals;
-                  }
-                  return a.playerName.localeCompare(b.playerName);
-              });
-              
-              const rankedScorers = fetchedScorers.map((scorer, index) => ({
-                ...scorer,
-                rank: index + 1
-              }));
-
-              setTopScorers(rankedScorers);
+              const fetchedScorers = snapshot.docs.map((doc) => doc.data() as ManualTopScorer);
+              setTopScorers(fetchedScorers);
           }, (error) => {
               const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
               errorEmitter.emit('permission-error', permissionError);
