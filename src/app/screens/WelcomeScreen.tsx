@@ -9,37 +9,31 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/firebase-client';
 
 interface WelcomeScreenProps {
-  onGuestContinue: () => void;
+  onChoice: (choice: 'google' | 'guest') => void;
 }
 
-export function WelcomeScreen({ onGuestContinue }: WelcomeScreenProps) {
-  const [loading, setLoading] = useState<null | 'google'>(null);
+export function WelcomeScreen({ onChoice }: WelcomeScreenProps) {
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleAuthError = (e: any) => {
     console.error("Login Error:", e);
-    
     let errorMessage = e.message || 'حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.';
-
-    if (e.code === 'auth/unauthorized-domain') {
-        errorMessage = `النطاق الذي تستخدمه غير مصرح به. يرجى إضافته إلى قائمة النطاقات المصرح بها في إعدادات Firebase Authentication.`;
-    } else if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+    if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
         errorMessage = 'تم إلغاء عملية تسجيل الدخول.';
-    } else if (e.code === 'auth/account-exists-with-different-credential') {
-        errorMessage = 'يوجد حساب بنفس البريد الإلكتروني ولكن بطريقة تسجيل دخول مختلفة.';
     }
-    
     setError(errorMessage);
-    setLoading(null);
+    setLoading(false);
   }
 
   const handleGoogleLogin = async () => {
     if (loading) return;
-    setLoading('google');
+    setLoading(true);
     setError(null);
     try {
       await signInWithGoogle();
-      // Auth state listener in AppFlow will handle navigation
+      // The main AppFlow will detect the user change and proceed.
+      // We don't need to call onChoice here for google sign in.
     } catch (e: any) {
       handleAuthError(e);
     }
@@ -64,10 +58,10 @@ export function WelcomeScreen({ onGuestContinue }: WelcomeScreenProps) {
             <Button 
               onClick={handleGoogleLogin} 
               className="w-full" 
-              disabled={!!loading}
+              disabled={loading}
               size="lg"
             >
-              {loading === 'google' ? (
+              {loading ? (
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
               ) : (
                 <GoogleIcon className="h-5 w-5 mr-2" />
@@ -76,11 +70,11 @@ export function WelcomeScreen({ onGuestContinue }: WelcomeScreenProps) {
             </Button>
             <Button
                 variant="ghost"
-                onClick={onGuestContinue}
+                onClick={() => onChoice('guest')}
                 className="w-full"
-                disabled={!!loading}
+                disabled={loading}
             >
-                تخطي (المتابعة كزائر)
+                تصفح كزائر
             </Button>
         </div>
 

@@ -7,13 +7,14 @@ import { AppContentWrapper } from './AppContentWrapper';
 import { AdProvider } from '@/components/AdProvider';
 import { Loader2 } from 'lucide-react';
 import { FavoriteSelectionScreen } from './screens/FavoriteSelectionScreen';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, type Firestore } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
+import { WelcomeScreen } from './screens/WelcomeScreen';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
-import { LoginScreen } from './screens/LoginScreen';
+import { signInWithGoogle, handleNewUser } from '@/lib/firebase-client';
 
 export type ScreenKey = 'Welcome' | 'Matches' | 'Competitions' | 'AllCompetitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'PlayerDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails' | 'NotificationSettings' | 'GeneralSettings' | 'ManagePinnedMatch' | 'PrivacyPolicy' | 'TermsOfService' | 'FavoriteSelection' | 'GoPro' | 'Login';
 
@@ -37,63 +38,52 @@ const LoadingSplashScreen = () => (
 const AppFlow = () => {
     const { user, isUserLoading } = useAuth();
     const { db } = useFirestore();
-    const [flowState, setFlowState] = useState<'loading' | 'login' | 'favorite_selection' | 'app'>('loading');
+    const [flowState, setFlowState] = useState<'loading' | 'welcome' | 'favorite_selection' | 'app'>('loading');
 
     useEffect(() => {
-        const checkOnboardingStatus = async () => {
+        const checkUserStatus = async () => {
             if (isUserLoading) {
                 setFlowState('loading');
                 return;
             }
 
-            if (!user) {
-                // Guest user flow
+            // For development, always show welcome screen if not logged in.
+            // In production, you would re-enable the localStorage check.
+            const alwaysShowWelcomeForTesting = true; 
+
+            if (user) {
+                // User is logged in, check if they have completed onboarding in Firestore
+                if (!db) return;
+                const userDocRef = doc(db, 'users', user.uid);
+                try {
+                    const userDoc = await getDoc(userDocRef);
+                    if (userDoc.exists() && userDoc.data().onboardingComplete) {
+                        setFlowState('app');
+                    } else {
+                        // New registered user or existing user who hasn't onboarded
+                        setFlowState('favorite_selection');
+                    }
+                } catch (error) {
+                    const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
+                    errorEmitter.emit('permission-error', permissionError);
+                    setFlowState('app'); // Fail gracefully
+                }
+            } else {
+                // No user is logged in
+                if (alwaysShowWelcomeForTesting) {
+                     setFlowState('welcome');
+                     return;
+                }
                 const guestOnboardingComplete = localStorage.getItem(GUEST_ONBOARDING_COMPLETE_KEY) === 'true';
-                if (guestOnboardingComplete) {
+                 if (guestOnboardingComplete) {
                     setFlowState('app');
                 } else {
-                    // Check if they have old local favorites, if so, they are "onboarded"
-                    const localFavs = getLocalFavorites();
-                    if (Object.keys(localFavs.teams || {}).length > 0 || Object.keys(localFavs.leagues || {}).length > 0) {
-                        localStorage.setItem(GUEST_ONBOARDING_COMPLETE_KEY, 'true');
-                        setFlowState('app');
-                    } else {
-                        setFlowState('favorite_selection');
-                    }
+                    setFlowState('welcome');
                 }
-                return;
-            }
-            
-            // Registered user flow
-            if (user.isAnonymous) {
-                // Anonymous users created via old system, treat as guests who completed onboarding.
-                setFlowState('app');
-                return;
-            }
-
-            if (!db) return;
-            const userDocRef = doc(db, 'users', user.uid);
-            try {
-                const userDoc = await getDoc(userDocRef);
-                if (userDoc.exists()) {
-                    const userData = userDoc.data() as UserProfile;
-                    if (userData.onboardingComplete) {
-                        setFlowState('app');
-                    } else {
-                        setFlowState('favorite_selection');
-                    }
-                } else {
-                    await handleNewUser(user, db);
-                    setFlowState('favorite_selection');
-                }
-            } catch (error) {
-                 const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
-                 errorEmitter.emit('permission-error', permissionError);
-                 setFlowState('app'); // Fail gracefully into the app
             }
         };
 
-        checkOnboardingStatus();
+        checkUserStatus();
 
     }, [user, isUserLoading, db]);
 
@@ -101,6 +91,7 @@ const AppFlow = () => {
         if (user && db) {
              const userDocRef = doc(db, 'users', user.uid);
              try {
+                // This ensures the user exists before updating
                 await setDoc(userDocRef, { onboardingComplete: true }, { merge: true });
             } catch (error) {
                 const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { onboardingComplete: true } });
@@ -113,13 +104,20 @@ const AppFlow = () => {
         setFlowState('app');
     };
     
+    const handleChoice = (choice: 'google' | 'guest') => {
+        if (choice === 'google') {
+            signInWithGoogle().catch(err => console.error(err));
+            // The useEffect hook will react to the user change and move to favorite_selection
+        } else { // guest
+            setFlowState('favorite_selection');
+        }
+    };
+    
     switch (flowState) {
         case 'loading':
              return <LoadingSplashScreen />;
-        case 'login':
-             return <LoginScreen navigate={(screen, props) => {
-                 if (screen === 'FavoriteSelection') setFlowState('favorite_selection');
-             }} goBack={() => {}} canGoBack={false} />;
+        case 'welcome':
+            return <WelcomeScreen onChoice={handleChoice} />;
         case 'favorite_selection':
             return <FavoriteSelectionScreen onOnboardingComplete={handleOnboardingComplete} />;
         case 'app':
@@ -138,28 +136,3 @@ export default function Home() {
     <AppFlow />
   );
 }
-
-// This needs to be here to avoid circular dependency issues with firebase-client
-const handleNewUser = async (user: User, firestore: Firestore) => {
-    const userRef = doc(firestore, 'users', user.uid);
-    try {
-        const userDoc = await getDoc(userRef);
-        if (!userDoc.exists()) {
-            const displayName = user.displayName || `مستخدم_${user.uid.substring(0, 5)}`;
-            const photoURL = user.photoURL || '';
-
-            const userProfileData: UserProfile = {
-                displayName: displayName,
-                email: user.email!,
-                photoURL: photoURL,
-                isProUser: false,
-                isAnonymous: user.isAnonymous,
-                onboardingComplete: false,
-            };
-            await setDoc(userRef, userProfileData);
-        }
-    } catch (error) {
-        const permissionError = new FirestorePermissionError({ path: userRef.path, operation: 'write', requestResourceData: {}});
-        errorEmitter.emit('permission-error', permissionError);
-    }
-};

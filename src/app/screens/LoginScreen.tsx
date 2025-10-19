@@ -11,7 +11,7 @@ import { signInWithGoogle } from '@/lib/firebase-client';
 import type { ScreenProps } from '@/app/page';
 
 export function LoginScreen({ navigate }: ScreenProps) {
-  const [loading, setLoading] = useState<null | 'google'>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleAuthError = (e: any) => {
@@ -19,21 +19,17 @@ export function LoginScreen({ navigate }: ScreenProps) {
     
     let errorMessage = e.message || 'حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.';
 
-    if (e.code === 'auth/unauthorized-domain') {
-        errorMessage = `النطاق الذي تستخدمه غير مصرح به. يرجى إضافته إلى قائمة النطاقات المصرح بها في إعدادات Firebase Authentication.`;
-    } else if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+    if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
         errorMessage = 'تم إلغاء عملية تسجيل الدخول.';
-    } else if (e.code === 'auth/account-exists-with-different-credential') {
-        errorMessage = 'يوجد حساب بنفس البريد الإلكتروني ولكن بطريقة تسجيل دخول مختلفة.';
     }
     
     setError(errorMessage);
-    setLoading(null);
+    setLoading(false);
   }
 
   const handleGoogleLogin = async () => {
     if (loading) return;
-    setLoading('google');
+    setLoading(true);
     setError(null);
     try {
       await signInWithGoogle();
@@ -42,6 +38,15 @@ export function LoginScreen({ navigate }: ScreenProps) {
       handleAuthError(e);
     }
   };
+  
+  const handleGuestContinue = () => {
+      // This is now handled by the WelcomeScreen and AppFlow
+      // This button shouldn't really be shown in the new flow but is kept for safety
+      if ((window as any).appNavigate) {
+        (window as any).appNavigate('FavoriteSelection');
+      }
+  }
+
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -62,15 +67,23 @@ export function LoginScreen({ navigate }: ScreenProps) {
             <Button 
               onClick={handleGoogleLogin} 
               className="w-full" 
-              disabled={!!loading}
+              disabled={loading}
               size="lg"
             >
-              {loading === 'google' ? (
+              {loading ? (
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
               ) : (
                 <GoogleIcon className="h-5 w-5 mr-2" />
               )}
               المتابعة باستخدام جوجل
+            </Button>
+            <Button
+                variant="ghost"
+                onClick={handleGuestContinue}
+                className="w-full"
+                disabled={loading}
+            >
+                تصفح كزائر
             </Button>
         </div>
 
