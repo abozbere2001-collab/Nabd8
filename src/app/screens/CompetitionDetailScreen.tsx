@@ -303,13 +303,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   const handleSaveRename = async (type: RenameType, id: string | number, newName: string, newNote?: string) => {
     if (!db) return;
-
+    const batch = writeBatch(db);
+    
     if (type === 'team') {
         const team = teams.find(t => t.team.id === id)?.team;
         if (!team) return;
 
-        const batch = writeBatch(db);
-        
         if (isAdmin) {
             const nameRef = doc(db, "teamCustomizations", String(id));
             if (newName && newName !== team.name) {
@@ -318,56 +317,41 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 batch.delete(nameRef);
             }
         }
-        
         if (user && newNote !== undefined) {
              const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
              const fieldPath = `ourBallTeams.${id}.note`;
-             const updateData = { [fieldPath]: newNote.length > 0 ? newNote : deleteField() };
+             const updateData = { [fieldPath]: newNote.trim().length > 0 ? newNote.trim() : deleteField() };
              batch.set(favRef, updateData, { merge: true });
         }
-        
-        try {
-            await batch.commit();
-            toast({ title: 'نجاح', description: 'تم حفظ التغييرات بنجاح.' });
-            await fetchAllCustomNames();
-        } catch (serverError) {
-             const permissionError = new FirestorePermissionError({ path: `batch write for team ${id}`, operation: 'write' });
-             errorEmitter.emit('permission-error', permissionError);
-        }
-
     } else if (type === 'player') {
         const player = topScorers.find(p => p.player.id === id)?.player;
-        if(!player) return;
+        if (!player) return;
         
         const docRef = doc(db, "playerCustomizations", String(id));
-        const data = { customName: newName };
         if (newName && newName !== player.name) {
-            setDoc(docRef, data).then(fetchAllCustomNames).catch(serverError => {
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
-                errorEmitter.emit('permission-error', permissionError);
-            });
+            batch.set(docRef, { customName: newName });
         } else {
-            deleteDoc(docRef).then(fetchAllCustomNames).catch(serverError => {
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
-                errorEmitter.emit('permission-error', permissionError);
-            });
+            batch.delete(docRef);
         }
     } else if (type === 'league' && leagueId) {
         const docRef = doc(db, "leagueCustomizations", String(id));
-        const data = { customName: newName };
         if (newName && newName !== initialTitle) {
-            setDoc(docRef, data).then(() => setDisplayTitle(newName)).catch(serverError => {
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
-                errorEmitter.emit('permission-error', permissionError);
-            });
+            batch.set(docRef, { customName: newName });
         } else {
-            deleteDoc(docRef).then(() => setDisplayTitle(initialTitle)).catch(serverError => {
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
-                errorEmitter.emit('permission-error', permissionError);
-            });
+            batch.delete(docRef);
         }
     }
-     setRenameItem(null);
+    
+    try {
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم حفظ التغييرات بنجاح.' });
+        await fetchAllCustomNames();
+    } catch (serverError) {
+         const permissionError = new FirestorePermissionError({ path: `batch write for ${type} ${id}`, operation: 'write' });
+         errorEmitter.emit('permission-error', permissionError);
+    }
+    
+    setRenameItem(null);
   };
 
   const handleDeleteCompetition = () => {
@@ -398,13 +382,15 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       {isAdmin && leagueId && (
         <>
             <AlertDialog open={isDeleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => { e.stopPropagation(); setDeleteAlertOpen(true); }}
-                >
-                    <Trash2 className="h-5 w-5 text-destructive" />
-                </Button>
+                <AlertDialogTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); setDeleteAlertOpen(true); }}
+                    >
+                        <Trash2 className="h-5 w-5 text-destructive" />
+                    </Button>
+                </AlertDialogTrigger>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>

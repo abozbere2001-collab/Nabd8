@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from './ui/textarea';
+import { useAdmin } from '@/firebase/provider';
 
 type ItemType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
 
@@ -40,6 +41,7 @@ export function RenameDialog({
 }: RenameDialogProps) {
   const [newName, setNewName] = useState('');
   const [newNote, setNewNote] = useState('');
+  const { isAdmin } = useAdmin();
 
   useEffect(() => {
     if (isOpen && item) {
@@ -74,27 +76,33 @@ export function RenameDialog({
         <DialogHeader>
           <DialogTitle>تعديل {itemTypeDisplay}</DialogTitle>
            <DialogDescription>
-             {item?.type === 'team' ? "يمكنك تعديل الاسم المخصص وإضافة ملاحظة شخصية." : `أدخل القيمة الجديدة لـ ${itemTypeDisplay}.`}
+             {isAdmin && item?.type !== 'team' && `أدخل القيمة الجديدة لـ ${itemTypeDisplay}.`}
+             {isAdmin && item?.type === 'team' && "يمكنك تعديل الاسم المخصص وإضافة ملاحظة إدارية."}
+             {!isAdmin && item?.type === 'team' && "أضف ملاحظة شخصية على هذا الفريق."}
            </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="name">{item?.type === 'status' ? 'الحالة المخصصة' : 'الاسم المخصص'}</Label>
-            <Input
-              id="name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder={item?.type === 'status' ? 'مثال: مؤجلة' : `الاسم الأصلي: ${item?.originalName || item?.name}`}
-            />
-          </div>
+          
+          {isAdmin && (
+            <div className="grid w-full items-center gap-1.5">
+                <Label htmlFor="name">{item?.type === 'status' ? 'الحالة المخصصة' : 'الاسم المخصص'}</Label>
+                <Input
+                id="name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder={item?.type === 'status' ? 'مثال: مؤجلة' : `الاسم الأصلي: ${item?.originalName || item?.name}`}
+                />
+            </div>
+          )}
+
           {hasNoteField && (
             <div className="grid w-full items-center gap-1.5">
-                <Label htmlFor="note">ملاحظة (اختياري)</Label>
+                <Label htmlFor="note">ملاحظة</Label>
                 <Textarea 
                     id="note"
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
-                    placeholder="اكتب ملاحظتك الشخصية هنا..."
+                    placeholder={isAdmin ? "ملاحظة إدارية (تظهر للمدراء فقط)" : "اكتب ملاحظتك الشخصية هنا..."}
                 />
             </div>
           )}
@@ -113,7 +121,3 @@ export function RenameDialog({
     </Dialog>
   );
 }
-
-    
-
-    
