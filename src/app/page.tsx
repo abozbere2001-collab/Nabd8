@@ -14,7 +14,6 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { WelcomeScreen } from './screens/WelcomeScreen';
 import { LoginScreen } from './screens/LoginScreen';
-import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 import { handleNewUser } from '@/lib/firebase-client';
 
 export type ScreenKey = 'Welcome' | 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'AllCompetitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'PlayerDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails' | 'NotificationSettings' | 'GeneralSettings' | 'ManagePinnedMatch' | 'PrivacyPolicy' | 'TermsOfService' | 'FavoriteSelection' | 'GoPro';
@@ -108,7 +107,8 @@ const AppFlow = () => {
     };
 
     const handleLoginSuccess = () => {
-        setFlowState('loading'); // Will trigger re-check in useEffect
+        // After successful login, the useEffect will re-evaluate and move to 'app' or 'favorite_selection'
+        setFlowState('loading'); 
     }
 
     const goBackToWelcome = () => {
