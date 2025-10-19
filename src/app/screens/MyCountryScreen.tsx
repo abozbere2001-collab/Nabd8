@@ -10,11 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { collection, getDocs, doc, query, orderBy, onSnapshot, deleteDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
-import type { Fixture, Standing, AdminFavorite, ManualTopScorer, PinnedMatch, Favorites, Team } from '@/lib/types';
+import type { Fixture, Standing, ManualTopScorer, PinnedMatch, Favorites, Team } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
-import { Users, Search, Pin, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Users, Search, Pin, Edit, Trash2, Loader2, Trophy } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { FixtureItem } from '@/components/FixtureItem';
@@ -79,14 +79,16 @@ function OurLeagueTab({
     standings, 
     topScorers, 
     loading, 
-    isAdmin 
+    isAdmin,
+    ourLeague,
 }: { 
     navigate: ScreenProps['navigate'],
     fixtures: Fixture[],
     standings: Standing[],
     topScorers: ManualTopScorer[],
     loading: boolean,
-    isAdmin: boolean
+    isAdmin: boolean,
+    ourLeague: { id: number, name: string, logo: string } | null
 }) {
     const listRef = useRef<HTMLDivElement>(null);
     const firstUpcomingMatchRef = useRef<HTMLDivElement>(null);
@@ -106,8 +108,29 @@ function OurLeagueTab({
             }, 100);
         }
     }, [loading, sortedFixtures]);
+    
+    if (!ourLeague) {
+         return (
+            <div className="text-center text-muted-foreground py-10 px-4">
+                <p className="text-lg font-semibold">اختر دوريك المفضل</p>
+                <p>اذهب إلى "كل البطولات" واضغط على القلب ❤️ بجانب دوريك المفضل ليظهر هنا.</p>
+                <Button className="mt-4" onClick={() => navigate('AllCompetitions')}>استكشف البطولات</Button>
+            </div>
+        );
+    }
 
     return (
+      <div className="flex flex-col">
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-card border mb-4">
+             <Avatar className="h-10 w-10 p-1 border">
+                <AvatarImage src={ourLeague.logo} className="object-contain" />
+            </Avatar>
+            <div>
+                <p className="font-bold text-lg">{ourLeague.name}</p>
+                <p className="text-sm text-muted-foreground">دورينا المفضل</p>
+            </div>
+        </div>
+
         <Tabs defaultValue="matches" className="w-full">
              <div className="sticky top-0 bg-background z-10 -mx-4 px-1">
                 <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
@@ -159,7 +182,7 @@ function OurLeagueTab({
                     </TableHeader>
                     <TableBody>
                         {standings.map((s) => (
-                            <TableRow key={`${s.rank}-${s.team.id}`} className="cursor-pointer" onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: s.team.id, teamName: s.team.name })}>
+                            <TableRow key={`${s.rank}-${s.team.id}`} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id})}>
                                 <TableCell className="text-center font-bold">{s.points}</TableCell>
                                 <TableCell className="text-center">{s.all.lose}</TableCell>
                                 <TableCell className="text-center">{s.all.draw}</TableCell>
@@ -182,7 +205,7 @@ function OurLeagueTab({
             ): <p className="pt-4 text-center text-muted-foreground">جدول الترتيب غير متاح حاليًا.</p>}
           </TabsContent>
            <TabsContent value="scorers" className="p-0 mt-0 -mx-4">
-            {isAdmin && (
+            {isAdmin && ourLeague?.id === IRAQI_LEAGUE_ID && (
                 <div className="p-4">
                     <Button className="w-full" onClick={() => navigate('ManageTopScorers')}>
                         <Users className="ml-2 h-4 w-4" />
@@ -228,6 +251,7 @@ function OurLeagueTab({
             ) : <p className="pt-4 text-center text-muted-foreground">قائمة الهدافين غير متاحة حاليًا.</p>}
           </TabsContent>
         </Tabs>
+      </div>
     );
 }
 
@@ -241,7 +265,7 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
     const [customTeamNames, setCustomTeamNames] = useState<Map<number, string>>(new Map());
 
     const fetchCustomNames = useCallback(async () => {
-        if (!db) return;
+        if (!db) return new Map();
         try {
             const snapshot = await getDocs(collection(db, 'teamCustomizations'));
             const names = new Map<number, string>();
@@ -382,11 +406,14 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
   const [topScorers, setTopScorers] = useState<ManualTopScorer[]>([]);
-  const { isAdmin } = useAdmin();
+  const { isAdmin, user } = useAdmin();
   const { db } = useFirestore();
   const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
   const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
-
+  
+  const [ourLeague, setOurLeague] = useState<{ id: number, name: string, logo: string } | null>(null);
+  
+  const selectedLeagueId = ourLeague?.id || IRAQI_LEAGUE_ID;
 
   useEffect(() => {
     if (!db) {
@@ -415,12 +442,56 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   }, [db]);
 
 
+  useEffect(() => {
+    if (!db) return;
+    let unsubFavorites: () => void;
+    if (user) {
+        const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        unsubFavorites = onSnapshot(favsRef, (doc) => {
+            const favs = doc.data() as Favorites;
+            const ourLeagueId = favs?.ourLeagueId;
+            if (ourLeagueId && favs.leagues?.[ourLeagueId]) {
+                 setOurLeague({
+                    id: ourLeagueId,
+                    name: favs.leagues[ourLeagueId].name,
+                    logo: favs.leagues[ourLeagueId].logo,
+                 });
+            } else {
+                 setOurLeague(null);
+            }
+        });
+    } else {
+        const localFavs = getLocalFavorites();
+        const ourLeagueId = localFavs?.ourLeagueId;
+        if (ourLeagueId && localFavs.leagues?.[ourLeagueId]) {
+             setOurLeague({
+                id: ourLeagueId,
+                name: localFavs.leagues[ourLeagueId].name,
+                logo: localFavs.leagues[ourLeagueId].logo,
+            });
+        } else {
+            setOurLeague(null);
+        }
+    }
+     return () => {
+        if (unsubFavorites) unsubFavorites();
+    };
+  }, [user, db]);
+
+
   const fetchData = useCallback(async () => {
+    if(!ourLeague) {
+        setLoading(false);
+        return;
+    }
+    
+    const leagueId = ourLeague.id;
+
     setLoading(true);
     try {
       const [fixturesRes, standingsRes] = await Promise.all([
-        fetch(`/api/football/fixtures?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`),
-        fetch(`/api/football/standings?league=${IRAQI_LEAGUE_ID}&season=${CURRENT_SEASON}`),
+        fetch(`/api/football/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`),
+        fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
       ]);
 
       const fixturesData = await fixturesRes.json();
@@ -443,18 +514,18 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       setStandings(translatedStandings);
 
     } catch (error) {
-      console.error("Failed to fetch Iraqi league details:", error);
+      console.error("Failed to fetch league details:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ourLeague]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
   
   useEffect(() => {
-      if (db) {
+      if (db && ourLeague?.id === IRAQI_LEAGUE_ID) {
           const scorersRef = collection(db, 'iraqiLeagueTopScorers');
           const q = query(scorersRef, orderBy('rank', 'asc'));
           const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -465,8 +536,10 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
               errorEmitter.emit('permission-error', permissionError);
           });
            return () => unsubscribe();
+      } else {
+        setTopScorers([]); // Clear scorers if it's not the Iraqi league
       }
-  }, [db]);
+  }, [db, ourLeague]);
   
   return (
     <div className="flex h-full flex-col bg-background">
@@ -516,7 +589,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                     </TabsList>
                 </div>
             </div>
-          <TabsContent value="our-league" className="pt-0">
+          <TabsContent value="our-league" className="pt-4">
             <OurLeagueTab 
                 navigate={navigate} 
                 fixtures={fixtures}
@@ -524,6 +597,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 topScorers={topScorers}
                 loading={loading}
                 isAdmin={isAdmin}
+                ourLeague={ourLeague}
             />
           </TabsContent>
           <TabsContent value="our-ball" className="pt-0">
@@ -534,5 +608,3 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
