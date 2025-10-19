@@ -48,7 +48,17 @@ const AppFlow = () => {
             }
 
             if (user) {
-                // User is logged in, check if they have completed onboarding in Firestore
+                if (user.isAnonymous) {
+                    const guestOnboardingComplete = localStorage.getItem(GUEST_ONBOARDING_COMPLETE_KEY) === 'true';
+                    if (guestOnboardingComplete) {
+                        setFlowState('app');
+                    } else {
+                        setFlowState('favorite_selection');
+                    }
+                    return;
+                }
+
+                // Registered user
                 if (!db) return;
                 const userDocRef = doc(db, 'users', user.uid);
                 try {
@@ -56,8 +66,7 @@ const AppFlow = () => {
                     if (userDoc.exists() && userDoc.data().onboardingComplete) {
                         setFlowState('app');
                     } else {
-                        // New registered user or existing user who hasn't onboarded
-                        await handleNewUser(user, db); // Ensure user doc exists
+                        await handleNewUser(user, db);
                         setFlowState('favorite_selection');
                     }
                 } catch (error) {
@@ -65,15 +74,11 @@ const AppFlow = () => {
                         const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
                         errorEmitter.emit('permission-error', permissionError);
                     }
+                     setFlowState('login'); // Fallback to login on error
                 }
             } else {
-                // No user is logged in
-                const guestOnboardingComplete = localStorage.getItem(GUEST_ONBOARDING_COMPLETE_KEY) === 'true';
-                 if (guestOnboardingComplete) {
-                    setFlowState('app');
-                } else {
-                    setFlowState('welcome');
-                }
+                // No user is logged in at all, show welcome screen.
+                setFlowState('welcome');
             }
         };
 
@@ -82,32 +87,33 @@ const AppFlow = () => {
     }, [user, isUserLoading, db]);
 
     const handleOnboardingComplete = async () => {
-        if (user && db) {
+        if (user && db && !user.isAnonymous) {
              const userDocRef = doc(db, 'users', user.uid);
              try {
-                // This ensures the user exists before updating
                 await setDoc(userDocRef, { onboardingComplete: true }, { merge: true });
             } catch (error) {
                 const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { onboardingComplete: true } });
                 errorEmitter.emit('permission-error', permissionError);
             }
         } else {
-            // This is a guest user completing onboarding
             localStorage.setItem(GUEST_ONBOARDING_COMPLETE_KEY, 'true');
         }
         setFlowState('app');
     };
     
-    const handleWelcomeChoice = (choice: 'login' | 'guest') => {
+    const handleWelcomeChoice = async (choice: 'login' | 'guest') => {
         if (choice === 'guest') {
-             setFlowState('favorite_selection');
+            setFlowState('favorite_selection');
         } else {
             setFlowState('login');
         }
     };
-
+    
+    // This function is passed to LoginScreen to be called on successful authentication
     const handleLoginSuccess = () => {
-        // After successful login, the useEffect will re-evaluate and move to 'app' or 'favorite_selection'
+        // The useEffect hook will automatically re-evaluate the user's status 
+        // and navigate them to the correct screen ('app' or 'favorite_selection').
+        // We just need to trigger a loading state to allow the hook to run.
         setFlowState('loading'); 
     }
 
@@ -121,7 +127,7 @@ const AppFlow = () => {
         case 'welcome':
             return <WelcomeScreen onChoice={handleWelcomeChoice} />;
         case 'login':
-            return <LoginScreen onLoginSuccess={handleLoginSuccess} goBack={goBackToWelcome} canGoBack={true} />;
+            return <LoginScreen onLoginSuccess={handleLoginSuccess} goBack={goBackToWelcome} />;
         case 'favorite_selection':
             return <FavoriteSelectionScreen onOnboardingComplete={handleOnboardingComplete} />;
         case 'app':

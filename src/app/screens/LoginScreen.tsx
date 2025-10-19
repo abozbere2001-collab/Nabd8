@@ -12,10 +12,9 @@ import { signInWithGoogle } from '@/lib/firebase-client';
 interface LoginScreenProps {
   onLoginSuccess: () => void;
   goBack: () => void;
-  canGoBack: boolean;
 }
 
-export function LoginScreen({ onLoginSuccess, goBack, canGoBack }: LoginScreenProps) {
+export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +37,7 @@ export function LoginScreen({ onLoginSuccess, goBack, canGoBack }: LoginScreenPr
     setError(null);
     try {
       await signInWithGoogle();
-      // Auth state listener in AppFlow will handle navigation.
+      // onLoginSuccess is called to trigger a state change in the parent AppFlow
       onLoginSuccess();
     } catch (e: any) {
       handleAuthError(e);
@@ -74,16 +73,14 @@ export function LoginScreen({ onLoginSuccess, goBack, canGoBack }: LoginScreenPr
               )}
               المتابعة باستخدام جوجل
             </Button>
-            {canGoBack && (
-              <Button
-                  variant="ghost"
-                  onClick={goBack}
-                  className="w-full"
-                  disabled={loading}
-              >
-                  العودة
-              </Button>
-            )}
+            <Button
+                variant="ghost"
+                onClick={goBack}
+                className="w-full"
+                disabled={loading}
+            >
+                العودة
+            </Button>
         </div>
 
         <p className="mt-8 text-xs text-muted-foreground/80 px-4">
