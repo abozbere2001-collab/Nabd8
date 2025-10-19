@@ -6,8 +6,9 @@ const API_FOOTBALL_KEY = '75f36f22d689a0a61e777d92bbda1c08';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { route: string[] } }
+  context: { params: { route: string[] } }
 ) {
+  const params = context.params;
   const { searchParams } = new URL(request.url);
   const route = params.route || [];
   const routePath = Array.isArray(route) ? route.join('/') : '';
