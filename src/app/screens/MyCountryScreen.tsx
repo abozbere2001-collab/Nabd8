@@ -262,8 +262,7 @@ function OurLeagueTab({
 }
 
 function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
-    const { user } = useAuth();
-    const { db } = useFirestore();
+    const { user, db } = useAuth();
     const { toast } = useToast();
     const [teams, setTeams] = useState<Team[]>([]);
     const [loading, setLoading] = useState(true);
@@ -408,7 +407,7 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
 }
 
 export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
-    const { user, db } = useFirestore();
+    const { user, db } = useAuth();
     const { isAdmin } = useAdmin();
     const [loading, setLoading] = useState(true);
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
@@ -416,76 +415,59 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
     const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
-
-    const [ourLeague, setOurLeague] = useState<{ id: number; name: string; logo: string } | null>(null);
+    
     const [ourLeagueId, setOurLeagueId] = useState<number | null>(null);
+    const [ourLeague, setOurLeague] = useState<{ id: number; name: string; logo: string } | null>(null);
+
     const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>, players: Map<number, string>}>({leagues: new Map(), teams: new Map(), players: new Map() });
     
     // Step 1: Fetch all custom names once.
-    useEffect(() => {
-        const fetchAllCustomNames = async () => {
-            if (!db) return;
-            try {
-                const [leaguesSnapshot, teamsSnapshot, playersSnapshot] = await Promise.all([
-                    getDocs(collection(db, 'leagueCustomizations')),
-                    getDocs(collection(db, 'teamCustomizations')),
-                    getDocs(collection(db, 'playerCustomizations'))
-                ]);
-                const leagueNames = new Map<string, string>();
-                leaguesSnapshot.forEach(doc => leagueNames.set(doc.id, doc.data().customName));
-                const teamNames = new Map<string, string>();
-                teamsSnapshot.forEach(doc => teamNames.set(doc.id, doc.data().customName));
-                const playerNames = new Map<string, string>();
-                playersSnapshot.forEach(doc => playerNames.set(doc.id, doc.data().customName));
-                setCustomNames({ leagues: leagueNames, teams: teamNames, players: playerNames });
-            } catch (e) { console.warn("Could not fetch custom names", e); }
-        };
-        fetchAllCustomNames();
+    const fetchAllCustomNames = useCallback(async () => {
+        if (!db) return;
+        try {
+            const [leaguesSnapshot, teamsSnapshot, playersSnapshot] = await Promise.all([
+                getDocs(collection(db, 'leagueCustomizations')),
+                getDocs(collection(db, 'teamCustomizations')),
+                getDocs(collection(db, 'playerCustomizations'))
+            ]);
+            const leagueNames = new Map<number, string>();
+            leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+            const teamNames = new Map<number, string>();
+            teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+            const playerNames = new Map<number, string>();
+            playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
+            setCustomNames({ leagues: leagueNames, teams: teamNames, players: playerNames });
+        } catch (e) { console.warn("Could not fetch custom names", e); }
     }, [db]);
+    
+    useEffect(() => {
+        fetchAllCustomNames();
+    }, [fetchAllCustomNames]);
 
     const getDisplayName = useCallback((type: 'league' | 'team' | 'player', id: number, defaultName: string) => {
         const key = `${type}s` as 'leagues' | 'teams' | 'players';
-        return customNames[key]?.get(String(id)) || hardcodedTranslations[key]?.[id] || defaultName;
+        return customNames[key]?.get(id) || hardcodedTranslations[key]?.[id] || defaultName;
     }, [customNames]);
 
     // Step 2: Listen for user's favorite league choice.
     useEffect(() => {
-        const setupLeagueChoiceListener = () => {
-            const handleFavorites = (favs: Partial<Favorites>) => {
-                const leagueId = favs?.ourLeagueId;
-                if (leagueId && favs.leagues?.[leagueId]) {
-                    const favLeague = favs.leagues[leagueId];
-                    setOurLeague({
-                        id: favLeague.leagueId,
-                        name: getDisplayName('league', favLeague.leagueId, favLeague.name),
-                        logo: favLeague.logo,
-                    });
-                    setOurLeagueId(favLeague.leagueId);
-                } else {
-                    setOurLeague({
-                        ...IRAQI_LEAGUE_DEFAULT_DATA,
-                        name: getDisplayName('league', IRAQI_LEAGUE_ID, IRAQI_LEAGUE_DEFAULT_DATA.name),
-                    });
-                    setOurLeagueId(IRAQI_LEAGUE_ID);
-                }
-            };
-
-            if (user && db) {
-                const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                return onSnapshot(favsRef, (doc) => {
-                    handleFavorites(doc.data() as Favorites || {});
-                });
-            } else {
-                // Handle guest user
-                handleFavorites(getLocalFavorites());
-            }
+        const handleFavorites = (favs: Partial<Favorites>) => {
+            const leagueId = favs?.ourLeagueId;
+            setOurLeagueId(leagueId || IRAQI_LEAGUE_ID);
         };
 
-        const unsubscribe = setupLeagueChoiceListener();
-        return () => { if (unsubscribe) unsubscribe(); };
-    }, [user, db, getDisplayName]);
+        if (user && db) {
+            const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const unsubscribe = onSnapshot(favsRef, (doc) => {
+                handleFavorites(doc.data() as Favorites || {});
+            });
+            return () => unsubscribe();
+        } else {
+            handleFavorites(getLocalFavorites());
+        }
+    }, [user, db]);
 
-    // Step 3: Fetch data whenever the chosen league ID changes.
+    // Step 3: Fetch data whenever the chosen league ID or custom names change.
     useEffect(() => {
         if (!ourLeagueId) return;
 
@@ -501,6 +483,17 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 const fixturesData = await fixturesRes.json();
                 const standingsData = await standingsRes.json();
                 const scorersData = await scorersRes.json();
+
+                const leagueInfo = fixturesData?.response?.[0]?.league || standingsData?.response?.[0]?.league || scorersData?.response?.[0]?.league || (ourLeagueId === IRAQI_LEAGUE_ID ? IRAQI_LEAGUE_DEFAULT_DATA : null);
+                if (leagueInfo) {
+                    setOurLeague({
+                        id: leagueInfo.id,
+                        name: getDisplayName('league', leagueInfo.id, leagueInfo.name),
+                        logo: leagueInfo.logo,
+                    });
+                } else {
+                    setOurLeague(null);
+                }
 
                 const translatedFixtures = (fixturesData.response || []).map((fixture: Fixture) => ({
                     ...fixture,
@@ -527,6 +520,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 setTopScorers(translatedScorers);
             } catch (error) {
                 console.error("Failed to fetch league details:", error);
+                setOurLeague(null); // Reset on error
             } finally {
                 setLoading(false);
             }
