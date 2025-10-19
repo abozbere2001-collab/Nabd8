@@ -10,8 +10,8 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/firebase-client';
 
 interface LoginScreenProps {
-  onLoginSuccess: () => void;
-  goBack: () => void;
+  onLoginSuccess?: () => void;
+  goBack?: () => void;
 }
 
 export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps) {
@@ -37,8 +37,11 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps) {
     setError(null);
     try {
       await signInWithGoogle();
-      // onLoginSuccess is called to trigger a state change in the parent AppFlow
-      onLoginSuccess();
+      // The onAuthStateChanged listener will handle the redirection automatically.
+      // Calling onLoginSuccess is not needed here anymore.
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      }
     } catch (e: any) {
       handleAuthError(e);
     }
@@ -73,14 +76,16 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps) {
               )}
               المتابعة باستخدام جوجل
             </Button>
-            <Button
-                variant="ghost"
-                onClick={goBack}
-                className="w-full"
-                disabled={loading}
-            >
-                العودة
-            </Button>
+            {goBack && (
+                <Button
+                    variant="ghost"
+                    onClick={goBack}
+                    className="w-full"
+                    disabled={loading}
+                >
+                    العودة
+                </Button>
+            )}
         </div>
 
         <p className="mt-8 text-xs text-muted-foreground/80 px-4">
