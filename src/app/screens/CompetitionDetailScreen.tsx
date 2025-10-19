@@ -8,8 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
-import { Star, Pencil, Shield, Users, Trophy, BarChart2, Heart, Copy, Trash2, Loader2 } from 'lucide-react';
-import { Crown } from '@/components/icons/Crown';
+import { Star, Pencil, Heart, Copy, Trash2, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -111,7 +110,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const [season, setSeason] = useState<number>(CURRENT_SEASON);
   
   const fixturesListRef = useRef<HTMLDivElement>(null);
-  const firstUpcomingMatchRef = useRef<HTMLDivElement>(null);
 
   
   const fetchAllCustomNames = useCallback(async () => {
@@ -156,15 +154,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
     return defaultName;
   }, [customNames]);
-
-  
-  const isFavorited = leagueId && favorites?.leagues?.[leagueId];
-
-  const handleCopy = (url: string | null) => {
-    if (!url) return;
-    navigator.clipboard.writeText(url);
-    toast({ title: "تم نسخ الرابط", description: url });
-  };
 
   useEffect(() => {
     if (user && db) {
@@ -294,42 +283,33 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     }
   }, [user, db, favorites]);
 
-  const handleFavorite = (type: 'league' | 'team' | 'player', item: any) => {
-    if (!user || !db) return;
-    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    
-    let fieldPath = '';
-    let isFavoritedCurrent = false;
-    let favoriteData: any = { userId: user.uid };
-    const displayName = type === 'league' ? displayTitle : getDisplayName((type === 'player' ? 'player' : 'team'), item.id, item.name);
+  const handleFavoriteTeam = (team: Team) => {
+    const currentFavorites = user ? favorites : getLocalFavorites();
+    const newFavorites = JSON.parse(JSON.stringify(currentFavorites)); // Deep copy
+    const isCurrentlyFavorited = !!newFavorites.teams?.[team.id];
 
-
-    if (type === 'league' && leagueId) {
-        fieldPath = `leagues.${leagueId}`;
-        isFavoritedCurrent = !!favorites?.leagues?.[leagueId];
-        favoriteData.leagues = { [leagueId]: { leagueId, name: displayTitle, logo: logo || '' }};
-    } else if (type === 'team') {
-        fieldPath = `teams.${item.id}`;
-        isFavoritedCurrent = !!favorites?.teams?.[item.id];
-        favoriteData.teams = { [item.id]: { teamId: item.id, name: displayName, logo: item.logo }};
-    } else if (type === 'player') {
-        fieldPath = `players.${item.id}`;
-        isFavoritedCurrent = !!favorites?.players?.[item.id];
-        favoriteData.players = { [item.id]: { playerId: item.id, name: displayName, photo: item.photo }};
+    if (isCurrentlyFavorited) {
+        delete newFavorites.teams[team.id];
+    } else {
+        if (!newFavorites.teams) newFavorites.teams = {};
+        newFavorites.teams[team.id] = { teamId: team.id, name: team.name, logo: team.logo };
     }
+    setFavorites(newFavorites);
 
-    const operation = isFavoritedCurrent
-      ? updateDoc(favRef, { [fieldPath]: deleteField() })
-      : setDoc(favRef, favoriteData, { merge: true });
+    if (user && db) {
+        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const updateData = isCurrentlyFavorited 
+            ? { [`teams.${team.id}`]: deleteField() }
+            : { [`teams.${team.id}`]: { teamId: team.id, name: team.name, logo: team.logo }};
 
-    operation.catch(serverError => {
-      const permissionError = new FirestorePermissionError({
-          path: favRef.path,
-          operation: 'update',
-          requestResourceData: favoriteData,
-      });
-      errorEmitter.emit('permission-error', permissionError);
-    });
+        setDoc(favRef, updateData, { merge: true }).catch(serverError => {
+            setFavorites(currentFavorites); // Revert on error
+            const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
+            errorEmitter.emit('permission-error', permissionError);
+        });
+    } else {
+        setLocalFavorites(newFavorites);
+    }
   };
   
   const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
@@ -356,10 +336,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             batch.delete(nameRef);
         }
 
-        if (newNote !== undefined && newNote.length > 0) {
-            batch.set(noteRef, { teamId: id, name: team.name, logo: team.logo, note: newNote });
-        } else {
-            batch.delete(noteRef);
+        if (isAdmin && newNote !== undefined) {
+             if (newNote.length > 0) {
+                 batch.set(noteRef, { teamId: id, name: team.name, logo: team.logo, note: newNote });
+             } else {
+                 batch.delete(noteRef);
+             }
         }
 
         try {
@@ -389,6 +371,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             deleteDoc(docRef).then(() => setDisplayTitle(initialTitle));
         }
     }
+     setRenameItem(null);
   };
 
   const handleDeleteCompetition = () => {
@@ -454,11 +437,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             </Button>
         </>
       )}
-      {leagueId &&
-        <Button variant="ghost" size="icon" onClick={() => handleFavorite('league', {})}>
-            <Star className={cn("h-5 w-5 opacity-80", isFavorited ? "text-yellow-400 fill-current" : "text-muted-foreground")} />
-        </Button>
-      }
     </div>
   );
 
@@ -470,7 +448,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
           isOpen={!!renameItem}
           onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
           item={renameItem}
-          onSave={(type, id, newName) => handleSaveRename(type, id, newName)}
+          onSave={(type, id, newName, note) => handleSaveRename(type, id, newName, note)}
         />}
        <div className="flex-1 overflow-y-auto p-1">
         <CompetitionHeaderCard league={{ name: displayTitle, logo }} teamsCount={teams.length} />
@@ -605,6 +583,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     {teams.map(({ team }) => {
                         const displayName = getDisplayName('team', team.id, team.name);
                         const isOurBallTeam = !!favorites?.ourBallTeams?.[team.id];
+                        const isFavoritedTeam = !!favorites?.teams?.[team.id];
                         return (
                         <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
                             <div className='relative'>
@@ -627,6 +606,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 }}>
                                     <Heart className={cn("h-5 w-5", isOurBallTeam ? "text-red-500 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
+                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleFavoriteTeam(team);
+                                }}>
+                                    <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
+                                </Button>
                             </div>
                         </div>
                     )})}
@@ -647,3 +632,4 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
 
     
+

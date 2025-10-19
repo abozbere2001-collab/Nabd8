@@ -9,7 +9,7 @@ import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, onSnapshot, query, updateDoc, deleteField, getDocs, writeBatch, getDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot, query, updateDoc, deleteField, getDocs, writeBatch, getDoc, deleteDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -94,17 +94,14 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> }>({ leagues: new Map(), countries: new Map(), continents: new Map() });
 
     const getName = useCallback((type: 'league' | 'country' | 'continent', id: string | number, defaultName: string) => {
-        // Prioritize custom name from Firestore
         const firestoreMap = type === 'league' ? customNames.leagues : type === 'country' ? customNames.countries : customNames.continents;
         const customName = firestoreMap?.get(id as any);
         if (customName) return customName;
 
-        // Fallback to hardcoded translations
         const hardcodedMap = hardcodedTranslations[type === 'league' ? 'leagues' : type === 'country' ? 'countries' : 'continents'];
         const hardcodedName = hardcodedMap[id as any];
         if(hardcodedName) return hardcodedName;
 
-        // Return the original default name if no translation found
         return defaultName;
     }, [customNames]);
 
@@ -119,7 +116,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             });
             return () => unsubscribe();
         } else {
-            // Guest user, read from local storage
             setFavorites(getLocalFavorites());
         }
     }, [user, db]);
@@ -170,32 +166,35 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         return () => unsubscribe();
     }, [db, fetchAllCustomNames]);
 
-    const handleFavorite = useCallback((type: 'star' | 'heart' | 'ourBall', item: ManagedCompetitionType) => {
+    const handleFavoriteLeague = useCallback((item: ManagedCompetitionType, type: 'star' | 'heart') => {
         const itemId = item.leagueId;
         const currentFavorites = user ? favorites : getLocalFavorites();
-        const newFavorites = JSON.parse(JSON.stringify(currentFavorites)); // Deep copy
+        const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
 
         let isCurrentlyFavorited: boolean;
         let updateData: any;
+        let fieldPath: string;
 
         if (type === 'star') {
             isCurrentlyFavorited = !!newFavorites.leagues?.[itemId];
+            fieldPath = `leagues.${itemId}`;
             if (isCurrentlyFavorited) {
                 delete newFavorites.leagues[itemId];
-                updateData = { [`leagues.${itemId}`]: deleteField() };
+                updateData = { [fieldPath]: deleteField() };
             } else {
                 if (!newFavorites.leagues) newFavorites.leagues = {};
                 newFavorites.leagues[itemId] = { name: item.name, leagueId: itemId, logo: item.logo };
-                updateData = { leagues: newFavorites.leagues };
+                updateData = { [`leagues.${itemId}`]: { name: item.name, leagueId: itemId, logo: item.logo } };
             }
-        } else if (type === 'heart') {
+        } else { // 'heart' for ourLeague
             isCurrentlyFavorited = newFavorites.ourLeagueId === itemId;
+            fieldPath = 'ourLeagueId';
             if (isCurrentlyFavorited) {
                 delete newFavorites.ourLeagueId;
-                updateData = { ourLeagueId: deleteField() };
+                updateData = { [fieldPath]: deleteField() };
             } else {
                 newFavorites.ourLeagueId = itemId;
-                updateData = { ourLeagueId: itemId };
+                updateData = { [fieldPath]: itemId };
             }
         }
         
@@ -372,7 +371,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                             <span className="text-sm truncate">{comp.name}</span>
                                                         </div>
                                                         <div className="flex items-center gap-1">
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('heart', comp); }}>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteLeague(comp, 'heart'); }}>
                                                                 <Heart className={favorites.ourLeagueId === comp.leagueId ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                             </Button>
                                                             {isAdmin && (
@@ -380,7 +379,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                                     <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                                 </Button>
                                                             )}
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('star', comp); }}>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteLeague(comp, 'star'); }}>
                                                                 <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                             </Button>
                                                         </div>
@@ -411,7 +410,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                                     <span className="text-sm truncate">{comp.name}</span>
                                                                 </div>
                                                                 <div className="flex items-center gap-1">
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('heart', comp); }}>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteLeague(comp, 'heart'); }}>
                                                                         <Heart className={favorites.ourLeagueId === comp.leagueId ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                                     </Button>
                                                                     {isAdmin && (
@@ -419,7 +418,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                                             <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                                         </Button>
                                                                     )}
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('star', comp); }}>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteLeague(comp, 'star'); }}>
                                                                         <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                                     </Button>
                                                                 </div>
@@ -452,10 +451,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
-
-    
-
-
-    
-
-  
