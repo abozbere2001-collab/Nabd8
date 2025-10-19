@@ -111,8 +111,8 @@ function OurLeagueTab({
 
     return (
         <Tabs defaultValue="matches" className="w-full">
-            <div className="sticky top-0 bg-background z-10 -mx-4 px-1">
-                <div className="bg-card text-card-foreground rounded-t-lg border-x border-t shadow-md">
+             <div className="sticky top-0 bg-background z-10 -mx-4 px-1">
+                <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
                     <TabsList className="grid w-full grid-cols-3 rounded-none h-11 p-0 flex-row-reverse bg-transparent">
                         <TabsTrigger value="scorers" className='data-[state=active]:shadow-none'>الهدافين</TabsTrigger>
                         <TabsTrigger value="standings" className='data-[state=active]:shadow-none'>الترتيب</TabsTrigger>
@@ -490,14 +490,14 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         )}
 
         <Tabs defaultValue="our-league" className="w-full">
-          <div className="sticky top-0 bg-background z-10 px-1 pt-1">
-             <div className="bg-card text-card-foreground rounded-t-lg border-x border-t shadow-md">
-                <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-11 bg-transparent p-0">
-                  <TabsTrigger value="our-ball" className="data-[state=active]:shadow-none">كرتنا</TabsTrigger>
-                  <TabsTrigger value="our-league" className="data-[state=active]:shadow-none">دورينا</TabsTrigger>
-                </TabsList>
-             </div>
-          </div>
+           <div className="sticky top-0 bg-background z-10 px-1 pt-1 -mx-4">
+                <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
+                    <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-11 bg-transparent p-0">
+                      <TabsTrigger value="our-ball" className="data-[state=active]:shadow-none">كرتنا</TabsTrigger>
+                      <TabsTrigger value="our-league" className="data-[state=active]:shadow-none">دورينا</TabsTrigger>
+                    </TabsList>
+                </div>
+            </div>
           <TabsContent value="our-league" className="pt-0">
             <OurLeagueTab 
                 navigate={navigate} 

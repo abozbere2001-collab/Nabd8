@@ -446,7 +446,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         />
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col min-h-0">
             <div className="sticky top-0 z-10 px-1 pt-1 bg-background">
-                <div className="bg-card text-card-foreground rounded-t-lg border-x border-t shadow-md">
+                <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
                     <TabsList className="grid w-full grid-cols-3 bg-transparent p-0 h-11">
                         {tabs.map(tab => (
                             <TabsTrigger key={tab.id} value={tab.id} className="data-[state=active]:shadow-none">{tab.label}</TabsTrigger>
@@ -454,7 +454,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     </TabsList>
                 </div>
                  {activeTab !== 'predictions' && selectedDateKey && (
-                     <div className="bg-card py-2 border-x border-b rounded-b-lg shadow-md">
+                     <div className="bg-card py-2 border-x border-b rounded-b-lg shadow-md -mt-1">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                     </div>
                  )}

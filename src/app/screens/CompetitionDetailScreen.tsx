@@ -387,7 +387,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
        <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="matches" className="w-full">
            <div className="sticky top-0 bg-background z-10 px-1 pt-1">
-             <div className="bg-card rounded-t-lg border-x border-t pt-1">
+             <div className="bg-card rounded-b-lg border-x border-b shadow-md">
               <SeasonSelector season={season} onSeasonChange={setSeason} isAdmin={isAdmin} />
               <TabsList className="grid w-full grid-cols-4 rounded-none h-12 p-0 bg-transparent">
                 <TabsTrigger value="matches" className='rounded-none data-[state=active]:shadow-none'><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
@@ -568,5 +568,4 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
-
     

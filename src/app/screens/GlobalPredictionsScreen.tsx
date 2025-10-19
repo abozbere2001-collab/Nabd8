@@ -893,7 +893,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
                 <Tabs defaultValue="predictions" className="w-full">
                     <div className="sticky top-0 bg-background z-10 px-1 pt-1">
-                        <div className="bg-card text-card-foreground rounded-t-lg border-x border-t shadow-md">
+                        <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
                            <TabsList className="grid w-full grid-cols-3 bg-transparent p-0 h-11">
                                <TabsTrigger value="prizes" className="data-[state=active]:shadow-none">الجوائز</TabsTrigger>
                                <TabsTrigger value="leaderboard" className="data-[state=active]:shadow-none">الترتيب</TabsTrigger>
