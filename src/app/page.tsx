@@ -16,7 +16,7 @@ import { WelcomeScreen } from './screens/WelcomeScreen';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 import { signInWithGoogle, handleNewUser } from '@/lib/firebase-client';
 
-export type ScreenKey = 'Welcome' | 'Matches' | 'Competitions' | 'AllCompetitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'PlayerDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails' | 'NotificationSettings' | 'GeneralSettings' | 'ManagePinnedMatch' | 'PrivacyPolicy' | 'TermsOfService' | 'FavoriteSelection' | 'GoPro' | 'Login';
+export type ScreenKey = 'Welcome' | 'Login' | 'Matches' | 'Competitions' | 'AllCompetitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'PlayerDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails' | 'NotificationSettings' | 'GeneralSettings' | 'ManagePinnedMatch' | 'PrivacyPolicy' | 'TermsOfService' | 'FavoriteSelection' | 'GoPro';
 
 export type ScreenProps = {
   navigate: (screen: ScreenKey, props?: Record<string, any>) => void;
@@ -47,8 +47,7 @@ const AppFlow = () => {
                 return;
             }
 
-            // For development, always show welcome screen if not logged in.
-            // In production, you would re-enable the localStorage check.
+            // For development, always show welcome screen.
             const alwaysShowWelcomeForTesting = true; 
 
             if (user) {
@@ -61,12 +60,19 @@ const AppFlow = () => {
                         setFlowState('app');
                     } else {
                         // New registered user or existing user who hasn't onboarded
+                        await handleNewUser(user, db); // Ensure user doc exists
                         setFlowState('favorite_selection');
                     }
                 } catch (error) {
-                    const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
-                    errorEmitter.emit('permission-error', permissionError);
-                    setFlowState('app'); // Fail gracefully
+                    // This error is likely a permission error during handleNewUser or getDoc
+                    // We will re-throw it to be caught by the error boundary.
+                    // The FirestorePermissionError is already constructed inside handleNewUser.
+                    // For getDoc, we create one here.
+                    if (!(error instanceof FirestorePermissionError)) {
+                        const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
+                        errorEmitter.emit('permission-error', permissionError);
+                    }
+                    // Don't set state, let the error boundary handle it.
                 }
             } else {
                 // No user is logged in
@@ -105,12 +111,11 @@ const AppFlow = () => {
     };
     
     const handleChoice = (choice: 'google' | 'guest') => {
-        if (choice === 'google') {
-            signInWithGoogle().catch(err => console.error(err));
-            // The useEffect hook will react to the user change and move to favorite_selection
-        } else { // guest
-            setFlowState('favorite_selection');
+        if (choice === 'guest') {
+             setFlowState('favorite_selection');
         }
+        // For 'google', the onAuthStateChanged in useEffect will handle the flow change
+        // after the user signs in via the WelcomeScreen/LoginScreen.
     };
     
     switch (flowState) {

@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
@@ -10,7 +10,7 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/firebase-client';
 import type { ScreenProps } from '@/app/page';
 
-export function LoginScreen({ navigate }: ScreenProps) {
+export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,19 +34,12 @@ export function LoginScreen({ navigate }: ScreenProps) {
     try {
       await signInWithGoogle();
       // Auth state listener in AppFlow will handle navigation
+      // and data migration. After successful sign-in, the user will
+      // be in the 'app' state.
     } catch (e: any) {
       handleAuthError(e);
     }
   };
-  
-  const handleGuestContinue = () => {
-      // This is now handled by the WelcomeScreen and AppFlow
-      // This button shouldn't really be shown in the new flow but is kept for safety
-      if ((window as any).appNavigate) {
-        (window as any).appNavigate('FavoriteSelection');
-      }
-  }
-
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -61,7 +54,7 @@ export function LoginScreen({ navigate }: ScreenProps) {
         
         <NabdAlMalaebLogo className="h-24 w-24 mb-4" />
         <h1 className="text-3xl font-bold mb-2 font-headline text-primary">تسجيل الدخول</h1>
-        <p className="text-muted-foreground mb-8">اختر طريقة تسجيل الدخول للمتابعة</p>
+        <p className="text-muted-foreground mb-8">قم بتسجيل الدخول لمزامنة مفضلاتك وبياناتك عبر أجهزتك.</p>
         
         <div className="w-full max-w-xs space-y-4">
             <Button 
@@ -79,11 +72,11 @@ export function LoginScreen({ navigate }: ScreenProps) {
             </Button>
             <Button
                 variant="ghost"
-                onClick={handleGuestContinue}
+                onClick={goBack}
                 className="w-full"
                 disabled={loading}
             >
-                تصفح كزائر
+                العودة
             </Button>
         </div>
 

@@ -20,7 +20,8 @@ import { getLocalFavorites, clearLocalFavorites } from './local-favorites';
 
 export const handleNewUser = async (user: User, firestore: Firestore) => {
     const userRef = doc(firestore, 'users', user.uid);
-    
+    const leaderboardRef = doc(firestore, 'leaderboard', user.uid);
+
     try {
         const userDoc = await getDoc(userRef);
         if (!userDoc.exists()) {
@@ -45,17 +46,18 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
 
             const batch = writeBatch(firestore);
             batch.set(userRef, userProfileData);
-            batch.set(doc(firestore, 'leaderboard', user.uid), leaderboardEntry);
+            batch.set(leaderboardRef, leaderboardEntry);
 
             await batch.commit();
         }
-
     } catch (error: any) {
+        // Construct and emit a detailed error, then re-throw it so the calling function knows about it.
         const permissionError = new FirestorePermissionError({
             path: `users/${user.uid} or related docs`,
             operation: 'write',
         });
         errorEmitter.emit('permission-error', permissionError);
+        throw permissionError;
     }
 }
 
