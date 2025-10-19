@@ -43,7 +43,7 @@ import { isMatchLive } from '@/lib/matchStatus';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 
-type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach';
+type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
 
 function SeasonSelector({ season, onSeasonChange, isAdmin }: { season: number, onSeasonChange: (newSeason: number) => void, isAdmin: boolean }) {
     if (!isAdmin) {
@@ -416,7 +416,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
           isOpen={!!renameItem}
           onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
           item={renameItem}
-          onSave={handleSaveRename}
+          onSave={(type, id, newName) => handleSaveRename(type, id, newName)}
         />}
        <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="matches" className="w-full">
@@ -440,8 +440,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 ) : fixtures.length > 0 ? (
                     <div className="space-y-3 p-1">
                         {fixtures.map((fixture, index) => {
-                            const isUpcoming = isMatchLive(fixture.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(fixture.fixture.status.short);
-                            const isFirstUpcoming = isUpcoming && !fixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(f.fixture.status.short));
+                            const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(fixture.fixture.status.short);
+                            const isFirstUpcoming = isUpcomingOrLive && !fixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(f.fixture.status.short));
                             return (
                                 <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
                                     <FixtureItem fixture={fixture} navigate={navigate} />

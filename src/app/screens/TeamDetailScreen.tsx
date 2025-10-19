@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
@@ -23,6 +23,7 @@ import { CURRENT_SEASON } from '@/lib/constants';
 import { FixtureItem } from '@/components/FixtureItem';
 import { Skeleton } from '@/components/ui/skeleton';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
+import { isMatchLive } from '@/lib/matchStatus';
 
 interface TeamData {
     team: Team;
@@ -163,6 +164,9 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
     const { db } = useFirestore();
     const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>} | null>(null);
 
+    const fixturesListRef = useRef<HTMLDivElement>(null);
+    const firstUpcomingMatchRef = useRef<HTMLDivElement>(null);
+
 
      const fetchAllCustomNames = useCallback(async () => {
         if (!db) {
@@ -200,12 +204,12 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
 
                 const fixturesData = await fixturesRes.json();
                 const statsData = await statsRes.json();
-
-                const currentFixtures = fixturesData.response || [];
-                setFixtures(currentFixtures);
+                
+                const sortedFixtures = (fixturesData.response || []).sort((a: Fixture, b: Fixture) => a.fixture.timestamp - b.fixture.timestamp);
+                setFixtures(sortedFixtures);
                 setStats(statsData.response);
 
-                const leagueId = currentFixtures[0]?.league?.id || statsData?.response?.league?.id;
+                const leagueId = sortedFixtures[0]?.league?.id || statsData?.response?.league?.id;
 
                 if (leagueId) {
                     const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`);
@@ -221,6 +225,18 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
         };
         fetchData();
     }, [teamId, fetchAllCustomNames]);
+
+    useEffect(() => {
+        if (!loading && fixtures.length > 0 && fixturesListRef.current) {
+            setTimeout(() => {
+                if (firstUpcomingMatchRef.current && fixturesListRef.current) {
+                    const listTop = fixturesListRef.current.offsetTop;
+                    const itemTop = firstUpcomingMatchRef.current.offsetTop;
+                    fixturesListRef.current.scrollTop = itemTop - listTop;
+                }
+            }, 300);
+        }
+    }, [loading, fixtures]);
 
     const getDisplayName = useCallback((type: 'team' | 'league', id: number, defaultName: string) => {
         if (!customNames) return defaultName;
@@ -270,9 +286,17 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                 <TabsTrigger value="stats">الإحصائيات</TabsTrigger>
             </TabsList>
             <TabsContent value="matches" className="mt-4 space-y-3">
-                {processedFixtures.length > 0 ? processedFixtures.map(fixture => (
-                    <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />
-                )) : <p className="text-center text-muted-foreground p-8">لا توجد مباريات متاحة.</p>}
+                <div ref={fixturesListRef} className="h-full overflow-y-auto space-y-3">
+                    {processedFixtures.length > 0 ? processedFixtures.map((fixture, index) => {
+                        const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(fixture.fixture.status.short);
+                        const isFirstUpcoming = isUpcomingOrLive && !processedFixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(f.fixture.status.short));
+                        return (
+                            <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
+                                <FixtureItem fixture={fixture} navigate={navigate} />
+                            </div>
+                        )
+                    }) : <p className="text-center text-muted-foreground p-8">لا توجد مباريات متاحة.</p>}
+                </div>
             </TabsContent>
             <TabsContent value="standings" className="mt-4">
                  {processedStandings.length > 0 ? (
