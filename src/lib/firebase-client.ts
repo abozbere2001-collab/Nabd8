@@ -29,7 +29,10 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
     try {
         const userDoc = await getDoc(userRef);
         if (!userDoc.exists()) {
-            const displayName = user.displayName || `زائر_${user.uid.substring(0, 5)}`;
+            const displayName = user.isAnonymous 
+                ? `زائر_${user.uid.substring(0, 5)}`
+                : user.displayName || `مستخدم_${user.uid.substring(0, 5)}`;
+            
             const photoURL = user.photoURL || '';
 
             const userProfileData: UserProfile = {
@@ -38,6 +41,7 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
                 photoURL: photoURL,
                 isProUser: false,
                 isAnonymous: user.isAnonymous,
+                onboardingComplete: false,
             };
             await setDoc(userRef, userProfileData)
               .catch((serverError) => {
@@ -126,5 +130,3 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
             errorEmitter.emit('permission-error', permissionError);
         });
 };
-
-    

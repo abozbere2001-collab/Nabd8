@@ -9,8 +9,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2, User } from 'lucide-react';
 import { signInWithGoogle, signInAnonymously, handleNewUser } from '@/lib/firebase-client';
 import { useFirestore } from '@/firebase/provider';
-import { ScreenProps } from '@/app/page';
-
 
 interface WelcomeScreenProps {
   onOnboardingComplete: () => void;
@@ -26,6 +24,8 @@ export function WelcomeScreen({ onOnboardingComplete }: WelcomeScreenProps) {
     let errorMessage = e.message || 'حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة مرة أخرى.';
     if (e.code === 'auth/popup-closed-by-user') {
         errorMessage = 'تم إلغاء عملية تسجيل الدخول.';
+    } else if (e.code === 'auth/unauthorized-domain') {
+        errorMessage = `النطاق الذي تستخدمه غير مصرح به. يرجى إضافته إلى قائمة النطاقات المصرح بها في إعدادات Firebase Authentication.`;
     }
     setError(errorMessage);
     setLoading(null);
@@ -98,5 +98,3 @@ export function WelcomeScreen({ onOnboardingComplete }: WelcomeScreenProps) {
     </div>
   );
 }
-
-    

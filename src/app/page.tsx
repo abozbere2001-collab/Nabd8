@@ -37,7 +37,7 @@ const LoadingSplashScreen = () => (
 const AppFlow = () => {
     const { user, isUserLoading } = useUser();
     const { db } = useFirestore();
-    const [flowState, setFlowState] = useState<'loading' | 'welcome' | 'favorite_selection' | 'app' | 'login'>('login');
+    const [flowState, setFlowState] = useState<'loading' | 'welcome' | 'favorite_selection' | 'app' | 'login'>('loading');
 
     useEffect(() => {
         const checkOnboardingStatus = async () => {
@@ -68,30 +68,28 @@ const AppFlow = () => {
                         setFlowState('favorite_selection');
                     }
                 } else {
+                    // This can happen if the user record is being created
+                    // Let's assume favorite selection is the next step
                     setFlowState('favorite_selection');
                 }
             } catch (error) {
                  const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
                  errorEmitter.emit('permission-error', permissionError);
+                 // If we can't read the doc, fail gracefully into the app.
                  setFlowState('app');
             }
         };
 
-        // We bypass the onboarding flow for direct testing of login
-        // checkOnboardingStatus();
-        if (user && !isUserLoading) {
-            setFlowState('app');
-        } else if (!user && !isUserLoading) {
-            setFlowState('login');
-        } else {
-            setFlowState('loading');
-        }
+        checkOnboardingStatus();
 
     }, [user, isUserLoading, db]);
 
     const handleWelcomeComplete = () => {
         localStorage.setItem(HAS_SEEN_WELCOME_KEY, 'true');
-        setFlowState('login'); // Go to login after welcome
+        // After welcome, user might have logged in (Google/Visitor) or not.
+        // The useEffect will re-evaluate and direct to login or favorite_selection.
+        // Forcing a re-check by briefly setting to loading.
+        setFlowState('loading');
     }
 
     const handleFavoriteSelectionComplete = async () => {
@@ -103,7 +101,7 @@ const AppFlow = () => {
         } catch (error) {
             const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { onboardingComplete: true } });
             errorEmitter.emit('permission-error', permissionError);
-            setFlowState('app'); 
+            setFlowState('app'); // Fail gracefully
         }
     };
     
