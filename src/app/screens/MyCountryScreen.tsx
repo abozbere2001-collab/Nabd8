@@ -30,6 +30,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { isMatchLive } from '@/lib/matchStatus';
@@ -299,46 +300,10 @@ function OurLeagueTab({
     );
 }
 
-function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
+function OurBallTab({ navigate, ourBallTeams }: { navigate: ScreenProps['navigate'], ourBallTeams: Team[] }) {
     const { user, db } = useAuth();
     const { toast } = useToast();
-    const [teams, setTeams] = useState<Team[]>([]);
-    const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState<number | null>(null);
-
-    useEffect(() => {
-        let unsubscribe: (() => void) | null = null;
-        
-        const setupListener = async () => {
-            setLoading(true);
-
-            if (user && db) {
-                const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                unsubscribe = onSnapshot(favsRef, (snapshot) => {
-                    if (snapshot.exists()) {
-                        const favs = snapshot.data() as Favorites;
-                        setTeams(Object.values(favs.ourBallTeams || {}));
-                    } else {
-                        setTeams([]);
-                    }
-                    setLoading(false);
-                }, (error) => {
-                    const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'get' });
-                    errorEmitter.emit('permission-error', permissionError);
-                    setLoading(false);
-                });
-            } else {
-                setTeams(Object.values(getLocalFavorites().ourBallTeams || {}));
-                setLoading(false);
-            }
-        };
-
-        setupListener();
-
-        return () => {
-            if (unsubscribe) unsubscribe();
-        };
-    }, [user, db]);
 
     const handleDelete = (teamId: number) => {
         if (deletingId) return;
@@ -361,21 +326,12 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
             if (currentFavorites.ourBallTeams) {
                 delete currentFavorites.ourBallTeams[teamId];
                 setLocalFavorites(currentFavorites);
-                setTeams(Object.values(currentFavorites.ourBallTeams));
             }
             setDeletingId(null);
         }
     };
     
-    if (loading) {
-        return (
-             <div className="space-y-4 pt-4">
-                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
-            </div>
-        )
-    }
-
-    if (teams.length === 0) {
+    if (ourBallTeams.length === 0) {
         return (
             <div className="text-center text-muted-foreground py-10 px-4">
                 <p className="text-lg font-semibold">قسم "كرتنا" فارغ</p>
@@ -387,7 +343,7 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
 
     return (
         <div className="space-y-3 pt-4">
-            {teams.map(team => {
+            {ourBallTeams.map(team => {
                 return (
                     <div key={team.id} className="p-3 rounded-lg border bg-card flex items-center gap-3 h-16">
                         <div onClick={() => navigate('TeamDetails', { teamId: team.id })} className="flex-1 flex items-center gap-3 cursor-pointer">
@@ -431,7 +387,9 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user, db } = useAuth();
     const { isAdmin } = useAdmin();
     
-    const [ourLeagueId, setOurLeagueId] = useState<number | undefined>(undefined);
+    const [favorites, setFavorites] = useState<Partial<Favorites>>({});
+    const [loadingFavorites, setLoadingFavorites] = useState(true);
+
     const [ourLeagueData, setOurLeagueData] = useState<{ id: number; name: string; logo: string; } | null>(null);
     const [loadingLeague, setLoadingLeague] = useState(true);
 
@@ -439,46 +397,40 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
     
     useEffect(() => {
-        let isMounted = true;
-        const listenToFavorites = () => {
-            if (user && db) {
-                const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                return onSnapshot(favsRef, (docSnap) => {
-                    if (!isMounted) return;
-                    const favs = (docSnap.data() as Favorites) || {};
-                    setOurLeagueId(favs.ourLeagueId);
-                }, () => {
-                    if (!isMounted) return;
-                    setOurLeagueId(undefined); // Default to undefined
-                });
-            } else {
-                const favs = getLocalFavorites();
-                setOurLeagueId(favs.ourLeagueId);
-                return () => {};
-            }
-        };
-        const unsubscribe = listenToFavorites();
-        return () => {
-            isMounted = false;
-            unsubscribe();
-        };
+        setLoadingFavorites(true);
+        if (user && db) {
+            const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const unsubscribe = onSnapshot(favsRef, (docSnap) => {
+                setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
+                setLoadingFavorites(false);
+            }, (error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
+                setFavorites({});
+                setLoadingFavorites(false);
+            });
+            return () => unsubscribe();
+        } else {
+            setFavorites(getLocalFavorites());
+            setLoadingFavorites(false);
+        }
     }, [user, db]);
 
     useEffect(() => {
         let isMounted = true;
-        setLoadingLeague(true);
-        
         const fetchLeagueDetails = async () => {
-            if (ourLeagueId === undefined) {
-                 if (isMounted) {
-                    setOurLeagueData(null);
-                    setLoadingLeague(false);
-                 }
+            if (loadingFavorites) return;
+
+            setLoadingLeague(true);
+            const leagueId = favorites?.ourLeagueId;
+
+            if (!leagueId) {
+                setOurLeagueData(null);
+                setLoadingLeague(false);
                 return;
             }
 
             try {
-                const res = await fetch(`/api/football/leagues?id=${ourLeagueId}`);
+                const res = await fetch(`/api/football/leagues?id=${leagueId}`);
                 const data = await res.json();
                 if (isMounted && data.response?.[0]) {
                     const league = data.response[0].league;
@@ -495,9 +447,8 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         };
 
         fetchLeagueDetails();
-
         return () => { isMounted = false; };
-    }, [ourLeagueId]);
+    }, [favorites?.ourLeagueId, loadingFavorites]);
 
 
     useEffect(() => {
@@ -516,6 +467,8 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         });
         return () => unsub();
     }, [db]);
+    
+    const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}), [favorites.ourBallTeams]);
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -576,15 +529,14 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         )}
                     </TabsContent>
                     <TabsContent value="our-ball" className="pt-0">
-                        <OurBallTab navigate={navigate} />
+                         {loadingFavorites ? (
+                             <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                         ) : (
+                            <OurBallTab navigate={navigate} ourBallTeams={ourBallTeams} />
+                         )}
                     </TabsContent>
                 </Tabs>
             </div>
         </div>
     );
 }
-
-    
-
-    
-

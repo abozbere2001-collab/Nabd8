@@ -106,21 +106,21 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [customNames]);
 
     useEffect(() => {
-        if (user && db) {
-            const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const unsubscribe = onSnapshot(docRef, (doc) => {
-                setFavorites(doc.data() as Favorites || { userId: user.uid });
-            }, (error) => {
-                if (error.code !== 'permission-denied') {
-                    const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
-                    errorEmitter.emit('permission-error', permissionError);
-                }
-                setFavorites(getLocalFavorites()); // Fallback to local
-            });
-            return () => unsubscribe();
-        } else {
+        if (!user || !db) {
             setFavorites(getLocalFavorites());
+            return;
         }
+        
+        const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const unsubscribe = onSnapshot(docRef, (doc) => {
+            setFavorites(doc.data() as Favorites || { userId: user.uid });
+        }, (error) => {
+            if (user) { // Only emit error if a user is actually logged in
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'get' }));
+            }
+            setFavorites(getLocalFavorites()); // Fallback to local
+        });
+        return () => unsubscribe();
     }, [user, db]);
 
     const fetchAllCustomNames = useCallback(async () => {
@@ -203,7 +203,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
         if (user && db) {
             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            updateDoc(favRef, updateData).catch(serverError => {
+            setDoc(favRef, updateData, { merge: true }).catch(serverError => {
                 setFavorites(currentFavorites); // Revert on error
                 const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
                 errorEmitter.emit('permission-error', permissionError);
@@ -452,5 +452,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     );
 }
 
-
-    

@@ -77,8 +77,10 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                 setFavorites(favs);
                 setLoading(false);
             }, (error) => {
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
-                errorEmitter.emit('permission-error', permissionError);
+                if (user) {
+                  const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
+                  errorEmitter.emit('permission-error', permissionError);
+                }
                 setLoading(false);
             });
             return () => unsubscribe();
