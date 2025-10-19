@@ -6,7 +6,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteField, writeBatch } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Loader2, Pencil, Shirt, Star, Heart } from 'lucide-react';
@@ -18,13 +18,25 @@ import { Button } from '@/components/ui/button';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { Team, Player, Fixture, Standing, TeamStatistics, Favorites } from '@/lib/types';
+import type { Team, Player, Fixture, Standing, TeamStatistics, Favorites, AdminFavorite } from '@/lib/types';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { FixtureItem } from '@/components/FixtureItem';
 import { Skeleton } from '@/components/ui/skeleton';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { isMatchLive } from '@/lib/matchStatus';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 
 interface TeamData {
     team: Team;
@@ -413,31 +425,39 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
         setLoading(true);
         try {
             const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
-            if (teamRes.ok) {
-                const data = await teamRes.json();
-                if (data.response?.[0]) {
-                    const teamInfo = data.response[0];
-                    setTeamData(teamInfo);
-                    const name = teamInfo.team.name;
-                    if (db) {
-                        const customNameDocRef = doc(db, "teamCustomizations", String(teamId));
-                        try {
-                            const customNameDocSnap = await getDoc(customNameDocRef);
-                            if (customNameDocSnap.exists()) {
-                                setDisplayTitle(customNameDocSnap.data().customName);
-                            } else {
-                                setDisplayTitle(name);
-                            }
-                        } catch (error) {
-                           setDisplayTitle(name);
-                        }
-                    } else {
-                         setDisplayTitle(name);
-                    }
+            if (!teamRes.ok) throw new Error("Team API fetch failed");
+            
+            const data = await teamRes.json();
+            if (data.response?.[0]) {
+                const teamInfo = data.response[0];
+                setTeamData(teamInfo);
+                const name = teamInfo.team.name;
+
+                // For guest users or if db is not available, just set the title and finish.
+                if (!db) {
+                    setDisplayTitle(hardcodedTranslations.teams[teamId] || name);
+                    setLoading(false);
+                    return;
                 }
+                
+                // For logged-in users, check for custom name.
+                const customNameDocRef = doc(db, "teamCustomizations", String(teamId));
+                try {
+                    const customNameDocSnap = await getDoc(customNameDocRef);
+                    if (customNameDocSnap.exists()) {
+                        setDisplayTitle(customNameDocSnap.data().customName);
+                    } else {
+                        setDisplayTitle(hardcodedTranslations.teams[teamId] || name);
+                    }
+                } catch (error) {
+                    setDisplayTitle(hardcodedTranslations.teams[teamId] || name);
+                }
+            } else {
+                 throw new Error("Team not found in API response");
             }
         } catch (error) {
             console.error("Error fetching team info:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل بيانات الفريق.' });
         } finally {
             setLoading(false);
         }
@@ -445,7 +465,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     
     getTeamInfo();
     
-  }, [db, teamId]);
+  }, [db, teamId, toast]);
   
   useEffect(() => {
     if (!db || !user) {
@@ -464,6 +484,11 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   const handleFavoriteToggle = (type: 'star' | 'heart') => {
         if (!teamData) return;
         const { team } = teamData;
+
+        if (type === 'heart' && !favorites?.ourBallTeams?.[team.id]) {
+            handleRename();
+            return;
+        }
         
         const currentFavorites = user ? favorites : getLocalFavorites();
         const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
@@ -506,31 +531,41 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   };
 
   const handleSaveRename = async (type: string, id: number, newName: string, newNote?: string) => {
-        if (!teamData || !db) return;
-        const { team } = teamData;
-        
-        if (isAdmin) {
-            const customNameRef = doc(db, 'teamCustomizations', String(id));
-            if (newName && newName !== team.name) {
-                await setDoc(customNameRef, { customName: newName });
-            } else {
-                await deleteDoc(customNameRef);
-            }
-            setDisplayTitle(newName || team.name);
-            toast({ title: "نجاح", description: "تم تحديث الاسم المخصص للفريق." });
-        }
+    if (!teamData || !db) return;
+    const { team } = teamData;
+    
+    if (isAdmin) {
+      const customNameRef = doc(db, 'teamCustomizations', String(id));
+      if (newName && newName !== team.name) {
+        await setDoc(customNameRef, { customName: newName });
+      } else {
+        await deleteDoc(customNameRef);
+      }
+      setDisplayTitle(newName || team.name);
+      toast({ title: 'نجاح', description: 'تم تحديث الاسم المخصص للفريق.' });
+    }
 
-        if (user && newNote !== undefined) {
-             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-             const fieldPath = `ourBallTeams.${id}.note`;
-             const updateData = { [fieldPath]: newNote.length > 0 ? newNote : deleteField() };
-             
-             await setDoc(favRef, updateData, { merge: true });
-             toast({ title: "نجاح", description: "تم حفظ الملاحظة." });
-        }
+    if (user) {
+      const isFavorited = !!favorites?.ourBallTeams?.[team.id];
+      const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+      const fieldPath = `ourBallTeams.${id}`;
+      const favData = { 
+          teamId: team.id, 
+          name: team.name, 
+          logo: team.logo, 
+          type: team.national ? 'National' : 'Club',
+          note: newNote && newNote.length > 0 ? newNote : deleteField()
+      };
+      
+      const updateData = { [fieldPath]: favData };
 
-        setRenameItem(null);
-    };
+      await setDoc(favRef, updateData, { merge: true }).catch(err => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData }));
+      });
+    }
+
+    setRenameItem(null);
+  };
 
   if(loading) {
     return (
@@ -596,4 +631,3 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   );
 }
 
-    
