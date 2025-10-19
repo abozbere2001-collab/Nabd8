@@ -421,7 +421,6 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
     const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>, players: Map<number, string>}>({leagues: new Map(), teams: new Map(), players: new Map() });
     
-    // Step 1: Fetch all custom names once.
     const fetchAllCustomNames = useCallback(async () => {
         if (!db) return;
         try {
@@ -446,14 +445,15 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
     const getDisplayName = useCallback((type: 'league' | 'team' | 'player', id: number, defaultName: string) => {
         const key = `${type}s` as 'leagues' | 'teams' | 'players';
-        return customNames[key]?.get(id) || hardcodedTranslations[key]?.[id] || defaultName;
+        const hardcodedName = hardcodedTranslations[key]?.[id];
+        const customName = customNames[key]?.get(id);
+        return customName || hardcodedName || defaultName;
     }, [customNames]);
 
-    // Step 2: Listen for user's favorite league choice.
     useEffect(() => {
         const handleFavorites = (favs: Partial<Favorites>) => {
             const leagueId = favs?.ourLeagueId;
-            setOurLeagueId(leagueId || IRAQI_LEAGUE_ID);
+            setOurLeagueId(leagueId || null); // Set to null if not selected
         };
 
         if (user && db) {
@@ -467,9 +467,15 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         }
     }, [user, db]);
 
-    // Step 3: Fetch data whenever the chosen league ID or custom names change.
     useEffect(() => {
-        if (!ourLeagueId) return;
+        if (ourLeagueId === null) {
+            setOurLeague(null);
+            setFixtures([]);
+            setStandings([]);
+            setTopScorers([]);
+            setLoading(false);
+            return;
+        }
 
         const fetchLeagueData = async () => {
             setLoading(true);
@@ -484,7 +490,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 const standingsData = await standingsRes.json();
                 const scorersData = await scorersRes.json();
 
-                const leagueInfo = fixturesData?.response?.[0]?.league || standingsData?.response?.[0]?.league || scorersData?.response?.[0]?.league || (ourLeagueId === IRAQI_LEAGUE_ID ? IRAQI_LEAGUE_DEFAULT_DATA : null);
+                const leagueInfo = fixturesData?.response?.[0]?.league || standingsData?.response?.[0]?.league || scorersData?.response?.[0]?.league || null;
                 if (leagueInfo) {
                     setOurLeague({
                         id: leagueInfo.id,
@@ -520,7 +526,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 setTopScorers(translatedScorers);
             } catch (error) {
                 console.error("Failed to fetch league details:", error);
-                setOurLeague(null); // Reset on error
+                setOurLeague(null); 
             } finally {
                 setLoading(false);
             }
@@ -529,7 +535,6 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         fetchLeagueData();
     }, [ourLeagueId, getDisplayName]);
 
-    // Pinned Matches listener (independent)
     useEffect(() => {
         if (!db) { setLoadingPinnedMatches(false); return; }
         setLoadingPinnedMatches(true);
