@@ -12,48 +12,6 @@ export async function GET(
   const route = params.route || [];
   const routePath = Array.isArray(route) ? route.join('/') : '';
   
-  // Handle multi-ID requests specifically for players or fixture-specific player requests
-  if (routePath === 'fixtures/players' || (routePath === 'players' && searchParams.has('id'))) {
-    let apiUrl = '';
-    const fixtureId = searchParams.get('fixture');
-    const playerIds = searchParams.get('id');
-
-    if(routePath === 'fixtures/players' && fixtureId) {
-        apiUrl = `https://${API_FOOTBALL_HOST}/fixtures/players?fixture=${fixtureId}`;
-    } else if (routePath === 'players' && playerIds) {
-        apiUrl = `https://${API_FOOTBALL_HOST}/players?id=${playerIds}&season=${searchParams.get('season')}`;
-    } else {
-        return NextResponse.json({ error: 'Invalid players request' }, { status: 400 });
-    }
-    
-    try {
-        const apiResponse = await fetch(apiUrl, {
-             headers: {
-                'x-rapidapi-host': API_FOOTBALL_HOST,
-                'x-rapidapi-key': API_FOOTBALL_KEY,
-             },
-             next: { revalidate: 3600 } // Cache player data for 1 hour
-        });
-
-        if (!apiResponse.ok) {
-            const errorBody = await apiResponse.text();
-            console.error(`API Error for ${apiUrl}:`, errorBody);
-            return NextResponse.json({ error: 'Failed to fetch player data from football API', details: errorBody }, { status: apiResponse.status });
-        }
-        
-        const data = await apiResponse.json();
-        return NextResponse.json(data);
-
-    } catch (error) {
-         console.error(`API proxy error for players request (${apiUrl}):`, error);
-        return NextResponse.json(
-          { error: 'An internal error occurred while proxying the player data request.' },
-          { status: 500 }
-        );
-    }
-  }
-
-
   const apiURL = `https://${API_FOOTBALL_HOST}/${routePath}?${searchParams.toString()}`;
 
   if (!API_FOOTBALL_KEY) {
