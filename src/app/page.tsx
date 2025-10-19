@@ -13,10 +13,11 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { WelcomeScreen } from './screens/WelcomeScreen';
+import { LoginScreen } from './screens/LoginScreen';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
-import { signInWithGoogle, handleNewUser } from '@/lib/firebase-client';
+import { handleNewUser } from '@/lib/firebase-client';
 
-export type ScreenKey = 'Welcome' | 'Login' | 'Matches' | 'Competitions' | 'AllCompetitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'PlayerDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails' | 'NotificationSettings' | 'GeneralSettings' | 'ManagePinnedMatch' | 'PrivacyPolicy' | 'TermsOfService' | 'FavoriteSelection' | 'GoPro';
+export type ScreenKey = 'Welcome' | 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'AllCompetitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'PlayerDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails' | 'NotificationSettings' | 'GeneralSettings' | 'ManagePinnedMatch' | 'PrivacyPolicy' | 'TermsOfService' | 'FavoriteSelection' | 'GoPro';
 
 export type ScreenProps = {
   navigate: (screen: ScreenKey, props?: Record<string, any>) => void;
@@ -38,7 +39,7 @@ const LoadingSplashScreen = () => (
 const AppFlow = () => {
     const { user, isUserLoading } = useAuth();
     const { db } = useFirestore();
-    const [flowState, setFlowState] = useState<'loading' | 'welcome' | 'favorite_selection' | 'app'>('loading');
+    const [flowState, setFlowState] = useState<'loading' | 'welcome' | 'login' | 'favorite_selection' | 'app'>('loading');
 
     useEffect(() => {
         const checkUserStatus = async () => {
@@ -46,9 +47,6 @@ const AppFlow = () => {
                 setFlowState('loading');
                 return;
             }
-
-            // For development, always show welcome screen.
-            const alwaysShowWelcomeForTesting = true; 
 
             if (user) {
                 // User is logged in, check if they have completed onboarding in Firestore
@@ -64,22 +62,13 @@ const AppFlow = () => {
                         setFlowState('favorite_selection');
                     }
                 } catch (error) {
-                    // This error is likely a permission error during handleNewUser or getDoc
-                    // We will re-throw it to be caught by the error boundary.
-                    // The FirestorePermissionError is already constructed inside handleNewUser.
-                    // For getDoc, we create one here.
                     if (!(error instanceof FirestorePermissionError)) {
                         const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
                         errorEmitter.emit('permission-error', permissionError);
                     }
-                    // Don't set state, let the error boundary handle it.
                 }
             } else {
                 // No user is logged in
-                if (alwaysShowWelcomeForTesting) {
-                     setFlowState('welcome');
-                     return;
-                }
                 const guestOnboardingComplete = localStorage.getItem(GUEST_ONBOARDING_COMPLETE_KEY) === 'true';
                  if (guestOnboardingComplete) {
                     setFlowState('app');
@@ -110,19 +99,25 @@ const AppFlow = () => {
         setFlowState('app');
     };
     
-    const handleChoice = (choice: 'google' | 'guest') => {
+    const handleWelcomeChoice = (choice: 'google' | 'guest') => {
         if (choice === 'guest') {
              setFlowState('favorite_selection');
+        } else {
+            setFlowState('login');
         }
-        // For 'google', the onAuthStateChanged in useEffect will handle the flow change
-        // after the user signs in via the WelcomeScreen/LoginScreen.
     };
+
+    const goBackToApp = () => {
+        setFlowState('app');
+    }
     
     switch (flowState) {
         case 'loading':
              return <LoadingSplashScreen />;
         case 'welcome':
-            return <WelcomeScreen onChoice={handleChoice} />;
+            return <WelcomeScreen onChoice={handleWelcomeChoice} />;
+        case 'login':
+            return <LoginScreen navigate={() => {}} goBack={goBackToApp} canGoBack={true} />;
         case 'favorite_selection':
             return <FavoriteSelectionScreen onOnboardingComplete={handleOnboardingComplete} />;
         case 'app':

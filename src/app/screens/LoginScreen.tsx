@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
@@ -33,9 +33,7 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setError(null);
     try {
       await signInWithGoogle();
-      // Auth state listener in AppFlow will handle navigation
-      // and data migration. After successful sign-in, the user will
-      // be in the 'app' state.
+      // Auth state listener in AppFlow will handle navigation.
     } catch (e: any) {
       handleAuthError(e);
     }
@@ -70,22 +68,20 @@ export function LoginScreen({ navigate, goBack, canGoBack }: ScreenProps) {
               )}
               المتابعة باستخدام جوجل
             </Button>
-            <Button
-                variant="ghost"
-                onClick={goBack}
-                className="w-full"
-                disabled={loading}
-            >
-                العودة
-            </Button>
+            {canGoBack && (
+              <Button
+                  variant="ghost"
+                  onClick={goBack}
+                  className="w-full"
+                  disabled={loading}
+              >
+                  العودة
+              </Button>
+            )}
         </div>
 
         <p className="mt-8 text-xs text-muted-foreground/80 px-4">
-          بالاستمرار، أنت توافق على 
-          <button className="underline hover:text-primary px-1" onClick={() => navigate('TermsOfService')}>شروط الخدمة</button> 
-          و 
-          <button className="underline hover:text-primary px-1" onClick={() => navigate('PrivacyPolicy')}>سياسة الخصوصية</button>
-          .
+          بالاستمرار، أنت توافق على شروط الخدمة و سياسة الخصوصية.
         </p>
       </div>
     </div>
