@@ -146,7 +146,7 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
                         </div>
                         {player.number && (
                            <div className="relative flex items-center justify-center text-primary-foreground">
-                               <Shirt className="h-10 w-10 text-primary fill-primary" />
+                               <Shirt className="h-10 w-10 text-primary bg-primary p-1 rounded-md" />
                                <span className="absolute text-xs font-bold">{player.number}</span>
                            </div>
                         )}
@@ -234,13 +234,16 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
 
     useEffect(() => {
         if (!loading && fixtures.length > 0 && fixturesListRef.current) {
-            setTimeout(() => {
-                if (firstUpcomingMatchRef.current && fixturesListRef.current) {
-                    const listTop = fixturesListRef.current.offsetTop;
-                    const itemTop = firstUpcomingMatchRef.current.offsetTop;
-                    fixturesListRef.current.scrollTop = itemTop - listTop;
-                }
-            }, 300);
+            const firstUpcomingIndex = fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
+            if (firstUpcomingIndex !== -1 && firstUpcomingMatchRef.current) {
+                setTimeout(() => {
+                    if (firstUpcomingMatchRef.current && fixturesListRef.current) {
+                        const listTop = fixturesListRef.current.offsetTop;
+                        const itemTop = firstUpcomingMatchRef.current.offsetTop;
+                        fixturesListRef.current.scrollTop = itemTop - listTop;
+                    }
+                }, 300);
+            }
         }
     }, [loading, fixtures]);
 

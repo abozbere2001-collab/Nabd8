@@ -760,7 +760,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setRenameItem({ type: 'status', id: fixtureId, name: customStatus || '', originalName: '' })}
+              onClick={() => setRenameItem({ type: 'status' as any, id: fixtureId, name: customStatus || '', originalName: '' })}
             >
               <Pencil className="h-5 w-5" />
             </Button>
@@ -794,11 +794,11 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 />
                 <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-5 rounded-lg h-auto p-1 bg-card">
-                        <TabsTrigger value="details"><ShieldCheck className="w-4 h-4 ml-1" />تفاصيل</TabsTrigger>
-                        <TabsTrigger value="odds"><TrendingUp className="w-4 h-4 ml-1" />احتمالات</TabsTrigger>
-                        <TabsTrigger value="events"><Clock className="w-4 h-4 ml-1" />مُجريات</TabsTrigger>
-                        <TabsTrigger value="lineups"><Users className="w-4 h-4 ml-1" />التشكيل</TabsTrigger>
-                        <TabsTrigger value="standings"><BarChart className="w-4 h-4 ml-1" />الترتيب</TabsTrigger>
+                        <TabsTrigger value="details">تفاصيل</TabsTrigger>
+                        <TabsTrigger value="odds">احتمالات</TabsTrigger>
+                        <TabsTrigger value="events">مُجريات</TabsTrigger>
+                        <TabsTrigger value="lineups">التشكيل</TabsTrigger>
+                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
                     </TabsList>
                     <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
                     <TabsContent value="odds" className="mt-4"><OddsTab fixtureId={fixture.fixture.id} /></TabsContent>
@@ -812,4 +812,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-

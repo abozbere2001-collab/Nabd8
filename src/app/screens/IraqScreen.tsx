@@ -441,7 +441,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader 
-        title={"العراق"} 
+        title={"بلدي"} 
         onBack={goBack} 
         canGoBack={canGoBack} 
         actions={

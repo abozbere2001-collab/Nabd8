@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { isMatchLive } from '@/lib/matchStatus';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
-
+import { Card, CardContent } from '@/components/ui/card';
 
 type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
 
@@ -68,6 +68,21 @@ function SeasonSelector({ season, onSeasonChange, isAdmin }: { season: number, o
         </div>
     );
 }
+
+const CompetitionHeaderCard = ({ league, countryName, teamsCount }: { league: { name?: string, logo?: string }, countryName?: string, teamsCount?: number }) => (
+    <Card className="mb-4 overflow-hidden">
+        <div className="relative h-24 bg-gradient-to-r from-primary/20 to-accent/20">
+             <Avatar className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 h-24 w-24 border-4 border-background p-2 bg-background">
+                <AvatarImage src={league.logo} alt={league.name} className="object-contain" />
+                <AvatarFallback>{league.name?.charAt(0)}</AvatarFallback>
+            </Avatar>
+        </div>
+        <CardContent className="pt-14 text-center">
+            <h1 className="text-xl font-bold">{league.name}</h1>
+            <p className="text-muted-foreground">{countryName}</p>
+        </CardContent>
+    </Card>
+);
 
 
 export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: initialTitle, leagueId, logo }: ScreenProps & { title?: string, leagueId?: number, logo?: string }) {
@@ -411,25 +426,30 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 
+  const firstUpcomingMatchIndex = useMemo(() => {
+    return fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
+  }, [fixtures]);
+
   return (
     <div className="flex h-full flex-col bg-background">
-      <ScreenHeader title={displayTitle || ''} onBack={goBack} canGoBack={canGoBack} actions={secondaryActions} />
+      <ScreenHeader title={""} onBack={goBack} canGoBack={canGoBack} actions={secondaryActions} />
       {renameItem && <RenameDialog 
           isOpen={!!renameItem}
           onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
           item={renameItem}
           onSave={(type, id, newName) => handleSaveRename(type, id, newName)}
         />}
-       <div className="flex-1 overflow-y-auto">
+       <div className="flex-1 overflow-y-auto p-1">
+        <CompetitionHeaderCard league={{ name: displayTitle, logo }} teamsCount={teams.length} />
         <Tabs defaultValue="matches" className="w-full">
            <div className="sticky top-0 bg-background z-10 px-1 pt-1">
              <div className="bg-card rounded-b-lg border-x border-b shadow-md">
               <SeasonSelector season={season} onSeasonChange={setSeason} isAdmin={isAdmin} />
               <TabsList className="grid w-full grid-cols-4 rounded-none h-12 p-0 bg-transparent">
-                <TabsTrigger value="matches" className='rounded-none data-[state=active]:shadow-none'><Shield className="w-4 h-4 ml-1"/>المباريات</TabsTrigger>
-                <TabsTrigger value="standings" className='rounded-none data-[state=active]:shadow-none'><Trophy className="w-4 h-4 ml-1"/>الترتيب</TabsTrigger>
-                <TabsTrigger value="scorers" className='rounded-none data-[state=active]:shadow-none'><BarChart2 className="w-4 h-4 ml-1"/>الهدافين</TabsTrigger>
-                <TabsTrigger value="teams" className='rounded-none data-[state=active]:shadow-none'><Users className="w-4 h-4 ml-1"/>الفرق</TabsTrigger>
+                <TabsTrigger value="matches" className='rounded-none data-[state=active]:shadow-none'>المباريات</TabsTrigger>
+                <TabsTrigger value="standings" className='rounded-none data-[state=active]:shadow-none'>الترتيب</TabsTrigger>
+                <TabsTrigger value="scorers" className='rounded-none data-[state=active]:shadow-none'>الهدافين</TabsTrigger>
+                <TabsTrigger value="teams" className='rounded-none data-[state=active]:shadow-none'>الفرق</TabsTrigger>
               </TabsList>
              </div>
           </div>
@@ -587,3 +607,4 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     
 
     
+
