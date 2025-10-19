@@ -106,7 +106,7 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
     });
     
     if (user && db) {
-        // Registered user: save to Firestore
+        // Registered user: save to Firestore. Use merge to update existing empty doc.
         const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
         try {
             await setDoc(favRef, { ...favoritesToSave, userId: user.uid }, { merge: true });
@@ -114,7 +114,7 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
         } catch (error) {
              const permissionError = new FirestorePermissionError({
                 path: favRef.path,
-                operation: 'create',
+                operation: 'write', // 'write' covers create/update
                 requestResourceData: favoritesToSave
             });
             errorEmitter.emit('permission-error', permissionError);

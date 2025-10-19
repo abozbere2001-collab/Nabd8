@@ -21,6 +21,7 @@ import { getLocalFavorites, clearLocalFavorites } from './local-favorites';
 export const handleNewUser = async (user: User, firestore: Firestore) => {
     const userRef = doc(firestore, 'users', user.uid);
     const leaderboardRef = doc(firestore, 'leaderboard', user.uid);
+    const favoritesRef = doc(firestore, 'users', user.uid, 'favorites', 'data');
 
     try {
         const userDoc = await getDoc(userRef);
@@ -44,9 +45,16 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
                 totalPoints: 0,
             };
 
+            const initialFavorites: Partial<Favorites> = {
+                userId: user.uid,
+                teams: {},
+                leagues: {},
+            };
+
             const batch = writeBatch(firestore);
             batch.set(userRef, userProfileData);
             batch.set(leaderboardRef, leaderboardEntry);
+            batch.set(favoritesRef, initialFavorites); // Create empty favorites doc
 
             await batch.commit();
         }
@@ -54,7 +62,7 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
         // This is a critical path. If this fails, the user can't be created properly.
         // We will emit a specific, detailed error for debugging.
         const permissionError = new FirestorePermissionError({
-            path: `users/${user.uid} and leaderboard/${user.uid}`, // Indicate batch write
+            path: `users/${user.uid} and related docs`, // Indicate batch write
             operation: 'write',
             requestResourceData: { 
                 userProfile: { displayName: user.displayName, email: user.email },
