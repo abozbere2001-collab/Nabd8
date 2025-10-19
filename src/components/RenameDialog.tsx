@@ -50,7 +50,7 @@ export function RenameDialog({
 
   const handleSave = () => {
     if (item) {
-        onSave(item.type, item.id, newName, hasNoteField ? newNote : undefined);
+        onSave(item.type, item.id, newName, newNote);
     }
     onOpenChange(false);
   };
@@ -113,5 +113,7 @@ export function RenameDialog({
     </Dialog>
   );
 }
+
+    
 
     

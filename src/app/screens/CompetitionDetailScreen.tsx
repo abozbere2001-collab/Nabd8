@@ -203,26 +203,16 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       await fetchAllCustomNames();
 
       try {
-        const [fixturesRes, standingsRes, scorersRes, teamsRes] = await Promise.all([
-          fetch(`/api/football/fixtures?league=${leagueId}&season=${season}`),
+        const [standingsRes, scorersRes, teamsRes] = await Promise.all([
           fetch(`/api/football/standings?league=${leagueId}&season=${season}`),
           fetch(`/api/football/players/topscorers?league=${leagueId}&season=${season}`),
           fetch(`/api/football/teams?league=${leagueId}&season=${season}`)
         ]);
 
-        const fixturesData = await fixturesRes.json();
         const standingsData = await standingsRes.json();
         const scorersData = await scorersRes.json();
         const teamsData = await teamsRes.json();
         
-        if(fixturesData.response) {
-            const sortedFixtures = [...fixturesData.response].sort((a,b) => a.fixture.timestamp - b.fixture.timestamp);
-            setFixtures(sortedFixtures);
-            if(!initialTitle && fixturesData.response.length > 0) {
-                 const hardcodedName = hardcodedTranslations.leagues[fixturesData.response[0].league.id];
-                 setDisplayTitle(hardcodedName || fixturesData.response[0].league.name);
-            }
-        }
         if (standingsData.response[0]?.league?.standings[0]) setStandings(standingsData.response[0].league.standings[0]);
         if (scorersData.response) setTopScorers(scorersData.response);
         if (teamsData.response) setTeams(teamsData.response);
@@ -234,7 +224,29 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       }
     }
     fetchData();
-  }, [leagueId, initialTitle, season, fetchAllCustomNames]);
+  }, [leagueId, season, fetchAllCustomNames]);
+  
+  useEffect(() => {
+      async function fetchFixtures() {
+        if (!leagueId) return;
+        try {
+            const fixturesRes = await fetch(`/api/football/fixtures?league=${leagueId}&season=${season}`);
+            const fixturesData = await fixturesRes.json();
+            if(fixturesData.response) {
+                const sortedFixtures = [...fixturesData.response].sort((a,b) => a.fixture.timestamp - b.fixture.timestamp);
+                setFixtures(sortedFixtures);
+                if(!initialTitle && fixturesData.response.length > 0) {
+                     const hardcodedName = hardcodedTranslations.leagues[fixturesData.response[0].league.id];
+                     setDisplayTitle(hardcodedName || fixturesData.response[0].league.name);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to fetch fixtures:", error);
+        }
+    }
+    fetchFixtures();
+  }, [leagueId, season, initialTitle]);
+
 
   const firstUpcomingMatchIndex = useMemo(() => {
     return fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
@@ -253,26 +265,25 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     }
   }, [loading, fixtures, firstUpcomingMatchIndex]);
   
-  const handleOurBallFavorite = useCallback((team: Team) => {
+  const handleFavoriteToggle = useCallback((team: Team, type: 'star' | 'heart') => {
     const currentFavorites = user ? favorites : getLocalFavorites();
     const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-    const isCurrentlyFavorited = !!newFavorites.ourBallTeams?.[team.id];
+    const field = type === 'star' ? 'teams' : 'ourBallTeams';
+    const isCurrentlyFavorited = !!newFavorites[field]?.[team.id];
 
     if (isCurrentlyFavorited) {
-      delete newFavorites.ourBallTeams[team.id];
+        delete newFavorites[field][team.id];
     } else {
-      if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
-      newFavorites.ourBallTeams[team.id] = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
+        if (!newFavorites[field]) newFavorites[field] = {};
+        newFavorites[field][team.id] = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
     }
-
+    
     setFavorites(newFavorites);
 
     if (user && db) {
         const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const updateData = isCurrentlyFavorited 
-            ? { [`ourBallTeams.${team.id}`]: deleteField() }
-            : { [`ourBallTeams.${team.id}`]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' }};
-            
+        const updateData = { [`${field}.${team.id}`]: isCurrentlyFavorited ? deleteField() : { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
+        
         setDoc(favRef, updateData, { merge: true }).catch(serverError => {
             setFavorites(currentFavorites); // Revert on error
             const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
@@ -282,40 +293,11 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         setLocalFavorites(newFavorites);
     }
   }, [user, db, favorites]);
-
-  const handleFavoriteTeam = (team: Team) => {
-    const currentFavorites = user ? favorites : getLocalFavorites();
-    const newFavorites = JSON.parse(JSON.stringify(currentFavorites)); // Deep copy
-    const isCurrentlyFavorited = !!newFavorites.teams?.[team.id];
-
-    if (isCurrentlyFavorited) {
-        delete newFavorites.teams[team.id];
-    } else {
-        if (!newFavorites.teams) newFavorites.teams = {};
-        newFavorites.teams[team.id] = { teamId: team.id, name: team.name, logo: team.logo };
-    }
-    setFavorites(newFavorites);
-
-    if (user && db) {
-        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const updateData = isCurrentlyFavorited 
-            ? { [`teams.${team.id}`]: deleteField() }
-            : { [`teams.${team.id}`]: { teamId: team.id, name: team.name, logo: team.logo }};
-
-        setDoc(favRef, updateData, { merge: true }).catch(serverError => {
-            setFavorites(currentFavorites); // Revert on error
-            const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
-            errorEmitter.emit('permission-error', permissionError);
-        });
-    } else {
-        setLocalFavorites(newFavorites);
-    }
-  };
   
   const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
     if (!customNames) return;
     const currentName = getDisplayName(type as 'team'|'player', id, originalData.name);
-    const note = type === 'team' ? customNames.adminNotes.get(id) : undefined;
+    const note = type === 'team' ? (favorites.ourBallTeams?.[id] as any)?.note || '' : undefined;
     setRenameItem({ id, name: currentName, note, type, originalName: originalData.name });
   };
 
@@ -327,23 +309,23 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         if (!team) return;
 
         const batch = writeBatch(db);
-        const nameRef = doc(db, "teamCustomizations", String(id));
-        const noteRef = doc(db, "adminFavorites", String(id));
-
-        if (newName && newName !== team.name) {
-            batch.set(nameRef, { customName: newName });
-        } else {
-            batch.delete(nameRef);
+        
+        if (isAdmin) {
+            const nameRef = doc(db, "teamCustomizations", String(id));
+            if (newName && newName !== team.name) {
+                batch.set(nameRef, { customName: newName });
+            } else {
+                batch.delete(nameRef);
+            }
         }
-
-        if (isAdmin && newNote !== undefined) {
-             if (newNote.length > 0) {
-                 batch.set(noteRef, { teamId: id, name: team.name, logo: team.logo, note: newNote });
-             } else {
-                 batch.delete(noteRef);
-             }
+        
+        if (user && newNote !== undefined) {
+             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+             const fieldPath = `ourBallTeams.${id}.note`;
+             const updateData = { [fieldPath]: newNote.length > 0 ? newNote : deleteField() };
+             batch.set(favRef, updateData, { merge: true });
         }
-
+        
         try {
             await batch.commit();
             toast({ title: 'نجاح', description: 'تم حفظ التغييرات بنجاح.' });
@@ -358,17 +340,31 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         if(!player) return;
         
         const docRef = doc(db, "playerCustomizations", String(id));
+        const data = { customName: newName };
         if (newName && newName !== player.name) {
-            setDoc(docRef, { customName: newName }).then(fetchAllCustomNames);
+            setDoc(docRef, data).then(fetchAllCustomNames).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
+                errorEmitter.emit('permission-error', permissionError);
+            });
         } else {
-            deleteDoc(docRef).then(fetchAllCustomNames);
+            deleteDoc(docRef).then(fetchAllCustomNames).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
+                errorEmitter.emit('permission-error', permissionError);
+            });
         }
     } else if (type === 'league' && leagueId) {
         const docRef = doc(db, "leagueCustomizations", String(id));
+        const data = { customName: newName };
         if (newName && newName !== initialTitle) {
-            setDoc(docRef, { customName: newName }).then(() => setDisplayTitle(newName));
+            setDoc(docRef, data).then(() => setDisplayTitle(newName)).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
+                errorEmitter.emit('permission-error', permissionError);
+            });
         } else {
-            deleteDoc(docRef).then(() => setDisplayTitle(initialTitle));
+            deleteDoc(docRef).then(() => setDisplayTitle(initialTitle)).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
+                errorEmitter.emit('permission-error', permissionError);
+            });
         }
     }
      setRenameItem(null);
@@ -591,24 +587,24 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                     <AvatarImage src={team.logo} alt={team.name} />
                                     <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
                                 </Avatar>
-                                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
+                                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(team.logo) }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
                             </div>
                             <span className="font-semibold text-sm">
                                 {displayName}
                             </span>
                             <div className="absolute top-1 left-1 flex opacity-80">
-                                {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team)}}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team)}}>
                                     <Pencil className="h-4 w-4 text-muted-foreground" />
-                                </Button>}
+                                </Button>
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {
                                     e.stopPropagation();
-                                    handleOurBallFavorite(team);
+                                    handleFavoriteToggle(team, 'heart');
                                 }}>
                                     <Heart className={cn("h-5 w-5", isOurBallTeam ? "text-red-500 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {
                                     e.stopPropagation();
-                                    handleFavoriteTeam(team);
+                                    handleFavoriteToggle(team, 'star');
                                 }}>
                                     <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
@@ -633,3 +629,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
     
 
+
+
+    

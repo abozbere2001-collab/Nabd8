@@ -9,7 +9,7 @@ import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { collection, getDocs, doc, query, orderBy, onSnapshot, deleteDoc, updateDoc, deleteField, getDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, query, orderBy, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
 import type { Fixture, Standing, TopScorer, PinnedMatch, Favorites, Team } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -32,7 +32,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { isMatchLive } from '@/lib/matchStatus';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
@@ -81,12 +80,11 @@ function OurLeagueTab({
     navigate: ScreenProps['navigate'],
     ourLeague: { id: number; name: string; logo: string } | null;
 }) {
-    const { isAdmin } = useAdmin();
+    const { isAdmin, db } = useAdmin();
     const [loading, setLoading] = useState(true);
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
     const [standings, setStandings] = useState<Standing[]>([]);
     const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
-    const { db } = useFirestore();
     const [manualTopScorers, setManualTopScorers] = useState<any[]>([]);
 
     const listRef = useRef<HTMLDivElement>(null);
@@ -94,6 +92,52 @@ function OurLeagueTab({
     const sortedFixtures = useMemo(() => {
         return [...fixtures].sort((a, b) => a.fixture.timestamp - b.fixture.timestamp);
     }, [fixtures]);
+    
+    const [customNames, setCustomNames] = useState<{leagues: Map<number, string>, teams: Map<number, string>, players: Map<number, string>} | null>(null);
+
+    const fetchAllCustomNames = useCallback(async () => {
+        if (!db) {
+            setCustomNames({ leagues: new Map(), teams: new Map(), players: new Map() });
+            return;
+        }
+        try {
+            const [leaguesSnapshot, teamsSnapshot, playersSnapshot] = await Promise.all([
+                getDocs(collection(db, 'leagueCustomizations')),
+                getDocs(collection(db, 'teamCustomizations')),
+                getDocs(collection(db, 'playerCustomizations')),
+            ]);
+            
+            const names = {
+                leagues: new Map<number, string>(),
+                teams: new Map<number, string>(),
+                players: new Map<number, string>(),
+            };
+
+            leaguesSnapshot?.forEach(doc => names.leagues.set(Number(doc.id), doc.data().customName));
+            teamsSnapshot?.forEach(doc => names.teams.set(Number(doc.id), doc.data().customName));
+            playersSnapshot?.forEach(doc => names.players.set(Number(doc.id), doc.data().customName));
+            
+            setCustomNames(names);
+        } catch(error) {
+             console.warn("Could not fetch custom names, this is expected for non-admins", error);
+             setCustomNames({ leagues: new Map(), teams: new Map(), players: new Map() });
+        }
+    }, [db]);
+
+    const getDisplayName = useCallback((type: 'team' | 'player' | 'league', id: number, defaultName: string) => {
+        if (!customNames) return defaultName;
+        const key = `${type}s` as 'teams' | 'leagues' | 'players';
+        const firestoreMap = customNames[key];
+        const customName = firestoreMap.get(id);
+        if (customName) return customName;
+
+        const hardcodedMap = hardcodedTranslations[key];
+        const hardcodedName = hardcodedMap[id as any];
+        if (hardcodedName) return hardcodedName;
+
+        return defaultName;
+    }, [customNames]);
+
 
     useEffect(() => {
         const fetchLeagueData = async () => {
@@ -102,11 +146,12 @@ function OurLeagueTab({
                 setFixtures([]);
                 setStandings([]);
                 setTopScorers([]);
-                setManualTopScorers([]);
                 return;
             }
 
             setLoading(true);
+            await fetchAllCustomNames();
+
             try {
                 const [fixturesRes, standingsRes, scorersRes] = await Promise.all([
                     fetch(`/api/football/fixtures?league=${ourLeague.id}&season=${CURRENT_SEASON}`),
@@ -121,6 +166,7 @@ function OurLeagueTab({
                 setFixtures(fixturesData.response || []);
                 setStandings(standingsData.response?.[0]?.league?.standings?.[0] || []);
                 setTopScorers(scorersData.response || []);
+
             } catch (error) {
                 console.error("Failed to fetch league data:", error);
             } finally {
@@ -136,13 +182,16 @@ function OurLeagueTab({
             const unsubscribe = onSnapshot(q, (snapshot) => {
               const fetchedScorers = snapshot.docs.map((doc) => doc.data());
               setManualTopScorers(fetchedScorers);
+            }, error => {
+                const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
+                errorEmitter.emit('permission-error', permissionError);
             });
             return () => unsubscribe();
         } else {
             setManualTopScorers([]);
         }
 
-    }, [ourLeague, db]);
+    }, [ourLeague, db, fetchAllCustomNames]);
     
     useEffect(() => {
         if (!loading && listRef.current) {
@@ -165,6 +214,20 @@ function OurLeagueTab({
             </div>
         );
     }
+    
+    const processedFixtures = useMemo(() => fixtures.map(fixture => ({
+        ...fixture,
+        league: { ...fixture.league, name: getDisplayName('league', fixture.league.id, fixture.league.name) },
+        teams: {
+            home: { ...fixture.teams.home, name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name) },
+            away: { ...fixture.teams.away, name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name) },
+        }
+    })), [fixtures, getDisplayName]);
+
+    const processedStandings = useMemo(() => standings.map(s => ({
+        ...s,
+        team: { ...s.team, name: getDisplayName('team', s.team.id, s.team.name) }
+    })), [standings, getDisplayName]);
 
     const showManualScorers = ourLeague.id === IRAQI_LEAGUE_ID && manualTopScorers.length > 0;
     const finalScorers = showManualScorers ? manualTopScorers : topScorers;
@@ -198,8 +261,8 @@ function OurLeagueTab({
                         <div className="flex items-center justify-center h-64">
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                         </div>
-                    ) : sortedFixtures.length > 0 ? (
-                        sortedFixtures.map((fixture) => (
+                    ) : processedFixtures.length > 0 ? (
+                        processedFixtures.map((fixture) => (
                             <div key={fixture.fixture.id}>
                                 <FixtureItem fixture={fixture} navigate={navigate} />
                             </div>
@@ -214,7 +277,7 @@ function OurLeagueTab({
                  <div className="space-y-px p-4">
                     {Array.from({ length: 18 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
                 </div>
-            ) : standings.length > 0 ? (
+            ) : processedStandings.length > 0 ? (
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -227,7 +290,7 @@ function OurLeagueTab({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {standings.map((s) => (
+                        {processedStandings.map((s) => (
                             <TableRow key={`${s.rank}-${s.team.id}`} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id})}>
                                 <TableCell className="text-center font-bold">{s.points}</TableCell>
                                 <TableCell className="text-center">{s.all.lose}</TableCell>
@@ -259,7 +322,7 @@ function OurLeagueTab({
                     </Button>
                 </div>
             )}
-            {loading ? (
+            {loading || customNames === null ? (
                 <div className="space-y-px p-4">
                     {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
@@ -275,10 +338,11 @@ function OurLeagueTab({
                     </TableHeader>
                     <TableBody>
                         {finalScorers.map((scorer, index) => {
-                            const playerData = showManualScorers ? { name: scorer.playerName, photo: scorer.playerPhoto } : scorer.player;
-                            const teamName = showManualScorers ? scorer.teamName : scorer.statistics[0]?.team.name;
+                            const playerData = showManualScorers ? { name: scorer.playerName, photo: scorer.playerPhoto, id: null } : scorer.player;
+                            const teamName = showManualScorers ? scorer.teamName : getDisplayName('team', scorer.statistics[0]?.team.id, scorer.statistics[0]?.team.name);
                             const goals = showManualScorers ? scorer.goals : scorer.statistics[0]?.goals.total || 0;
                             const rank = showManualScorers ? scorer.rank : index + 1;
+                            const finalPlayerName = playerData.id ? getDisplayName('player', playerData.id, playerData.name) : playerData.name;
                            return (
                             <TableRow key={showManualScorers ? scorer.playerName : scorer.player.id}>
                                 <TableCell className="text-center font-bold text-lg">{goals}</TableCell>
@@ -287,7 +351,7 @@ function OurLeagueTab({
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-3 justify-end">
-                                        <p className="font-semibold">{playerData.name}</p>
+                                        <p className="font-semibold">{finalPlayerName}</p>
                                         <Avatar className="h-8 w-8">
                                             <AvatarImage src={playerData.photo} />
                                             <AvatarFallback>{playerData.name?.charAt(0)}</AvatarFallback>
@@ -353,9 +417,10 @@ function OurBallTab({ navigate }: { navigate: ScreenProps['navigate'] }) {
 
         if (user && db) {
             const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            updateDoc(docRef, { [`ourBallTeams.${teamId}`]: deleteField() })
+            const updateData = { [`ourBallTeams.${teamId}`]: deleteField() };
+            updateDoc(docRef, updateData)
                 .catch(error => {
-                    const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'update' });
+                    const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: updateData });
                     errorEmitter.emit('permission-error', permissionError);
                     toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الفريق.' });
                 })
@@ -439,63 +504,60 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     
     const [ourLeagueId, setOurLeagueId] = useState<number | null>(null);
     const [ourLeagueData, setOurLeagueData] = useState<{ id: number; name: string; logo: string; } | null>(null);
+    const [loadingLeague, setLoadingLeague] = useState(true);
 
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
     const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
     
+    // This effect only listens for changes in the user's favorite league ID.
+    useEffect(() => {
+        let unsubscribe = () => {};
+        if (user && db) {
+            const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            unsubscribe = onSnapshot(favsRef, (docSnap) => {
+                const favs = (docSnap.data() as Favorites) || {};
+                setOurLeagueId(favs.ourLeagueId || null);
+            });
+        } else {
+            const favs = getLocalFavorites();
+            setOurLeagueId(favs.ourLeagueId || null);
+        }
+        return () => unsubscribe();
+    }, [user, db]);
+
+    // This effect fetches league details ONLY when ourLeagueId changes.
     useEffect(() => {
         let isMounted = true;
+        setLoadingLeague(true);
         
-        const fetchLeagueDetails = async (leagueId: number | null) => {
-            if (leagueId) {
-                 try {
-                    const res = await fetch(`/api/football/leagues?id=${leagueId}`);
-                    const data = await res.json();
-                    if (isMounted && data.response?.[0]) {
-                        const league = data.response[0].league;
-                        const customNameRes = await getDoc(doc(db!, 'leagueCustomizations', String(leagueId)));
-                        const name = customNameRes.exists() ? customNameRes.data().customName : league.name;
-                        setOurLeagueData({ id: league.id, name: name, logo: league.logo });
-                    } else if (isMounted) {
-                        setOurLeagueData(null);
-                    }
-                } catch {
-                     if (isMounted) setOurLeagueData(null);
+        const fetchLeagueDetails = async () => {
+            if (ourLeagueId === null) {
+                setOurLeagueData(null);
+                setLoadingLeague(false);
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/football/leagues?id=${ourLeagueId}`);
+                const data = await res.json();
+                if (isMounted && data.response?.[0]) {
+                    const league = data.response[0].league;
+                    setOurLeagueData({ id: league.id, name: league.name, logo: league.logo });
+                } else if (isMounted) {
+                    setOurLeagueData(null);
                 }
-            } else {
-                 if (isMounted) setOurLeagueData(null);
+            } catch (e) {
+                if (isMounted) setOurLeagueData(null);
+                console.error("Failed to fetch league details", e);
+            } finally {
+                if (isMounted) setLoadingLeague(false);
             }
         };
 
-        const setupLeagueListener = () => {
-            if (user && db) {
-                const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                return onSnapshot(favsRef, (docSnap) => {
-                    const favs = (docSnap.data() as Favorites) || {};
-                    const newLeagueId = favs.ourLeagueId || null;
-                    if (isMounted && newLeagueId !== ourLeagueId) {
-                        setOurLeagueId(newLeagueId);
-                        fetchLeagueDetails(newLeagueId);
-                    }
-                });
-            } else {
-                const favs = getLocalFavorites();
-                const newLeagueId = favs.ourLeagueId || null;
-                if (isMounted && newLeagueId !== ourLeagueId) {
-                    setOurLeagueId(newLeagueId);
-                    fetchLeagueDetails(newLeagueId);
-                }
-                return () => {}; // No-op for guest
-            }
-        };
+        fetchLeagueDetails();
 
-        const unsubscribe = setupLeagueListener();
-        return () => { 
-            isMounted = false;
-            unsubscribe();
-        };
-
-    }, [user, db, ourLeagueId]);
+        return () => { isMounted = false; };
+    }, [ourLeagueId]);
 
 
     useEffect(() => {
@@ -564,10 +626,14 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         </div>
                     </div>
                     <TabsContent value="our-league" className="pt-4">
-                        <OurLeagueTab
-                            navigate={navigate}
-                            ourLeague={ourLeagueData}
-                        />
+                        {loadingLeague ? (
+                             <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                        ) : (
+                            <OurLeagueTab
+                                navigate={navigate}
+                                ourLeague={ourLeagueData}
+                            />
+                        )}
                     </TabsContent>
                     <TabsContent value="our-ball" className="pt-0">
                         <OurBallTab navigate={navigate} />
@@ -577,5 +643,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
+
+    
 
     
