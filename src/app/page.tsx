@@ -7,7 +7,6 @@ import { AppContentWrapper } from './AppContentWrapper';
 import { AdProvider } from '@/components/AdProvider';
 import { LoginScreen } from './screens/LoginScreen';
 import { Loader2 } from 'lucide-react';
-import { WelcomeScreen } from './screens/WelcomeScreen';
 import { FavoriteSelectionScreen } from './screens/FavoriteSelectionScreen';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
@@ -23,8 +22,6 @@ export type ScreenProps = {
   canGoBack: boolean;
 };
 
-const HAS_SEEN_WELCOME_KEY = 'goalstack_has_seen_welcome';
-
 const LoadingSplashScreen = () => (
     <div className="flex flex-col items-center justify-center h-screen bg-background text-center">
         <NabdAlMalaebLogo className="h-24 w-24 mb-4" />
@@ -37,7 +34,7 @@ const LoadingSplashScreen = () => (
 const AppFlow = () => {
     const { user, isUserLoading } = useUser();
     const { db } = useFirestore();
-    const [flowState, setFlowState] = useState<'loading' | 'welcome' | 'favorite_selection' | 'app' | 'login'>('loading');
+    const [flowState, setFlowState] = useState<'loading' | 'favorite_selection' | 'app' | 'login'>('loading');
 
     useEffect(() => {
         const checkOnboardingStatus = async () => {
@@ -47,12 +44,7 @@ const AppFlow = () => {
             }
 
             if (!user) {
-                const hasSeenWelcome = localStorage.getItem(HAS_SEEN_WELCOME_KEY);
-                if (hasSeenWelcome === 'true') {
-                    setFlowState('login');
-                } else {
-                    setFlowState('welcome');
-                }
+                setFlowState('login');
                 return;
             }
             
@@ -84,14 +76,6 @@ const AppFlow = () => {
 
     }, [user, isUserLoading, db]);
 
-    const handleWelcomeComplete = () => {
-        localStorage.setItem(HAS_SEEN_WELCOME_KEY, 'true');
-        // After welcome, user might have logged in (Google/Visitor) or not.
-        // The useEffect will re-evaluate and direct to login or favorite_selection.
-        // Forcing a re-check by briefly setting to loading.
-        setFlowState('loading');
-    }
-
     const handleFavoriteSelectionComplete = async () => {
         if (!user || !db) return;
         const userDocRef = doc(db, 'users', user.uid);
@@ -108,8 +92,6 @@ const AppFlow = () => {
     switch (flowState) {
         case 'loading':
              return <LoadingSplashScreen />;
-        case 'welcome':
-            return <WelcomeScreen onOnboardingComplete={handleWelcomeComplete} />;
         case 'login':
              return <LoginScreen navigate={() => {}} goBack={() => {}} canGoBack={false} />;
         case 'favorite_selection':

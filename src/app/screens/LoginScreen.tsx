@@ -3,17 +3,16 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
-import { ScreenHeader } from '@/components/ScreenHeader';
 import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Loader2 } from 'lucide-react';
-import { signInWithGoogle, handleNewUser } from '@/lib/firebase-client';
+import { AlertTriangle, Loader2, User } from 'lucide-react';
+import { signInWithGoogle, handleNewUser, signInAnonymously } from '@/lib/firebase-client';
 import { useFirestore } from '@/firebase/provider';
 
 
 export function LoginScreen({ goBack }: ScreenProps) {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<null | 'google' | 'visitor'>(null);
   const [error, setError] = useState<string | null>(null);
   const { db } = useFirestore();
 
@@ -31,11 +30,12 @@ export function LoginScreen({ goBack }: ScreenProps) {
     }
     
     setError(errorMessage);
+    setLoading(null);
   }
 
   const handleGoogleLogin = async () => {
     if (loading || !db) return;
-    setLoading(true);
+    setLoading('google');
     setError(null);
     try {
       const user = await signInWithGoogle();
@@ -44,10 +44,23 @@ export function LoginScreen({ goBack }: ScreenProps) {
       }
     } catch (e: any) {
       handleAuthError(e);
-    } finally {
-      setLoading(false);
     }
   };
+
+  const handleVisitorLogin = async () => {
+    if (loading || !db) return;
+    setLoading('visitor');
+    setError(null);
+    try {
+        const user = await signInAnonymously();
+        if (user) {
+            await handleNewUser(user, db);
+        }
+    } catch (e: any) {
+        handleAuthError(e);
+    }
+  }
+
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -61,27 +74,35 @@ export function LoginScreen({ goBack }: ScreenProps) {
         )}
         
         <NabdAlMalaebLogo className="h-24 w-24 mb-4" />
-        <h1 className="text-3xl font-bold mb-2 font-headline text-primary">نبض الملاعب</h1>
-        <p className="text-muted-foreground mb-8">سجل دخولك باستخدام جوجل للمتابعة.</p>
+        <h1 className="text-3xl font-bold mb-2 font-headline text-primary">أهلاً بك في نبض الملاعب</h1>
+        <p className="text-muted-foreground mb-8">اختر طريقة الدخول للمتابعة.</p>
         
         <div className="w-full max-w-xs space-y-4">
             <Button 
               onClick={handleGoogleLogin} 
               className="w-full" 
-              disabled={loading}
+              disabled={!!loading}
               size="lg"
             >
-              {loading ? (
+              {loading === 'google' ? (
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
               ) : (
                 <GoogleIcon className="h-5 w-5 mr-2" />
               )}
-              تسجيل الدخول باستخدام جوجل
+              المتابعة باستخدام جوجل
+            </Button>
+            <Button onClick={handleVisitorLogin} variant="secondary" className="w-full" disabled={!!loading} size="lg">
+                {loading === 'visitor' ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <User className="h-5 w-5 mr-2" />}
+                المتابعة كزائر
             </Button>
         </div>
 
         <p className="mt-8 text-xs text-muted-foreground/80 px-4">
-          بالنقر على "تسجيل الدخول"، أنت توافق على شروط الخدمة وسياسة الخصوصية الخاصة بنا.
+          بالاستمرار، أنت توافق على 
+          <button className="underline hover:text-primary px-1" onClick={() => (window as any).appNavigate && (window as any).appNavigate('TermsOfService')}>شروط الخدمة</button> 
+          و 
+          <button className="underline hover:text-primary px-1" onClick={() => (window as any).appNavigate && (window as any).appNavigate('PrivacyPolicy')}>سياسة الخصوصية</button>
+          .
         </p>
       </div>
     </div>
