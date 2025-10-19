@@ -58,21 +58,17 @@ export const FirebaseProvider = ({
     const userDocRef = doc(firestore, 'users', firebaseUser.uid);
 
     try {
-        // Check admin status. We expect this to fail for non-admins.
         const adminDocPromise = getDoc(adminDocRef)
-            .then(docSnap => docSnap.exists()) // Returns true if admin, false otherwise
+            .then(docSnap => docSnap.exists())
             .catch(error => {
-                // If it's a permission error, it's expected for non-admins. Return false.
                 if (error.code === 'permission-denied') {
                     return false;
                 }
-                // For other errors, emit a proper permission error
                 const permissionError = new FirestorePermissionError({ path: adminDocRef.path, operation: 'get' });
                 errorEmitter.emit('permission-error', permissionError);
                 throw permissionError;
             });
 
-        // Check user profile data (pro status, etc.)
         const userDocPromise = getDoc(userDocRef).catch(serverError => {
             const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
             errorEmitter.emit('permission-error', permissionError);
@@ -112,7 +108,7 @@ export const FirebaseProvider = ({
         const data = { isProUser: isPro };
         try {
             await setDoc(userDocRef, data, { merge: true });
-            setProUser(isPro); // Update state after successful write
+            setProUser(isPro);
         } catch (error) {
             const permissionError = new FirestorePermissionError({
               path: userDocRef.path,
@@ -130,7 +126,7 @@ export const FirebaseProvider = ({
         const data = { isAdmin: true, addedAt: new Date() };
         try {
             await setDoc(adminDocRef, data);
-            setIsAdmin(true); // Update state after successful write
+            setIsAdmin(true);
         } catch (error) {
             const permissionError = new FirestorePermissionError({
               path: adminDocRef.path,
@@ -181,6 +177,7 @@ export const useAdmin = () => {
     }
     return { 
         isAdmin: context.isAdmin,
+        db: context.firestore,
         makeAdmin: context.makeAdmin,
     };
 };

@@ -9,8 +9,20 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Send, MoreVertical, Edit, Trash2, CornerDownRight, Heart } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
-import { useAuth, useFirestore } from '@/firebase/provider';
-import { collection, addDoc, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs, setDoc, limit } from 'firebase/firestore';
+import { useAuth, useFirebase } from '@/firebase/provider';
+import { 
+    getDatabase, 
+    ref, 
+    onValue, 
+    push, 
+    update, 
+    remove, 
+    serverTimestamp,
+    query,
+    orderByChild,
+    limitToLast,
+    runTransaction
+} from "firebase/database";
 import type { MatchComment, Like } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -29,11 +41,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import { FirestorePermissionError } from '@/firebase/errors';
-import { errorEmitter } from '@/firebase/error-emitter';
+import { useToast } from '@/hooks/use-toast';
+import { collection, addDoc } from 'firebase/firestore';
+
 
 interface CommentsScreenProps extends ScreenProps {
   matchId: number;
@@ -51,7 +63,7 @@ const CommentInput = ({
 }: {
     user: any,
     sending: boolean,
-    onSend: (text: string, parentId?: string | null) => Promise<void>,
+    onSend: (text: string) => Promise<void>,
     initialText?: string,
     isReply?: boolean,
     onCancel?: () => void,
@@ -61,7 +73,6 @@ const CommentInput = ({
 
     const handleSend = async () => {
         if (!text.trim()) return;
-        // The parentId logic is handled by the main component's onSend function
         await onSend(text);
         setText('');
     };
@@ -119,8 +130,8 @@ const CommentItem = ({
     comment: MatchComment,
     user: any,
     onEdit: (comment: MatchComment) => void,
-    onDelete: (commentId: string) => void,
-    onLike: (commentId: string) => void,
+    onDelete: (commentId: string, parentId?: string) => void,
+    onLike: (commentId: string, parentId?: string) => void,
     isDeleting: string | null,
     isEditing: boolean,
     onUpdate: () => void,
@@ -130,7 +141,8 @@ const CommentItem = ({
     setEditingText: (text: string) => void,
     children: React.ReactNode,
 }) => {
-    const hasLiked = user && comment.likes?.some(like => like.id === user.uid);
+    const hasLiked = user && comment.likes && Object.keys(comment.likes).includes(user.uid);
+    const likeCount = comment.likes ? Object.keys(comment.likes).length : 0;
     
     return (
         <div className="flex items-start gap-3">
@@ -143,7 +155,7 @@ const CommentItem = ({
               <p className="font-semibold text-sm">{comment.userName}</p>
               {comment.timestamp && (
                 <p className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(comment.timestamp.toDate(), { addSuffix: true, locale: ar })}
+                  {formatDistanceToNow(new Date(comment.timestamp as number), { addSuffix: true, locale: ar })}
                 </p>
               )}
             </div>
@@ -168,9 +180,9 @@ const CommentItem = ({
             
             <div className="flex items-center gap-2 mt-2 -mb-2 -ml-2">
                {children}
-                <Button variant="ghost" size="sm" onClick={() => onLike(comment.id!)}>
+                <Button variant="ghost" size="sm" onClick={() => onLike(comment.id, comment.parentId)}>
                     <Heart className={cn("w-4 h-4 ml-1", hasLiked ? "text-red-500 fill-current" : "text-muted-foreground")} />
-                    <span className="text-xs">{comment.likes?.length || 0}</span>
+                    <span className="text-xs">{likeCount}</span>
                 </Button>
             </div>
           </div>
@@ -207,7 +219,7 @@ const CommentItem = ({
                   <AlertDialogCancel>إلغاء</AlertDialogCancel>
                   <AlertDialogAction
                     className="bg-destructive hover:bg-destructive/90"
-                    onClick={() => comment.id && onDelete(comment.id)}
+                    onClick={() => onDelete(comment.id, comment.parentId)}
                   >
                     {isDeleting === comment.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "حذف"}
                   </AlertDialogAction>
@@ -222,103 +234,57 @@ const CommentItem = ({
 
 export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: CommentsScreenProps) {
   const { user } = useAuth();
-  const { db } = useFirestore();
+  const { firebaseApp, firestore } = useFirebase();
   const [comments, setComments] = useState<MatchComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
-  const commentsColRef = useMemo(() => {
-      if (!db || !matchId) return null;
-      return collection(db, 'matches', String(matchId), 'comments');
-  }, [db, matchId]);
+  const db = useMemo(() => firebaseApp ? getDatabase(firebaseApp) : null, [firebaseApp]);
+  const commentsRef = useMemo(() => db ? ref(db, `match-comments/${matchId}`) : null, [db, matchId]);
   
   useEffect(() => {
-    if (!user || !commentsColRef || !db) {
+    if (!commentsRef) {
         setLoading(false);
         setComments([]);
         return;
     }
 
     setLoading(true);
-    // Fetch the last 20 comments in descending order, then reverse them on the client.
-    const q = query(commentsColRef, orderBy('timestamp', 'desc'), limit(20));
+    const commentsQuery = query(commentsRef, orderByChild('timestamp'), limitToLast(50));
     
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-        const commentPromises = snapshot.docs.map(async (doc) => {
-            const commentData = { id: doc.id, ...doc.data() } as MatchComment;
-            
-            try {
-                const repliesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies');
-                const repliesQuery = query(repliesRef, orderBy('timestamp', 'asc'));
-                const repliesSnapshot = await getDocs(repliesQuery);
-                const replies = repliesSnapshot.docs.map(replyDoc => ({ id: replyDoc.id, ...replyDoc.data() } as MatchComment));
-                commentData.replies = replies;
-
-                const likesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'likes');
-                const likesSnapshot = await getDocs(likesRef);
-                commentData.likes = likesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
-
-                commentData.replies = await Promise.all(replies.map(async (reply) => {
-                    if (!reply.id) return reply;
-                    const replyLikesRef = collection(db, 'matches', String(matchId), 'comments', doc.id, 'replies', reply.id, 'likes');
-                    const replyLikesSnapshot = await getDocs(replyLikesRef);
-                    const replyLikes = replyLikesSnapshot.docs.map(likeDoc => ({ id: likeDoc.id, ...likeDoc.data() } as Like));
-                    return { ...reply, likes: replyLikes };
-                }));
-
-            } catch (error) {
-                // This is likely a permission error on a subcollection
-                 const permissionError = new FirestorePermissionError({
-                    path: `${commentsColRef.path}/${doc.id}/...`, // Indicative path
-                    operation: 'list',
-                });
-                errorEmitter.emit('permission-error', permissionError);
-                // Return comment data without subcollections if they fail
-                return {
-                    ...commentData,
-                    replies: commentData.replies || [],
-                    likes: commentData.likes || []
-                };
-            }
-            return commentData;
-        });
-
-        try {
-            const resolvedComments = await Promise.all(commentPromises);
-            // Reverse the array to show the oldest of the last 20 comments first.
-            setComments(resolvedComments.reverse());
-        } catch(error) {
-            // This catch is for Promise.all, in case one of the promises rejects unexpectedly
-             const permissionError = new FirestorePermissionError({
-                path: `${commentsColRef.path}/...`, // Indicative path
-                operation: 'list',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        } finally {
-            setLoading(false);
+    const unsubscribe = onValue(commentsQuery, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            const commentsArray: MatchComment[] = Object.entries(data).map(([id, value]) => ({
+                id,
+                ...(value as Omit<MatchComment, 'id'>),
+                replies: (value as MatchComment).replies 
+                  ? Object.entries((value as MatchComment).replies).map(([replyId, replyValue]) => ({
+                      id: replyId,
+                      ...(replyValue as Omit<MatchComment, 'id'>)
+                    }))
+                  : []
+            }));
+            setComments(commentsArray);
+        } else {
+            setComments([]);
         }
-
+        setLoading(false);
     }, (error) => {
-        if (!user) return;
-        const permissionError = new FirestorePermissionError({
-            path: commentsColRef.path,
-            operation: 'list',
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        console.error("RTDB Error:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحميل التعليقات.'});
         setLoading(false);
     });
 
-    return () => {
-        unsubscribe();
-    };
-
-  }, [user, commentsColRef, db, matchId]);
+    return () => unsubscribe();
+  }, [commentsRef, toast]);
 
 
   useEffect(() => {
@@ -328,32 +294,31 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
   }, [comments, editingCommentId, replyingTo]);
 
   const handleSendComment = async (text: string) => {
-    if (!text.trim() || !user || sending || !commentsColRef || !db) return;
+    if (!text.trim() || !user || sending || !db) return;
   
     setSending(true);
     
     const parentId = replyingTo;
+    const path = parentId ? `match-comments/${matchId}/${parentId}/replies` : `match-comments/${matchId}`;
+    const targetRef = ref(db, path);
 
     const newCommentData = {
       text: text.trim(),
       userId: user.uid,
       userName: user.displayName,
       userPhoto: user.photoURL,
-      timestamp: new Date(),
+      timestamp: serverTimestamp(),
       parentId: parentId || null,
     };
     
-    const collectionRef = parentId 
-        ? collection(db, 'matches', String(matchId), 'comments', parentId, 'replies')
-        : commentsColRef;
-
-    addDoc(collectionRef, newCommentData)
-    .then((newDocRef) => {
+    try {
+        await push(targetRef, newCommentData);
         if (parentId) {
+            setReplyingTo(null);
             const parentComment = comments.find(c => c.id === parentId);
-            if (parentComment && parentComment.userId !== user.uid) {
-                const notificationsCollectionRef = collection(db, 'users', parentComment.userId, 'notifications');
-                const notificationData = {
+            if (parentComment && parentComment.userId !== user.uid && firestore) {
+                 const notificationsCollectionRef = collection(firestore, 'users', parentComment.userId, 'notifications');
+                 const notificationData = {
                     recipientId: parentComment.userId,
                     senderId: user.uid,
                     senderName: user.displayName,
@@ -361,35 +326,18 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
                     type: 'reply' as 'reply' | 'like',
                     matchId: matchId,
                     commentId: parentId,
-                    commentText: text.trim(),
+                    commentText: parentComment.text,
                     read: false,
                     timestamp: new Date(),
                 };
-                addDoc(notificationsCollectionRef, notificationData)
-                .catch((serverError) => {
-                     const permissionError = new FirestorePermissionError({
-                        path: notificationsCollectionRef.path,
-                        operation: 'create',
-                        requestResourceData: notificationData
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
-                });
+                await addDoc(notificationsCollectionRef, notificationData);
             }
         }
-        if (replyingTo) {
-            setReplyingTo(null);
-        }
-    })
-    .catch((serverError) => {
-        const permissionError = new FirestorePermissionError({
-            path: collectionRef.path,
-            operation: 'create',
-            requestResourceData: newCommentData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-    }).finally(() => {
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إرسال التعليق.'});
+    } finally {
       setSending(false);
-    });
+    }
   };
 
   const handleEditClick = (c: MatchComment) => {
@@ -409,171 +357,92 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     setEditingCommentId(null);
   }
 
-  const handleUpdateComment = () => {
+  const handleUpdateComment = async () => {
     if (!editingCommentId || !editingText.trim() || sending || !db) return;
     setSending(true);
     
-    let commentDocRef;
+    const parentComment = comments.find(c => c.replies && c.replies.some(r => r.id === editingCommentId));
+    const path = parentComment
+        ? `match-comments/${matchId}/${parentComment.id}/replies/${editingCommentId}`
+        : `match-comments/${matchId}/${editingCommentId}`;
     
-    const parentComment = comments.find(c => c.replies.some(r => r.id === editingCommentId));
-    if (parentComment && parentComment.id) {
-        commentDocRef = doc(db, 'matches', String(matchId), 'comments', parentComment.id, 'replies', editingCommentId);
-    } else {
-        commentDocRef = doc(db, 'matches', String(matchId), 'comments', editingCommentId);
-    }
-
+    const commentRef = ref(db, path);
     const updatedData = { text: editingText.trim() };
     
-    updateDoc(commentDocRef, updatedData)
-    .then(() => {
-      handleCancelEdit();
-    })
-    .catch((serverError) => {
-        const permissionError = new FirestorePermissionError({
-            path: commentDocRef.path,
-            operation: 'update',
-            requestResourceData: updatedData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-    })
-    .finally(() => {
+    try {
+        await update(commentRef, updatedData);
+        handleCancelEdit();
+    } catch(error) {
+         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث التعليق.'});
+    } finally {
       setSending(false);
-    });
+    }
   };
   
-  const handleDeleteComment = (commentId: string) => {
+  const handleDeleteComment = async (commentId: string, parentId?: string) => {
     if (!db) return;
     setIsDeleting(commentId);
 
-    const batchDelete = async () => {
-        const batch = writeBatch(db);
-
-        let isTopLevel = true;
-        let parentCommentId: string | undefined = undefined;
-
-        const parentComment = comments.find(c => c.replies.some(r => r.id === commentId));
-        if (parentComment && parentComment.id) {
-            isTopLevel = false;
-            parentCommentId = parentComment.id;
-        }
-        
-        const commentRef = isTopLevel 
-            ? doc(db, 'matches', String(matchId), 'comments', commentId)
-            : doc(db, 'matches', String(matchId), 'comments', parentCommentId!, 'replies', commentId);
-
-        const likesRef = collection(commentRef, 'likes');
-        const repliesRef = collection(commentRef, 'replies'); 
-        
-        const likesSnapshot = await getDocs(likesRef);
-        likesSnapshot.forEach(doc => batch.delete(doc.ref));
-
-        if (isTopLevel) {
-            const repliesSnapshot = await getDocs(repliesRef);
-            repliesSnapshot.forEach(doc => batch.delete(doc.ref));
-        }
-
-        batch.delete(commentRef);
-        await batch.commit();
-    };
-
-    batchDelete()
-    .catch((serverError) => {
-        const permissionError = new FirestorePermissionError({
-            path: `matches/${matchId}/comments/...`, // Indicative path
-            operation: 'delete',
-        });
-        errorEmitter.emit('permission-error', permissionError);
-    })
-    .finally(() => {
+    const path = parentId ? `match-comments/${matchId}/${parentId}/replies/${commentId}` : `match-comments/${matchId}/${commentId}`;
+    const commentRef = ref(db, path);
+    try {
+        await remove(commentRef);
+    } catch(error) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف التعليق.'});
+    } finally {
         setIsDeleting(null);
-    });
+    }
   }
 
-  const handleLikeComment = (commentId: string) => {
+  const handleLikeComment = (commentId: string, parentId?: string) => {
     if (!user || !db) return;
 
-    let parentCommentId: string | null = null;
-    let originalComment: MatchComment | null = null;
+    const path = parentId
+        ? `match-comments/${matchId}/${parentId}/replies/${commentId}/likes/${user.uid}`
+        : `match-comments/${matchId}/${commentId}/likes/${user.uid}`;
+    
+    const likeRef = ref(db, path);
 
-    for (const parent of comments) {
-        if (parent.id === commentId) {
-            originalComment = parent;
-            break;
+    const comment = parentId 
+        ? comments.find(c => c.id === parentId)?.replies.find(r => r.id === commentId)
+        : comments.find(c => c.id === commentId);
+
+    if (!comment) return;
+
+    runTransaction(likeRef, (currentData) => {
+        if (currentData) {
+            // User has liked, so unlike
+            return null;
+        } else {
+            // User has not liked, so like
+            return { userId: user.uid, timestamp: serverTimestamp() };
         }
-        const reply = parent.replies.find(r => r.id === commentId);
-        if (reply && parent.id) {
-            parentCommentId = parent.id;
-            originalComment = reply;
-            break;
-        }
-    }
-
-    if (!originalComment) return;
-
-    const likeRef = parentCommentId
-        ? doc(db, 'matches', String(matchId), 'comments', parentCommentId, 'replies', commentId, 'likes', user.uid)
-        : doc(db, 'matches', String(matchId), 'comments', commentId, 'likes', user.uid);
-
-    const hasLiked = originalComment.likes?.some(like => like.id === user.uid);
-    const likeData = { userId: user.uid };
-
-    const originalComments = comments; 
-    setComments(prevComments => prevComments.map(p => {
-        const updateCommentLikes = (c: MatchComment): MatchComment => {
-            if (c.id === commentId) {
-                 const currentLikes = c.likes || [];
-                 const newLikes = hasLiked
-                    ? currentLikes.filter(l => l.id !== user.uid)
-                    : [...currentLikes, { id: user.uid, userId: user.uid }];
-                return { ...c, likes: newLikes };
+    }).then((transactionResult) => {
+        if (transactionResult.committed && firestore) {
+            const hasLiked = transactionResult.snapshot.exists();
+             if (hasLiked && comment.userId !== user.uid) {
+                const notificationsCollectionRef = collection(firestore, 'users', comment.userId, 'notifications');
+                const notificationData = {
+                    recipientId: comment.userId,
+                    senderId: user.uid,
+                    senderName: user.displayName,
+                    senderPhoto: user.photoURL,
+                    type: 'like' as 'like' | 'reply',
+                    matchId: matchId,
+                    commentId: commentId,
+                    commentText: comment.text,
+                    read: false,
+                    timestamp: new Date(),
+                };
+                addDoc(notificationsCollectionRef, notificationData).catch(console.error);
             }
-            if (c.replies && c.replies.length > 0) {
-                 return { ...c, replies: c.replies.map(updateCommentLikes) };
-            }
-            return c;
-        };
-        return updateCommentLikes(p);
-    }));
-
-    const operation = hasLiked ? deleteDoc(likeRef) : setDoc(likeRef, likeData);
-
-    operation.then(() => {
-        if (!hasLiked && originalComment && originalComment.userId !== user.uid) {
-            const notificationsCollectionRef = collection(db, 'users', originalComment.userId, 'notifications');
-            const notificationData = {
-                recipientId: originalComment.userId,
-                senderId: user.uid,
-                senderName: user.displayName,
-                senderPhoto: user.photoURL,
-                type: 'like' as 'like' | 'reply',
-                matchId: matchId,
-                commentId: commentId,
-                commentText: originalComment.text,
-                read: false,
-                timestamp: new Date(),
-            };
-            addDoc(notificationsCollectionRef, notificationData).catch((serverError) => {
-                 const permissionError = new FirestorePermissionError({
-                    path: notificationsCollectionRef.path,
-                    operation: 'create',
-                    requestResourceData: notificationData
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            });
         }
-    }).catch((serverError) => {
-        setComments(originalComments); 
-        
-        const permissionError = new FirestorePermissionError({
-            path: likeRef.path,
-            operation: hasLiked ? 'delete' : 'create',
-            requestResourceData: hasLiked ? undefined : likeData
-        });
-        errorEmitter.emit('permission-error', permissionError);
+    }).catch(error => {
+         toast({ variant: 'destructive', title: 'خطأ', description: 'فشلت عملية الإعجاب.'});
     });
   };
 
-  const renderCommentTree = (comment: MatchComment, parentId: string | null = null) => (
+  const renderCommentTree = (comment: MatchComment) => (
     <div key={comment.id}>
         <CommentItem
             comment={comment}
@@ -600,7 +469,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
                 <CommentInput 
                     user={user}
                     sending={sending && !editingCommentId}
-                    onSend={(text) => handleSendComment(text)}
+                    onSend={handleSendComment}
                     isReply={true}
                     onCancel={() => setReplyingTo(null)}
                     autoFocus
@@ -609,7 +478,7 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
             
             {comment.replies && comment.replies.length > 0 && (
                 <div className="mt-4 space-y-4">
-                    {comment.replies.map(reply => renderCommentTree(reply, comment.id))}
+                    {comment.replies.map(reply => renderCommentTree(reply))}
                 </div>
             )}
         </div>
@@ -646,3 +515,4 @@ export function CommentsScreen({ matchId, goBack, canGoBack, headerActions }: Co
     </div>
   );
 }
+

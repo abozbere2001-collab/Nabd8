@@ -194,8 +194,8 @@ export interface MatchDetails {
 }
 
 export interface Like {
-  id: string; // User ID
   userId: string;
+  timestamp: any;
 }
 
 export interface MatchComment {
@@ -204,10 +204,10 @@ export interface MatchComment {
   userName: string;
   userPhoto: string;
   text: string;
-  timestamp: any; // Firestore ServerTimestamp
+  timestamp: any; // RTDB ServerTimestamp
   parentId?: string | null;
   replies: MatchComment[];
-  likes: Like[];
+  likes: { [key: string]: Like };
 }
 
 export interface Notification {

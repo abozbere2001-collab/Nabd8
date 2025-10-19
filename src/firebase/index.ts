@@ -1,9 +1,11 @@
+
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
 
 let firebaseApp: FirebaseApp;
 if (!getApps().length) {
@@ -14,8 +16,9 @@ if (!getApps().length) {
 
 const auth = getAuth(firebaseApp);
 const firestore = getFirestore(firebaseApp);
+const database = getDatabase(firebaseApp);
 
-export { firebaseApp, auth, firestore };
+export { firebaseApp, auth, firestore, database };
 
 export * from './provider';
 export * from './client-provider';

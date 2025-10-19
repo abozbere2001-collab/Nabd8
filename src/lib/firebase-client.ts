@@ -17,11 +17,14 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { auth, firestore as db } from "@/firebase";
 import { getLocalFavorites, clearLocalFavorites } from './local-favorites';
+import { getDatabase, ref, set } from 'firebase/database';
 
 export const handleNewUser = async (user: User, firestore: Firestore) => {
     const userRef = doc(firestore, 'users', user.uid);
     const leaderboardRef = doc(firestore, 'leaderboard', user.uid);
     const favoritesRef = doc(firestore, 'users', user.uid, 'favorites', 'data');
+    const rtdb = getDatabase();
+    const rtdbUserRef = ref(rtdb, `users/${user.uid}`);
 
     try {
         const userDoc = await getDoc(userRef);
@@ -54,15 +57,19 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
             const batch = writeBatch(firestore);
             batch.set(userRef, userProfileData);
             batch.set(leaderboardRef, leaderboardEntry);
-            batch.set(favoritesRef, initialFavorites); // Create empty favorites doc
+            batch.set(favoritesRef, initialFavorites);
 
-            await batch.commit();
+            await Promise.all([
+                batch.commit(),
+                set(rtdbUserRef, {
+                    displayName,
+                    photoURL,
+                }),
+            ]);
         }
     } catch (error: any) {
-        // This is a critical path. If this fails, the user can't be created properly.
-        // We will emit a specific, detailed error for debugging.
         const permissionError = new FirestorePermissionError({
-            path: `users/${user.uid} and related docs`, // Indicate batch write
+            path: `users/${user.uid} and related docs`,
             operation: 'write',
             requestResourceData: { 
                 userProfile: { displayName: user.displayName, email: user.email },
@@ -70,7 +77,6 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
             }
         });
         errorEmitter.emit('permission-error', permissionError);
-        // Re-throw the original error to allow the caller to handle UI state
         throw error;
     }
 }
@@ -81,7 +87,6 @@ export const signInWithGoogle = async (): Promise<User> => {
     const result = await signInWithPopup(auth, provider);
     const user = result.user;
 
-    // --- Data Migration Logic ---
     const localFavorites = getLocalFavorites();
     if (db && (Object.keys(localFavorites.teams || {}).length > 0 || Object.keys(localFavorites.leagues || {}).length > 0)) {
         await handleNewUser(user, db); 
@@ -92,7 +97,6 @@ export const signInWithGoogle = async (): Promise<User> => {
             const remoteFavsDoc = await getDoc(favRef);
             const remoteFavs = remoteFavsDoc.exists() ? (remoteFavsDoc.data() as Favorites) : {};
 
-            // Merge logic
             const mergedTeams = { ...(remoteFavs.teams || {}), ...(localFavorites.teams || {}) };
             const mergedLeagues = { ...(remoteFavs.leagues || {}), ...(localFavorites.leagues || {}) };
 
@@ -122,7 +126,6 @@ export const signInWithGoogle = async (): Promise<User> => {
 
 
 export const signOut = (): Promise<void> => {
-    // Clear guest data on any sign out, just in case
     localStorage.removeItem('goalstack_guest_onboarding_complete');
     return firebaseSignOut(auth);
 };
@@ -135,6 +138,7 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
 
     const userRef = doc(db, 'users', user.uid);
     const leaderboardRef = doc(db, 'leaderboard', user.uid);
+    const rtdbUserRef = ref(getDatabase(), `users/${user.uid}`);
     
     const userProfileUpdateData = { displayName: newDisplayName };
     setDoc(userRef, userProfileUpdateData, { merge: true })
@@ -157,4 +161,6 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
             });
             errorEmitter.emit('permission-error', permissionError);
         });
+
+    set(rtdbUserRef, { displayName: newDisplayName, photoURL: user.photoURL }).catch(console.error);
 };
