@@ -67,20 +67,17 @@ export function RenameDialog({
     status: 'الحالة',
   };
 
-  const itemTypeDisplay = item ? itemTypeMap[item.type] : 'العنصر';
-  const isTeamAndUser = item?.type === 'team' && !isAdmin;
-  const isTeamAndAdmin = item?.type === 'team' && isAdmin;
-
   const getTitle = () => {
     if (!item) return '';
-    if (item.type === 'team') return `ملاحظة على فريق ${item.name}`;
-    return `تعديل ${itemTypeDisplay}`;
+    if (item.type === 'team' && !isAdmin) return `إضافة ملاحظة على فريق ${item.name}`;
+    if (item.type === 'team' && isAdmin) return `تعديل وملاحظة على فريق ${item.name}`;
+    return `تعديل ${itemTypeMap[item.type]}`;
   }
   
   const getDescription = () => {
       if (!item) return '';
-      if(item.type === 'team') return 'اكتب ملاحظتك الشخصية على هذا الفريق. ستظهر هذه الملاحظة لك فقط في قسم "كرتنا".';
-      if(isAdmin) return `أدخل القيمة الجديدة لـ ${itemTypeDisplay}.`;
+      if(item.type === 'team' && !isAdmin) return 'سيتم حفظ هذا الفريق مع ملاحظتك في قسم "كرتنا".';
+      if(isAdmin) return `أدخل القيمة الجديدة لـ ${itemTypeMap[item.type]}.`;
       return '';
   }
 
@@ -112,7 +109,7 @@ export function RenameDialog({
 
           {item?.type === 'team' && (
             <div className="grid w-full items-center gap-1.5">
-                <Label htmlFor="note">ملاحظة</Label>
+                <Label htmlFor="note">ملاحظة (اختياري)</Label>
                 <Textarea 
                     id="note"
                     value={newNote}
@@ -129,12 +126,13 @@ export function RenameDialog({
             </Button>
           </DialogClose>
           <Button type="submit" onClick={handleSave}>
-            حفظ التغييرات
+            حفظ
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
 
 
