@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -19,6 +18,7 @@ import { SearchSheet } from '@/components/SearchSheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
+import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
 // --- TYPE DEFINITIONS ---
 interface CompetitionsByCountry {
@@ -86,7 +86,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const { user } = useAuth();
     const { db } = useFirestore();
     const { toast } = useToast();
-    const [favorites, setFavorites] = useState<Favorites>({ userId: '', leagues: {}, teams: {}, players: {} });
+    const [favorites, setFavorites] = useState<Partial<Favorites>>({});
     const [renameItem, setRenameItem] = useState<RenameState | null>(null);
     const [isAddOpen, setAddOpen] = useState(false);
 
@@ -108,15 +108,19 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [customNames]);
 
     useEffect(() => {
-        if (!user || !db) return;
-        const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const unsubscribe = onSnapshot(docRef, (doc) => {
-            setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {}, teams: {}, players: {} });
-        }, (error) => {
-            const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
-            errorEmitter.emit('permission-error', permissionError);
-        });
-        return () => unsubscribe();
+        if (user && db) {
+            const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const unsubscribe = onSnapshot(docRef, (doc) => {
+                setFavorites(doc.data() as Favorites || { userId: user.uid });
+            }, (error) => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+            return () => unsubscribe();
+        } else {
+            // Guest user, read from local storage
+            setFavorites(getLocalFavorites());
+        }
     }, [user, db]);
 
     const fetchAllCustomNames = useCallback(async () => {
@@ -166,36 +170,46 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [db, fetchAllCustomNames]);
 
     const handleFavorite = useCallback(async (item: ManagedCompetitionType) => {
-        if (!user || !db) return;
-        
-        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const itemId = item.leagueId;
-        const fieldPath = `leagues.${itemId}`;
-        const isFavorited = !!favorites?.leagues?.[itemId];
-
-        let favoriteData: Partial<Favorites> = { userId: user.uid };
-        
         const payload = { 
             name: getName('league', itemId, item.name),
             leagueId: itemId,
             logo: item.logo
         };
-        
-        favoriteData.leagues = { [itemId]: payload };
 
-        const operation = isFavorited
-            ? updateDoc(favRef, { [fieldPath]: deleteField() })
-            : setDoc(favRef, favoriteData, { merge: true });
+        const newFavorites = { ...favorites };
+        if (!newFavorites.leagues) newFavorites.leagues = {};
 
-        operation.catch(serverError => {
-            const permissionError = new FirestorePermissionError({
-                path: favRef.path,
-                operation: isFavorited ? 'update' : 'create',
-                requestResourceData: favoriteData
+        const isFavorited = !!newFavorites.leagues?.[itemId];
+
+        if (isFavorited) {
+            delete newFavorites.leagues[itemId];
+        } else {
+            newFavorites.leagues[itemId] = payload;
+        }
+        setFavorites(newFavorites);
+
+        if (user && db) {
+            const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const fieldPath = `leagues.${itemId}`;
+            const operation = isFavorited
+                ? updateDoc(favRef, { [fieldPath]: deleteField() })
+                : setDoc(favRef, { leagues: { [itemId]: payload } }, { merge: true });
+
+            operation.catch(serverError => {
+                const permissionError = new FirestorePermissionError({
+                    path: favRef.path,
+                    operation: 'update',
+                    requestResourceData: { leagues: { [itemId]: payload } }
+                });
+                errorEmitter.emit('permission-error', permissionError);
+                // Revert optimistic update on error
+                setFavorites(favorites);
             });
-            errorEmitter.emit('permission-error', permissionError);
-        });
-
+        } else {
+            // Guest user, save to local storage
+            setLocalFavorites(newFavorites);
+        }
     }, [user, db, favorites, getName]);
 
 

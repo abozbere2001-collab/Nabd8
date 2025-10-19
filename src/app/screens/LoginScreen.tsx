@@ -7,12 +7,12 @@ import type { ScreenProps } from '@/app/page';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2, User } from 'lucide-react';
-import { signInWithGoogle, handleNewUser, signInAnonymously } from '@/lib/firebase-client';
+import { signInWithGoogle, handleNewUser } from '@/lib/firebase-client';
 import { useFirestore } from '@/firebase/provider';
 
 
-export function LoginScreen({ goBack }: ScreenProps) {
-  const [loading, setLoading] = useState<null | 'google' | 'visitor'>(null);
+export function LoginScreen({ goBack, canGoBack }: ScreenProps) {
+  const [loading, setLoading] = useState<null | 'google'>(null);
   const [error, setError] = useState<string | null>(null);
   const { db } = useFirestore();
 
@@ -38,32 +38,19 @@ export function LoginScreen({ goBack }: ScreenProps) {
     setLoading('google');
     setError(null);
     try {
-      const user = await signInWithGoogle();
-      if (user) {
-        await handleNewUser(user, db);
-      }
+      // This function now handles data migration
+      await signInWithGoogle();
+      // The auth state listener in the provider will handle the rest.
+      // We can optionally close this screen if it's a modal.
+      if (canGoBack) goBack();
     } catch (e: any) {
       handleAuthError(e);
     }
   };
 
-  const handleVisitorLogin = async () => {
-    if (loading || !db) return;
-    setLoading('visitor');
-    setError(null);
-    try {
-        const user = await signInAnonymously();
-        if (user) {
-            await handleNewUser(user, db);
-        }
-    } catch (e: any) {
-        handleAuthError(e);
-    }
-  }
-
-
   return (
     <div className="flex h-full flex-col bg-background">
+       {canGoBack && <div className="p-4"><Button variant="ghost" onClick={goBack}>إغلاق</Button></div>}
       <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
         {error && (
           <Alert variant="destructive" className="mb-6 text-right">
@@ -74,8 +61,8 @@ export function LoginScreen({ goBack }: ScreenProps) {
         )}
         
         <NabdAlMalaebLogo className="h-24 w-24 mb-4" />
-        <h1 className="text-3xl font-bold mb-2 font-headline text-primary">أهلاً بك في نبض الملاعب</h1>
-        <p className="text-muted-foreground mb-8">اختر طريقة الدخول للمتابعة.</p>
+        <h1 className="text-3xl font-bold mb-2 font-headline text-primary">تسجيل الدخول</h1>
+        <p className="text-muted-foreground mb-8">سجل الدخول لحفظ مفضلاتك ومزامنتها عبر أجهزتك.</p>
         
         <div className="w-full max-w-xs space-y-4">
             <Button 
@@ -90,10 +77,6 @@ export function LoginScreen({ goBack }: ScreenProps) {
                 <GoogleIcon className="h-5 w-5 mr-2" />
               )}
               المتابعة باستخدام جوجل
-            </Button>
-            <Button onClick={handleVisitorLogin} variant="secondary" className="w-full" disabled={!!loading} size="lg">
-                {loading === 'visitor' ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <User className="h-5 w-5 mr-2" />}
-                المتابعة كزائر
             </Button>
         </div>
 

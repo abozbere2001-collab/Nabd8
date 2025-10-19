@@ -30,12 +30,11 @@ import { NotificationSettingsScreen } from './screens/NotificationSettingsScreen
 import { GeneralSettingsScreen } from './screens/GeneralSettingsScreen';
 import PrivacyPolicyScreen from './privacy-policy/page';
 import TermsOfServiceScreen from './terms-of-service/page';
-import { WelcomeScreen } from './screens/WelcomeScreen';
 import { GoProScreen } from './screens/GoProScreen';
 import type { ScreenKey } from './page';
 
 import { useAd, SplashScreenAd, BannerAd } from '@/components/AdProvider';
-import { useUser } from '@/firebase';
+import { useAuth } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -79,7 +78,6 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   GeneralSettings: { component: GeneralSettingsScreen },
   PrivacyPolicy: { component: PrivacyPolicyScreen },
   TermsOfService: { component: TermsOfServiceScreen },
-  Welcome: { component: WelcomeScreen },
   GoPro: { component: GoProScreen },
 };
 
@@ -93,7 +91,7 @@ type StackItem = {
 };
 
 export const ProfileButton = () => {
-    const { user } = useUser();
+    const { user } = useAuth();
 
     const handleSignOut = async () => {
         await signOut();
@@ -104,9 +102,21 @@ export const ProfileButton = () => {
             (window as any).appNavigate('Profile');
         }
     };
+    
+    const navigateToLogin = () => {
+         if ((window as any).appNavigate) {
+            (window as any).appNavigate('Login');
+        }
+    }
 
 
-    if (!user || user.isAnonymous) return null;
+    if (!user) {
+        return (
+            <Button variant="ghost" size="sm" onClick={navigateToLogin}>
+                تسجيل الدخول
+            </Button>
+        );
+    }
 
     return (
         <DropdownMenu>

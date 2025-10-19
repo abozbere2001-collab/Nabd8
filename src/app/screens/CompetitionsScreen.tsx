@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -20,16 +19,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
+import { getLocalFavorites } from '@/lib/local-favorites';
 
 // --- MAIN SCREEN COMPONENT ---
 export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user } = useAuth();
     const { db } = useFirestore();
     const { toast } = useToast();
-    const [favorites, setFavorites] = useState<Favorites | null>(null);
+    const [favorites, setFavorites] = useState<Partial<Favorites>>({});
     const [loading, setLoading] = useState(true);
     const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string> }>({ leagues: new Map(), teams: new Map() });
-
 
     const fetchAllCustomNames = useCallback(async () => {
         if (!db) return;
@@ -48,8 +47,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             setCustomNames({ leagues: leagueNames, teams: teamNames });
 
         } catch (error) {
-            const permissionError = new FirestorePermissionError({ path: 'customizations collections', operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
+            console.warn("Could not fetch custom names. This may be expected for guests.", error);
         }
     }, [db]);
 
@@ -68,23 +66,26 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
 
 
     useEffect(() => {
-        if (!user || !db) {
-            setLoading(false);
-            return;
-        };
         setLoading(true);
         fetchAllCustomNames();
-        const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const unsubscribe = onSnapshot(docRef, (doc) => {
-            const favs = (doc.data() as Favorites) || { userId: user.uid, leagues: {}, teams: {}, players: {} };
-            setFavorites(favs);
+        
+        if (user && db) {
+            const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const unsubscribe = onSnapshot(docRef, (doc) => {
+                const favs = (doc.data() as Favorites) || { userId: user.uid };
+                setFavorites(favs);
+                setLoading(false);
+            }, (error) => {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
+                errorEmitter.emit('permission-error', permissionError);
+                setLoading(false);
+            });
+            return () => unsubscribe();
+        } else {
+            // Guest user, read from local storage
+            setFavorites(getLocalFavorites());
             setLoading(false);
-        }, (error) => {
-            const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
-            errorEmitter.emit('permission-error', permissionError);
-            setLoading(false);
-        });
-        return () => unsubscribe();
+        }
     }, [user, db, fetchAllCustomNames]);
 
 
@@ -94,7 +95,7 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         ...team,
         name: getDisplayName('team', team.teamId, team.name)
       }));
-    }, [favorites, getDisplayName]);
+    }, [favorites.teams, getDisplayName]);
 
     const favoriteLeagues = useMemo(() => {
         if (!favorites?.leagues) return [];
@@ -102,9 +103,13 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
             ...comp,
             name: getDisplayName('league', comp.leagueId, comp.name)
         }));
-    }, [favorites, getDisplayName]);
+    }, [favorites.leagues, getDisplayName]);
 
-    const favoritePlayers = useMemo(() => favorites?.players ? Object.values(favorites.players) : [], [favorites]);
+    const favoritePlayers = useMemo(() => favorites?.players ? Object.values(favorites.players) : [], [favorites.players]);
+    
+    const handleLoginClick = () => {
+        navigate('Login');
+    }
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -220,6 +225,12 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                 </div>
                             </TabsContent>
                         </Tabs>
+                         {!user && (
+                            <div className="px-4 pt-4 text-center">
+                                 <p className="text-sm text-muted-foreground mb-4">للحفاظ على مفضلاتك ومزامنتها عبر الأجهزة، قم بتسجيل الدخول.</p>
+                                <Button onClick={handleLoginClick} className="w-full max-w-sm mx-auto">تسجيل الدخول</Button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

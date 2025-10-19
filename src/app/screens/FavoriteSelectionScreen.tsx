@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { useAuth, useFirestore } from '@/firebase/provider';
@@ -15,6 +15,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { getLocalFavorites, clearLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
 interface FavoriteSelectionScreenProps {
   onOnboardingComplete: () => void;
@@ -52,6 +53,17 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
   const [selectedTeams, setSelectedTeams] = useState<Set<number>>(new Set());
   const [selectedLeagues, setSelectedLeagues] = useState<Set<number>>(new Set());
 
+  useEffect(() => {
+    // Pre-populate selections from local storage if they exist
+    const localFavs = getLocalFavorites();
+    if (localFavs.teams) {
+      setSelectedTeams(new Set(Object.keys(localFavs.teams).map(Number)));
+    }
+    if (localFavs.leagues) {
+      setSelectedLeagues(new Set(Object.keys(localFavs.leagues).map(Number)));
+    }
+  }, []);
+
   const handleSelect = useCallback((item: any, type: 'team' | 'league') => {
     const updater = type === 'team' ? setSelectedTeams : setSelectedLeagues;
     updater(prev => {
@@ -67,7 +79,7 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
   
   const handleContinue = async () => {
     if (!user || !db) {
-        onOnboardingComplete(); // Fail gracefully
+        onOnboardingComplete(); // Should not happen in this flow, but as a fallback
         return;
     };
     
@@ -101,6 +113,8 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
 
     try {
         await setDoc(favRef, favoritesData, { merge: true });
+        // Clear local favorites as they are now migrated
+        clearLocalFavorites();
     } catch (error) {
          const permissionError = new FirestorePermissionError({
             path: favRef.path,
