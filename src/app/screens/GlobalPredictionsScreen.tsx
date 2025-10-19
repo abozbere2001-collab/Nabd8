@@ -644,27 +644,37 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     const handleFullReset = async () => {
         if (!db) return;
         setIsResetting(true);
-        toast({ title: 'بدء إعادة تعيين النقاط...', description: 'سيتم تصفير نقاط جميع المستخدمين.' });
-    
+        toast({ title: "بدء حذف سجلات المتصدرين...", description: "سيتم حذف جميع المستخدمين من لوحة الصدارة." });
+
         try {
-            const leaderboardRef = collection(db, 'leaderboard');
+            const leaderboardRef = collection(db, "leaderboard");
             const snapshot = await getDocs(leaderboardRef);
+
+            if (snapshot.empty) {
+                toast({ title: "فارغة بالفعل", description: "لوحة الصدارة فارغة ولا يوجد مستخدمون لحذفهم." });
+                setIsResetting(false);
+                setResetAlertOpen(false);
+                setResetPin('');
+                return;
+            }
+
             const batch = writeBatch(db);
-    
-            snapshot.docs.forEach(doc => {
-                batch.update(doc.ref, { totalPoints: 0 });
+            snapshot.docs.forEach((doc) => {
+                batch.delete(doc.ref);
             });
-    
             await batch.commit();
-            
-            toast({ title: 'نجاح', description: 'تم تصفير نقاط جميع المستخدمين بنجاح.' });
+
+            toast({ title: "نجاح", description: "تم حذف جميع المستخدمين من لوحة الصدارة بنجاح." });
             setResetAlertOpen(false);
             setResetPin('');
         } catch (error) {
-            console.error("Error during points reset:", error);
-            const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'write' });
+            console.error("Error resetting leaderboard:", error);
+            const permissionError = new FirestorePermissionError({
+                path: 'leaderboard',
+                operation: 'delete',
+            });
             errorEmitter.emit('permission-error', permissionError);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشلت عملية إعادة تعيين النقاط.' });
+            toast({ variant: 'destructive', title: 'خطأ في الحذف', description: 'فشلت عملية حذف السجلات. تحقق من صلاحياتك.' });
         } finally {
             setIsResetting(false);
         }
@@ -857,9 +867,9 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                  <AlertDialog open={isResetAlertOpen} onOpenChange={setResetAlertOpen}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                             <AlertDialogTitle>إعادة تعيين النقاط</AlertDialogTitle>
+                             <AlertDialogTitle>إعادة تعيين لوحة الصدارة</AlertDialogTitle>
                              <AlertDialogDescription>
-                                هذا الإجراء سيقوم بتصفير نقاط جميع المستخدمين في لوحة الصدارة. لا يمكن التراجع عن هذا. للبدء، أدخل الرمز السري.
+                                هذا الإجراء سيقوم بحذف جميع المستخدمين من لوحة الصدارة. لا يمكن التراجع عن هذا. للمتابعة، أدخل الرمز السري.
                              </AlertDialogDescription>
                         </AlertDialogHeader>
                         <div className="space-y-2">
@@ -879,7 +889,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                 disabled={isResetting || resetPin !== FULL_RESET_PIN}
                                 className="bg-destructive hover:bg-destructive/90"
                             >
-                                {isResetting ? <Loader2 className="h-4 w-4 animate-spin"/> : "إعادة تعيين النقاط"}
+                                {isResetting ? <Loader2 className="h-4 w-4 animate-spin"/> : "حذف الكل"}
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
@@ -1029,6 +1039,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
 
 
 
