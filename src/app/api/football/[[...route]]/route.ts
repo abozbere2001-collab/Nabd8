@@ -28,7 +28,7 @@ export async function GET(
   const isVolatileRequest = routePath.includes('fixtures') || routePath.includes('odds');
   // Disable caching for fixture lists by date, as they can be very large.
   const isLargeRequest = routePath === 'fixtures' && searchParams.has('date');
-  const cacheOptions = isLargeRequest ? { cache: 'no-store' } : { next: { revalidate: isVolatileRequest ? 60 : 3600 } };
+  const cacheOptions = isLargeRequest ? { cache: 'no-store' as RequestCache } : { next: { revalidate: isVolatileRequest ? 60 : 3600 } };
   
 
   try {
