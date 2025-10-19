@@ -8,13 +8,14 @@ import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/firebase-client';
+import { ScreenProps } from '@/app/page';
 
 interface LoginScreenProps {
   onLoginSuccess?: () => void;
   goBack?: () => void;
 }
 
-export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps) {
+export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & ScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +39,6 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps) {
     try {
       await signInWithGoogle();
       // The onAuthStateChanged listener will handle the redirection automatically.
-      // Calling onLoginSuccess is not needed here anymore.
       if (onLoginSuccess) {
         onLoginSuccess();
       }
