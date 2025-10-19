@@ -642,35 +642,37 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     };
     
     const handleFullReset = async () => {
-        if (!db || !user) return;
+        if (!db) return;
         setIsResetting(true);
-        toast({ title: 'بدء إعادة التعيين الكاملة...', description: 'قد تستغرق هذه العملية بعض الوقت.' });
+        toast({ title: 'بدء إعادة تعيين النقاط...', description: 'سيتم تصفير نقاط جميع المستخدمين.' });
     
-        const collectionsToDelete = ['predictions', 'seasonPredictions', 'leaderboard', 'users'];
         try {
-            for (const collectionName of collectionsToDelete) {
-                const collectionRef = collection(db, collectionName);
-                const snapshot = await getDocs(collectionRef);
-                const batch = writeBatch(db);
+            const leaderboardRef = collection(db, 'leaderboard');
+            const snapshot = await getDocs(leaderboardRef);
+            const batch = writeBatch(db);
     
-                snapshot.docs.forEach(doc => {
-                    // Do not delete the admin's own user document
-                    if (collectionName === 'users' && doc.id === user.uid) {
-                        return;
-                    }
-                    batch.delete(doc.ref);
-                });
+            snapshot.docs.forEach(doc => {
+                batch.update(doc.ref, { totalPoints: 0 });
+            });
     
-                await batch.commit();
-            }
-            toast({ title: 'نجاح', description: 'تم حذف جميع بيانات التوقعات والمستخدمين بنجاح.' });
+            await batch.commit();
+            
+            // Also clear the local predictions to start fresh
+            const predictionsRef = collection(db, 'predictions');
+            const predSnapshot = await getDocs(predictionsRef);
+            const deletePredBatch = writeBatch(db);
+            predSnapshot.forEach(doc => deletePredBatch.delete(doc.ref));
+            await deletePredBatch.commit();
+
+
+            toast({ title: 'نجاح', description: 'تم تصفير نقاط جميع المستخدمين بنجاح.' });
             setResetAlertOpen(false);
             setResetPin('');
         } catch (error) {
-            console.error("Error during full reset:", error);
-             const permissionError = new FirestorePermissionError({ path: `multiple collections`, operation: 'delete' });
-             errorEmitter.emit('permission-error', permissionError);
-             toast({ variant: 'destructive', title: 'خطأ', description: 'فشلت عملية إعادة التعيين.' });
+            console.error("Error during points reset:", error);
+            const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'write' });
+            errorEmitter.emit('permission-error', permissionError);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشلت عملية إعادة تعيين النقاط.' });
         } finally {
             setIsResetting(false);
         }
@@ -863,9 +865,9 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                  <AlertDialog open={isResetAlertOpen} onOpenChange={setResetAlertOpen}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                             <AlertDialogTitle>إعادة تعيين كاملة</AlertDialogTitle>
+                             <AlertDialogTitle>إعادة تعيين النقاط</AlertDialogTitle>
                              <AlertDialogDescription>
-                                هذا الإجراء سيقوم بحذف جميع بيانات المستخدمين والتوقعات. لا يمكن التراجع عن هذا. للبدء، أدخل الرمز السري.
+                                هذا الإجراء سيقوم بتصفير نقاط جميع المستخدمين في لوحة الصدارة. لا يمكن التراجع عن هذا. للبدء، أدخل الرمز السري.
                              </AlertDialogDescription>
                         </AlertDialogHeader>
                         <div className="space-y-2">
@@ -885,7 +887,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                                 disabled={isResetting || resetPin !== FULL_RESET_PIN}
                                 className="bg-destructive hover:bg-destructive/90"
                             >
-                                {isResetting ? <Loader2 className="h-4 w-4 animate-spin"/> : "حذف كل شيء"}
+                                {isResetting ? <Loader2 className="h-4 w-4 animate-spin"/> : "إعادة تعيين النقاط"}
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
@@ -1035,5 +1037,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
 
 
