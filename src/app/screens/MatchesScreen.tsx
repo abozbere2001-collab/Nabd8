@@ -10,7 +10,7 @@ import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
-import { Loader2, Search, Star } from 'lucide-react';
+import { Loader2, Search, Star, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -249,7 +249,7 @@ type TabName = 'my-results' | 'all-matches' | 'predictions';
 
 const tabs: {id: TabName, label: string}[] = [
     { id: 'my-results', label: 'نتائجي' },
-    { id: 'all-matches', label: 'كل المباريات' },
+    // The 'all-matches' tab is now hidden from the UI
     { id: 'predictions', label: 'التوقعات' },
 ];
 
@@ -263,7 +263,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   
   useEffect(() => {
-    // Set initial date only once, and only on the client
     if (!selectedDateKey && typeof window !== 'undefined') {
       setSelectedDateKey(formatDateKey(new Date()));
     }
@@ -392,6 +391,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   
   useEffect(() => {
+      // We no longer hide 'all-matches', so this check is removed.
+      // This effect will run for 'my-results' tab.
       if (activeTab === 'predictions') return;
 
       if (isVisible && selectedDateKey) {
@@ -413,7 +414,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const handleTabChange = (value: string) => {
     const tabValue = value as TabName;
     setActiveTab(tabValue);
-    if ((tabValue === 'my-results' || tabValue === 'all-matches') && selectedDateKey && !matchesCache.has(selectedDateKey)) {
+    // Trigger fetch only if the tab is not predictions and data isn't cached
+    if ((tabValue === 'my-results') && selectedDateKey && !matchesCache.has(selectedDateKey)) {
         const controller = new AbortController();
         fetchAndProcessData(selectedDateKey, controller.signal);
         return () => controller.abort();
@@ -447,15 +449,24 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col min-h-0">
             <div className="sticky top-0 z-10 px-1 pt-1 bg-background">
                 <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
-                    <TabsList className="grid w-full grid-cols-3 bg-transparent p-0 h-11">
+                    <TabsList className={cn("grid w-full bg-transparent p-0 h-11", `grid-cols-${tabs.length}`)}>
                         {tabs.map(tab => (
                             <TabsTrigger key={tab.id} value={tab.id} className="data-[state=active]:shadow-none">{tab.label}</TabsTrigger>
                         ))}
                     </TabsList>
                 </div>
                  {activeTab !== 'predictions' && selectedDateKey && (
-                     <div className="bg-card py-2 border-x border-b rounded-b-lg shadow-md -mt-1">
+                     <div className="relative bg-card py-2 border-x border-b rounded-b-lg shadow-md -mt-1">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7"
+                            onClick={() => handleDateChange(formatDateKey(new Date()))}
+                            disabled={isToday(new Date(selectedDateKey))}
+                         >
+                            <CalendarClock className="h-4 w-4"/>
+                         </Button>
                     </div>
                  )}
             </div>
@@ -473,17 +484,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                 />
             </TabsContent>
             
-             <TabsContent value="all-matches" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0" hidden={activeTab !== 'all-matches'}>
-                <FixturesList 
-                    fixtures={currentFixtures}
-                    loading={loading}
-                    activeTab={activeTab}
-                    favoritedLeagueIds={favoritedLeagueIds}
-                    favoritedTeamIds={favoritedTeamIds}
-                    hasAnyFavorites={hasAnyFavorites}
-                    commentedMatches={commentedMatches}
-                    navigate={navigate}
-                />
+            <TabsContent value="all-matches" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0" hidden={activeTab !== 'all-matches'}>
+                {/* This content is now effectively hidden as the tab is removed */}
             </TabsContent>
 
             <TabsContent value="predictions" className="flex-1 overflow-y-auto p-0 mt-0" hidden={activeTab !== 'predictions'}>
