@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -102,11 +103,6 @@ export function GeneralSettingsScreen({ navigate, goBack, canGoBack, headerActio
                 <Button onClick={() => navigate('GoPro')} className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:opacity-90">
                     <Gem className="ml-2 h-4 w-4" />
                     الترقية إلى النسخة الإحترافية
-                </Button>
-            )}
-             {process.env.NODE_ENV === 'development' && !isAdmin && (
-                <Button onClick={handleMakeAdmin} className="w-full">
-                    {"ترقية إلى حساب مدير (للتطوير)"}
                 </Button>
             )}
           </CardContent>

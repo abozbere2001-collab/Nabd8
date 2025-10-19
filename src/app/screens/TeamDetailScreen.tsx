@@ -9,7 +9,7 @@ import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { Loader2, Pencil } from 'lucide-react';
+import { Loader2, Pencil, Shirt } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -144,6 +144,12 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
                                 <p className="text-xs text-muted-foreground">{player.position}</p>
                             </div>
                         </div>
+                        {player.number && (
+                           <div className="relative flex items-center justify-center text-primary-foreground">
+                               <Shirt className="h-10 w-10 text-primary" />
+                               <span className="absolute text-xs font-bold">{player.number}</span>
+                           </div>
+                        )}
                         {isAdmin && (
                             <Button variant="ghost" size="icon" onClick={() => setRenameItem({ id: player.id, name: getDisplayName(player.id, player.name), originalName: player.name })}>
                                 <Pencil className="h-4 w-4" />
@@ -285,7 +291,7 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                 <TabsTrigger value="standings">الترتيب</TabsTrigger>
                 <TabsTrigger value="stats">الإحصائيات</TabsTrigger>
             </TabsList>
-            <TabsContent value="matches" className="mt-4 space-y-3">
+            <TabsContent value="matches" className="mt-4">
                 <div ref={fixturesListRef} className="h-full overflow-y-auto space-y-3">
                     {processedFixtures.length > 0 ? processedFixtures.map((fixture, index) => {
                         const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(fixture.fixture.status.short);
