@@ -29,6 +29,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { isMatchLive } from '@/lib/matchStatus';
@@ -376,6 +377,9 @@ function OurBallTab({ navigate, ourBallTeams, user, db }: { navigate: ScreenProp
     useEffect(() => {
         if (ourBallTeams.length > 0 && !selectedTeamId) {
             setSelectedTeamId(ourBallTeams[0].id);
+        } else if (ourBallTeams.length > 0 && selectedTeamId && !ourBallTeams.some(t => t.id === selectedTeamId)) {
+            // If the selected team is no longer in the list, select the first one
+            setSelectedTeamId(ourBallTeams[0].id);
         } else if (ourBallTeams.length === 0) {
             setSelectedTeamId(null);
         }
@@ -444,7 +448,9 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
                 setLoading(false);
             }, (error) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
+                if (user) { // Only emit error if a user is actually logged in
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
+                }
                 setFavorites(getLocalFavorites()); // Fallback for permission errors
                 setLoading(false);
             });
@@ -464,13 +470,13 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         const leagueId = favorites?.ourLeagueId;
         if (!leagueId) return null;
         
+        // Data might come from the 'leagues' map within favorites
         const leagueDetails = favorites?.leagues?.[leagueId];
         if (leagueDetails) {
             return { id: leagueId, name: leagueDetails.name, logo: leagueDetails.logo };
         }
         
-        // This part is a fallback, might need to fetch from API if details aren't in favorites.
-        return { id: leagueId, name: 'الدوري المفضل', logo: '' };
+        return null;
 
     }, [favorites]);
 
