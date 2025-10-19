@@ -657,14 +657,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     
             await batch.commit();
             
-            // Also clear the local predictions to start fresh
-            const predictionsRef = collection(db, 'predictions');
-            const predSnapshot = await getDocs(predictionsRef);
-            const deletePredBatch = writeBatch(db);
-            predSnapshot.forEach(doc => deletePredBatch.delete(doc.ref));
-            await deletePredBatch.commit();
-
-
             toast({ title: 'نجاح', description: 'تم تصفير نقاط جميع المستخدمين بنجاح.' });
             setResetAlertOpen(false);
             setResetPin('');
@@ -1037,6 +1029,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
         </div>
     );
 }
+
 
 
 
