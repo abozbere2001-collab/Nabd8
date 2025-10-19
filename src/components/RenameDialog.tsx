@@ -74,7 +74,7 @@ export function RenameDialog({
         <DialogHeader>
           <DialogTitle>تعديل {itemTypeDisplay}</DialogTitle>
            <DialogDescription>
-             {hasNoteField ? "يمكنك تعديل الاسم المخصص وإضافة ملاحظة إدارية خاصة." : `أدخل القيمة الجديدة لـ ${itemTypeDisplay}.`}
+             {item?.type === 'team' ? "يمكنك تعديل الاسم المخصص وإضافة ملاحظة شخصية." : `أدخل القيمة الجديدة لـ ${itemTypeDisplay}.`}
            </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -89,12 +89,12 @@ export function RenameDialog({
           </div>
           {hasNoteField && (
             <div className="grid w-full items-center gap-1.5">
-                <Label htmlFor="note">ملاحظة إدارية (اختياري)</Label>
+                <Label htmlFor="note">ملاحظة (اختياري)</Label>
                 <Textarea 
                     id="note"
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
-                    placeholder="اكتب ملاحظتك هنا... (تظهر في قسم 'كرتنا')"
+                    placeholder="اكتب ملاحظتك الشخصية هنا..."
                 />
             </div>
           )}
@@ -113,3 +113,5 @@ export function RenameDialog({
     </Dialog>
   );
 }
+
+    

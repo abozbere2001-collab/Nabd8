@@ -14,7 +14,7 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import type { Favorites, ManagedCompetition as ManagedCompetitionType } from '@/lib/types';
+import type { Favorites, ManagedCompetition as ManagedCompetitionType, Team } from '@/lib/types';
 import { SearchSheet } from '@/components/SearchSheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
@@ -171,12 +171,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const currentFavorites = user ? favorites : getLocalFavorites();
         const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
 
-        let isCurrentlyFavorited: boolean;
         let updateData: any;
         let fieldPath: string;
 
         if (type === 'star') {
-            isCurrentlyFavorited = !!newFavorites.leagues?.[itemId];
+            const isCurrentlyFavorited = !!newFavorites.leagues?.[itemId];
             fieldPath = `leagues.${itemId}`;
             if (isCurrentlyFavorited) {
                 delete newFavorites.leagues[itemId];
@@ -187,7 +186,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 updateData = { [`leagues.${itemId}`]: { name: item.name, leagueId: itemId, logo: item.logo } };
             }
         } else { // 'heart' for ourLeague
-            isCurrentlyFavorited = newFavorites.ourLeagueId === itemId;
+            const isCurrentlyFavorited = newFavorites.ourLeagueId === itemId;
             fieldPath = 'ourLeagueId';
             if (isCurrentlyFavorited) {
                 delete newFavorites.ourLeagueId;
@@ -297,7 +296,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
       const data = { customName: newName };
 
-      // If the new name is empty or same as original, delete the custom name
       if (!newName || (originalItem && newName === originalItem.name)) {
           deleteDoc(doc(db, collectionName, docId)).then(() => {
               fetchAllCustomNames();
@@ -451,3 +449,4 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+    

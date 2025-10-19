@@ -6,10 +6,10 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteField } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { Loader2, Pencil, Shirt } from 'lucide-react';
+import { Loader2, Pencil, Shirt, Star, Heart } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,12 +18,13 @@ import { Button } from '@/components/ui/button';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { Team, Player, Fixture, Standing, TeamStatistics } from '@/lib/types';
+import type { Team, Player, Fixture, Standing, TeamStatistics, Favorites } from '@/lib/types';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { FixtureItem } from '@/components/FixtureItem';
 import { Skeleton } from '@/components/ui/skeleton';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { isMatchLive } from '@/lib/matchStatus';
+import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
 interface TeamData {
     team: Team;
@@ -38,21 +39,39 @@ interface TeamData {
     };
 }
 
-const TeamHeader = ({ team, venue }: { team: Team, venue: TeamData['venue'] }) => (
-    <Card className="mb-4 overflow-hidden">
-        <div className="relative h-24 bg-gradient-to-r from-primary/20 to-accent/20" style={{backgroundImage: `url(${venue?.image})`, backgroundSize: 'cover', backgroundPosition: 'center'}}>
-            <div className="absolute inset-0 bg-black/50" />
-            <Avatar className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 h-24 w-24 border-4 border-background">
-                <AvatarImage src={team.logo} alt={team.name} />
-                <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-        </div>
-        <CardContent className="pt-16 text-center">
-            <h1 className="text-2xl font-bold">{team.name}</h1>
-            <p className="text-muted-foreground">{venue?.name}</p>
-        </CardContent>
-    </Card>
-);
+const TeamHeader = ({ team, venue, onStar, onHeart, favorites, isAdmin, onRename }: { team: Team, venue: TeamData['venue'], onStar: () => void, onHeart: () => void, favorites: Partial<Favorites>, isAdmin: boolean, onRename: () => void }) => {
+    const isOurBall = !!favorites.ourBallTeams?.[team.id];
+    const isStarred = !!favorites.teams?.[team.id];
+
+    return (
+        <Card className="mb-4 overflow-hidden">
+            <div className="relative h-24 bg-gradient-to-r from-primary/20 to-accent/20" style={{backgroundImage: `url(${venue?.image})`, backgroundSize: 'cover', backgroundPosition: 'center'}}>
+                <div className="absolute inset-0 bg-black/50" />
+                <Avatar className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 h-24 w-24 border-4 border-background">
+                    <AvatarImage src={team.logo} alt={team.name} />
+                    <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div className="absolute top-2 left-2 flex items-center gap-1 z-10">
+                     <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/20 hover:bg-black/40" onClick={onHeart}>
+                        <Heart className={cn("h-5 w-5", isOurBall ? "text-red-500 fill-current" : "text-white/80")} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/20 hover:bg-black/40" onClick={onStar}>
+                        <Star className={cn("h-5 w-5", isStarred ? "text-yellow-400 fill-current" : "text-white/80")} />
+                    </Button>
+                     {isAdmin && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/20 hover:bg-black/40" onClick={onRename}>
+                            <Pencil className="h-4 w-4 text-white/80" />
+                        </Button>
+                    )}
+                </div>
+            </div>
+            <CardContent className="pt-16 text-center">
+                <h1 className="text-2xl font-bold">{team.name}</h1>
+                <p className="text-muted-foreground">{venue?.name}</p>
+            </CardContent>
+        </Card>
+    );
+};
 
 const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: ScreenProps['navigate'] }) => {
     const [players, setPlayers] = useState<Player[]>([]);
@@ -377,10 +396,15 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
 
 
 export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: ScreenProps & { teamId: number }) {
-  const { db } = useFirestore();
+  const { user, db } = useAuth();
+  const { isAdmin } = useAdmin();
+  const { toast } = useToast();
   const [displayTitle, setDisplayTitle] = useState<string | undefined>(undefined);
   const [teamData, setTeamData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [renameItem, setRenameItem] = useState<{ id: number, name: string, note?: string, type: 'team', originalData: any } | null>(null);
+  const [favorites, setFavorites] = useState<Partial<Favorites>>({});
+
 
   useEffect(() => {
     if (!teamId) return;
@@ -405,8 +429,6 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
                                 setDisplayTitle(name);
                             }
                         } catch (error) {
-                           // This can fail for non-admins due to security rules, which is fine.
-                           // We just fall back to the default name.
                            setDisplayTitle(name);
                         }
                     } else {
@@ -424,7 +446,91 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     getTeamInfo();
     
   }, [db, teamId]);
+  
+  useEffect(() => {
+    if (!db || !user) {
+        setFavorites(getLocalFavorites());
+        return;
+    };
+    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+    const unsub = onSnapshot(favRef, (docSnap) => {
+        setFavorites(docSnap.exists() ? docSnap.data() as Favorites : {});
+    }, (error) => {
+        console.error("Error fetching favorites:", error);
+    });
+    return () => unsub();
+  }, [user, db]);
 
+  const handleFavoriteToggle = (type: 'star' | 'heart') => {
+        if (!teamData) return;
+        const { team } = teamData;
+        
+        const currentFavorites = user ? favorites : getLocalFavorites();
+        const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+
+        const field = type === 'star' ? 'teams' : 'ourBallTeams';
+        const isFavorited = !!newFavorites[field]?.[team.id];
+
+        if (isFavorited) {
+            delete newFavorites[field][team.id];
+        } else {
+            if (!newFavorites[field]) newFavorites[field] = {};
+            newFavorites[field][team.id] = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
+        }
+        
+        setFavorites(newFavorites);
+
+        if (user && db) {
+            const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const updateData = { [`${field}.${team.id}`]: isFavorited ? deleteField() : { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
+            setDoc(favRef, updateData, { merge: true }).catch(err => {
+                setFavorites(currentFavorites); // Revert on fail
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData }));
+            });
+        } else {
+            setLocalFavorites(newFavorites);
+        }
+  };
+
+  const handleRename = () => {
+    if (!teamData) return;
+    const { team } = teamData;
+    const note = (favorites.ourBallTeams?.[team.id] as any)?.note || '';
+    setRenameItem({
+        id: team.id,
+        name: displayTitle || team.name,
+        note: note,
+        type: 'team',
+        originalData: team,
+    });
+  };
+
+  const handleSaveRename = async (type: string, id: number, newName: string, newNote?: string) => {
+        if (!teamData || !db) return;
+        const { team } = teamData;
+        
+        if (isAdmin) {
+            const customNameRef = doc(db, 'teamCustomizations', String(id));
+            if (newName && newName !== team.name) {
+                await setDoc(customNameRef, { customName: newName });
+            } else {
+                await deleteDoc(customNameRef);
+            }
+            setDisplayTitle(newName || team.name);
+            toast({ title: "نجاح", description: "تم تحديث الاسم المخصص للفريق." });
+        }
+
+        if (user && newNote !== undefined) {
+             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+             const fieldPath = `ourBallTeams.${id}.note`;
+             const updateData = { [fieldPath]: newNote.length > 0 ? newNote : deleteField() };
+             
+             await setDoc(favRef, updateData, { merge: true });
+             toast({ title: "نجاح", description: "تم حفظ الملاحظة." });
+        }
+
+        setRenameItem(null);
+    };
 
   if(loading) {
     return (
@@ -455,8 +561,24 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
         onBack={goBack} 
         canGoBack={canGoBack} 
       />
+      {renameItem && (
+          <RenameDialog
+              isOpen={!!renameItem}
+              onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
+              item={renameItem}
+              onSave={(type, id, name, note) => handleSaveRename(type, Number(id), name, note)}
+          />
+      )}
       <div className="flex-1 overflow-y-auto p-1">
-        <TeamHeader team={{...teamData.team, name: displayTitle || teamData.team.name}} venue={teamData.venue} />
+        <TeamHeader 
+            team={{...teamData.team, name: displayTitle || teamData.team.name}}
+            venue={teamData.venue} 
+            onStar={() => handleFavoriteToggle('star')}
+            onHeart={() => handleFavoriteToggle('heart')}
+            favorites={favorites}
+            isAdmin={isAdmin}
+            onRename={handleRename}
+        />
          <Tabs defaultValue="details" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="details">التفاصيل</TabsTrigger>
@@ -473,3 +595,5 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
+
+    

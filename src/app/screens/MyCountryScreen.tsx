@@ -9,7 +9,7 @@ import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { collection, getDocs, doc, query, orderBy, onSnapshot, deleteDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { collection, getDocs, doc, query, orderBy, onSnapshot, deleteDoc, updateDoc, deleteField, getDoc, setDoc } from 'firebase/firestore';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
 import type { Fixture, Standing, TopScorer, PinnedMatch, Favorites, Team } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -36,7 +36,7 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { isMatchLive } from '@/lib/matchStatus';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
-const IRAQI_LEAGUE_ID = 542; // Fallback for guests
+const IRAQI_LEAGUE_ID = 542;
 
 function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onManage: () => void, isAdmin: boolean}) {
     if (!match.isEnabled) return null;
@@ -86,6 +86,8 @@ function OurLeagueTab({
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
     const [standings, setStandings] = useState<Standing[]>([]);
     const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
+    const { db } = useFirestore();
+    const [manualTopScorers, setManualTopScorers] = useState<any[]>([]);
 
     const listRef = useRef<HTMLDivElement>(null);
 
@@ -100,6 +102,7 @@ function OurLeagueTab({
                 setFixtures([]);
                 setStandings([]);
                 setTopScorers([]);
+                setManualTopScorers([]);
                 return;
             }
 
@@ -126,7 +129,20 @@ function OurLeagueTab({
         };
 
         fetchLeagueData();
-    }, [ourLeague]);
+        
+        if (db && ourLeague?.id === IRAQI_LEAGUE_ID) {
+            const scorersRef = collection(db, 'iraqiLeagueTopScorers');
+            const q = query(scorersRef, orderBy('rank', 'asc'));
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+              const fetchedScorers = snapshot.docs.map((doc) => doc.data());
+              setManualTopScorers(fetchedScorers);
+            });
+            return () => unsubscribe();
+        } else {
+            setManualTopScorers([]);
+        }
+
+    }, [ourLeague, db]);
     
     useEffect(() => {
         if (!loading && listRef.current) {
@@ -149,6 +165,10 @@ function OurLeagueTab({
             </div>
         );
     }
+
+    const showManualScorers = ourLeague.id === IRAQI_LEAGUE_ID && manualTopScorers.length > 0;
+    const finalScorers = showManualScorers ? manualTopScorers : topScorers;
+
 
     return (
       <div className="flex flex-col">
@@ -231,7 +251,7 @@ function OurLeagueTab({
             ): <p className="pt-4 text-center text-muted-foreground">جدول الترتيب غير متاح حاليًا.</p>}
           </TabsContent>
            <TabsContent value="scorers" className="p-0 mt-0 -mx-4">
-            {isAdmin && ourLeague?.id === 542 && (
+            {isAdmin && ourLeague?.id === IRAQI_LEAGUE_ID && (
                 <div className="p-4">
                     <Button className="w-full" onClick={() => navigate('ManageTopScorers')}>
                         <Users className="ml-2 h-4 w-4" />
@@ -243,7 +263,7 @@ function OurLeagueTab({
                 <div className="space-y-px p-4">
                     {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
-            ) : topScorers.length > 0 ? (
+            ) : finalScorers.length > 0 ? (
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -254,24 +274,29 @@ function OurLeagueTab({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {topScorers.map((scorer, index) => (
-                            <TableRow key={scorer.player.id}>
-                                <TableCell className="text-center font-bold text-lg">{scorer.statistics[0]?.goals.total || 0}</TableCell>
+                        {finalScorers.map((scorer, index) => {
+                            const playerData = showManualScorers ? { name: scorer.playerName, photo: scorer.playerPhoto } : scorer.player;
+                            const teamName = showManualScorers ? scorer.teamName : scorer.statistics[0]?.team.name;
+                            const goals = showManualScorers ? scorer.goals : scorer.statistics[0]?.goals.total || 0;
+                            const rank = showManualScorers ? scorer.rank : index + 1;
+                           return (
+                            <TableRow key={showManualScorers ? scorer.playerName : scorer.player.id}>
+                                <TableCell className="text-center font-bold text-lg">{goals}</TableCell>
                                 <TableCell>
-                                     <p className="text-xs text-muted-foreground text-right">{scorer.statistics[0]?.team.name}</p>
+                                     <p className="text-xs text-muted-foreground text-right">{teamName}</p>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-3 justify-end">
-                                        <p className="font-semibold">{scorer.player.name}</p>
+                                        <p className="font-semibold">{playerData.name}</p>
                                         <Avatar className="h-8 w-8">
-                                            <AvatarImage src={scorer.player.photo} />
-                                            <AvatarFallback>{scorer.player.name.charAt(0)}</AvatarFallback>
+                                            <AvatarImage src={playerData.photo} />
+                                            <AvatarFallback>{playerData.name?.charAt(0)}</AvatarFallback>
                                         </Avatar>
                                     </div>
                                 </TableCell>
-                                <TableCell className="font-bold">{index + 1}</TableCell>
+                                <TableCell className="font-bold">{rank}</TableCell>
                             </TableRow>
-                        ))}
+                        )})}
                     </TableBody>
                 </Table>
             ) : <p className="pt-4 text-center text-muted-foreground">قائمة الهدافين غير متاحة حاليًا.</p>}
@@ -412,6 +437,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user, db } = useAuth();
     const { isAdmin } = useAdmin();
     
+    const [ourLeagueId, setOurLeagueId] = useState<number | null>(null);
     const [ourLeagueData, setOurLeagueData] = useState<{ id: number; name: string; logo: string; } | null>(null);
 
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
@@ -419,33 +445,18 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     
     useEffect(() => {
         let isMounted = true;
-        const fetchOurLeagueId = () => {
-            if (user && db) {
-                const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                return onSnapshot(favsRef, (docSnap) => {
-                    if (!isMounted) return;
-                    const favs = (docSnap.data() as Favorites) || {};
-                    const leagueId = favs.ourLeagueId || null;
-                    fetchLeagueDetails(leagueId);
-                });
-            } else {
-                 if (!isMounted) return;
-                const favs = getLocalFavorites();
-                const leagueId = favs.ourLeagueId || null;
-                fetchLeagueDetails(leagueId);
-                return () => {}; // No-op for guest
-            }
-        };
-
+        
         const fetchLeagueDetails = async (leagueId: number | null) => {
             if (leagueId) {
-                try {
+                 try {
                     const res = await fetch(`/api/football/leagues?id=${leagueId}`);
                     const data = await res.json();
                     if (isMounted && data.response?.[0]) {
                         const league = data.response[0].league;
-                        setOurLeagueData({ id: league.id, name: league.name, logo: league.logo });
-                    } else if(isMounted) {
+                        const customNameRes = await getDoc(doc(db!, 'leagueCustomizations', String(leagueId)));
+                        const name = customNameRes.exists() ? customNameRes.data().customName : league.name;
+                        setOurLeagueData({ id: league.id, name: name, logo: league.logo });
+                    } else if (isMounted) {
                         setOurLeagueData(null);
                     }
                 } catch {
@@ -456,13 +467,36 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             }
         };
 
-        const unsubscribe = fetchOurLeagueId();
+        const setupLeagueListener = () => {
+            if (user && db) {
+                const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+                return onSnapshot(favsRef, (docSnap) => {
+                    const favs = (docSnap.data() as Favorites) || {};
+                    const newLeagueId = favs.ourLeagueId || null;
+                    if (isMounted && newLeagueId !== ourLeagueId) {
+                        setOurLeagueId(newLeagueId);
+                        fetchLeagueDetails(newLeagueId);
+                    }
+                });
+            } else {
+                const favs = getLocalFavorites();
+                const newLeagueId = favs.ourLeagueId || null;
+                if (isMounted && newLeagueId !== ourLeagueId) {
+                    setOurLeagueId(newLeagueId);
+                    fetchLeagueDetails(newLeagueId);
+                }
+                return () => {}; // No-op for guest
+            }
+        };
+
+        const unsubscribe = setupLeagueListener();
         return () => { 
             isMounted = false;
             unsubscribe();
         };
 
-    }, [user, db]);
+    }, [user, db, ourLeagueId]);
+
 
     useEffect(() => {
         if (!db) { setLoadingPinnedMatches(false); return; }
@@ -543,3 +577,5 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
+
+    
