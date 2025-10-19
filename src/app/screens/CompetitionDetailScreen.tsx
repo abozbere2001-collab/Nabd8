@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
@@ -232,14 +232,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     if (!loading && fixtures.length > 0 && fixturesListRef.current) {
         const firstUpcomingIndex = fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
         if (firstUpcomingIndex !== -1 && firstUpcomingMatchRef.current) {
-            // Use a small timeout to ensure the DOM is ready for scrolling
             setTimeout(() => {
                 if (firstUpcomingMatchRef.current && fixturesListRef.current) {
                     const listTop = fixturesListRef.current.offsetTop;
                     const itemTop = firstUpcomingMatchRef.current.offsetTop;
                     fixturesListRef.current.scrollTop = itemTop - listTop;
                 }
-            }, 100);
+            }, 300);
         }
     }
   }, [loading, fixtures]);
@@ -363,8 +362,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         setDeleteAlertOpen(false);
       });
   }
-
-  const firstUpcomingMatchIndex = fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
 
   const secondaryActions = (
     <div className="flex items-center gap-1">
@@ -509,35 +506,31 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-16 text-left">الأهداف</TableHead>
-                            <TableHead>الفريق</TableHead>
-                            <TableHead className="flex-1">اللاعب</TableHead>
-                            <TableHead className="w-8">#</TableHead>
+                            <TableHead className="text-left w-12">الأهداف</TableHead>
+                            <TableHead className="text-right">اللاعب</TableHead>
+                            <TableHead className="text-right w-8">#</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {topScorers.map(({ player, statistics }, index) => {
                             const displayName = getDisplayName('player', player.id, player.name);
+                            const teamName = getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name);
                             return (
                                 <TableRow key={player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
                                     <TableCell className="font-bold text-lg text-left">{statistics[0]?.goals.total}</TableCell>
-                                    <TableCell onClick={(e) => { e.stopPropagation(); navigate('TeamDetails', { teamId: statistics[0]?.team.id })}}>
-                                        <p className="text-xs text-muted-foreground truncate">{getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name)}</p>
-                                    </TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-3">
-                                            <div className="relative">
-                                                <Avatar className="h-10 w-10">
-                                                    <AvatarImage src={player.photo} alt={player.name} />
-                                                    <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
-                                                </Avatar>
+                                        <div className="flex items-center gap-3 justify-end">
+                                            <div className="text-right">
+                                                <p className="font-semibold truncate">{displayName}</p>
+                                                <p className="text-xs text-muted-foreground truncate">{teamName}</p>
                                             </div>
-                                            <p className="font-semibold">
-                                                {displayName}
-                                            </p>
+                                            <Avatar className="h-10 w-10">
+                                                <AvatarImage src={player.photo} alt={player.name} />
+                                                <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
+                                            </Avatar>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="font-bold">{index + 1}</TableCell>
+                                    <TableCell className="font-bold text-right">{index + 1}</TableCell>
                                 </TableRow>
                             )})}
                     </TableBody>
