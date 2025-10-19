@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
@@ -230,13 +230,17 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
   useEffect(() => {
     if (!loading && fixtures.length > 0 && fixturesListRef.current) {
-        setTimeout(() => {
-             if (firstUpcomingMatchRef.current && fixturesListRef.current) {
-                const listTop = fixturesListRef.current.offsetTop;
-                const itemTop = firstUpcomingMatchRef.current.offsetTop;
-                fixturesListRef.current.scrollTop = itemTop - listTop;
-            }
-        }, 300); // Increased timeout to allow DOM to settle
+        const firstUpcomingIndex = fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
+        if (firstUpcomingIndex !== -1 && firstUpcomingMatchRef.current) {
+            // Use a small timeout to ensure the DOM is ready for scrolling
+            setTimeout(() => {
+                if (firstUpcomingMatchRef.current && fixturesListRef.current) {
+                    const listTop = fixturesListRef.current.offsetTop;
+                    const itemTop = firstUpcomingMatchRef.current.offsetTop;
+                    fixturesListRef.current.scrollTop = itemTop - listTop;
+                }
+            }, 100);
+        }
     }
   }, [loading, fixtures]);
 
@@ -247,7 +251,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     let fieldPath = '';
     let isFavoritedCurrent = false;
     let favoriteData: any = { userId: user.uid };
-    const displayName = getDisplayName((type === 'player' ? 'player' : 'team'), item.id, item.name);
+    const displayName = type === 'league' ? displayTitle : getDisplayName((type === 'player' ? 'player' : 'team'), item.id, item.name);
 
 
     if (type === 'league' && leagueId) {
@@ -360,9 +364,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       });
   }
 
-  const firstUpcomingMatchIndex = useMemo(() => {
-    return fixtures.findIndex(f => isMatchLive(f.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(f.fixture.status.short));
-  }, [fixtures]);
+  const firstUpcomingMatchIndex = fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
 
   const secondaryActions = (
     <div className="flex items-center gap-1">
@@ -460,7 +462,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-auto"></TableHead>
                             <TableHead className="text-center">نقاط</TableHead>
                             <TableHead className="text-center">خ</TableHead>
                             <TableHead className="text-center">ت</TableHead>
@@ -472,19 +473,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     <TableBody>
                         {standings.map((s) => {
                             const displayName = getDisplayName('team', s.team.id, s.team.name);
-                            const isFavoritedTeam = !!favorites?.teams?.[s.team.id];
                             return (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                                <TableCell onClick={e => e.stopPropagation()}>
-                                     <div className='flex items-center justify-end opacity-80'>
-                                        {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('team', s.team.id, s.team)}>
-                                            <Pencil className="h-4 w-4 text-muted-foreground" />
-                                        </Button>}
-                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleFavorite('team', {...s.team, name: displayName})}>
-                                            <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
-                                        </Button>
-                                     </div>
-                                </TableCell>
                                 <TableCell className="text-center font-bold">{s.points}</TableCell>
                                 <TableCell className="text-center">{s.all.lose}</TableCell>
                                 <TableCell className="text-center">{s.all.draw}</TableCell>
@@ -494,14 +484,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                     <div className="flex items-center gap-2 justify-end">
                                         <p className="truncate">
                                             {displayName}
-                                            {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {s.team.id})</span>}
                                         </p>
                                         <div className="relative">
                                             <Avatar className="h-6 w-6">
                                                 <AvatarImage src={s.team.logo} alt={s.team.name} />
                                                 <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
                                             </Avatar>
-                                            {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(s.team.logo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
                                         </div>
                                          <span>{s.rank}</span>
                                     </div>
@@ -521,11 +509,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-auto text-left"></TableHead>
-                            <TableHead className="text-center w-16">الأهداف</TableHead>
-                            <TableHead className="text-right">الفريق</TableHead>
-                            <TableHead className="flex-1 text-right">اللاعب</TableHead>
-                            <TableHead className="w-8 text-right">#</TableHead>
+                            <TableHead className="w-16 text-left">الأهداف</TableHead>
+                            <TableHead>الفريق</TableHead>
+                            <TableHead className="flex-1">اللاعب</TableHead>
+                            <TableHead className="w-8">#</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -533,33 +520,21 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const displayName = getDisplayName('player', player.id, player.name);
                             return (
                                 <TableRow key={player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
-                                    <TableCell>
-                                        <div className='flex items-center justify-start opacity-80' onClick={e => e.stopPropagation()}>
-                                            {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename('player', player.id, player)}>
-                                                <Pencil className="h-4 w-4 text-muted-foreground" />
-                                            </Button>}
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleFavorite('player', {...player, name: displayName})}>
-                                                <Star className={cn("h-5 w-5", favorites?.players?.[player.id] ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-center font-bold text-lg">{statistics[0]?.goals.total}</TableCell>
+                                    <TableCell className="font-bold text-lg text-left">{statistics[0]?.goals.total}</TableCell>
                                     <TableCell onClick={(e) => { e.stopPropagation(); navigate('TeamDetails', { teamId: statistics[0]?.team.id })}}>
-                                        <p className="text-xs text-muted-foreground text-right truncate">{getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name)}</p>
+                                        <p className="text-xs text-muted-foreground truncate">{getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name)}</p>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-3 justify-end">
-                                            <p className="font-semibold">
-                                                {displayName}
-                                                {isAdmin && <span className="text-xs text-muted-foreground ml-2">(ID: {player.id})</span>}
-                                            </p>
+                                        <div className="flex items-center gap-3">
                                             <div className="relative">
                                                 <Avatar className="h-10 w-10">
                                                     <AvatarImage src={player.photo} alt={player.name} />
                                                     <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
                                                 </Avatar>
-                                                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleCopy(player.photo); }}><Copy className="h-3 w-3 text-muted-foreground" /></Button>}
                                             </div>
+                                            <p className="font-semibold">
+                                                {displayName}
+                                            </p>
                                         </div>
                                     </TableCell>
                                     <TableCell className="font-bold">{index + 1}</TableCell>
@@ -595,7 +570,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             </div>
                             <span className="font-semibold text-sm">
                                 {displayName}
-                                {isAdmin && <span className="block text-xs text-muted-foreground">(ID: {team.id})</span>}
                             </span>
                             <div className="absolute top-1 left-1 flex opacity-80">
                                 {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team)}}>
@@ -615,6 +589,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+    
+
     
 
     

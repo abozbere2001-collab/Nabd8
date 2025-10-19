@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Loader2 } from 'lucide-react';
@@ -48,14 +49,18 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
     }, [teamId, toast]);
 
     useEffect(() => {
-        if (!loading && firstUpcomingMatchRef.current && listRef.current) {
-            setTimeout(() => {
-                 if (firstUpcomingMatchRef.current && listRef.current) {
-                    const listTop = listRef.current.offsetTop;
-                    const itemTop = firstUpcomingMatchRef.current.offsetTop;
-                    listRef.current.scrollTop = itemTop - listTop;
-                }
-            }, 100);
+        if (!loading && allFixtures.length > 0 && listRef.current) {
+            const firstUpcomingIndex = allFixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
+            if (firstUpcomingIndex !== -1 && firstUpcomingMatchRef.current) {
+                // Use a small timeout to ensure the DOM is ready for scrolling
+                setTimeout(() => {
+                    if (firstUpcomingMatchRef.current && listRef.current) {
+                        const listTop = listRef.current.offsetTop;
+                        const itemTop = firstUpcomingMatchRef.current.offsetTop;
+                        listRef.current.scrollTop = itemTop - listTop;
+                    }
+                }, 100);
+            }
         }
     }, [loading, allFixtures]);
 
@@ -70,8 +75,8 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
                 ) : allFixtures.length > 0 ? (
                     <div className="space-y-2">
                         {allFixtures.map((fixture, index) => {
-                            const isUpcoming = !isMatchLive(fixture.fixture.status) && !['FT', 'AET', 'PEN', 'PST'].includes(fixture.fixture.status.short);
-                            const isFirstUpcoming = isUpcoming && !allFixtures.slice(0, index).some(f => !isMatchLive(f.fixture.status) && !['FT', 'AET', 'PEN', 'PST'].includes(f.fixture.status.short));
+                             const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || new Date(fixture.fixture.timestamp * 1000) > new Date();
+                             const isFirstUpcoming = isUpcomingOrLive && !allFixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
                             
                             return (
                                 <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
@@ -91,3 +96,5 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
         </div>
     );
 }
+
+    
