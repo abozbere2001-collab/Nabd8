@@ -37,7 +37,7 @@ const LoadingSplashScreen = () => (
 const AppFlow = () => {
     const { user, isUserLoading } = useUser();
     const { db } = useFirestore();
-    const [flowState, setFlowState] = useState<'loading' | 'welcome' | 'favorite_selection' | 'app' | 'login'>('loading');
+    const [flowState, setFlowState] = useState<'loading' | 'welcome' | 'favorite_selection' | 'app' | 'login'>('login');
 
     useEffect(() => {
         const checkOnboardingStatus = async () => {
@@ -77,13 +77,21 @@ const AppFlow = () => {
             }
         };
 
-        checkOnboardingStatus();
+        // We bypass the onboarding flow for direct testing of login
+        // checkOnboardingStatus();
+        if (user && !isUserLoading) {
+            setFlowState('app');
+        } else if (!user && !isUserLoading) {
+            setFlowState('login');
+        } else {
+            setFlowState('loading');
+        }
 
     }, [user, isUserLoading, db]);
 
     const handleWelcomeComplete = () => {
         localStorage.setItem(HAS_SEEN_WELCOME_KEY, 'true');
-        setFlowState('loading'); 
+        setFlowState('login'); // Go to login after welcome
     }
 
     const handleFavoriteSelectionComplete = async () => {
