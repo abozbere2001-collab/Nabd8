@@ -126,3 +126,5 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
             errorEmitter.emit('permission-error', permissionError);
         });
 };
+
+    
