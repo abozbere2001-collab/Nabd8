@@ -28,7 +28,7 @@ interface RenameDialogProps {
     name: string;
     note?: string;
     type: ItemType;
-    originalName?: string;
+    originalData?: any;
   } | null;
   onSave: (type: ItemType, id: string | number, newName: string, newNote?: string) => void;
 }
@@ -71,29 +71,41 @@ export function RenameDialog({
   const isTeamAndUser = item?.type === 'team' && !isAdmin;
   const isTeamAndAdmin = item?.type === 'team' && isAdmin;
 
+  const getTitle = () => {
+    if (!item) return '';
+    if (item.type === 'team') return `ملاحظة على فريق ${item.name}`;
+    return `تعديل ${itemTypeDisplay}`;
+  }
+  
+  const getDescription = () => {
+      if (!item) return '';
+      if(item.type === 'team') return 'اكتب ملاحظتك الشخصية على هذا الفريق. ستظهر هذه الملاحظة لك فقط في قسم "كرتنا".';
+      if(isAdmin) return `أدخل القيمة الجديدة لـ ${itemTypeDisplay}.`;
+      return '';
+  }
+
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
-             {isTeamAndUser ? `ملاحظة على ${item.name}` : `تعديل ${itemTypeDisplay}`}
+             {getTitle()}
           </DialogTitle>
            <DialogDescription>
-             {isTeamAndUser && "أضف ملاحظة شخصية على هذا الفريق. ستظهر هذه الملاحظة لك فقط."}
-             {isTeamAndAdmin && "يمكنك تعديل الاسم المخصص للفريق وإضافة ملاحظة إدارية."}
-             {isAdmin && item?.type !== 'team' && `أدخل القيمة الجديدة لـ ${itemTypeDisplay}.`}
+             {getDescription()}
            </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           
-          {isAdmin && !isTeamAndUser && (
+          {isAdmin && (
             <div className="grid w-full items-center gap-1.5">
                 <Label htmlFor="name">{item?.type === 'status' ? 'الحالة المخصصة' : 'الاسم المخصص'}</Label>
                 <Input
                 id="name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder={item?.type === 'status' ? 'مثال: مؤجلة' : `الاسم الأصلي: ${item?.originalName || item?.name}`}
+                placeholder={item?.type === 'status' ? 'مثال: مؤجلة' : `الاسم الأصلي: ${item?.originalData?.name || item?.name}`}
                 />
             </div>
           )}
@@ -105,7 +117,7 @@ export function RenameDialog({
                     id="note"
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
-                    placeholder={isAdmin ? "ملاحظة (تظهر للجميع)" : "اكتب ملاحظتك الشخصية هنا..."}
+                    placeholder="اكتب ملاحظتك الشخصية هنا..."
                 />
             </div>
           )}
@@ -124,4 +136,5 @@ export function RenameDialog({
     </Dialog>
   );
 }
+
 
