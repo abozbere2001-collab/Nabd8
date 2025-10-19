@@ -47,29 +47,11 @@ interface ProcessedOdds {
     home: number;
     draw: number;
     away: number;
-    homeChange: number;
-    drawChange: number;
-    awayChange: number;
     homeTeamName: string;
     awayTeamName: string;
     homeTeamLogo: string;
     awayTeamLogo: string;
 }
-
-const OddsChangeIndicator = ({ change }: { change: number }) => {
-    if (change === 0) return null;
-
-    const isUp = change > 0;
-    const color = isUp ? "text-green-500" : "text-red-500";
-    const Icon = isUp ? ArrowUp : ArrowDown;
-
-    return (
-        <span className={cn("flex items-center font-mono text-[10px]", color)}>
-            <Icon className="h-2.5 w-2.5" />
-            {Math.abs(change).toFixed(2)}
-        </span>
-    );
-};
 
 export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
     const [odds, setOdds] = useState<ProcessedOdds | null>(null);
@@ -81,7 +63,7 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
 
         setLoading(true);
         Promise.all([
-            fetch(`/api/football/odds?fixture=${fixtureId}`),
+            fetch(`/api/football/odds?fixture=${fixtureId}&bookmaker=8`), // Bet365
             fetch(`/api/football/fixtures?id=${fixtureId}`)
         ])
         .then(async ([oddsRes, fixtureRes]) => {
@@ -97,39 +79,20 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
             const fixtureResponse: FixtureApiResponse | undefined = fixtureData.response?.[0];
             
             if (oddsResponse && fixtureResponse) {
-                const bookmaker = oddsResponse.bookmakers.find((b: Bookmaker) => b.id === 8); // Bet365
+                const bookmaker = oddsResponse.bookmakers.find((b: Bookmaker) => b.id === 8);
                 const matchWinnerBet = bookmaker?.bets.find((b: Bet) => b.id === 1);
                 
                 if (matchWinnerBet && oddsResponse.update) {
-                    const oddsHistory = oddsData.odds_history?.[fixtureId]?.[bookmaker?.id]?.[1] || [];
-                    
                     const currentOdds: { [key: string]: number } = {};
                     matchWinnerBet.values.forEach((v: OddValue) => {
                        const key = v.value.toLowerCase().replace(' ', '');
                        currentOdds[key] = parseFloat(v.odd);
                     });
-                    
-                    const previousOdds: { [key: string]: number } = {};
-                    if(oddsHistory.length > 1) {
-                        const prev = oddsHistory[1]; // second to last
-                        prev.values.forEach((v: OddValue) => {
-                            const key = v.value.toLowerCase().replace(' ', '');
-                            previousOdds[key] = parseFloat(v.odd);
-                        });
-                    } else {
-                        // If no history, changes are 0
-                         previousOdds.home = currentOdds.home;
-                         previousOdds.draw = currentOdds.draw;
-                         previousOdds.away = currentOdds.away;
-                    }
 
                     setOdds({
                         home: currentOdds.home,
                         draw: currentOdds.draw,
                         away: currentOdds.away,
-                        homeChange: currentOdds.home - (previousOdds.home || currentOdds.home),
-                        drawChange: currentOdds.draw - (previousOdds.draw || currentOdds.draw),
-                        awayChange: currentOdds.away - (previousOdds.away || currentOdds.away),
                         homeTeamName: fixtureResponse.teams.home.name,
                         awayTeamName: fixtureResponse.teams.away.name,
                         homeTeamLogo: fixtureResponse.teams.home.logo,
@@ -162,14 +125,12 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
                             </div>
                             <div className="flex items-center gap-1">
                                 <span className="font-bold text-base">{odds.home.toFixed(2)}</span>
-                                <OddsChangeIndicator change={odds.homeChange} />
                             </div>
                         </div>
                         <div className="flex justify-between items-center text-sm p-2 rounded-md bg-accent/50">
                              <span className="font-semibold">تعادل</span>
                              <div className="flex items-center gap-1">
                                 <span className="font-bold text-base">{odds.draw.toFixed(2)}</span>
-                                <OddsChangeIndicator change={odds.drawChange} />
                             </div>
                         </div>
                         <div className="flex justify-between items-center text-sm p-2 rounded-md bg-accent/50">
@@ -179,7 +140,6 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
                             </div>
                              <div className="flex items-center gap-1">
                                 <span className="font-bold text-base">{odds.away.toFixed(2)}</span>
-                                <OddsChangeIndicator change={odds.awayChange} />
                             </div>
                         </div>
                     </div>

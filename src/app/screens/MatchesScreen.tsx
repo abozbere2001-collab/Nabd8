@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -272,31 +271,34 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [loading, setLoading] = useState(true);
     
   const [commentedMatches, setCommentedMatches] = useState<{ [key: number]: MatchDetails }>({});
+  
+  const [customNamesCache, setCustomNamesCache] = useState<{leagues: Map<number, string>, teams: Map<number, string>} | null>(null);
 
   const fetchAndProcessData = useCallback(async (dateKey: string, abortSignal: AbortSignal) => {
-    if (!db) {
-        setLoading(false);
-        return;
-    }
-    
     setLoading(true);
       
-      try {
-        const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
-            getDocs(collection(db, 'leagueCustomizations')),
-            getDocs(collection(db, 'teamCustomizations'))
-        ]);
-        
-        if (abortSignal.aborted) return;
-        
-        const leagueNames = new Map<number, string>();
-        leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
-        const teamNames = new Map<number, string>();
-        teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+    try {
+        let localCustomNames = customNamesCache;
+        if (!localCustomNames && db) {
+            const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+                getDocs(collection(db, 'leagueCustomizations')),
+                getDocs(collection(db, 'teamCustomizations'))
+            ]);
+            
+            if (abortSignal.aborted) return;
+            
+            const leagueNames = new Map<number, string>();
+            leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+            const teamNames = new Map<number, string>();
+            teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+            localCustomNames = { leagues: leagueNames, teams: teamNames };
+            setCustomNamesCache(localCustomNames);
+        }
+
 
         const getDisplayName = (type: 'team' | 'league', id: number, defaultName: string) => {
-            const firestoreMap = type === 'team' ? teamNames : leagueNames;
-            const customName = firestoreMap.get(id);
+            const firestoreMap = type === 'team' ? localCustomNames?.teams : localCustomNames?.leagues;
+            const customName = firestoreMap?.get(id);
             if (customName) return customName;
 
             const hardcodedMap = type === 'team' ? hardcodedTranslations.teams : hardcodedTranslations.leagues;
@@ -315,7 +317,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
         let rawFixtures: FixtureType[] = data.response || [];
 
-        // If user has no favorites (guest or registered), show popular leagues by default on 'my-results'
         const currentFavorites = user ? favorites : getLocalFavorites();
         const hasFavs = (currentFavorites?.teams && Object.keys(currentFavorites.teams).length > 0) || (currentFavorites?.leagues && Object.keys(currentFavorites.leagues).length > 0);
         
@@ -353,7 +354,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             setLoading(false);
           }
       }
-  }, [db, activeTab, user, favorites]);
+  }, [db, activeTab, user, favorites, customNamesCache]);
 
 
   useEffect(() => {
@@ -367,7 +368,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         });
         return () => unsubscribe();
     } else {
-        // For guest users, favorites are handled by getLocalFavorites directly
         setFavorites({});
     }
   }, [user, db]);
@@ -391,8 +391,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   
   useEffect(() => {
-      // We no longer hide 'all-matches', so this check is removed.
-      // This effect will run for 'my-results' tab.
       if (activeTab === 'predictions') return;
 
       if (isVisible && selectedDateKey) {
@@ -414,7 +412,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const handleTabChange = (value: string) => {
     const tabValue = value as TabName;
     setActiveTab(tabValue);
-    // Trigger fetch only if the tab is not predictions and data isn't cached
     if ((tabValue === 'my-results') && selectedDateKey && !matchesCache.has(selectedDateKey)) {
         const controller = new AbortController();
         fetchAndProcessData(selectedDateKey, controller.signal);
