@@ -274,7 +274,7 @@ function OurLeagueTab({
                             const goals = showManualScorers ? scorer.goals : scorer.statistics[0]?.goals.total || 0;
                             const rank = showManualScorers ? scorer.rank : index + 1;
                            return (
-                            <TableRow key={showManualScorers ? scorer.playerName : scorer.player.id}>
+                            <TableRow key={showManualScorers ? `${scorer.playerName}-${index}` : scorer.player.id}>
                                 <TableCell className="text-center font-bold text-lg">{goals}</TableCell>
                                 <TableCell>
                                      <p className="text-xs text-muted-foreground text-right">{teamName}</p>
@@ -343,10 +343,10 @@ function OurBallTab({ navigate, ourBallTeams }: { navigate: ScreenProps['navigat
 
     return (
         <div className="space-y-3 pt-4">
-            {ourBallTeams.map(team => {
+            {ourBallTeams.map((team, index) => {
                 return (
-                    <div key={team.id} className="p-3 rounded-lg border bg-card flex items-center gap-3 h-16">
-                        <div onClick={() => navigate('TeamDetails', { teamId: team.id })} className="flex-1 flex items-center gap-3 cursor-pointer">
+                    <div key={`${team.id}-${index}`} className="p-3 rounded-lg border bg-card flex items-center gap-3 h-16">
+                        <div onClick={() => navigate('AdminFavoriteTeamDetails', { teamId: team.id, teamName: team.name })} className="flex-1 flex items-center gap-3 cursor-pointer">
                             <Avatar className="h-10 w-10">
                                 <AvatarImage src={team.logo} alt={team.name} />
                                 <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
@@ -388,82 +388,50 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { isAdmin } = useAdmin();
     
     const [favorites, setFavorites] = useState<Partial<Favorites>>({});
-    const [loadingFavorites, setLoadingFavorites] = useState(true);
-
-    const [ourLeagueData, setOurLeagueData] = useState<{ id: number; name: string; logo: string; } | null>(null);
-    const [loadingLeague, setLoadingLeague] = useState(true);
+    const [loading, setLoading] = useState(true);
 
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
-    const [loadingPinnedMatches, setLoadingPinnedMatches] = useState(true);
     
     useEffect(() => {
-        setLoadingFavorites(true);
+        setLoading(true);
         if (user && db) {
             const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
             const unsubscribe = onSnapshot(favsRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
-                setLoadingFavorites(false);
+                setLoading(false);
             }, (error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
                 setFavorites({});
-                setLoadingFavorites(false);
+                setLoading(false);
             });
             return () => unsubscribe();
         } else {
+            // Guest user
             setFavorites(getLocalFavorites());
-            setLoadingFavorites(false);
+            setLoading(false);
         }
     }, [user, db]);
 
-    useEffect(() => {
-        let isMounted = true;
-        const fetchLeagueDetails = async () => {
-            if (loadingFavorites) return;
-
-            setLoadingLeague(true);
-            const leagueId = favorites?.ourLeagueId;
-
-            if (!leagueId) {
-                setOurLeagueData(null);
-                setLoadingLeague(false);
-                return;
-            }
-
-            try {
-                const res = await fetch(`/api/football/leagues?id=${leagueId}`);
-                const data = await res.json();
-                if (isMounted && data.response?.[0]) {
-                    const league = data.response[0].league;
-                    setOurLeagueData({ id: league.id, name: league.name, logo: league.logo });
-                } else if (isMounted) {
-                    setOurLeagueData(null);
-                }
-            } catch (e) {
-                if (isMounted) setOurLeagueData(null);
-                console.error("Failed to fetch league details", e);
-            } finally {
-                if (isMounted) setLoadingLeague(false);
-            }
-        };
-
-        fetchLeagueDetails();
-        return () => { isMounted = false; };
-    }, [favorites?.ourLeagueId, loadingFavorites]);
+    const ourLeagueData = useMemo(() => {
+        const leagueId = favorites?.ourLeagueId;
+        const leagueDetails = favorites?.leagues?.[leagueId!];
+        if (leagueId && leagueDetails) {
+            return { id: leagueId, name: leagueDetails.name, logo: leagueDetails.logo };
+        }
+        return null;
+    }, [favorites]);
 
 
     useEffect(() => {
-        if (!db) { setLoadingPinnedMatches(false); return; }
-        setLoadingPinnedMatches(true);
+        if (!db) { return; }
         const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
         const q = query(pinnedMatchesRef);
         const unsub = onSnapshot(q, (snapshot) => {
             const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch));
             setPinnedMatches(matches);
-            setLoadingPinnedMatches(false);
         }, (serverError) => {
             const permissionError = new FirestorePermissionError({ path: pinnedMatchesRef.path, operation: 'list' });
             errorEmitter.emit('permission-error', permissionError);
-            setLoadingPinnedMatches(false);
         });
         return () => unsub();
     }, [db]);
@@ -488,25 +456,19 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 }
             />
             <div className="flex-1 overflow-y-auto px-4">
-                {loadingPinnedMatches ? (
-                    <Skeleton className="h-28 w-full mb-4" />
-                ) : (
-                    <>
-                        {pinnedMatches.map(match => (
-                            <PinnedMatchCard
-                                key={match.id}
-                                match={match}
-                                onManage={() => navigate('ManagePinnedMatch', { matchId: match.id })}
-                                isAdmin={isAdmin}
-                            />
-                        ))}
-                        {isAdmin && pinnedMatches.filter(m => m.isEnabled).length === 0 && (
-                            <Button className="w-full my-2" onClick={() => navigate('ManagePinnedMatch', { matchId: null })}>
-                                <Pin className="ml-2 h-4 w-4" />
-                                إضافة مباراة للتثبيت
-                            </Button>
-                        )}
-                    </>
+                {pinnedMatches.map(match => (
+                    <PinnedMatchCard
+                        key={match.id}
+                        match={match}
+                        onManage={() => navigate('ManagePinnedMatch', { matchId: match.id })}
+                        isAdmin={isAdmin}
+                    />
+                ))}
+                {isAdmin && pinnedMatches.filter(m => m.isEnabled).length === 0 && (
+                    <Button className="w-full my-2" onClick={() => navigate('ManagePinnedMatch', { matchId: null })}>
+                        <Pin className="ml-2 h-4 w-4" />
+                        إضافة مباراة للتثبيت
+                    </Button>
                 )}
 
                 <Tabs defaultValue="our-league" className="w-full">
@@ -519,7 +481,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         </div>
                     </div>
                     <TabsContent value="our-league" className="pt-4">
-                        {loadingLeague ? (
+                        {loading ? (
                              <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
                         ) : (
                             <OurLeagueTab
@@ -529,7 +491,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         )}
                     </TabsContent>
                     <TabsContent value="our-ball" className="pt-0">
-                         {loadingFavorites ? (
+                         {loading ? (
                              <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
                          ) : (
                             <OurBallTab navigate={navigate} ourBallTeams={ourBallTeams} />
@@ -540,3 +502,4 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
+

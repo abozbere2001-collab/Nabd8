@@ -23,7 +23,10 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
 
     useEffect(() => {
         const fetchFixtures = async () => {
-            if (!teamId) return;
+            if (!teamId) {
+                setLoading(false);
+                return
+            };
             setLoading(true);
             try {
                 const url = `/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
@@ -97,4 +100,3 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
     );
 }
 
-    
