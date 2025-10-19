@@ -696,15 +696,15 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
     useEffect(() => {
         if (!db) return;
         setLoadingLeaderboard(true);
+        setHasMore(true);
 
         const leaderboardRef = collection(db, 'leaderboard');
         const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), limit(LEADERBOARD_PAGE_SIZE));
 
         const unsubscribeLeaderboard = onSnapshot(q, (snapshot) => {
             const scores: UserScore[] = [];
-            let rank = 1;
-            snapshot.forEach(doc => {
-                scores.push({...(doc.data() as UserScore), rank: rank++ });
+            snapshot.forEach((doc, index) => {
+                scores.push({...(doc.data() as UserScore), rank: index + 1 });
             });
             
             const lastDoc = snapshot.docs[snapshot.docs.length - 1];
@@ -732,7 +732,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
         try {
             const snapshot = await getDocs(q);
-            let currentRank = (leaderboard[leaderboard.length - 1]?.rank || 0) + 1;
+            let currentRank = (leaderboard.length) + 1;
             const newScores = snapshot.docs.map(doc => ({...doc.data() as UserScore, rank: currentRank++}));
             const lastDoc = snapshot.docs[snapshot.docs.length - 1];
 
@@ -781,7 +781,7 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
                 ...fixture,
                 teams: {
                     home: { ...fixture.teams.home, name: hardcodedTranslations.teams[fixture.teams.home.id] || fixture.teams.home.name },
-                    away: { ...fixture.teams.away, name: hardcodedTranslations.teams[fixture.teams.away.id] || fixture.teams.away.name },
+                    away: { ...fixture.teams.away, name: hardcodedTranslations.teams.away.id || fixture.teams.away.name },
                 },
                 league: {
                     ...fixture.league,
@@ -1044,3 +1044,6 @@ export function GlobalPredictionsScreen({ navigate, goBack, canGoBack, headerAct
 
 
 
+
+
+    
