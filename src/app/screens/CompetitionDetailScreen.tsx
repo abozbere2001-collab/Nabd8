@@ -42,6 +42,7 @@ import {
 import { isMatchLive } from '@/lib/matchStatus';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { Card, CardContent } from '@/components/ui/card';
+import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
 type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
 
@@ -91,7 +92,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const { db } = useFirestore();
   const { toast } = useToast();
 
-  const [favorites, setFavorites] = useState<Favorites>({ userId: user?.uid || '', leagues: {}, teams: {}, players: {} });
+  const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   
   const [loading, setLoading] = useState(true);
   const [displayTitle, setDisplayTitle] = useState(initialTitle);
@@ -166,18 +167,21 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   };
 
   useEffect(() => {
-    if (!user || !db) return;
-    const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    const unsub = onSnapshot(favDocRef, (doc) => {
-        setFavorites(doc.data() as Favorites || { userId: user.uid, leagues: {}, teams: {}, players: {} });
-    }, (error) => {
-        const permissionError = new FirestorePermissionError({
-            path: favDocRef.path,
-            operation: 'get',
+    if (user && db) {
+        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const unsub = onSnapshot(favDocRef, (doc) => {
+            setFavorites(doc.data() as Favorites || { userId: user.uid });
+        }, (error) => {
+            const permissionError = new FirestorePermissionError({
+                path: favDocRef.path,
+                operation: 'get',
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
-        errorEmitter.emit('permission-error', permissionError);
-    });
-    return () => unsub();
+        return () => unsub();
+    } else {
+        setFavorites(getLocalFavorites());
+    }
   }, [user, db]);
 
  useEffect(() => {
@@ -259,6 +263,36 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         }, 300);
     }
   }, [loading, fixtures, firstUpcomingMatchIndex]);
+  
+  const handleOurBallFavorite = useCallback((team: Team) => {
+    const currentFavorites = user ? favorites : getLocalFavorites();
+    const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+    const isCurrentlyFavorited = !!newFavorites.ourBallTeams?.[team.id];
+
+    if (isCurrentlyFavorited) {
+      delete newFavorites.ourBallTeams[team.id];
+    } else {
+      if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
+      newFavorites.ourBallTeams[team.id] = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
+    }
+
+    setFavorites(newFavorites);
+
+    if (user && db) {
+        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const updateData = isCurrentlyFavorited 
+            ? { [`ourBallTeams.${team.id}`]: deleteField() }
+            : { [`ourBallTeams.${team.id}`]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' }};
+            
+        setDoc(favRef, updateData, { merge: true }).catch(serverError => {
+            setFavorites(currentFavorites); // Revert on error
+            const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
+            errorEmitter.emit('permission-error', permissionError);
+        });
+    } else {
+        setLocalFavorites(newFavorites);
+    }
+  }, [user, db, favorites]);
 
   const handleFavorite = (type: 'league' | 'team' | 'player', item: any) => {
     if (!user || !db) return;
@@ -589,10 +623,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 </Button>}
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {
                                     e.stopPropagation();
-                                    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                                    const fieldPath = `ourBallTeams.${team.id}`;
-                                    const updateData = isOurBallTeam ? { [fieldPath]: deleteField() } : { [fieldPath]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
-                                    setDoc(favRef, updateData, { merge: true }).catch(err => console.error(err));
+                                    handleOurBallFavorite(team);
                                 }}>
                                     <Heart className={cn("h-5 w-5", isOurBallTeam ? "text-red-500 fill-current" : "text-muted-foreground/50")} />
                                 </Button>

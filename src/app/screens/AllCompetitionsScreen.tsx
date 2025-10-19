@@ -9,7 +9,7 @@ import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, onSnapshot, query, updateDoc, deleteField, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot, query, updateDoc, deleteField, getDocs, writeBatch, getDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -170,28 +170,32 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         return () => unsubscribe();
     }, [db, fetchAllCustomNames]);
 
-    const handleFavorite = useCallback((type: 'star' | 'heart', item: ManagedCompetitionType) => {
+    const handleFavorite = useCallback((type: 'star' | 'heart' | 'ourBall', item: ManagedCompetitionType) => {
         const itemId = item.leagueId;
         const currentFavorites = user ? favorites : getLocalFavorites();
-        const isCurrentlyFavorited = type === 'star' ? !!currentFavorites.leagues?.[itemId] : currentFavorites.ourLeagueId === itemId;
-        const newFavorites = { ...currentFavorites };
+        const newFavorites = JSON.parse(JSON.stringify(currentFavorites)); // Deep copy
+
+        let isCurrentlyFavorited: boolean;
+        let updateData: any;
 
         if (type === 'star') {
-            if (!newFavorites.leagues) newFavorites.leagues = {};
+            isCurrentlyFavorited = !!newFavorites.leagues?.[itemId];
             if (isCurrentlyFavorited) {
                 delete newFavorites.leagues[itemId];
+                updateData = { [`leagues.${itemId}`]: deleteField() };
             } else {
-                newFavorites.leagues[itemId] = { 
-                    name: item.name,
-                    leagueId: itemId,
-                    logo: item.logo
-                };
+                if (!newFavorites.leagues) newFavorites.leagues = {};
+                newFavorites.leagues[itemId] = { name: item.name, leagueId: itemId, logo: item.logo };
+                updateData = { leagues: newFavorites.leagues };
             }
-        } else { // 'heart'
+        } else if (type === 'heart') {
+            isCurrentlyFavorited = newFavorites.ourLeagueId === itemId;
             if (isCurrentlyFavorited) {
                 delete newFavorites.ourLeagueId;
+                updateData = { ourLeagueId: deleteField() };
             } else {
                 newFavorites.ourLeagueId = itemId;
+                updateData = { ourLeagueId: itemId };
             }
         }
         
@@ -199,26 +203,15 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
         if (user && db) {
             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            let updateData: any;
-            if (type === 'star') {
-                 updateData = isCurrentlyFavorited
-                    ? { [`leagues.${itemId}`]: deleteField() }
-                    : { leagues: newFavorites.leagues };
-            } else {
-                 updateData = isCurrentlyFavorited
-                    ? { ourLeagueId: deleteField() }
-                    : { ourLeagueId: newFavorites.ourLeagueId };
-            }
-
             setDoc(favRef, updateData, { merge: true }).catch(serverError => {
                 setFavorites(currentFavorites); // Revert on error
-                const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update' });
+                const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
                 errorEmitter.emit('permission-error', permissionError);
             });
         } else {
             setLocalFavorites(newFavorites);
         }
-    }, [user, db, favorites, getName]);
+    }, [user, db, favorites]);
 
 
     const sortedGroupedCompetitions = useMemo(() => {
@@ -378,7 +371,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                             <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
                                                             <span className="text-sm truncate">{comp.name}</span>
                                                         </div>
-                                                        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <div className="flex items-center gap-1">
                                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('heart', comp); }}>
                                                                 <Heart className={favorites.ourLeagueId === comp.leagueId ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                             </Button>
@@ -417,7 +410,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                                     <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
                                                                     <span className="text-sm truncate">{comp.name}</span>
                                                                 </div>
-                                                                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <div className="flex items-center gap-1">
                                                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite('heart', comp); }}>
                                                                         <Heart className={favorites.ourLeagueId === comp.leagueId ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                                     </Button>
