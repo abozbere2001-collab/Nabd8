@@ -106,18 +106,21 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [customNames]);
 
     useEffect(() => {
-        if (user && db) {
-            const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const unsubscribe = onSnapshot(docRef, (doc) => {
-                setFavorites(doc.data() as Favorites || { userId: user.uid });
-            }, (error) => {
+        if (!user || !db) {
+            setFavorites(getLocalFavorites());
+            return;
+        }
+
+        const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const unsubscribe = onSnapshot(docRef, (doc) => {
+            setFavorites(doc.data() as Favorites || { userId: user.uid });
+        }, (error) => {
+            if (error.code !== 'permission-denied') {
                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
                 errorEmitter.emit('permission-error', permissionError);
-            });
-            return () => unsubscribe();
-        } else {
-            setFavorites(getLocalFavorites());
-        }
+            }
+        });
+        return () => unsubscribe();
     }, [user, db]);
 
     const fetchAllCustomNames = useCallback(async () => {
@@ -168,32 +171,31 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const handleFavoriteLeague = useCallback((item: ManagedCompetitionType, type: 'star' | 'heart') => {
         const itemId = item.leagueId;
-        const currentFavorites = user ? favorites : getLocalFavorites();
+        
+        const currentFavorites = user && db ? favorites : getLocalFavorites();
         const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
 
-        let updateData: any;
-        let fieldPath: string;
-
+        let updateData: any = {};
+        
         if (type === 'star') {
             const isCurrentlyFavorited = !!newFavorites.leagues?.[itemId];
-            fieldPath = `leagues.${itemId}`;
             if (isCurrentlyFavorited) {
                 delete newFavorites.leagues[itemId];
-                updateData = { [fieldPath]: deleteField() };
+                updateData = { [`leagues.${itemId}`]: deleteField() };
             } else {
                 if (!newFavorites.leagues) newFavorites.leagues = {};
-                newFavorites.leagues[itemId] = { name: item.name, leagueId: itemId, logo: item.logo };
-                updateData = { [`leagues.${itemId}`]: { name: item.name, leagueId: itemId, logo: item.logo } };
+                const favData = { name: item.name, leagueId: itemId, logo: item.logo };
+                newFavorites.leagues[itemId] = favData;
+                updateData = { [`leagues.${itemId}`]: favData };
             }
         } else { // 'heart' for ourLeague
             const isCurrentlyFavorited = newFavorites.ourLeagueId === itemId;
-            fieldPath = 'ourLeagueId';
-            if (isCurrentlyFavorited) {
+             if (isCurrentlyFavorited) {
                 delete newFavorites.ourLeagueId;
-                updateData = { [fieldPath]: deleteField() };
+                updateData = { ourLeagueId: deleteField() };
             } else {
                 newFavorites.ourLeagueId = itemId;
-                updateData = { [fieldPath]: itemId };
+                updateData = { ourLeagueId: itemId };
             }
         }
         
@@ -449,6 +451,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
-    
-
-    
