@@ -2,20 +2,19 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useUser, useFirestore, useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { AppContentWrapper } from './AppContentWrapper';
 import { AdProvider } from '@/components/AdProvider';
-import { LoginScreen } from './screens/LoginScreen';
+import { WelcomeScreen } from './screens/WelcomeScreen';
 import { Loader2 } from 'lucide-react';
 import { FavoriteSelectionScreen } from './screens/FavoriteSelectionScreen';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import type { UserProfile, Favorites } from '@/lib/types';
+import type { UserProfile } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
-import { getLocalFavorites, clearLocalFavorites } from '@/lib/local-favorites';
 
-export type ScreenKey = 'Login' | 'SignUp' | 'Matches' | 'Competitions' | 'AllCompetitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'PlayerDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails' | 'NotificationSettings' | 'GeneralSettings' | 'ManagePinnedMatch' | 'PrivacyPolicy' | 'TermsOfService' | 'Welcome' | 'FavoriteSelection' | 'GoPro';
+export type ScreenKey = 'Welcome' | 'Matches' | 'Competitions' | 'AllCompetitions' | 'Iraq' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'PlayerDetails' | 'AdminFavoriteTeamDetails' | 'Comments' | 'Notifications' | 'GlobalPredictions' | 'AdminMatchSelection' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails' | 'NotificationSettings' | 'GeneralSettings' | 'ManagePinnedMatch' | 'PrivacyPolicy' | 'TermsOfService' | 'FavoriteSelection' | 'GoPro' | 'Login';
 
 export type ScreenProps = {
   navigate: (screen: ScreenKey, props?: Record<string, any>) => void;
@@ -35,7 +34,7 @@ const LoadingSplashScreen = () => (
 const AppFlow = () => {
     const { user, isUserLoading } = useAuth();
     const { db } = useFirestore();
-    const [flowState, setFlowState] = useState<'loading' | 'favorite_selection' | 'app'>('loading');
+    const [flowState, setFlowState] = useState<'loading' | 'welcome' | 'favorite_selection' | 'app'>('loading');
 
     useEffect(() => {
         const checkOnboardingStatus = async () => {
@@ -45,12 +44,18 @@ const AppFlow = () => {
             }
 
             if (!user) {
-                // If no user, just go to the app in guest mode.
-                // Local storage will be used for favorites.
-                setFlowState('app');
+                // Always show welcome screen if not logged in.
+                // The welcome screen will handle guest mode continuation.
+                setFlowState('welcome');
                 return;
             }
             
+            // If user is anonymous, they are essentially a guest, go to app.
+            if (user.isAnonymous) {
+                setFlowState('app');
+                return;
+            }
+
             if (!db) return;
             const userDocRef = doc(db, 'users', user.uid);
             try {
@@ -60,12 +65,13 @@ const AppFlow = () => {
                     if (userData.onboardingComplete) {
                         setFlowState('app');
                     } else {
-                        // User exists but hasn't completed onboarding.
-                        // This can happen if they sign up but close the app.
+                        // User exists but hasn't completed onboarding (e.g., from a fresh sign-up).
                         setFlowState('favorite_selection');
                     }
                 } else {
-                    // This is a fresh sign-up. Show favorite selection.
+                    // This is a fresh sign-up after the auth state has changed.
+                    // The handleNewUser function should have created the doc,
+                    // but as a fallback, show favorite selection.
                     setFlowState('favorite_selection');
                 }
             } catch (error) {
@@ -80,23 +86,15 @@ const AppFlow = () => {
 
     }, [user, isUserLoading, db]);
 
-    const handleFavoriteSelectionComplete = async () => {
-        if (!user || !db) return;
+    const handleOnboardingComplete = async () => {
+        if (!user || !db || user.isAnonymous) {
+            setFlowState('app');
+            return;
+        }
+        
         const userDocRef = doc(db, 'users', user.uid);
          try {
-            // Merge local favorites with any selected during onboarding screen
-            const localFavorites = getLocalFavorites();
-            if (localFavorites) {
-                // We merge teams and leagues.
-                 await setDoc(userDocRef, {
-                    favorites: {
-                        teams: localFavorites.teams || {},
-                        leagues: localFavorites.leagues || {},
-                    }
-                }, { merge: true });
-                clearLocalFavorites();
-            }
-            
+            // Mark onboarding as complete for registered user
             await setDoc(userDocRef, { onboardingComplete: true }, { merge: true });
             setFlowState('app');
         } catch (error) {
@@ -106,11 +104,18 @@ const AppFlow = () => {
         }
     };
     
+    // This function will be called from WelcomeScreen when "Continue as guest" is clicked.
+    const handleGuestContinue = () => {
+        setFlowState('app');
+    };
+    
     switch (flowState) {
         case 'loading':
              return <LoadingSplashScreen />;
+        case 'welcome':
+             return <WelcomeScreen onGuestContinue={handleGuestContinue} />;
         case 'favorite_selection':
-            return <FavoriteSelectionScreen onOnboardingComplete={handleFavoriteSelectionComplete} />;
+            return <FavoriteSelectionScreen onOnboardingComplete={handleOnboardingComplete} />;
         case 'app':
             return (
                 <AdProvider>

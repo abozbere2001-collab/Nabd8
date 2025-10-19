@@ -1,6 +1,5 @@
 
 "use client";
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
@@ -8,9 +7,12 @@ import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/firebase-client';
-import type { ScreenProps } from '@/app/page';
 
-export function LoginScreen({ navigate }: ScreenProps) {
+interface WelcomeScreenProps {
+  onGuestContinue: () => void;
+}
+
+export function WelcomeScreen({ onGuestContinue }: WelcomeScreenProps) {
   const [loading, setLoading] = useState<null | 'google'>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,8 +57,8 @@ export function LoginScreen({ navigate }: ScreenProps) {
         )}
         
         <NabdAlMalaebLogo className="h-24 w-24 mb-4" />
-        <h1 className="text-3xl font-bold mb-2 font-headline text-primary">تسجيل الدخول</h1>
-        <p className="text-muted-foreground mb-8">اختر طريقة تسجيل الدخول للمتابعة</p>
+        <h1 className="text-3xl font-bold mb-2 font-headline text-primary">أهلاً بك في نبض الملاعب</h1>
+        <p className="text-muted-foreground mb-8">عالم كرة القدم بين يديك. سجل الدخول لمزامنة مفضلاتك، أو تصفح كزائر.</p>
         
         <div className="w-full max-w-xs space-y-4">
             <Button 
@@ -72,13 +74,21 @@ export function LoginScreen({ navigate }: ScreenProps) {
               )}
               المتابعة باستخدام جوجل
             </Button>
+            <Button
+                variant="ghost"
+                onClick={onGuestContinue}
+                className="w-full"
+                disabled={!!loading}
+            >
+                تخطي (المتابعة كزائر)
+            </Button>
         </div>
 
         <p className="mt-8 text-xs text-muted-foreground/80 px-4">
           بالاستمرار، أنت توافق على 
-          <button className="underline hover:text-primary px-1" onClick={() => navigate('TermsOfService')}>شروط الخدمة</button> 
+          <button className="underline hover:text-primary px-1" onClick={() => (window as any).appNavigate && (window as any).appNavigate('TermsOfService')}>شروط الخدمة</button> 
           و 
-          <button className="underline hover:text-primary px-1" onClick={() => navigate('PrivacyPolicy')}>سياسة الخصوصية</button>
+          <button className="underline hover:text-primary px-1" onClick={() => (window as any).appNavigate && (window as any).appNavigate('PrivacyPolicy')}>سياسة الخصوصية</button>
           .
         </p>
       </div>
