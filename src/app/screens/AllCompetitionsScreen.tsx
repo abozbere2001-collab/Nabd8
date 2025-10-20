@@ -21,6 +21,16 @@ import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileButton } from '../AppContentWrapper';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // --- Persistent Cache Logic ---
 const COMPETITIONS_CACHE_KEY = 'goalstack_competitions_cache';
@@ -106,6 +116,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const [favorites, setFavorites] = useState<Partial<Favorites>>({});
     const [renameItem, setRenameItem] = useState<RenameState | null>(null);
     const [isAddOpen, setAddOpen] = useState(false);
+    const [crownConfirmationState, setCrownConfirmationState] = useState<{ isOpen: boolean; item: ManagedCompetitionType | null }>({ isOpen: false, item: null });
     
     const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> }>({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
 
@@ -407,7 +418,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [user, db, favorites, toast]);
     
     const handleCrownToggle = (item: ManagedCompetitionType | Team) => {
-        if (!user || !db) {
+        if (!user) {
             toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
             return;
         }
@@ -415,30 +426,10 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const isLeague = 'leagueId' in item;
         const id = isLeague ? item.leagueId : item.id;
         
-        const isCrowned = isLeague
-            ? !!favorites.crownedLeagues?.[id]
-            : !!favorites.crownedTeams?.[id];
-
         if (isLeague) {
-            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            let updateData: { crownedLeagues: { [key: string]: CrownedLeague } | {} };
-    
-            if (isCrowned) {
-                // If it's already crowned, uncrown it by setting an empty object.
-                updateData = { crownedLeagues: {} };
-                toast({ title: 'نجاح', description: `تم إزالة تتويج ${item.name}.` });
-            } else {
-                // If a new league is crowned, it replaces the old one.
-                const crownData: CrownedLeague = { leagueId: Number(id), name: item.name, logo: item.logo, note: '' };
-                updateData = { crownedLeagues: { [id]: crownData } };
-                toast({ title: 'نجاح', description: `تم تتويج ${item.name}.` });
-            }
-    
-            updateDoc(favDocRef, updateData).catch(serverError => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
-            });
-
+            setCrownConfirmationState({ isOpen: true, item: item as ManagedCompetitionType });
         } else { // It's a team
+             const isCrowned = !!favorites.crownedTeams?.[id];
             if (isCrowned) {
                 // Uncrowning a team
                 const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
@@ -457,6 +448,32 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 });
             }
         }
+    };
+    
+    const handleConfirmCrown = () => {
+        const item = crownConfirmationState.item;
+        if (!item || !user || !db) return;
+
+        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const isCrowned = !!favorites.crownedLeagues?.[item.leagueId];
+        
+        let updateData: { crownedLeagues: { [key: string]: CrownedLeague } | {} };
+    
+        if (isCrowned) {
+            updateData = { crownedLeagues: {} };
+            toast({ title: 'نجاح', description: `تم إزالة تتويج ${item.name}.` });
+        } else {
+            // Crowning a new league replaces the old one.
+            const crownData: CrownedLeague = { leagueId: item.leagueId, name: item.name, logo: item.logo, note: '' };
+            updateData = { crownedLeagues: { [item.leagueId]: crownData } };
+            toast({ title: 'نجاح', description: `تم تتويج ${item.name}.` });
+        }
+    
+        updateDoc(favDocRef, updateData).catch(serverError => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
+        });
+        
+        setCrownConfirmationState({ isOpen: false, item: null });
     };
 
 
@@ -745,7 +762,22 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     fetchAllData(true);
                 }
             }} />
+             <AlertDialog open={crownConfirmationState.isOpen} onOpenChange={(isOpen) => setCrownConfirmationState({ isOpen, item: null })}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد من تتويج هذا الدوري؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            سيصبح هذا هو دوريك الأساسي في قسم "دورينا". يمكنك تغيير هذا الاختيار مرة واحدة فقط كل شهر، لذا اختر بعناية.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmCrown}>تأكيد</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
+
 
