@@ -468,9 +468,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             const cacheBusterRef = doc(db, 'appConfig', 'cache');
             setDoc(cacheBusterRef, { competitionsLastUpdated: new Date() }, { merge: true })
                 .catch(error => {
-                    const permissionError = new FirestorePermissionError({ path: 'appConfig/cache', operation: 'write' });
+                    // This might fail if rules are not set up, but we proceed with the client-side refresh anyway.
+                    // The permission error will be emitted for the developer to see.
+                    const permissionError = new FirestorePermissionError({ path: 'appConfig/cache', operation: 'write', requestResourceData: { competitionsLastUpdated: '...' } });
                     errorEmitter.emit('permission-error', permissionError);
-                    toast({ variant: 'destructive', title: 'خطأ في الصلاحيات', description: 'فشل في فرض التحديث للآخرين.' });
+                    toast({ variant: 'destructive', title: 'خطأ في الصلاحيات', description: 'فشل في فرض التحديث للآخرين. تحقق من قواعد الأمان.' });
                 });
         }
         
