@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -11,10 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Crown, Search, X, Loader2 } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import type { CrownedTeam, Favorites, Fixture, CrownedLeague, Standing, TopScorer, Prediction } from '@/lib/types';
+import type { CrownedTeam, Favorites, Fixture, CrownedLeague, Standing, TopScorer, Prediction, Team, Player } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { collection, onSnapshot, doc, updateDoc, deleteField, setDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, deleteField, setDoc, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
@@ -24,6 +23,7 @@ import { CURRENT_SEASON } from '@/lib/constants';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, addDays } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import PredictionCard from '@/components/PredictionCard';
 
 const CrownedTeamScroller = ({
@@ -157,12 +157,62 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
     );
 };
 
+const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTab: string, league: CrownedLeague, navigate: ScreenProps['navigate'], user: any, db: any }) => {
+    const [data, setData] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const { toast } = useToast();
 
-const DoreenaTab = ({ league, user, db, navigate }: { league: CrownedLeague, user: any, db: any, navigate: ScreenProps['navigate'] }) => {
-    const [todayFixtures, setTodayFixtures] = useState<Fixture[]>([]);
-    const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
-    const [loading, setLoading] = useState(true);
-    
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!activeTab || !league?.leagueId) return;
+
+            setLoading(true);
+            setData(null);
+
+            let url = '';
+            try {
+                switch (activeTab) {
+                    case 'matches':
+                        const fromDate = format(new Date(), 'yyyy-MM-dd');
+                        const toDate = format(addDays(new Date(), 14), 'yyyy-MM-dd');
+                        url = `/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&from=${fromDate}&to=${toDate}`;
+                        break;
+                    case 'standings':
+                        url = `/api/football/standings?league=${league.leagueId}&season=${CURRENT_SEASON}`;
+                        break;
+                    case 'scorers':
+                        url = `/api/football/players/topscorers?league=${league.leagueId}&season=${CURRENT_SEASON}`;
+                        break;
+                    case 'predictions':
+                        // Fetch today's matches for predictions
+                        const today = format(new Date(), 'yyyy-MM-dd');
+                        url = `/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&date=${today}`;
+                        break;
+                }
+                
+                if (url) {
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error('Failed to fetch data');
+                    const result = await res.json();
+                    
+                    if (activeTab === 'standings') {
+                        setData(result.response[0]?.league?.standings[0] || []);
+                    } else {
+                        setData(result.response || []);
+                    }
+                }
+
+            } catch (error) {
+                console.error(`Error fetching ${activeTab}:`, error);
+                toast({ variant: 'destructive', title: 'خطأ', description: `فشل في جلب بيانات ${activeTab}` });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [activeTab, league, toast]);
+
     const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
         if (!user || homeGoalsStr === '' || awayGoalsStr === '' || !db) return;
         const homeGoals = parseInt(homeGoalsStr, 10);
@@ -187,75 +237,152 @@ const DoreenaTab = ({ league, user, db, navigate }: { league: CrownedLeague, use
             errorEmitter.emit('permission-error', permissionError);
         });
     }, [user, db]);
+    
+    const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
 
     useEffect(() => {
-        setLoading(true);
-        const today = format(new Date(), 'yyyy-MM-dd');
-        
-        const fetchTodayMatchesAndPredictions = async () => {
-            try {
-                // Fetch matches for today
-                const fixturesRes = await fetch(`/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&date=${today}`);
-                const fixturesData = await fixturesRes.json();
-                const fixtures: Fixture[] = fixturesData.response || [];
-                setTodayFixtures(fixtures);
-                
-                // Fetch user predictions for these matches
-                if (fixtures.length > 0 && user && db) {
-                    const fixtureIds = fixtures.map(f => f.fixture.id);
-                    const predsRef = collection(db, 'predictions');
-                    const q = query(predsRef, where('userId', '==', user.uid), where('fixtureId', 'in', fixtureIds));
-                    const querySnapshot = await getDocs(q);
-                    const userPredictions: { [key: number]: Prediction } = {};
-                    querySnapshot.forEach(doc => {
-                        const pred = doc.data() as Prediction;
-                        userPredictions[pred.fixtureId] = pred;
-                    });
-                    setPredictions(userPredictions);
-                }
-            } catch (error) {
-                console.error("Failed to fetch today's league matches:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+        if (activeTab === 'predictions' && data && user && db) {
+            const fixtureIds = (data as Fixture[]).map(f => f.fixture.id);
+            if (fixtureIds.length === 0) return;
 
-        fetchTodayMatchesAndPredictions();
-    }, [league.leagueId, user, db]);
+            const q = query(collection(db, 'predictions'), where('userId', '==', user.uid), where('fixtureId', 'in', fixtureIds));
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const userPredictions: { [key: number]: Prediction } = {};
+                snapshot.forEach(doc => {
+                    const pred = doc.data() as Prediction;
+                    userPredictions[pred.fixtureId] = pred;
+                });
+                setPredictions(userPredictions);
+            });
+            return () => unsubscribe();
+        }
+    }, [activeTab, data, user, db]);
 
 
     if (loading) {
-        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin"/></div>
+        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    }
+    
+    if (!data || data.length === 0) {
+        return <div className="text-center text-muted-foreground py-10">لا توجد بيانات متاحة حاليًا.</div>;
     }
 
-    return (
-        <div className="space-y-4">
-            <Card className="bg-card/50">
-                <CardHeader className="flex flex-row items-center gap-3">
-                     <Avatar className="h-10 w-10"><AvatarImage src={league.logo} className="object-contain p-1" /></Avatar>
-                     <div>
-                        <CardTitle>{league.name}</CardTitle>
-                     </div>
-                </CardHeader>
-            </Card>
+    if (activeTab === 'matches') {
+        return (
+            <div className="space-y-2">
+                {(data as Fixture[]).map((fixture) => <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />)}
+            </div>
+        );
+    }
 
-            {todayFixtures.length > 0 ? (
-                todayFixtures.map(fixture => (
-                    <PredictionCard 
-                        key={fixture.fixture.id}
-                        fixture={fixture}
-                        userPrediction={predictions[fixture.fixture.id]}
-                        onSave={handleSavePrediction}
-                    />
-                ))
-            ) : (
-                <div className="text-center text-muted-foreground pt-10">
-                    <p>لا توجد مباريات لهذا الدوري اليوم.</p>
-                </div>
-            )}
-        </div>
-    );
+    if (activeTab === 'standings') {
+        return (
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="text-center">نقاط</TableHead>
+                        <TableHead className="text-center">لعب</TableHead>
+                        <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                        <TableHead>#</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {(data as Standing[]).map((s) => (
+                        <TableRow key={s.team.id} onClick={() => navigate('TeamDetails', { teamId: s.team.id })} className="cursor-pointer">
+                            <TableCell className="text-center font-bold">{s.points}</TableCell>
+                            <TableCell className="text-center">{s.all.played}</TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-2 justify-end">
+                                    <span>{s.team.name}</span>
+                                    <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
+                                </div>
+                            </TableCell>
+                            <TableCell className="font-bold">{s.rank}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        );
+    }
+    
+    if (activeTab === 'scorers') {
+        return (
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="text-left w-12">الأهداف</TableHead>
+                        <TableHead className="text-right">اللاعب</TableHead>
+                        <TableHead>#</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {(data as TopScorer[]).map(({ player, statistics }, index) => (
+                        <TableRow key={player.id} onClick={() => navigate('PlayerDetails', { playerId: player.id })} className="cursor-pointer">
+                            <TableCell className="font-bold text-lg text-left">{statistics[0]?.goals.total}</TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-3 justify-end">
+                                    <div className="text-right">
+                                        <p className="font-semibold">{player.name}</p>
+                                        <p className="text-xs text-muted-foreground">{statistics[0]?.team.name}</p>
+                                    </div>
+                                    <Avatar className="h-10 w-10"><AvatarImage src={player.photo} /></Avatar>
+                                </div>
+                            </TableCell>
+                            <TableCell className="font-bold">{index + 1}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        );
+    }
+
+    if (activeTab === 'predictions') {
+         return (
+             <Tabs defaultValue="voting" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="prizes">الجوائز</TabsTrigger>
+                    <TabsTrigger value="leaderboard">الترتيب</TabsTrigger>
+                    <TabsTrigger value="voting">تصويت</TabsTrigger>
+                </TabsList>
+                <TabsContent value="voting" className="mt-4 space-y-4">
+                     {(data as Fixture[]).length > 0 ? (
+                        (data as Fixture[]).map(fixture => (
+                            <PredictionCard 
+                                key={fixture.fixture.id}
+                                fixture={fixture}
+                                userPrediction={predictions[fixture.fixture.id]}
+                                onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
+                            />
+                        ))
+                    ) : (
+                        <div className="text-center text-muted-foreground pt-10">
+                            <p>لا توجد مباريات متاحة للتوقع لهذا اليوم.</p>
+                        </div>
+                    )}
+                </TabsContent>
+                <TabsContent value="leaderboard" className="mt-4">
+                    <Card>
+                       <CardContent className="p-10 text-center text-muted-foreground">
+                            <p className="text-lg font-bold">قريبًا...</p>
+                            <p>سيتم عرض لوحة الصدارة الخاصة بتوقعات هذا الدوري هنا.</p>
+                       </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="prizes" className="mt-4">
+                    <Card>
+                       <CardContent className="p-10 text-center text-muted-foreground">
+                            <p className="text-lg font-bold">قريبًا...</p>
+                            <p>سيتم الإعلان عن جوائز دورينا هنا.</p>
+                       </CardContent>
+                    </Card>
+                </TabsContent>
+             </Tabs>
+         );
+    }
+
+    return null;
 };
+
 
 
 export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
@@ -263,7 +390,8 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState('kurratna');
+  const [mainTab, setMainTab] = useState('kurratna');
+  const [doreenaSubTab, setDoreenaSubTab] = useState('matches');
 
   useEffect(() => {
     if (!user || !db) return;
@@ -349,7 +477,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           </div>
         }
       />
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col min-h-0">
+      <Tabs value={mainTab} onValueChange={setMainTab} className="flex flex-1 flex-col min-h-0">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="doreena">دورينا</TabsTrigger>
           <TabsTrigger value="kurratna">كرتنا</TabsTrigger>
@@ -375,13 +503,30 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           </div>
         </TabsContent>
 
-        <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
+        <TabsContent value="doreena" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
           {crownedLeague ? (
-            <DoreenaTab league={crownedLeague} user={user} db={db} navigate={navigate} />
+             <Tabs value={doreenaSubTab} onValueChange={setDoreenaSubTab} className="flex flex-1 flex-col min-h-0 p-1">
+                 <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="matches">المباريات</TabsTrigger>
+                    <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                    <TabsTrigger value="scorers">الهدافين</TabsTrigger>
+                    <TabsTrigger value="predictions">التوقعات</TabsTrigger>
+                 </TabsList>
+                 <div className="flex-1 overflow-y-auto mt-2">
+                    <DoreenaTabContent 
+                        activeTab={doreenaSubTab} 
+                        league={crownedLeague} 
+                        navigate={navigate} 
+                        user={user}
+                        db={db}
+                    />
+                 </div>
+             </Tabs>
           ) : (
-            <div className="text-center text-muted-foreground pt-10">
+            <div className="text-center text-muted-foreground pt-10 flex flex-col items-center gap-4">
               <p className="font-bold text-lg">لم تقم بتتويج أي بطولة بعد</p>
               <p>اذهب إلى البطولات واضغط على أيقونة التاج 👑</p>
+              <Button onClick={() => navigate('AllCompetitions')}>استكشف البطولات</Button>
             </div>
           )}
         </TabsContent>
@@ -389,3 +534,6 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+
+    
