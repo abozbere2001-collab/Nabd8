@@ -69,14 +69,14 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         let pinnedInitialized = false;
       
         const tryFinishLoading = () => {
-          if ((favoritesUnsubscribe ? favoritesInitialized : true) && (pinnedMatchesUnsubscribe ? pinnedInitialized : true)) {
+          if (favoritesInitialized && pinnedInitialized) {
             setIsLoading(false);
           }
         };
       
         if (user && db) {
           const favsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data'); 
-      
+          
           favoritesUnsubscribe = onSnapshot(favsRef, (docSnap) => {
             const data = docSnap.exists() ? (docSnap.data() as Favorites) : {};
             setFavorites(data || {});
@@ -84,15 +84,13 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             tryFinishLoading();
           }, (error) => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-            setFavorites({}); // Don't clear on permission error, maybe they have local favs
+            setFavorites(getLocalFavorites()); // Fallback to local on permission error
             favoritesInitialized = true;
             tryFinishLoading();
           });
         } else {
-          const local = getLocalFavorites();
-          setFavorites(local);
+          setFavorites(getLocalFavorites());
           favoritesInitialized = true;
-          tryFinishLoading();
         }
       
         if (db) {
@@ -109,15 +107,16 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             tryFinishLoading();
           });
         } else {
-            pinnedInitialized = true;
-            tryFinishLoading();
+             pinnedInitialized = true;
         }
+
+        tryFinishLoading(); // Initial check in case db is not available
       
         return () => {
           if (favoritesUnsubscribe) favoritesUnsubscribe();
           if (pinnedMatchesUnsubscribe) pinnedMatchesUnsubscribe();
         };
-      }, [user, db]);
+    }, [user, db]);
     
     const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}), [favorites.ourBallTeams]);
     const ourLeagueId = useMemo(() => favorites.ourLeagueId, [favorites.ourLeagueId]);
