@@ -78,9 +78,10 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 handleFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
             }, (error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-                handleFavorites({});
+                handleFavorites({}); // Fallback to empty on error
             });
         } else {
+            // Guest user
             handleFavorites(getLocalFavorites());
         }
 
@@ -93,6 +94,9 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             }, (serverError) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
             });
+        } else {
+            // No db connection, can't fetch pinned matches
+             if(isMounted) setPinnedMatches([]);
         }
 
         return () => {
@@ -104,11 +108,11 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
     const ourLeagueData = useMemo(() => {
         const leagueId = favorites?.ourLeagueId;
-        const favLeagues = favorites?.leagues;
-        if (!leagueId || !favLeagues || !favLeagues[leagueId]) return null;
-        const leagueDetails = favLeagues[leagueId];
-        return { id: leagueId, name: leagueDetails.name, logo: leagueDetails.logo };
-    }, [favorites?.ourLeagueId, favorites?.leagues]);
+        // In the new simplified version, we don't rely on the `favorites.leagues` map.
+        // We will pass the ID and `OurLeagueTab` will fetch the details if needed.
+        if (!leagueId) return null;
+        return { id: leagueId };
+    }, [favorites?.ourLeagueId]);
 
     const ourBallTeams = useMemo(() => {
         if (!favorites.ourBallTeams) return [];
@@ -165,13 +169,13 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                                 </TabsList>
                             </div>
                         </div>
-                        <TabsContent value="our-league" className="flex-1">
+                        <TabsContent value="our-league" className="flex-1 overflow-auto">
                              <OurLeagueTab
                                 navigate={navigate}
-                                ourLeague={ourLeagueData}
+                                ourLeagueId={ourLeagueData?.id}
                             />
                         </TabsContent>
-                        <TabsContent value="our-ball" className="pt-0 flex-1 flex flex-col min-h-0">
+                        <TabsContent value="our-ball" className="pt-0 flex-1 overflow-auto">
                             <OurBallTab navigate={navigate} ourBallTeams={ourBallTeams} />
                         </TabsContent>
                     </Tabs>
