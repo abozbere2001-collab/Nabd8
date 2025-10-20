@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -114,8 +113,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const getName = useCallback((type: 'league' | 'team' | 'country' | 'continent', id: string | number, defaultName: string) => {
         if (!defaultName) return '';
-        const firestoreMap = customNames[type === 'league' ? 'leagues' : type === 'team' ? 'teams' : type];
-        return firestoreMap?.get(id as any) || hardcodedTranslations[type === 'league' ? 'leagues' : type === 'team' ? 'teams' : type]?.get(id) || defaultName;
+        const firestoreMap = type === 'league' ? customNames.leagues : type === 'team' ? customNames.teams : type === 'country' ? customNames.countries : customNames.continents;
+        return firestoreMap?.get(id as any) || (hardcodedTranslations[type + 's']?.[id] ?? defaultName);
     }, [customNames]);
 
     const fetchAllData = useCallback(async (forceRefresh = false) => {
@@ -164,7 +163,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
                 } catch (e) { console.warn("Could not check cache-buster."); }
             }
-
+            
             if (cached?.data?.managedCompetitions && cached.data.managedCompetitions.length > 0 && !forceRefresh && cached.lastFetched > serverLastUpdated) {
                 setManagedCompetitions(cached.data.managedCompetitions);
                 return; 
@@ -421,13 +420,15 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
         op.then(() => {
             setCustomNames(prev => {
-                const newMap = new Map(prev[type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type]);
+                const mapType = type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type;
+                const newMap = new Map(prev[mapType as 'teams' | 'leagues' | 'countries' | 'continents']);
+
                 if (newName && newName.trim() && newName !== originalName) {
-                    newMap.set(Number(id), newName);
+                    newMap.set(id as any, newName);
                 } else {
-                    newMap.delete(Number(id));
+                    newMap.delete(id as any);
                 }
-                const updatedNames = { ...prev, [type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type]: newMap };
+                const updatedNames = { ...prev, [mapType]: newMap };
                 return updatedNames;
             });
             toast({ title: 'نجاح', description: 'تم حفظ التغييرات.' });

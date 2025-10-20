@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
@@ -427,7 +428,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         const leagueDetails = favorites?.leagues?.[leagueId];
         return leagueDetails ? { id: leagueId, name: leagueDetails.name, logo: leagueDetails.logo } : null;
 
-    }, [favorites]);
+    }, [favorites.ourLeagueId, favorites.leagues]);
 
 
     useEffect(() => {
@@ -512,5 +513,3 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
-
-    
