@@ -1,9 +1,10 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy, Loader2 } from 'lucide-react';
+import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy, Loader2, Crown } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
@@ -12,7 +13,7 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import type { Favorites, ManagedCompetition as ManagedCompetitionType, Team, FavoriteTeam, FavoriteLeague } from '@/lib/types';
+import type { Favorites, ManagedCompetition as ManagedCompetitionType, Team, FavoriteTeam, FavoriteLeague, CrownedLeague, CrownedTeam } from '@/lib/types';
 import { SearchSheet } from '@/components/SearchSheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
@@ -70,12 +71,12 @@ interface TeamsByContinent {
     [continent: string]: Team[]
 }
 
-type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
+type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status' | 'crown';
 interface RenameState {
   id: string | number;
   name: string;
   type: RenameType;
-  purpose: 'rename' | 'note';
+  purpose: 'rename' | 'note' | 'crown';
   note?: string;
   originalData?: any;
   originalName?: string;
@@ -358,14 +359,14 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         }
     };
 
-    const handleFavorite = useCallback((item: ManagedCompetitionType | Team) => {
+    const handleFavoriteToggle = useCallback((item: ManagedCompetitionType | Team) => {
         const isLeague = 'leagueId' in item;
-        
+        const itemId = isLeague ? item.leagueId : item.id;
+
         if (!user) {
             const currentFavorites = getLocalFavorites();
             const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
             const itemType = isLeague ? 'leagues' : 'teams';
-            const itemId = isLeague ? (item as ManagedCompetitionType).leagueId : (item as Team).id;
 
             if (!newFavorites[itemType]) newFavorites[itemType] = {};
 
@@ -378,44 +379,90 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 newFavorites[itemType][itemId] = favData;
             }
             setLocalFavorites(newFavorites);
-            setFavorites(newFavorites); // Update local state for UI
+            setFavorites(newFavorites);
             return;
         }
 
         if (!db) return;
 
-        const itemId = isLeague ? (item as ManagedCompetitionType).leagueId : (item as Team).id;
         const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const itemType = isLeague ? 'leagues' : 'teams';
-        const currentItem = favorites[itemType]?.[itemId];
-        const isCurrentlyStarred = !!currentItem;
-        
-        let updateData: { [key: string]: any } = {};
+        const isCurrentlyFavorited = !!favorites[itemType]?.[itemId];
         
         const fieldPath = `${itemType}.${itemId}`;
-        if (isCurrentlyStarred) {
-            updateData[fieldPath] = deleteField();
+        let updateData: { [key: string]: any };
+        if (isCurrentlyFavorited) {
+            updateData = { [fieldPath]: deleteField() };
         } else {
             const favData = isLeague
                 ? { name: item.name, leagueId: itemId, logo: item.logo }
                 : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-            updateData[fieldPath] = favData;
+            updateData = { [fieldPath]: favData };
         }
         
         updateDoc(favDocRef, updateData).catch(err => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }))
         });
 
-    }, [user, db, favorites, toast, navigate]);
+    }, [user, db, favorites, toast]);
+    
+    const handleCrownToggle = (item: ManagedCompetitionType | Team) => {
+        if (!user || !db) {
+            toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+            return;
+        }
+        
+        const isLeague = 'leagueId' in item;
+        const itemType = isLeague ? 'league' : 'team';
+        const id = isLeague ? item.leagueId : item.id;
+        
+        const isCrowned = isLeague
+            ? !!favorites.crownedLeagues?.[id]
+            : !!favorites.crownedTeams?.[id];
+
+        if (isCrowned) {
+            // Un-crown it
+            const fieldPath = isLeague ? `crownedLeagues.${id}` : `crownedTeams.${id}`;
+            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            updateDoc(favDocRef, { [fieldPath]: deleteField() }).catch(err => {
+                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: { [fieldPath]: 'DELETED'} }))
+            });
+        } else {
+            // Open dialog to crown it
+            setRenameItem({
+                type: itemType as 'league' | 'team',
+                id: id,
+                name: item.name,
+                originalData: item,
+                purpose: 'crown'
+            });
+        }
+    };
 
 
-
-    const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote?: string) => {
-        if (!renameItem || !user || !db) return;
+    const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote: string = '') => {
+        if (!renameItem) return;
         
         const { originalData, purpose } = renameItem;
-        
-        if (purpose === 'rename' && isAdmin) {
+
+        if (purpose === 'crown' && user && db) {
+            const isLeague = type === 'league';
+            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const fieldPath = isLeague ? `crownedLeagues.${id}` : `crownedTeams.${id}`;
+
+            const crownData = isLeague 
+                ? { leagueId: Number(id), name: originalData.name, logo: originalData.logo, note: newNote } as CrownedLeague
+                : { teamId: Number(id), name: originalData.name, logo: originalData.logo, note: newNote } as CrownedTeam;
+            
+            const updateData = { [fieldPath]: crownData };
+
+            updateDoc(favDocRef, updateData).then(() => {
+                toast({ title: 'نجاح', description: `تم تتويج ${originalData.name}.` });
+            }).catch(serverError => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
+            });
+        }
+        else if (purpose === 'rename' && isAdmin && db) {
             const collectionName = `${type}Customizations`;
             const docRef = doc(db, collectionName, String(id));
             const data = { customName: newName };
@@ -494,7 +541,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                  <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                </Button>
                              )}
-                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(team); }}>
+                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(team); }}>
                                <Star className={isStarred ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                              </Button>
                            </div>
@@ -527,6 +574,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                            <ul className="flex flex-col">{
                                (content.leagues as ManagedCompetitionType[]).map(comp => {
                                   const isStarred = !!favorites.leagues?.[comp.leagueId];
+                                  const isCrowned = !!favorites.crownedLeagues?.[comp.leagueId];
                                    return (
                                        <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
                                            <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
@@ -539,7 +587,10 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                        <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                    </Button>
                                                )}
-                                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp); }}>
+                                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleCrownToggle(comp); }}>
+                                                   <Crown className={isCrowned ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                               </Button>
+                                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(comp); }}>
                                                    <Star className={isStarred ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                </Button>
                                            </div>
@@ -564,6 +615,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                    <AccordionContent className="p-1">
                                        <ul className="flex flex-col">{leagues.map(comp => {
                                              const isStarred = !!favorites.leagues?.[comp.leagueId];
+                                             const isCrowned = !!favorites.crownedLeagues?.[comp.leagueId];
                                            return (
                                                <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
                                                    <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
@@ -576,7 +628,10 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                                <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                            </Button>
                                                        )}
-                                                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp); }}>
+                                                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleCrownToggle(comp); }}>
+                                                            <Crown className={isCrowned ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                       </Button>
+                                                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(comp); }}>
                                                            <Star className={isStarred ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                        </Button>
                                                    </div>

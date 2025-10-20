@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Crown, Search, X, Loader2 } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { useAuth, useFirestore } from '@/firebase/provider';
-import type { CrownedTeam, Favorites, Fixture } from '@/lib/types';
+import type { CrownedTeam, Favorites, Fixture, CrownedLeague, Standing, TopScorer } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { collection, onSnapshot, doc, updateDoc, deleteField } from 'firebase/firestore';
@@ -20,6 +21,9 @@ import { useToast } from '@/hooks/use-toast';
 import { FixtureItem } from '@/components/FixtureItem';
 import { isMatchLive } from '@/lib/matchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { format, addDays } from 'date-fns';
 
 const CrownedTeamScroller = ({
   crownedTeams,
@@ -155,6 +159,130 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
 };
 
 
+const CrownedLeagueCard = ({ league, navigate }: { league: CrownedLeague, navigate: ScreenProps['navigate'] }) => {
+    const [fixtures, setFixtures] = useState<Fixture[]>([]);
+    const [standings, setStandings] = useState<Standing[]>([]);
+    const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const today = new Date();
+                const twoWeeksFromNow = addDays(today, 14);
+                const fromDate = format(today, 'yyyy-MM-dd');
+                const toDate = format(twoWeeksFromNow, 'yyyy-MM-dd');
+
+                const [fixturesRes, standingsRes, scorersRes] = await Promise.all([
+                    fetch(`/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&from=${fromDate}&to=${toDate}`),
+                    fetch(`/api/football/standings?league=${league.leagueId}&season=${CURRENT_SEASON}`),
+                    fetch(`/api/football/players/topscorers?league=${league.leagueId}&season=${CURRENT_SEASON}`)
+                ]);
+
+                const fixturesData = await fixturesRes.json();
+                const standingsData = await standingsRes.json();
+                const scorersData = await scorersRes.json();
+                
+                setFixtures(fixturesData.response || []);
+                setStandings(standingsData.response?.[0]?.league?.standings?.[0] || []);
+                setTopScorers(scorersData.response || []);
+
+            } catch (error) {
+                console.error(`Failed to fetch data for league ${league.leagueId}`, error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [league.leagueId]);
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center gap-3">
+                <Avatar className="h-10 w-10"><AvatarImage src={league.logo} className="object-contain p-1" /></Avatar>
+                <div>
+                    <CardTitle>{league.name}</CardTitle>
+                    {league.note && <p className="text-sm text-muted-foreground">{league.note}</p>}
+                </div>
+            </CardHeader>
+            <CardContent>
+                {loading ? <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin"/></div> : (
+                    <Tabs defaultValue="matches" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3">
+                            <TabsTrigger value="matches">المباريات</TabsTrigger>
+                            <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                            <TabsTrigger value="scorers">الهدافين</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="matches" className="mt-4 space-y-2">
+                            {fixtures.length > 0 ? fixtures.map(f => <FixtureItem key={f.fixture.id} fixture={f} navigate={navigate} />) : <p className="text-center text-sm text-muted-foreground p-4">لا توجد مباريات قادمة خلال الأسبوعين المقبلين.</p>}
+                        </TabsContent>
+                        <TabsContent value="standings" className="mt-4">
+                             {standings.length > 0 ? (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="text-center">نقاط</TableHead>
+                                            <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                                            <TableHead className="w-[40px]">#</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {standings.slice(0, 5).map(s => (
+                                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
+                                                <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2 justify-end">
+                                                        <span className="font-semibold truncate">{s.team.name}</span>
+                                                        <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="font-bold">{s.rank}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                             ) : <p className="text-center text-sm text-muted-foreground p-4">الترتيب غير متاح حاليًا.</p>}
+                        </TabsContent>
+                        <TabsContent value="scorers" className="mt-4">
+                            {topScorers.length > 0 ? (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-12 text-center">أهداف</TableHead>
+                                            <TableHead className="text-right">اللاعب</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                         {topScorers.slice(0, 5).map(({ player, statistics }) => (
+                                            <TableRow key={player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
+                                                <TableCell className="font-bold text-lg text-center">{statistics[0]?.goals.total}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-3 justify-end">
+                                                        <div className="text-right">
+                                                            <p className="font-semibold truncate">{player.name}</p>
+                                                            <p className="text-xs text-muted-foreground truncate">{statistics[0]?.team.name}</p>
+                                                        </div>
+                                                        <Avatar className="h-10 w-10">
+                                                            <AvatarImage src={player.photo} />
+                                                        </Avatar>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                         ))}
+                                    </TableBody>
+                                </Table>
+                            ) : <p className="text-center text-sm text-muted-foreground p-4">قائمة الهدافين غير متاحة حاليًا.</p>}
+                        </TabsContent>
+                    </Tabs>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
+
+
 export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { user } = useAuth();
   const { db } = useFirestore();
@@ -179,6 +307,11 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     if (!favorites.crownedTeams) return [];
     return Object.values(favorites.crownedTeams);
   }, [favorites.crownedTeams]);
+
+  const crownedLeagues = useMemo(() => {
+    if (!favorites.crownedLeagues) return [];
+    return Object.values(favorites.crownedLeagues);
+  }, [favorites.crownedLeagues]);
   
   useEffect(() => {
     if(crownedTeams.length > 0 && !selectedTeamId) {
@@ -190,10 +323,10 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   }, [crownedTeams, selectedTeamId]);
 
 
-  const handleRemoveCrownedTeam = (teamId: number) => {
+  const handleRemoveCrowned = (type: 'team' | 'league', id: number) => {
     if (!user || !db) return;
     const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    const fieldPath = `crownedTeams.${teamId}`;
+    const fieldPath = type === 'team' ? `crownedTeams.${id}` : `crownedLeagues.${id}`;
     updateDoc(favRef, { [fieldPath]: deleteField() })
       .catch(err => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: { [fieldPath]: 'DELETED' } }));
@@ -212,7 +345,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
               <Crown className="h-16 w-16 text-muted-foreground mb-4"/>
               <h2 className="text-xl font-bold">ميزة حصرية للمستخدمين المسجلين</h2>
               <p className="text-muted-foreground mb-6">
-                قم بتسجيل الدخول لتتويج فرقك المفضلة وحفظ ملاحظاتك الخاصة.
+                قم بتسجيل الدخول لتتويج فرقك وبطولاتك المفضلة.
               </p>
               <Button onClick={() => navigate('Login')}>تسجيل الدخول</Button>
            </div>
@@ -241,11 +374,11 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         <CrownedTeamScroller 
           crownedTeams={crownedTeams} 
           onSelectTeam={handleSelectTeam}
-          onRemove={handleRemoveCrownedTeam} 
+          onRemove={(id) => handleRemoveCrowned('team', id)} 
           selectedTeamId={selectedTeamId}
         />
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {selectedTeamId ? (
           <TeamFixturesDisplay teamId={selectedTeamId} navigate={navigate} />
         ) : (
@@ -255,6 +388,15 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             </div>
           )
         )}
+        {crownedLeagues.map(league => (
+            <CrownedLeagueCard key={league.leagueId} league={league} navigate={navigate} />
+        ))}
+         {crownedTeams.length === 0 && crownedLeagues.length === 0 && (
+            <div className="text-center text-muted-foreground pt-10">
+                <p className="font-bold text-lg">لم تقم بتتويج أي شيء بعد</p>
+                <p>اذهب إلى الفرق أو البطولات واضغط على أيقونة التاج 👑</p>
+            </div>
+         )}
       </div>
     </div>
   );

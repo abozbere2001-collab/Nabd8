@@ -175,12 +175,20 @@ export interface CrownedTeam {
   note: string;
 }
 
+export interface CrownedLeague {
+    leagueId: number;
+    name: string;
+    logo: string;
+    note: string;
+}
+
 export interface Favorites {
   userId: string;
   leagues?: { [key: number]: FavoriteLeague };
   teams?: { [key: number]: FavoriteTeam };
   players?: { [key: number]: any };
-  crownedTeams?: { [key: number]: CrownedTeam }; // User-specific crowned teams
+  crownedTeams?: { [key: number]: CrownedTeam };
+  crownedLeagues?: { [key: number]: CrownedLeague };
   notificationsEnabled?: {
     news?: boolean;
     comments?: boolean;
