@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, writeBatch, deleteField, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, writeBatch, deleteField, onSnapshot, updateDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
 import type { Favorites, AdminFavorite, ManagedCompetition, Team } from '@/lib/types';
@@ -202,14 +202,16 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
                 const favs = doc.data() as Favorites || {};
                 setFavorites(prev => ({...prev, leagues: favs.leagues, teams: favs.teams}));
             }, (error) => {
-                // Silently handle permission errors for guests or restricted users
+                if(error.code === 'permission-denied') console.warn("Permission denied for starred favorites.");
+                else errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'get'}));
             });
 
             unsubOur = onSnapshot(ourFavsRef, (doc) => {
                 const favs = doc.data() as Favorites || {};
                 setFavorites(prev => ({...prev, ourLeagueId: favs.ourLeagueId, ourBallTeams: favs.ourBallTeams}));
             }, (error) => {
-                 // Silently handle permission errors for guests or restricted users
+                if(error.code === 'permission-denied') console.warn("Permission denied for ourFavorites.");
+                 else errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'get'}));
             });
 
         } else {
@@ -306,41 +308,45 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 }, [localSearchIndex]);
 
 
-  const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
-        const isLeague = 'leagueId' in item || !('national' in item);
+   const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
+        const isLeague = !('national' in item);
         const itemId = item.id;
         
-        const currentFavorites = user && db ? favorites : getLocalFavorites();
-        const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-
-        if (user && db) { // Logged-in user
+        if (user && db) {
             const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
             const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
 
             if (type === 'heart') {
+                const isCurrentlyHearted = isLeague 
+                    ? favorites.ourLeagueId === itemId
+                    : !!favorites.ourBallTeams?.[itemId];
+
                  if (isLeague) {
-                    const isHearted = newFavorites.ourLeagueId === itemId;
-                    const updateData = { ourLeagueId: isHearted ? deleteField() : itemId };
+                    const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
                     setDoc(ourFavsRef, updateData, { merge: true })
                         .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'write', requestResourceData: updateData})));
                  } else { // Team
-                    const isHearted = newFavorites.ourBallTeams?.[itemId];
+                    const fieldPath = `ourBallTeams.${itemId}`;
                     const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    const updateData = { ourBallTeams: { [itemId]: isHearted ? deleteField() : favData } };
-                    setDoc(ourFavsRef, updateData, { merge: true })
-                        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'write', requestResourceData: updateData})));
+                    const updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
+                    updateDoc(ourFavsRef, updateData)
+                         .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'update', requestResourceData: updateData})));
                  }
             } else { // Star
                 const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-                const isStarred = newFavorites[itemType]?.[itemId];
+                const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
+                const fieldPath = `${itemType}.${itemId}`;
                 const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                const updateData = { [itemType]: { [itemId]: isStarred ? deleteField() : favData } };
-                setDoc(starredFavsRef, updateData, { merge: true })
-                     .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'write', requestResourceData: updateData})));
+                const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
+                 updateDoc(starredFavsRef, updateData)
+                     .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'update', requestResourceData: updateData})));
             }
         } else { // Guest user
+            const currentFavorites = getLocalFavorites();
+            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+
             if (type === 'heart') {
                 if (isLeague) {
                     if (newFavorites.ourLeagueId === itemId) delete newFavorites.ourLeagueId;
@@ -482,4 +488,3 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
-

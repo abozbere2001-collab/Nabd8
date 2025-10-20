@@ -57,8 +57,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user, db } = useAuth();
     const { isAdmin } = useAdmin();
     
-    const [ourLeagueId, setOurLeagueId] = useState<number | null>(null);
-    const [ourBallTeams, setOurBallTeams] = useState<Team[]>([]);
+    const [ourFavorites, setOurFavorites] = useState<Partial<Favorites>>({});
     const [isLoading, setIsLoading] = useState(true);
 
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
@@ -68,22 +67,15 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
     useEffect(() => {
         setIsLoading(true);
-        // This effect will run once when the user status is known.
-        // It sets up the correct listener for favorites.
-        
         let unsubscribe: (() => void) | null = null;
       
         if (user && db) {
-            // LOGGED-IN USER: Listen to Firestore
             const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
             unsubscribe = onSnapshot(ourFavsRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    const data = docSnap.data() as Favorites;
-                    setOurLeagueId(data.ourLeagueId || null);
-                    setOurBallTeams(Object.values(data.ourBallTeams || {}));
+                    setOurFavorites(docSnap.data() as Favorites);
                 } else {
-                    setOurLeagueId(null);
-                    setOurBallTeams([]);
+                    setOurFavorites({});
                 }
                 setIsLoading(false);
             }, (error) => {
@@ -91,10 +83,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 setIsLoading(false);
             });
         } else {
-            // GUEST USER: Read from local storage
-            const localFavs = getLocalFavorites();
-            setOurLeagueId(localFavs.ourLeagueId || null);
-            setOurBallTeams(Object.values(localFavs.ourBallTeams || {}));
+            setOurFavorites(getLocalFavorites());
             setIsLoading(false);
         }
       
@@ -104,7 +93,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     }, [user, db]);
 
     useEffect(() => {
-        // This effect fetches league details whenever ourLeagueId changes.
+        const ourLeagueId = ourFavorites.ourLeagueId;
         if (ourLeagueId && db) {
             setLoadingLeague(true);
              doc(db, 'managedCompetitions', String(ourLeagueId)).get()
@@ -119,11 +108,10 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         } else {
             setLeagueDetails(null);
         }
-    }, [ourLeagueId, db]);
+    }, [ourFavorites.ourLeagueId, db]);
 
 
     useEffect(() => {
-        // This effect for pinned matches runs independently.
         if (!db) return;
         const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
         const q = query(pinnedMatchesRef);
@@ -134,6 +122,8 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         });
         return () => unsub();
     }, [db]);
+    
+    const ourBallTeams = useMemo(() => Object.values(ourFavorites.ourBallTeams || {}), [ourFavorites.ourBallTeams]);
 
 
     return (
@@ -202,4 +192,3 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
-

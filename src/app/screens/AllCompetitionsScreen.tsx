@@ -365,7 +365,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const isLeague = 'leagueId' in item;
         const itemId = isLeague ? item.leagueId : item.id;
         
-        if (user && db) { // Logged-in user
+        if (user && db) {
             const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
             const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
 
@@ -374,36 +374,26 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     ? favorites.ourLeagueId === itemId
                     : !!favorites.ourBallTeams?.[itemId];
 
-                const fieldPath = isLeague ? 'ourLeagueId' : `ourBallTeams.${itemId}`;
-                let updateData: any;
-
-                if (isCurrentlyHearted) {
-                    updateData = { [fieldPath]: deleteField() };
-                } else {
-                    if (isLeague) {
-                        updateData = { ourLeagueId: itemId };
-                    } else {
-                        const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                        updateData = { [fieldPath]: favData };
-                    }
-                }
-                updateDoc(ourFavsRef, updateData)
-                    .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'update', requestResourceData: updateData})));
-
+                 if (isLeague) {
+                    const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
+                    setDoc(ourFavsRef, updateData, { merge: true })
+                        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'write', requestResourceData: updateData})));
+                 } else { // Team
+                    const fieldPath = `ourBallTeams.${itemId}`;
+                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                    const updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
+                    updateDoc(ourFavsRef, updateData)
+                         .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'update', requestResourceData: updateData})));
+                 }
             } else { // Star
                 const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
                 const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
                 const fieldPath = `${itemType}.${itemId}`;
-                let updateData: any;
+                const favData = isLeague 
+                    ? { name: item.name, leagueId: itemId, logo: item.logo }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
 
-                if(isCurrentlyStarred) {
-                    updateData = { [fieldPath]: deleteField() };
-                } else {
-                    const favData = isLeague 
-                        ? { name: item.name, leagueId: itemId, logo: item.logo }
-                        : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    updateData = { [fieldPath]: favData };
-                }
                  updateDoc(starredFavsRef, updateData)
                      .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'update', requestResourceData: updateData})));
             }
