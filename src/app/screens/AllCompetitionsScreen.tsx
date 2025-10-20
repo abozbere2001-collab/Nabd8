@@ -114,7 +114,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const [loadingClubData, setLoadingClubData] = useState(true);
     const [loadingNationalTeams, setLoadingNationalTeams] = useState(false);
 
-
+    
     const getName = useCallback((type: 'league' | 'team' | 'country' | 'continent', id: string | number, defaultName: string) => {
         if (!defaultName) return '';
         const mapKey = type === 'league' ? 'leagues' : type === 'team' ? 'teams' : type === 'country' ? 'countries' : 'continents';
@@ -132,6 +132,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const fetchAllData = useCallback(async (forceRefresh = false) => {
         setLoadingClubData(true);
+        if (!db) {
+            setLoadingClubData(false);
+            setManagedCompetitions([]);
+            return;
+        }
 
         const fetchCustomNames = async () => {
              if (!db) {
@@ -207,60 +212,38 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [db, toast]);
 
 
-    const fetchNationalTeams = useCallback(async () => {
-        const cached = getCachedData<Team[]>(TEAMS_CACHE_KEY);
-        if (cached?.data && cached.data.length > 0) {
-            setNationalTeams(cached.data);
-            return;
-        }
-
-        setLoadingNationalTeams(true);
-        toast({ title: 'جاري جلب بيانات المنتخبات...', description: 'قد تستغرق هذه العملية دقيقة في المرة الأولى.' });
-    
-        try {
-            let countries: { name: string }[] = [];
-            const cachedCountries = getCachedData<{ name: string }[]>(COUNTRIES_CACHE_KEY);
-            if (cachedCountries?.data) {
-                countries = cachedCountries.data;
-            } else {
-                const countriesRes = await fetch('/api/football/countries');
-                if (!countriesRes.ok) throw new Error('Failed to fetch countries');
-                const countriesData = await countriesRes.json();
-                countries = countriesData.response || [];
-                setCachedData(COUNTRIES_CACHE_KEY, countries);
-            }
-
-            const teamPromises = countries.map(country => 
-                fetch(`/api/football/teams?country=${country.name}`)
-                    .then(res => res.ok ? res.json() : { response: [] })
-                    .then(data => (data.response || []).filter((r: { team: Team }) => r.team.national).map((r: { team: Team}) => r.team))
-                    .catch(() => []) // return empty array on error for a specific country
-            );
-    
-            const results = await Promise.all(teamPromises);
-            const nationalTeamsData = results.flat(); // Flatten the array of arrays
-            
-            setCachedData(TEAMS_CACHE_KEY, nationalTeamsData);
-            setNationalTeams(nationalTeamsData);
-
-        } catch (error) {
-            console.error("Error fetching national teams:", error);
-            toast({ variant: 'destructive', title: "خطأ", description: "فشل في جلب بيانات المنتخبات الوطنية." });
-        } finally {
-            setLoadingNationalTeams(false);
-        }
-    }, [toast]);
-    
-    const handleNationalTeamsAccordionOpen = (value: string[]) => {
-        if (value.includes('national-teams') && !nationalTeams && !loadingNationalTeams) {
-            fetchNationalTeams();
-        }
-    };
-
-
     useEffect(() => {
         fetchAllData();
-    }, [fetchAllData]);
+
+        if (!user || !db) {
+            setFavorites(getLocalFavorites());
+            return;
+        };
+
+        const unsubscribes: (() => void)[] = [];
+
+        const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const unsubStarred = onSnapshot(starredFavsRef, (doc) => {
+            const favs = doc.data() as Favorites || {};
+            setFavorites(prev => ({...prev, leagues: favs.leagues, teams: favs.teams}));
+        });
+        unsubscribes.push(unsubStarred);
+
+        const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+        const unsubOur = onSnapshot(ourFavsRef, (doc) => {
+            const favs = doc.data() as Favorites || {};
+            setFavorites(prev => ({...prev, ourLeagueId: favs.ourLeagueId, ourBallTeams: favs.ourBallTeams}));
+        }, (error) => {
+            // This error handler is crucial. It catches permission-denied errors.
+            const permissionError = new FirestorePermissionError({path: ourFavsRef.path, operation: 'get'});
+            errorEmitter.emit('permission-error', permissionError);
+        });
+        unsubscribes.push(unsubOur);
+        
+        return () => unsubscribes.forEach(unsub => unsub());
+
+    }, [user, db, fetchAllData]);
+
 
     const sortedGroupedCompetitions = useMemo(() => {
         if (!managedCompetitions) return null;
@@ -328,32 +311,56 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         
         return grouped;
     }, [nationalTeams, getName]);
-
-
-    useEffect(() => {
-        if (!user || !db) {
-            setFavorites(getLocalFavorites());
+    
+    const fetchNationalTeams = useCallback(async () => {
+        const cached = getCachedData<Team[]>(TEAMS_CACHE_KEY);
+        if (cached?.data && cached.data.length > 0) {
+            setNationalTeams(cached.data);
             return;
-        };
+        }
 
-        const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-        
-        const unsubStarred = onSnapshot(starredFavsRef, (doc) => {
-            const favs = doc.data() as Favorites || {};
-            setFavorites(prev => ({...prev, leagues: favs.leagues, teams: favs.teams}));
-        });
-        
-        const unsubOur = onSnapshot(ourFavsRef, (doc) => {
-             const favs = doc.data() as Favorites || {};
-             setFavorites(prev => ({...prev, ourLeagueId: favs.ourLeagueId, ourBallTeams: favs.ourBallTeams}));
-        });
+        setLoadingNationalTeams(true);
+        toast({ title: 'جاري جلب بيانات المنتخبات...', description: 'قد تستغرق هذه العملية دقيقة في المرة الأولى.' });
+    
+        try {
+            let countries: { name: string }[] = [];
+            const cachedCountries = getCachedData<{ name: string }[]>(COUNTRIES_CACHE_KEY);
+            if (cachedCountries?.data) {
+                countries = cachedCountries.data;
+            } else {
+                const countriesRes = await fetch('/api/football/countries');
+                if (!countriesRes.ok) throw new Error('Failed to fetch countries');
+                const countriesData = await countriesRes.json();
+                countries = countriesData.response || [];
+                setCachedData(COUNTRIES_CACHE_KEY, countries);
+            }
 
-        return () => {
-            unsubStarred();
-            unsubOur();
-        };
-    }, [user, db]);
+            const teamPromises = countries.map(country => 
+                fetch(`/api/football/teams?country=${country.name}`)
+                    .then(res => res.ok ? res.json() : { response: [] })
+                    .then(data => (data.response || []).filter((r: { team: Team }) => r.team.national).map((r: { team: Team}) => r.team))
+                    .catch(() => []) // return empty array on error for a specific country
+            );
+    
+            const results = await Promise.all(teamPromises);
+            const nationalTeamsData = results.flat(); // Flatten the array of arrays
+            
+            setCachedData(TEAMS_CACHE_KEY, nationalTeamsData);
+            setNationalTeams(nationalTeamsData);
+
+        } catch (error) {
+            console.error("Error fetching national teams:", error);
+            toast({ variant: 'destructive', title: "خطأ", description: "فشل في جلب بيانات المنتخبات الوطنية." });
+        } finally {
+            setLoadingNationalTeams(false);
+        }
+    }, [toast]);
+
+    const handleNationalTeamsAccordionOpen = (value: string[]) => {
+        if (value.includes('national-teams') && !nationalTeams && !loadingNationalTeams) {
+            fetchNationalTeams();
+        }
+    };
 
 
     const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
@@ -396,8 +403,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
             const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
 
-            setDoc(favDocRef, updateData, { merge: true }).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+            updateDoc(favDocRef, updateData).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
             });
         }
 
@@ -429,7 +436,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         if (renameItem.purpose === 'note' && user && db) {
             const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
             const itemData = renameItem?.originalData as Team;
-            const isCurrentlyHearted = !!favorites.ourBallTeams?.[itemData.id];
             
             const favData = { 
                 name: itemData.name, 
@@ -439,7 +445,15 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 ...(newNote && { note: newNote })
              };
             
-            const updateData = { [`ourBallTeams.${itemData.id}`]: isCurrentlyHearted && !newNote ? deleteField() : favData };
+            const isHearted = !!favorites.ourBallTeams?.[itemData.id];
+            const hasNote = newNote && newNote.trim().length > 0;
+            
+            if(!isHearted && !hasNote) {
+                 setRenameItem(null);
+                 return;
+            }
+
+            const updateData = { [`ourBallTeams.${itemData.id}`]: favData };
 
             setDoc(favDocRef, updateData, { merge: true }).then(() => {
                 toast({ title: 'نجاح', description: 'تم تحديث الملاحظة على الفريق المفضل.' });
