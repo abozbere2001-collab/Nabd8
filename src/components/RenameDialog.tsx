@@ -67,14 +67,13 @@ export function RenameDialog({
 
   const getTitle = () => {
     if (!item) return '';
-    if (item.type === 'team' && !isAdmin) return `إضافة ملاحظة على فريق ${item.name}`;
-    if (item.type === 'team' && isAdmin) return `تعديل وملاحظة على فريق ${item.name}`;
+    if (item.type === 'team') return `إضافة ملاحظة على فريق ${item.name}`;
     return `تعديل ${itemTypeMap[item.type]}`;
   }
   
   const getDescription = () => {
       if (!item) return '';
-      if(item.type === 'team' && !isAdmin) return 'سيتم حفظ هذا الفريق مع ملاحظتك في قسم "كرتنا".';
+      if(item.type === 'team') return 'سيتم حفظ هذا الفريق مع ملاحظتك في قسم "بلدي".';
       if(isAdmin && item.type !== 'status') return `أدخل الاسم الجديد لـ ${itemTypeMap[item.type]}. اتركه فارغًا للعودة للاسم الأصلي.`;
       if(isAdmin && item.type === 'status') return `أدخل الحالة المخصصة للمباراة. اترك الحقل فارغًا لإزالته.`;
       return '';
@@ -94,7 +93,7 @@ export function RenameDialog({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           
-          {isAdmin && (
+          {isAdmin && (item?.type !== 'team') && (
             <div className="grid w-full items-center gap-1.5">
                 <Label htmlFor="name">{item?.type === 'status' ? 'الحالة المخصصة' : 'الاسم المخصص'}</Label>
                 <Input

@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
@@ -78,10 +76,7 @@ interface TeamData {
     };
 }
 
-const TeamHeader = ({ team, venue, onStar, onHeart, favorites, isAdmin, onRename }: { team: Team, venue: TeamData['venue'], onStar: () => void, onHeart: () => void, favorites: Partial<Favorites>, isAdmin: boolean, onRename: () => void }) => {
-    const isOurBall = !!favorites.ourBallTeams?.[team.id];
-    const isStarred = !!favorites.teams?.[team.id];
-
+const TeamHeader = ({ team, venue, onStar, onHeart, isStarred, isHearted, isAdmin, onRename }: { team: Team, venue: TeamData['venue'], onStar: () => void, onHeart: () => void, isStarred: boolean, isHearted: boolean, isAdmin: boolean, onRename: () => void }) => {
     return (
         <Card className="mb-4 overflow-hidden">
             <div className="relative h-24 bg-gradient-to-r from-primary/20 to-accent/20" style={{backgroundImage: `url(${venue?.image})`, backgroundSize: 'cover', backgroundPosition: 'center'}}>
@@ -92,7 +87,7 @@ const TeamHeader = ({ team, venue, onStar, onHeart, favorites, isAdmin, onRename
                 </Avatar>
                 <div className="absolute top-2 left-2 flex items-center gap-1 z-10">
                      <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/20 hover:bg-black/40" onClick={onHeart}>
-                        <Heart className={cn("h-5 w-5", isOurBall ? "text-red-500 fill-current" : "text-white/80")} />
+                        <Heart className={cn("h-5 w-5", isHearted ? "text-red-500 fill-current" : "text-white/80")} />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/20 hover:bg-black/40" onClick={onStar}>
                         <Star className={cn("h-5 w-5", isStarred ? "text-yellow-400 fill-current" : "text-white/80")} />
@@ -472,14 +467,12 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
                 setTeamData(teamInfo);
                 const name = teamInfo.team.name;
 
-                // For guest users or if db is not available, just set the title and finish.
                 if (!db) {
                     setDisplayTitle(hardcodedTranslations.teams[teamId] || name);
                     setLoading(false);
                     return;
                 }
                 
-                // For logged-in users, check for custom name.
                 const customNameDocRef = doc(db, "teamCustomizations", String(teamId));
                 try {
                     const customNameDocSnap = await getDoc(customNameDocRef);
@@ -511,50 +504,54 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
         setFavorites(getLocalFavorites());
         return;
     };
-    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    const unsub = onSnapshot(favRef, (docSnap) => {
-        setFavorites(docSnap.exists() ? docSnap.data() as Favorites : {});
-    }, (error) => {
-        console.error("Error fetching favorites:", error);
+    const starredFavRef = doc(db, 'users', user.uid, 'favorites', 'data');
+    const ourFavRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+    
+    const unsubStarred = onSnapshot(starredFavRef, (docSnap) => {
+        setFavorites(prev => ({...prev, ...docSnap.data()}));
     });
-    return () => unsub();
+    const unsubOur = onSnapshot(ourFavRef, (docSnap) => {
+        setFavorites(prev => ({...prev, ...docSnap.data()}));
+    });
+
+    return () => {
+        unsubStarred();
+        unsubOur();
+    };
   }, [user, db]);
 
   const handleFavoriteToggle = (type: 'star' | 'heart') => {
-        if (!teamData) return;
-        const { team } = teamData;
+    if (!teamData) return;
+    const { team } = teamData;
 
-        if (type === 'heart' && !favorites?.ourBallTeams?.[team.id]) {
-            handleRename();
-            return;
-        }
-        
-        const currentFavorites = user ? favorites : getLocalFavorites();
-        const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+    if (type === 'heart' && !favorites?.ourBallTeams?.[team.id]) {
+        handleRename();
+        return;
+    }
+    
+    const currentFavorites = user && db ? favorites : getLocalFavorites();
+    const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+    const favTypeKey = type === 'star' ? 'teams' : 'ourBallTeams';
+    const isFavorited = !!newFavorites[favTypeKey]?.[team.id];
 
-        const field = type === 'star' ? 'teams' : 'ourBallTeams';
-        const isFavorited = !!newFavorites[field]?.[team.id];
-
-        if (isFavorited) {
-            delete newFavorites[field][team.id];
-        } else {
-            if (!newFavorites[field]) newFavorites[field] = {};
-            newFavorites[field][team.id] = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
-        }
-        
+    if (isFavorited) {
+        delete newFavorites[favTypeKey][team.id];
+    } else {
+        if (!newFavorites[favTypeKey]) newFavorites[favTypeKey] = {};
+        newFavorites[favTypeKey][team.id] = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
+    }
+    
+    if (user && db) {
+        const favDocRef = type === 'star' ? doc(db, 'users', user.uid, 'favorites', 'data') : doc(db, 'users', user.uid, 'ourFavorites', 'data');
+        setDoc(favDocRef, newFavorites, { merge: true }).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'write', requestResourceData: newFavorites }));
+        });
+    } else {
+        setLocalFavorites(newFavorites);
         setFavorites(newFavorites);
-
-        if (user && db) {
-            const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const updateData = { [`${field}.${team.id}`]: isFavorited ? deleteField() : { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
-            setDoc(favRef, updateData, { merge: true }).catch(err => {
-                setFavorites(currentFavorites); // Revert on fail
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData }));
-            });
-        } else {
-            setLocalFavorites(newFavorites);
-        }
+    }
   };
+
 
   const handleRename = () => {
     if (!teamData) return;
@@ -585,8 +582,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     }
 
     if (user) {
-      const isFavorited = !!favorites?.ourBallTeams?.[team.id];
-      const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+      const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
       const fieldPath = `ourBallTeams.${id}`;
       const favData: any = { 
           teamId: team.id, 
@@ -600,8 +596,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
       
       const updateData = { [fieldPath]: favData };
 
-      await setDoc(favRef, updateData, { merge: true }).catch(err => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData }));
+      await setDoc(favDocRef, updateData, { merge: true }).catch(err => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
       });
     }
 
@@ -630,6 +626,9 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     );
   }
 
+  const isStarred = !!favorites.teams?.[teamId];
+  const isHearted = !!favorites.ourBallTeams?.[teamId];
+
   return (
     <div className="flex flex-col bg-background h-full">
       <ScreenHeader 
@@ -651,7 +650,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
             venue={teamData.venue} 
             onStar={() => handleFavoriteToggle('star')}
             onHeart={() => handleFavoriteToggle('heart')}
-            favorites={favorites}
+            isStarred={isStarred}
+            isHearted={isHearted}
             isAdmin={isAdmin}
             onRename={handleRename}
         />
@@ -671,4 +671,3 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
-

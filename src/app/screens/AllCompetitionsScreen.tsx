@@ -69,7 +69,7 @@ interface TeamsByContinent {
     [continent: string]: Team[]
 }
 
-type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach';
+type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
 interface RenameState {
   id: string | number;
   name: string;
@@ -100,7 +100,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const { user } = useAuth();
     const { toast } = useToast();
     
-    const [favorites, setFavorites] = useState<Partial<Favorites>>({});
+    // This state ONLY holds starred favorites. Hearted favorites are managed elsewhere.
+    const [starredFavorites, setStarredFavorites] = useState<Partial<Favorites>>({});
     const [renameItem, setRenameItem] = useState<RenameState | null>(null);
     const [isAddOpen, setAddOpen] = useState(false);
     
@@ -329,28 +330,19 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     useEffect(() => {
         if (!user || !db) {
-            setFavorites(getLocalFavorites());
+            setStarredFavorites(getLocalFavorites());
             return;
         }
-
+        // This screen is ONLY concerned with starred favorites.
         const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-
         const unsubStarred = onSnapshot(starredFavsRef, (doc) => {
-            setFavorites(prev => ({...prev, ...doc.data()}));
+            setStarredFavorites(doc.data() as Favorites || {});
         }, (error) => {
             console.warn("Permission denied listening to starred favorites.", error);
         });
 
-        const unsubOur = onSnapshot(ourFavsRef, (doc) => {
-            setFavorites(prev => ({...prev, ...doc.data()}));
-        }, (error) => {
-            console.warn("Permission denied listening to ourFavorites.", error);
-        });
-
         return () => {
             unsubStarred();
-            unsubOur();
         };
     }, [user, db]);
 
@@ -359,101 +351,112 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const isLeague = 'leagueId' in item;
         const itemId = isLeague ? item.leagueId : item.id;
         
-        let favDocRef: any;
-        let updateData: any;
+        if (type === 'star') {
+            const currentFavorites = user ? starredFavorites : getLocalFavorites();
+            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+            if (!newFavorites[itemType]) newFavorites[itemType] = {};
 
-        if (user && db) {
-            if (type === 'heart') {
-                favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-                const isCurrentlyHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
-                 if (isLeague) {
-                    updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
-                } else {
-                    const fieldPath = `ourBallTeams.${itemId}`;
-                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
-                }
-            } else { // star
-                favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                const isCurrentlyStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
-                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-                const fieldPath = `${itemType}.${itemId}`;
-                const favData = isLeague 
+            const isCurrentlyStarred = !!newFavorites[itemType]?.[itemId];
+            
+            if (isCurrentlyStarred) {
+                delete newFavorites[itemType]![itemId];
+            } else {
+                 const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
+                newFavorites[itemType]![itemId] = favData;
             }
-             setDoc(favDocRef, updateData, { merge: true }).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
-            });
-
-        } else { // Guest user
-            const currentFavorites = getLocalFavorites();
-            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-            
-            if (type === 'heart') {
-                if (isLeague) {
-                    if (newFavorites.ourLeagueId === itemId) delete newFavorites.ourLeagueId;
-                    else newFavorites.ourLeagueId = itemId;
-                } else {
-                    if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
-                    if (newFavorites.ourBallTeams[itemId]) delete newFavorites.ourBallTeams[itemId];
-                    else newFavorites.ourBallTeams[itemId] = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                }
+             
+            if (user && db) {
+                 const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+                 const fieldPath = `${itemType}.${itemId}`;
+                 const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : newFavorites[itemType]![itemId] };
+                 setDoc(favDocRef, updateData, { merge: true }).catch(err => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+                });
             } else {
-                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-                if (!newFavorites[itemType]) newFavorites[itemType] = {};
-                if (newFavorites[itemType]?.[itemId]) delete newFavorites[itemType]![itemId];
-                else {
-                    const favData = isLeague 
-                        ? { name: item.name, leagueId: itemId, logo: item.logo }
-                        : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    newFavorites[itemType]![itemId] = favData;
-                }
+                setLocalFavorites(newFavorites);
+                setStarredFavorites(newFavorites);
             }
-            setLocalFavorites(newFavorites);
-            setFavorites(newFavorites);
+        } else if (type === 'heart') {
+             // Open rename/note dialog to handle heart functionality
+             const note = (starredFavorites.ourBallTeams?.[itemId] as any)?.note || '';
+             handleOpenRename(isLeague ? 'league' : 'team', itemId, item.name, item.name, note);
         }
-    }, [user, db, favorites]);
+    }, [user, db, starredFavorites]);
 
-     const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
+     const handleSaveRename = (type: RenameType, id: string | number, newName: string, newNote?: string) => {
         if (!db) return;
-        const collectionName = `${type}Customizations`;
-        const docId = String(id);
-        
-        const originalName = renameItem?.originalName;
-        const data = { customName: newName };
 
-        const op = (newName && newName.trim() && newName !== originalName)
-            ? setDoc(doc(db, collectionName, docId), data)
-            : deleteDoc(doc(db, collectionName, docId));
+        // Admin-specific name customization
+        if (isAdmin && type !== 'team') {
+            const collectionName = `${type}Customizations`;
+            const docId = String(id);
+            const originalName = renameItem?.originalName;
+            const data = { customName: newName };
 
-        op.then(() => {
-            setCustomNames(prev => {
-                const mapType = type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type;
-                const newMap = new Map(prev[mapType as keyof typeof prev]);
+            const op = (newName && newName.trim() && newName !== originalName)
+                ? setDoc(doc(db, collectionName, docId), data)
+                : deleteDoc(doc(db, collectionName, docId));
 
-                if (newName && newName.trim() && newName !== originalName) {
-                    newMap.set(id as any, newName);
-                } else {
-                    newMap.delete(id as any);
-                }
-                return { ...prev, [mapType]: newMap };
+            op.then(() => {
+                setCustomNames(prev => {
+                    const mapType = type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type;
+                    const newMap = new Map(prev[mapType as keyof typeof prev]);
+
+                    if (newName && newName.trim() && newName !== originalName) {
+                        newMap.set(id as any, newName);
+                    } else {
+                        newMap.delete(id as any);
+                    }
+                    return { ...prev, [mapType]: newMap };
+                });
+                toast({ title: 'نجاح', description: 'تم حفظ التغييرات.' });
+            }).catch(serverError => {
+                const permissionError = new FirestorePermissionError({ path: doc(db, collectionName, docId).path, operation: 'write', requestResourceData: data });
+                errorEmitter.emit('permission-error', permissionError);
             });
-            toast({ title: 'نجاح', description: 'تم حفظ التغييرات.' });
-        }).catch(serverError => {
-            const permissionError = new FirestorePermissionError({ path: doc(db, collectionName, docId).path, operation: 'write', requestResourceData: data });
-            errorEmitter.emit('permission-error', permissionError);
-        });
+        }
+        
+        // Heart favorite logic (for both users and admins)
+        if (renameItem?.type === 'team' || renameItem?.type === 'league') {
+             if (user) {
+                const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+                const isLeague = renameItem.type === 'league';
+                const itemId = renameItem.id;
+                
+                let updateData;
+                if (isLeague) {
+                    updateData = { ourLeagueId: itemId };
+                } else {
+                    const item = renameItem.originalData as Team;
+                    const fieldPath = `ourBallTeams.${itemId}`;
+                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: item.national ? 'National' : 'Club', note: newNote };
+                    updateData = { [fieldPath]: favData };
+                }
+                 setDoc(favDocRef, updateData, { merge: true }).catch(err => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+                });
+                 toast({ title: 'نجاح', description: 'تمت الإضافة إلى مفضلة "بلدي".' });
+             }
+        }
+
         setRenameItem(null);
     };
     
-     const handleOpenRename = (type: RenameType, id: number | string, name: string, originalName?: string) => {
+     const handleOpenRename = (type: RenameType, id: number | string, name: string, originalName?: string, note?: string) => {
+        const itemToRename = type === 'team'
+            ? nationalTeams?.find(t => t.id === id)
+            : managedCompetitions?.find(c => c.leagueId === id);
+
         setRenameItem({
             type: type,
             id: id,
             name: name,
             originalName: originalName || name,
+            note: note || '',
+            originalData: itemToRename
         });
     };
 
@@ -498,7 +501,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                       </div>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(team, 'heart'); }}>
-                          <Heart className={favorites.ourBallTeams?.[team.id] ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                           <Heart className={starredFavorites.ourBallTeams?.[team.id] ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                         </Button>
                         {isAdmin && (
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team.name, nationalTeams?.find(t => t.id === team.id)?.name) }}>
@@ -506,7 +509,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                           </Button>
                         )}
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(team, 'star'); }}>
-                          <Star className={favorites.teams?.[team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                          <Star className={starredFavorites.teams?.[team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                         </Button>
                       </div>
                     </li>
@@ -543,7 +546,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                        </div>
                                        <div className="flex items-center gap-1">
                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                               <Heart className={(favorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                               <Heart className={(starredFavorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                            </Button>
                                            {isAdmin && (
                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
@@ -551,7 +554,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                </Button>
                                            )}
                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'star'); }}>
-                                               <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                               <Star className={starredFavorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                            </Button>
                                        </div>
                                    </li>
@@ -580,7 +583,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                </div>
                                                <div className="flex items-center gap-1">
                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                                       <Heart className={(favorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                       <Heart className={(starredFavorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                    </Button>
                                                    {isAdmin && (
                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
@@ -588,7 +591,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                        </Button>
                                                    )}
                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'star'); }}>
-                                                       <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                       <Star className={starredFavorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                    </Button>
                                                </div>
                                            </li>
@@ -677,7 +680,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 isOpen={!!renameItem}
                 onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
                 item={renameItem}
-                onSave={(type, id, newName) => handleSaveRename(type, id, newName)}
+                onSave={(type, id, newName, note) => handleSaveRename(type, id, newName, note)}
             />}
             <AddCompetitionDialog isOpen={isAddOpen} onOpenChange={(isOpen) => {
                 setAddOpen(isOpen);

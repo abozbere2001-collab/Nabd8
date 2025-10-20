@@ -75,10 +75,9 @@ const normalizeArabic = (text: string) => {
     .replace(/[\u064B-\u0652]/g, "") // Remove harakat
     .replace(/[أإآ]/g, "ا")
     .replace(/ة/g, "ه")
-    .replace(/آ/g, "ا") // Also handle Madda
-    .replace(/ى/g, "ي") // Alef Maksura to Yeh
-    .toLowerCase()
-    .trim();
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 };
 
 
@@ -310,59 +309,43 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
    const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
         const isLeague = !('national' in item);
         const itemId = item.id;
-        
-        let favDocRef: any;
-        let updateData: any;
+        const currentFavorites = user ? favorites : getLocalFavorites();
+        const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
 
-        if (user && db) {
-            if (type === 'heart') {
-                favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-                const isCurrentlyHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
-                 if (isLeague) {
-                    updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
+        if (type === 'heart') {
+            const isHearted = isLeague ? newFavorites.ourLeagueId === itemId : !!newFavorites.ourBallTeams?.[itemId];
+            if (isLeague) {
+                newFavorites.ourLeagueId = isHearted ? undefined : itemId;
+            } else {
+                if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
+                if (isHearted) {
+                    delete newFavorites.ourBallTeams[itemId];
                 } else {
-                    const fieldPath = `ourBallTeams.${itemId}`;
-                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
+                    newFavorites.ourBallTeams[itemId] = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
                 }
-            } else { // star
-                favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                const isCurrentlyStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
-                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-                const fieldPath = `${itemType}.${itemId}`;
+            }
+        } else { // star
+            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+            if (!newFavorites[itemType]) newFavorites[itemType] = {};
+            const isStarred = !!newFavorites[itemType]?.[itemId];
+            if (isStarred) {
+                delete newFavorites[itemType]![itemId];
+            } else {
                 const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
+                newFavorites[itemType]![itemId] = favData;
             }
-             setDoc(favDocRef, updateData, { merge: true }).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+        }
+        
+        if (user && db) {
+            const favDocRef = type === 'star' ? doc(db, 'users', user.uid, 'favorites', 'data') : doc(db, 'users', user.uid, 'ourFavorites', 'data');
+            // This setDoc overwrites the document, which is what we want for ourFavorites but might be destructive for favorites.
+            // Let's use merge for safety.
+            setDoc(favDocRef, newFavorites, { merge: true }).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: newFavorites}))
             });
-
-        } else { // Guest user
-            const currentFavorites = getLocalFavorites();
-            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-            
-            if (type === 'heart') {
-                if (isLeague) {
-                    if (newFavorites.ourLeagueId === itemId) delete newFavorites.ourLeagueId;
-                    else newFavorites.ourLeagueId = itemId;
-                } else {
-                    if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
-                    if (newFavorites.ourBallTeams[itemId]) delete newFavorites.ourBallTeams[itemId];
-                    else newFavorites.ourBallTeams[itemId] = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                }
-            } else {
-                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-                 if (!newFavorites[itemType]) newFavorites[itemType] = {};
-                if (newFavorites[itemType]?.[itemId]) delete newFavorites[itemType]![itemId];
-                else {
-                     const favData = isLeague 
-                        ? { name: item.name, leagueId: itemId, logo: item.logo }
-                        : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    newFavorites[itemType]![itemId] = favData;
-                }
-            }
+        } else {
             setLocalFavorites(newFavorites);
             setFavorites(newFavorites);
         }
@@ -378,7 +361,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   }
 
   const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
-    const currentName = getDisplayName(type, id, originalData.name);
+    const currentName = getDisplayName(type as 'team' | 'league', id, originalData.name);
     setRenameItem({ id, name: currentName, type, originalData });
   };
   
