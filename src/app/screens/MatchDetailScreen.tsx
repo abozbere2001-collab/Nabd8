@@ -108,9 +108,7 @@ const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture
     );
 };
 
-const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statistics: MatchStatistics[] | null }) => {
-    if (!fixture) return <Skeleton className="h-40 w-full" />;
-
+const DetailsTab = ({ fixture, statistics, loading }: { fixture: Fixture; statistics: MatchStatistics[] | null; loading: boolean }) => {
     const homeStats = statistics?.find(s => s.team.id === fixture.teams.home.id)?.statistics || [];
     const awayStats = statistics?.find(s => s.team.id === fixture.teams.away.id)?.statistics || [];
 
@@ -151,9 +149,9 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
             <Card>
                 <CardContent className="p-4 space-y-4">
                     <h3 className="font-bold text-center">إحصائيات المباراة</h3>
-                    {statistics === null ? (
+                    {loading ? (
                         <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-                    ) : statistics.length > 0 ? (
+                    ) : statistics && statistics.length > 0 ? (
                         statMapping.map(stat => {
                             const homeValueRaw = findStat(homeStats, stat.type);
                             const awayValueRaw = findStat(awayStats, stat.type);
@@ -194,9 +192,10 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
 
 
 const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { events: MatchEvent[] | null, homeTeam: Fixture['teams']['home'], awayTeam: Fixture['teams']['away'], highlightsOnly: boolean }) => {
-    if (!events) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    if (events === null) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     
     const filteredEvents = React.useMemo(() => {
+        if (!events) return [];
         if (!highlightsOnly) return events;
         return events.filter(e => e.type === 'Goal' || (e.type === 'Card' && e.detail.includes('Red')));
     }, [events, highlightsOnly]);
@@ -433,9 +432,9 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
 };
 
 
-const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] | null, fixture: Fixture, navigate: ScreenProps['navigate'] }) => {
-    if (!standings) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    if (standings.length === 0) return <p className="text-center text-muted-foreground p-8">جدول الترتيب غير متاح حاليًا.</p>;
+const StandingsTab = ({ standings, fixture, navigate, loading }: { standings: Standing[] | null, fixture: Fixture, navigate: ScreenProps['navigate'], loading: boolean }) => {
+    if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    if (!standings || standings.length === 0) return <p className="text-center text-muted-foreground p-8">جدول الترتيب غير متاح حاليًا.</p>;
     
     return (
         <Table>
@@ -517,18 +516,115 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     const { isAdmin, db } = useAdmin();
     const { toast } = useToast();
     
-    // State for raw data from API
+    // State for raw data from API, separating data for each tab
     const [fixture, setFixture] = useState<Fixture | null>(initialFixture || null);
     const [lineups, setLineups] = useState<LineupData[] | null>(null);
     const [events, setEvents] = useState<MatchEvent[] | null>(null);
     const [statistics, setStatistics] = useState<MatchStatistics[] | null>(null);
     const [standings, setStandings] = useState<Standing[] | null>(null);
-    const [loading, setLoading] = useState(true);
+    
+    const [activeTab, setActiveTab] = useState('lineups');
+    const [loadingTabs, setLoadingTabs] = useState({
+        details: false,
+        odds: false,
+        standings: false,
+        events: false,
+        lineups: false,
+    });
     
     // State for custom data
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> } | null>(null);
     const [customStatus, setCustomStatus] = useState<string | null>(null);
     const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
+
+    // Initial fixture data fetch
+    useEffect(() => {
+        const fetchFixture = async () => {
+            if (!fixture) { // Only fetch if not passed via props
+                try {
+                    const res = await fetch(`/api/football/fixtures?id=${fixtureId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setFixture(data.response?.[0] || null);
+                    }
+                } catch (e) { console.error(e); }
+            }
+        };
+        fetchFixture();
+    }, [fixtureId, fixture]);
+
+
+    const fetchTabData = useCallback(async (tab: string) => {
+        if (!fixtureId) return;
+
+        setLoadingTabs(prev => ({ ...prev, [tab]: true }));
+        try {
+            let res;
+            switch(tab) {
+                case 'lineups':
+                     const [lineupsRes, playersRes] = await Promise.all([
+                        fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
+                        fetch(`/api/football/fixtures/players?fixture=${fixtureId}`),
+                    ]);
+                    if (lineupsRes.ok && playersRes.ok) {
+                        const lineupsData = await lineupsRes.json();
+                        const playersData = await playersRes.json();
+                        const detailedPlayers = playersData.response ? playersData.response.flatMap((team: any) => team.players) : [];
+                        const mergedLineups = mergePlayerData(lineupsData.response, detailedPlayers);
+                        setLineups(mergedLineups.length > 0 ? mergedLineups : []);
+                    }
+                    break;
+                case 'events':
+                    res = await fetch(`/api/football/fixtures/events?fixture=${fixtureId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setEvents(data.response || []);
+                    }
+                    break;
+                case 'details':
+                    res = await fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setStatistics(data.response || []);
+                    }
+                    break;
+                case 'standings':
+                     if (fixture?.league?.id) {
+                        res = await fetch(`/api/football/standings?league=${fixture.league.id}&season=${fixture.league.season || CURRENT_SEASON}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            setStandings(data.response?.[0]?.league?.standings?.[0] || []);
+                        }
+                    } else {
+                        setStandings([]);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        } catch (error) {
+            console.error(`Failed to fetch ${tab}:`, error);
+        } finally {
+            setLoadingTabs(prev => ({ ...prev, [tab]: false }));
+        }
+
+    }, [fixtureId, fixture]);
+    
+    // Fetch data for the default tab
+    useEffect(() => {
+        if (fixture) {
+             fetchTabData(activeTab);
+        }
+    }, [fixture, fetchTabData]);
+
+    const handleTabChange = (newTab: string) => {
+        setActiveTab(newTab);
+        // Fetch data only if it hasn't been fetched yet
+        if (newTab === 'lineups' && lineups === null) fetchTabData(newTab);
+        else if (newTab === 'events' && events === null) fetchTabData(newTab);
+        else if (newTab === 'details' && statistics === null) fetchTabData(newTab);
+        else if (newTab === 'standings' && standings === null) fetchTabData(newTab);
+    };
 
     // Fetch all custom names once
     useEffect(() => {
@@ -559,83 +655,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     }, [db]);
 
 
-    // Fetch all data for the match
-    useEffect(() => {
-        let isMounted = true;
-        
-        const fetchAllData = async () => {
-            if (!fixtureId) {
-                 if (isMounted) setLoading(false);
-                 return;
-            };
-            setLoading(true);
-
-            try {
-                // Fetch all data concurrently
-                const [fixtureRes, lineupsRes, eventsRes, statisticsRes, playersRes] = await Promise.all([
-                    fetch(`/api/football/fixtures?id=${fixtureId}`),
-                    fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
-                    fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
-                    fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
-                    fetch(`/api/football/fixtures/players?fixture=${fixtureId}`),
-                ].map(p => p.catch(e => e))); // Catch individual promise rejections
-
-                if (!isMounted) return;
-
-                // Process fixture data first, as it's essential
-                if (fixtureRes instanceof Error || !fixtureRes.ok) throw new Error('Failed to fetch fixture data');
-                const fixtureData = await fixtureRes.json();
-                const currentFixture = fixtureData.response?.[0];
-                if (!currentFixture) {
-                    toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على المباراة.' });
-                    setLoading(false);
-                    return;
-                }
-                setFixture(currentFixture);
-
-                // Process other data safely
-                const lineupsData = !(lineupsRes instanceof Error) && lineupsRes.ok ? await lineupsRes.json() : { response: [] };
-                const eventsData = !(eventsRes instanceof Error) && eventsRes.ok ? await eventsRes.json() : { response: [] };
-                const statisticsData = !(statisticsRes instanceof Error) && statisticsRes.ok ? await statisticsRes.json() : { response: [] };
-                const playersData = !(playersRes instanceof Error) && playersRes.ok ? await playersRes.json() : { response: [] };
-                
-                const detailedPlayers = playersData.response ? playersData.response.flatMap((team: any) => team.players) : [];
-                const mergedLineups = mergePlayerData(lineupsData.response, detailedPlayers);
-                
-                setLineups(mergedLineups);
-                setEvents(eventsData.response);
-                setStatistics(statisticsData.response);
-                
-                // Fetch standings separately and safely
-                const leagueId = currentFixture.league?.id;
-                const season = currentFixture.league?.season || CURRENT_SEASON;
-                if(leagueId) {
-                    try {
-                        const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${season}`);
-                        if(isMounted && standingsRes.ok){
-                            const standingsData = await standingsRes.json();
-                            setStandings(standingsData.response[0]?.league?.standings[0] || []);
-                        }
-                    } catch (e) {
-                         if (isMounted) setStandings([]);
-                    }
-                }
-
-            } catch (error) {
-                if (isMounted) {
-                    console.error("Failed to fetch match details:", error);
-                    toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحميل بيانات المباراة.' });
-                }
-            } finally {
-                if (isMounted) setLoading(false);
-            }
-        };
-
-        fetchAllData();
-
-        return () => { isMounted = false; };
-    }, [fixtureId, toast]);
-    
     // Listen for custom match status
     useEffect(() => {
         if (!db || !fixtureId) return;
@@ -726,7 +745,8 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 .catch(serverError => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' })));
         }
         setCustomNames(prev => {
-            const newMap = new Map(prev?.[type]);
+            if (!prev) return null;
+            const newMap = new Map(prev[type]);
             if (newName && newName !== originalName) {
                 newMap.set(Number(id), newName);
             } else {
@@ -751,7 +771,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     };
 
 
-    if (loading || !processedFixture) {
+    if (!processedFixture) {
         return (
             <div className="flex h-full flex-col bg-background">
                 <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} />
@@ -798,7 +818,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     navigate={navigate}
                     customStatus={customStatus}
                 />
-                <Tabs defaultValue="lineups" className="w-full">
+                <Tabs defaultValue="lineups" value={activeTab} onValueChange={handleTabChange} className="w-full">
                     <TabsList className="grid w-full grid-cols-5 rounded-lg h-auto p-1 bg-card">
                         <TabsTrigger value="details">تفاصيل</TabsTrigger>
                         <TabsTrigger value="odds">احتمالات</TabsTrigger>
@@ -806,10 +826,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                         <TabsTrigger value="events">مُجريات</TabsTrigger>
                         <TabsTrigger value="lineups">التشكيل</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="details" className="mt-4"><DetailsTab fixture={processedFixture} statistics={statistics} /></TabsContent>
+                    <TabsContent value="details" className="mt-4"><DetailsTab fixture={processedFixture} statistics={statistics} loading={loadingTabs.details} /></TabsContent>
                     <TabsContent value="odds" className="mt-4"><OddsTab fixtureId={processedFixture.fixture.id} /></TabsContent>
                     <TabsContent value="standings" className="mt-4">
-                        <StandingsTab standings={processedStandings} fixture={processedFixture} navigate={navigate} />
+                        <StandingsTab standings={processedStandings} fixture={processedFixture} navigate={navigate} loading={loadingTabs.standings} />
                     </TabsContent>
                     <TabsContent value="events" className="mt-4"><TimelineTab events={processedEvents} homeTeam={processedFixture.teams.home} awayTeam={processedFixture.teams.away} /></TabsContent>
                     <TabsContent value="lineups" className="mt-4">
@@ -828,3 +848,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
