@@ -53,13 +53,20 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
   const [selectedTeams, setSelectedTeams] = useState<Set<number>>(new Set());
   const [selectedLeagues, setSelectedLeagues] = useState<Set<number>>(new Set());
 
+  // Al Nassr's ID is 605
+  const AL_NASSR_ID = 605;
+
   useEffect(() => {
     // This component is now used for both guests and new registered users.
     // For registered users, local favorites might exist if they used the app as a guest first.
     const localFavs = getLocalFavorites();
+    const initialTeams = new Set<number>([AL_NASSR_ID]);
+    
     if (localFavs.teams) {
-      setSelectedTeams(new Set(Object.keys(localFavs.teams).map(Number)));
+      Object.keys(localFavs.teams).map(Number).forEach(id => initialTeams.add(id));
     }
+    setSelectedTeams(initialTeams);
+
     if (localFavs.leagues) {
       setSelectedLeagues(new Set(Object.keys(localFavs.leagues).map(Number)));
     }
