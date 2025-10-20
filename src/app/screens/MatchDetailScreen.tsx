@@ -227,12 +227,12 @@ const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { ev
         <div className="space-y-6 pt-4">
              <div className="flex justify-between items-center px-4">
                 <div className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8"><AvatarImage src={awayTeam.logo} /></Avatar>
-                    <span className="font-bold">{awayTeam.name}</span>
+                    <Avatar className="h-8 w-8"><AvatarImage src={homeTeam.logo} /></Avatar>
+                    <span className="font-bold">{homeTeam.name}</span>
                 </div>
                  <div className="flex items-center gap-2">
-                    <span className="font-bold">{homeTeam.name}</span>
-                    <Avatar className="h-8 w-8"><AvatarImage src={homeTeam.logo} /></Avatar>
+                    <span className="font-bold">{awayTeam.name}</span>
+                    <Avatar className="h-8 w-8"><AvatarImage src={awayTeam.logo} /></Avatar>
                 </div>
             </div>
             
@@ -244,9 +244,9 @@ const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { ev
                     const playerIn = event.assist;
 
                     return (
-                        <div key={`${event.time.elapsed}-${event.player.name}-${index}`} className={cn("relative flex my-4 items-center", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
+                        <div key={`${event.time.elapsed}-${event.player.name}-${index}`} className={cn("relative flex my-4 items-center", isHomeEvent ? "flex-row" : "flex-row-reverse")}>
                            <div className="flex-1 px-4">
-                                <div className={cn("flex items-center gap-3 w-full", isHomeEvent ? "flex-row-reverse text-right" : "flex-row text-left")}>
+                                <div className={cn("flex items-center gap-3 w-full", isHomeEvent ? "flex-row text-left" : "flex-row-reverse text-right")}>
                                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background flex-shrink-0">
                                         {getEventIcon(event)}
                                     </div>
@@ -297,7 +297,6 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
 }
 
 const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string, originalName: string) => void }) => {
-    const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
 
     if (lineups === null) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
@@ -307,8 +306,14 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
         return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     }
 
-    const home = lineups[0];
-    const away = lineups[1];
+    const home = lineups.find(l => l.team.id === lineups[0].team.id);
+    const away = lineups.find(l => l.team.id !== lineups[0].team.id);
+
+    if (!home || !away) {
+         return <p className="text-center text-muted-foreground p-8">خطأ في بيانات التشكيلة.</p>;
+    }
+
+    const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
     
     const activeLineup = activeTeamTab === 'home' ? home : away;
     
@@ -560,6 +565,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             data.teams.home.name = getDisplayName('team', data.teams.home.id, data.teams.home.name);
             data.teams.away.name = getDisplayName('team', data.teams.away.id, data.teams.away.name);
         } else if (type === 'lineups' && data.team) {
+            data.team.name = getDisplayName('team', data.team.id, data.team.name);
             if(data.coach?.id) data.coach.name = getDisplayName('coach', data.coach.id, data.coach.name);
             data.startXI = data.startXI.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
             data.substitutes = data.substitutes.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
@@ -583,7 +589,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         const fetchAllData = async () => {
             if (!fixtureId) return;
 
-            // Immediately show initial fixture if available
             if (initialFixture) {
                 setFixture(initialFixture);
             } else {
@@ -591,7 +596,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             }
             
             try {
-                // Fetch custom names first
                 if (db) {
                      const [teamsSnapshot, leaguesSnapshot, playersSnapshot, coachSnapshot] = await Promise.all([
                         getDocs(collection(db, 'teamCustomizations')),
@@ -609,7 +613,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     setCustomNames(names);
                 }
 
-                // Fetch fixture data (even if initialFixture is present, to get latest)
                 const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
                 if (!isMounted) return;
                 const fixtureData = await fixtureRes.json();
@@ -624,34 +627,35 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 setFixture(applyCustomNames(currentFixture, 'fixture'));
                 setLoading(false);
 
-                // Fetch other data concurrently after getting fixture
-                const { league, teams } = currentFixture;
+                const { league } = currentFixture;
                 const leagueId = league?.id;
                 const season = league?.season || CURRENT_SEASON;
 
-                const fetchPromises = [
-                    fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`).then(res => res.json()),
-                    fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).then(res => res.json()),
-                    fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`).then(res => res.json()),
-                    leagueId ? fetch(`/api/football/standings?league=${leagueId}&season=${season}`).then(res => res.json()) : Promise.resolve(null),
-                    fetch(`/api/football/fixtures/players?fixture=${fixtureId}`).then(res => res.json())
-                ];
-
-                const [lineupsData, eventsData, statisticsData, standingsData, playersData] = await Promise.all(fetchPromises);
-
+                const fetchLineupsPromise = fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`).then(res => res.json());
+                const fetchEventsPromise = fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).then(res => res.json());
+                const fetchStatisticsPromise = fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`).then(res => res.json());
+                const fetchStandingsPromise = leagueId ? fetch(`/api/football/standings?league=${leagueId}&season=${season}`).then(res => res.json()) : Promise.resolve(null);
+                
+                const [lineupsData, eventsData, statisticsData, standingsData] = await Promise.all([fetchLineupsPromise, fetchEventsPromise, fetchStatisticsPromise, fetchStandingsPromise]);
+                
                 if (!isMounted) return;
 
-                // Set lineups and events first
-                let initialLineups = applyCustomNames(lineupsData?.response || [], 'lineups');
+                const initialLineups = applyCustomNames(lineupsData?.response || [], 'lineups');
                 setLineups(initialLineups);
                 setEvents(applyCustomNames(eventsData?.response || [], 'events'));
                 setStatistics(applyCustomNames(statisticsData?.response || [], 'statistics'));
                 setStandings(applyCustomNames(standingsData?.response?.[0]?.league?.standings[0] || [], 'standings'));
                 
-                // Then, merge detailed player data (with ratings) into lineups
-                if (playersData?.response) {
-                    const detailedPlayers = playersData.response.flatMap((team: any) => team.players);
-                    setLineups(prevLineups => prevLineups ? mergePlayerData(prevLineups, detailedPlayers) : null);
+                // Fetch player ratings and merge them
+                const playersDataRes = await fetch(`/api/football/fixtures/players?fixture=${fixtureId}`);
+                if (!isMounted) return;
+
+                if (playersDataRes.ok) {
+                    const playersData = await playersDataRes.json();
+                     if (playersData?.response) {
+                        const detailedPlayers = playersData.response.flatMap((team: any) => team.players);
+                        setLineups(prevLineups => prevLineups ? mergePlayerData(prevLineups, detailedPlayers) : null);
+                    }
                 }
 
             } catch (error) {
@@ -700,7 +704,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             setDoc(docRef, data)
                 .then(() => {
                     toast({ title: "نجاح", description: `تم تحديث الاسم.` });
-                    // Re-fetch custom names to update UI
                      if (db) {
                         getDocs(collection(db, collectionName)).then(snapshot => {
                              const names = new Map<number, string>();
@@ -830,5 +833,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
-
