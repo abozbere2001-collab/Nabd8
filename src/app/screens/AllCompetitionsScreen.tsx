@@ -6,9 +6,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy, Loader2 } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, onSnapshot, query, updateDoc, deleteField, getDocs, writeBatch, getDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot, getDocs, writeBatch, getDoc, deleteDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -27,17 +26,18 @@ const COMPETITIONS_CACHE_KEY = 'goalstack_competitions_cache';
 const TEAMS_CACHE_KEY = 'goalstack_national_teams_cache';
 const CACHE_EXPIRATION_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
 
-interface Cache<T> {
-    data: T;
+interface CompetitionsCache {
+    managedCompetitions: ManagedCompetitionType[];
+    customNames: { leagues: Record<string, string>, countries: Record<string, string>, continents: Record<string, string> };
     lastFetched: number;
 }
 
-const getCachedData = <T>(key: string): Cache<T> | null => {
+const getCachedData = <T>(key: string): { data: T; lastFetched: number } | null => {
     if (typeof window === 'undefined') return null;
     try {
         const cachedData = localStorage.getItem(key);
         if (!cachedData) return null;
-        return JSON.parse(cachedData) as Cache<T>;
+        return JSON.parse(cachedData) as { data: T; lastFetched: number };
     } catch (error) {
         return null;
     }
@@ -45,7 +45,7 @@ const getCachedData = <T>(key: string): Cache<T> | null => {
 
 const setCachedData = <T>(key: string, data: T) => {
     if (typeof window === 'undefined') return;
-    const cacheData: Cache<T> = { data, lastFetched: Date.now() };
+    const cacheData = { data, lastFetched: Date.now() };
     localStorage.setItem(key, JSON.stringify(cacheData));
 };
 
@@ -88,8 +88,8 @@ const WORLD_LEAGUES_KEYWORDS = ["world", "uefa", "champions league", "europa", "
 
 // --- MAIN SCREEN COMPONENT ---
 export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
-    const { isAdmin } = useAdmin();
-    const { user, db } = useAuth();
+    const { isAdmin, db } = useAdmin();
+    const { user } = useAuth();
     const { toast } = useToast();
     
     const [favorites, setFavorites] = useState<Partial<Favorites>>({});
@@ -120,7 +120,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const fetchAllData = useCallback(async (forceRefresh = false) => {
         setLoadingData(true);
     
-        // Fetch Club Competitions
         const fetchClubData = async () => {
           if (!db) return { competitions: [], customNames: { leagues: new Map(), countries: new Map(), continents: new Map() } };
           
@@ -146,29 +145,34 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
           try {
             const compsSnapshot = await getDocs(collection(db, 'managedCompetitions'));
             const fetchedCompetitions = compsSnapshot.docs.map(d => d.data() as ManagedCompetitionType);
-            let fetchedCustomNames = { leagues: {}, countries: {}, continents: {} };
-    
+            
+            let fetchedCustomNames = { leagues: new Map<number, string>(), countries: new Map<string, string>(), continents: new Map<string, string>() };
+
             if (isAdmin) {
               const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
                 getDocs(collection(db, 'leagueCustomizations')),
                 getDocs(collection(db, 'countryCustomizations')),
                 getDocs(collection(db, 'continentCustomizations')),
               ]);
-              fetchedCustomNames.leagues = Object.fromEntries(leaguesSnapshot.docs.map(d => [d.id, d.data().customName]));
-              fetchedCustomNames.countries = Object.fromEntries(countriesSnapshot.docs.map(d => [d.id, d.data().customName]));
-              fetchedCustomNames.continents = Object.fromEntries(continentsSnapshot.docs.map(d => [d.id, d.data().customName]));
+              leaguesSnapshot.docs.forEach(d => fetchedCustomNames.leagues.set(Number(d.id), d.data().customName));
+              countriesSnapshot.docs.forEach(d => fetchedCustomNames.countries.set(d.id, d.data().customName));
+              continentsSnapshot.docs.forEach(d => fetchedCustomNames.continents.set(d.id, d.data().customName));
             }
             
-            const cachePayload: CompetitionsCache = { managedCompetitions: fetchedCompetitions, customNames: fetchedCustomNames, lastFetched: Date.now() };
+            const cachePayload: CompetitionsCache = { 
+                managedCompetitions: fetchedCompetitions, 
+                customNames: {
+                    leagues: Object.fromEntries(fetchedCustomNames.leagues),
+                    countries: Object.fromEntries(fetchedCustomNames.countries),
+                    continents: Object.fromEntries(fetchedCustomNames.continents),
+                },
+                lastFetched: Date.now()
+            };
             setCachedData(COMPETITIONS_CACHE_KEY, cachePayload);
     
             return {
               competitions: fetchedCompetitions,
-              customNames: {
-                leagues: new Map(Object.entries(fetchedCustomNames.leagues)),
-                countries: new Map(Object.entries(fetchedCustomNames.countries)),
-                continents: new Map(Object.entries(fetchedCustomNames.continents))
-              }
+              customNames: fetchedCustomNames
             };
           } catch (error) {
             console.error("Failed to fetch competitions data:", error);
@@ -179,7 +183,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
           }
         };
     
-        // Fetch National Teams
         const fetchNationalTeams = async () => {
           const cached = getCachedData<Team[]>(TEAMS_CACHE_KEY);
           if (cached && !forceRefresh && Date.now() - cached.lastFetched < CACHE_EXPIRATION_MS) {
@@ -199,7 +202,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
           }
         };
         
-        // Fetch all data in parallel
         const [clubResult, teamsResult, customTeamsSnapshot] = await Promise.all([
           fetchClubData(),
           fetchNationalTeams(),
@@ -207,7 +209,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         ]);
     
         const teamNamesMap = new Map<number, string>();
-        customTeamsSnapshot.forEach(doc => teamNamesMap.set(Number(doc.id), doc.data().customName));
+        if (customTeamsSnapshot && customTeamsSnapshot.docs) {
+          customTeamsSnapshot.docs.forEach(doc => teamNamesMap.set(Number(doc.id), doc.data().customName));
+        }
         
         setManagedCompetitions(clubResult.competitions);
         setNationalTeams(teamsResult);
@@ -405,7 +409,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const handleAdminRefresh = async () => {
         if (!db) return;
-        toast({ title: 'بدء التحديث...', description: 'جاري تحديث بيانات البطولات لجميع المستخدمين.' });
+        toast({ title: 'بدء التحديث...', description: 'جاري تحديث بيانات البطولات والمنتخبات لجميع المستخدمين.' });
         try {
             const cacheBusterRef = doc(db, 'appConfig', 'cache');
             await setDoc(cacheBusterRef, { competitionsLastUpdated: new Date() }, { merge: true });
@@ -583,8 +587,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 }
             />
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                 <Accordion type="multiple" className="w-full space-y-4">
-                    <AccordionItem value="national" className="rounded-lg border bg-card/50">
+                 <Accordion type="multiple" className="w-full space-y-4" defaultValue={['national-teams']}>
+                    <AccordionItem value="national-teams" className="rounded-lg border bg-card/50">
                         <AccordionTrigger className="px-4 py-3 hover:no-underline">
                             <div className="flex items-center gap-3">
                                 <Users className="h-6 w-6 text-primary"/>
@@ -597,11 +601,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                              </Accordion>
                         </AccordionContent>
                     </AccordionItem>
-                    <AccordionItem value="clubs" className="rounded-lg border bg-card/50">
+                    <AccordionItem value="club-competitions" className="rounded-lg border bg-card/50">
                         <AccordionTrigger className="px-4 py-3 hover:no-underline">
                             <div className="flex items-center gap-3">
                                 <Trophy className="h-6 w-6 text-primary"/>
-                                <h3 className="text-lg font-bold">الأندية</h3>
+                                <h3 className="text-lg font-bold">بطولات الأندية</h3>
                             </div>
                         </AccordionTrigger>
                         <AccordionContent className="p-2">
@@ -629,3 +633,4 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     );
 }
 
+    
