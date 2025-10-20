@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -23,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 interface OurBallTabProps {
     navigate: ScreenProps['navigate'];
@@ -70,6 +72,10 @@ export function OurBallTab({ navigate, ourBallTeams }: OurBallTabProps) {
         );
     }
 
+    const getDisplayName = (team: Team) => {
+        return hardcodedTranslations.teams[team.id] || team.name;
+    };
+
     return (
         <div className="space-y-3 pt-4 px-4">
             {ourBallTeams.map((team) => (
@@ -77,10 +83,10 @@ export function OurBallTab({ navigate, ourBallTeams }: OurBallTabProps) {
                     <div onClick={() => navigate('TeamDetails', { teamId: team.id })} className="flex-1 flex items-center gap-3 cursor-pointer">
                         <Avatar className="h-10 w-10">
                             <AvatarImage src={team.logo} alt={team.name} />
-                            <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
+                            <AvatarFallback>{getDisplayName(team).substring(0, 2)}</AvatarFallback>
                         </Avatar>
                         <div>
-                            <p className="font-bold">{team.name}</p>
+                            <p className="font-bold">{getDisplayName(team)}</p>
                         </div>
                     </div>
                     <AlertDialog>
@@ -93,7 +99,7 @@ export function OurBallTab({ navigate, ourBallTeams }: OurBallTabProps) {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    سيتم حذف فريق "{team.name}" من قائمة "كرتنا".
+                                    سيتم حذف فريق "{getDisplayName(team)}" من قائمة "كرتنا".
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
@@ -14,7 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { collection, query, orderBy, onSnapshot, getDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 const IRAQI_LEAGUE_ID = 542;
 
@@ -64,10 +66,11 @@ export function OurLeagueTab({ navigate, ourLeagueId }: OurLeagueTabProps) {
                 const fixturesData = await fixturesRes.json();
                 const standingsData = await standingsRes.json();
                 const scorersData = await scorersRes.json();
-
-                if (leagueData.response?.[0]) {
-                    const league = leagueData.response[0].league;
-                    setLeagueDetails({ id: league.id, name: league.name, logo: league.logo });
+                
+                const rawLeague = leagueData.response?.[0]?.league;
+                 if (rawLeague) {
+                    const name = hardcodedTranslations.leagues[rawLeague.id] || rawLeague.name;
+                    setLeagueDetails({ ...rawLeague, name });
                 }
 
                 setFixtures(fixturesData.response || []);

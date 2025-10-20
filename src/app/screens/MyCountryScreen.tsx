@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -56,68 +57,45 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { isAdmin } = useAdmin();
     
     const [favorites, setFavorites] = useState<Partial<Favorites>>({});
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingFavorites, setIsLoadingFavorites] = useState(true);
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
-    
+
+    // Step 1: Listen to favorites from Firestore or get from local storage
     useEffect(() => {
-        setIsLoading(true);
-        let favoritesUnsubscribe: (() => void) | null = null;
-        let pinnedMatchesUnsubscribe: (() => void) | null = null;
-        let isMounted = true;
-
-        const handleFavorites = (favData: Partial<Favorites>) => {
-            if (isMounted) {
-                setFavorites(favData);
-                setIsLoading(false);
-            }
-        };
-
+        setIsLoadingFavorites(true);
         if (user && db) {
             const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            favoritesUnsubscribe = onSnapshot(favsRef, (docSnap) => {
-                handleFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
+            const unsubscribe = onSnapshot(favsRef, (docSnap) => {
+                setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
+                setIsLoadingFavorites(false);
             }, (error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-                handleFavorites({}); // Fallback to empty on error
+                setFavorites({}); // Fallback
+                setIsLoadingFavorites(false);
             });
+            return () => unsubscribe();
         } else {
             // Guest user
-            handleFavorites(getLocalFavorites());
+            setFavorites(getLocalFavorites());
+            setIsLoadingFavorites(false);
         }
-
-        if (db) {
-            const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
-            pinnedMatchesUnsubscribe = onSnapshot(query(pinnedMatchesRef), (snapshot) => {
-                if (isMounted) {
-                    setPinnedMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch)));
-                }
-            }, (serverError) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
-            });
-        } else {
-            // No db connection, can't fetch pinned matches
-             if(isMounted) setPinnedMatches([]);
-        }
-
-        return () => {
-            isMounted = false;
-            if (favoritesUnsubscribe) favoritesUnsubscribe();
-            if (pinnedMatchesUnsubscribe) pinnedMatchesUnsubscribe();
-        };
     }, [user, db]);
 
-    const ourLeagueData = useMemo(() => {
-        const leagueId = favorites?.ourLeagueId;
-        // In the new simplified version, we don't rely on the `favorites.leagues` map.
-        // We will pass the ID and `OurLeagueTab` will fetch the details if needed.
-        if (!leagueId) return null;
-        return { id: leagueId };
-    }, [favorites?.ourLeagueId]);
-
-    const ourBallTeams = useMemo(() => {
-        if (!favorites.ourBallTeams) return [];
-        return Object.values(favorites.ourBallTeams).sort((a, b) => a.name.localeCompare(b.name));
-    }, [favorites.ourBallTeams]);
+    // Step 2: Listen to pinned matches (admin feature)
+    useEffect(() => {
+        if (!db) return;
+        const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
+        const unsub = onSnapshot(query(pinnedMatchesRef), (snapshot) => {
+            setPinnedMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch)));
+        }, (serverError) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
+        });
+        return () => unsub();
+    }, [db]);
+    
+    // Step 3: Memoize the derived favorite data
+    const ourLeagueId = useMemo(() => favorites?.ourLeagueId, [favorites?.ourLeagueId]);
+    const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}).sort((a, b) => a.name.localeCompare(b.name)), [favorites.ourBallTeams]);
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -137,7 +115,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 }
             />
             
-            {isLoading ? (
+            {isLoadingFavorites ? (
                 <div className="flex-1 flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-primary"/>
                 </div>
@@ -172,7 +150,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         <TabsContent value="our-league" className="flex-1 overflow-auto">
                              <OurLeagueTab
                                 navigate={navigate}
-                                ourLeagueId={ourLeagueData?.id}
+                                ourLeagueId={ourLeagueId}
                             />
                         </TabsContent>
                         <TabsContent value="our-ball" className="pt-0 flex-1 overflow-auto">
