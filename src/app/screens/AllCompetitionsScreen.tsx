@@ -16,10 +16,10 @@ import type { Favorites, ManagedCompetition as ManagedCompetitionType, Team } fr
 import { SearchSheet } from '@/components/SearchSheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
-import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileButton } from '../AppContentWrapper';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 
 // --- Persistent Cache Logic ---
@@ -130,79 +130,77 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         return defaultName;
     }, [customNames]);
 
-    const fetchClubData = useCallback(async (forceRefresh = false) => {
+    const fetchAllData = useCallback(async (forceRefresh = false) => {
         setLoadingClubData(true);
-      
         if (!db) {
             setLoadingClubData(false);
             return;
+        }
+
+        const fetchCustomNames = async () => {
+            const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, teamsSnapshot] = await Promise.all([
+                getDocs(collection(db, 'leagueCustomizations')),
+                getDocs(collection(db, 'countryCustomizations')),
+                getDocs(collection(db, 'continentCustomizations')),
+                getDocs(collection(db, 'teamCustomizations'))
+            ]).catch(err => {
+                console.warn("Could not fetch some customizations, this might be a permission issue for non-admins but data will still load.", err);
+                return [null, null, null, null];
+            });
+
+            const fetchedCustomNames = {
+                leagues: new Map<number, string>(),
+                countries: new Map<string, string>(),
+                continents: new Map<string, string>(),
+                teams: new Map<number, string>()
+            };
+
+            leaguesSnapshot?.forEach(d => fetchedCustomNames.leagues.set(Number(d.id), d.data().customName));
+            countriesSnapshot?.forEach(d => fetchedCustomNames.countries.set(d.id, d.data().customName));
+            continentsSnapshot?.forEach(d => fetchedCustomNames.continents.set(d.id, d.data().customName));
+            teamsSnapshot?.forEach(d => fetchedCustomNames.teams.set(Number(d.id), d.data().customName));
+            
+            return fetchedCustomNames;
         };
+
+        const fetchClubData = async () => {
+            const cached = getCachedData<CompetitionsCache>(COMPETITIONS_CACHE_KEY);
+            let serverLastUpdated = 0;
+            try {
+                const cacheBusterRef = doc(db, 'appConfig', 'cache');
+                const cacheBusterSnap = await getDoc(cacheBusterRef);
+                serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
+            } catch (e) { console.warn("Could not check cache-buster."); }
+
+            if (cached?.data?.managedCompetitions && !forceRefresh && cached.lastFetched > serverLastUpdated) {
+                setManagedCompetitions(cached.data.managedCompetitions);
+                return; // Names will be set by fetchCustomNames
+            }
+
+            try {
+                const compsSnapshot = await getDocs(collection(db, 'managedCompetitions'));
+                const fetchedCompetitions = compsSnapshot.docs.map(d => d.data() as ManagedCompetitionType);
+                setManagedCompetitions(fetchedCompetitions);
+                 setCachedData(COMPETITIONS_CACHE_KEY, { ...cached, data: { ...cached?.data, managedCompetitions: fetchedCompetitions, lastFetched: Date.now() } });
+            } catch (error) {
+                if (error instanceof Error && (error.message.includes('permission-denied') || error.message.includes('insufficient permissions'))) {
+                    toast({ variant: "destructive", title: "خطأ في الصلاحيات", description: "فشل تحميل بيانات البطولات." });
+                }
+            }
+        };
+
+        const [fetchedNames] = await Promise.all([
+            fetchCustomNames(),
+            fetchClubData()
+        ]);
+
+        if (fetchedNames) {
+            setCustomNames(fetchedNames);
+        }
         
-        const cached = getCachedData<CompetitionsCache>(COMPETITIONS_CACHE_KEY);
-        let serverLastUpdated = 0;
-        try {
-          const cacheBusterRef = doc(db, 'appConfig', 'cache');
-          const cacheBusterSnap = await getDoc(cacheBusterRef);
-          serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
-        } catch (e) { console.warn("Could not check cache-buster."); }
-  
-        if (cached?.data?.managedCompetitions && !forceRefresh && cached.lastFetched > serverLastUpdated) {
-            setManagedCompetitions(cached.data.managedCompetitions);
-            setCustomNames(prev => ({
-                ...prev,
-                leagues: new Map(Object.entries(cached.data.customNames?.leagues || {})),
-                countries: new Map(Object.entries(cached.data.customNames?.countries || {})),
-                continents: new Map(Object.entries(cached.data.customNames?.continents || {}))
-            }));
-            setLoadingClubData(false);
-            return;
-        }
-  
-        try {
-          const compsSnapshot = await getDocs(collection(db, 'managedCompetitions'));
-          const fetchedCompetitions = compsSnapshot.docs.map(d => d.data() as ManagedCompetitionType);
-          
-          let fetchedCustomNames = { leagues: new Map<number, string>(), countries: new Map<string, string>(), continents: new Map<string, string>() };
+        setLoadingClubData(false);
 
-          if (isAdmin) {
-            const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
-              getDocs(collection(db, 'leagueCustomizations')),
-              getDocs(collection(db, 'countryCustomizations')),
-              getDocs(collection(db, 'continentCustomizations')),
-            ]);
-            leaguesSnapshot.docs.forEach(d => fetchedCustomNames.leagues.set(Number(d.id), d.data().customName));
-            countriesSnapshot.docs.forEach(d => fetchedCustomNames.countries.set(d.id, d.data().customName));
-            continentsSnapshot.docs.forEach(d => fetchedCustomNames.continents.set(d.id, d.data().customName));
-          }
-          
-          const cachePayload: CompetitionsCache = { 
-              managedCompetitions: fetchedCompetitions, 
-              customNames: {
-                  leagues: Object.fromEntries(fetchedCustomNames.leagues),
-                  countries: Object.fromEntries(fetchedCustomNames.countries),
-                  continents: Object.fromEntries(fetchedCustomNames.continents),
-              },
-              lastFetched: Date.now()
-          };
-          setCachedData(COMPETITIONS_CACHE_KEY, cachePayload);
-  
-          setManagedCompetitions(fetchedCompetitions);
-           setCustomNames(prev => ({
-              ...prev,
-              leagues: fetchedCustomNames.leagues,
-              countries: fetchedCustomNames.countries,
-              continents: fetchedCustomNames.continents
-          }));
-
-        } catch (error) {
-          console.error("Failed to fetch competitions data:", error);
-          if (error instanceof Error && (error.message.includes('permission-denied') || error.message.includes('insufficient permissions'))) {
-              toast({ variant: "destructive", title: "خطأ في الصلاحيات", description: "فشل تحميل بيانات البطولات." });
-          }
-        } finally {
-            setLoadingClubData(false);
-        }
-    }, [db, isAdmin, toast]);
+    }, [db, toast]);
 
 
     const fetchNationalTeams = useCallback(async () => {
@@ -259,23 +257,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     useEffect(() => {
-        const fetchInitialData = async () => {
-            if (!db) {
-                 setCustomNames({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
-            } else {
-                 try {
-                    const teamsSnapshot = isAdmin ? await getDocs(collection(db, 'teamCustomizations')) : null;
-                    const teamNamesMap = new Map<number, string>();
-                    teamsSnapshot?.docs?.forEach(doc => teamNamesMap.set(Number(doc.id), doc.data().customName));
-                    setCustomNames(prev => ({ ...prev, teams: teamNamesMap }));
-                } catch (error) {
-                    console.warn("Could not fetch team custom names", error);
-                }
-            }
-            fetchClubData();
-        };
-        fetchInitialData();
-    }, [fetchClubData, db, isAdmin]);
+        fetchAllData();
+    }, [fetchAllData]);
 
     const sortedGroupedCompetitions = useMemo(() => {
         if (!managedCompetitions) return null;
@@ -320,7 +303,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
         }
         return sortedGrouped;
-    }, [managedCompetitions, getName, customNames]);
+    }, [managedCompetitions, getName]);
     
     const groupedNationalTeams = useMemo(() => {
         if (!nationalTeams) return null;
@@ -342,7 +325,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         });
         
         return grouped;
-    }, [nationalTeams, getName, customNames]);
+    }, [nationalTeams, getName]);
 
 
     useEffect(() => {
@@ -435,25 +418,25 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [user, db, favorites]);
 
     const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
-      if (!db) return;
-      const collectionName = `${type}Customizations`;
-      const docId = String(id);
-      
-      const originalName = renameItem?.originalName;
-      const data = { customName: newName };
+        if (!db) return;
+        const collectionName = `${type}Customizations`;
+        const docId = String(id);
+        
+        const originalName = renameItem?.originalName;
+        const data = { customName: newName };
 
-      const op = (newName && newName !== originalName)
-        ? setDoc(doc(db, collectionName, docId), data)
-        : deleteDoc(doc(db, collectionName, docId));
+        const op = (newName && newName.trim() && newName !== originalName)
+            ? setDoc(doc(db, collectionName, docId), data)
+            : deleteDoc(doc(db, collectionName, docId));
 
-      op.then(() => {
-          fetchClubData(true);
-          toast({ title: 'نجاح', description: 'تم حفظ التغييرات.' });
-      }).catch(serverError => {
-          const permissionError = new FirestorePermissionError({ path: doc(db, collectionName, docId).path, operation: 'write' });
-          errorEmitter.emit('permission-error', permissionError);
-      });
-      setRenameItem(null);
+        op.then(() => {
+            fetchAllData(true);
+            toast({ title: 'نجاح', description: 'تم حفظ التغييرات.' });
+        }).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: doc(db, collectionName, docId).path, operation: 'write', requestResourceData: data });
+            errorEmitter.emit('permission-error', permissionError);
+        });
+        setRenameItem(null);
     };
 
     const handleAdminRefresh = async () => {
@@ -465,7 +448,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             localStorage.removeItem(COMPETITIONS_CACHE_KEY);
             localStorage.removeItem(TEAMS_CACHE_KEY);
             localStorage.removeItem(COUNTRIES_CACHE_KEY);
-            await fetchClubData(true);
+            await fetchAllData(true);
             await fetchNationalTeams();
             toast({ title: 'نجاح', description: 'تم تحديث البيانات بنجاح.' });
         } catch (error) {
@@ -679,7 +662,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             <AddCompetitionDialog isOpen={isAddOpen} onOpenChange={(isOpen) => {
                 setAddOpen(isOpen);
                 if(!isOpen) {
-                    fetchClubData(true);
+                    fetchAllData(true);
                 }
             }} />
         </div>
