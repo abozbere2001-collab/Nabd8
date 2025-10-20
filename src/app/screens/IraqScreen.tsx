@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -107,7 +106,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
     if (user && db) {
       // ✅ التعديل هنا: القراءة الآن من نفس المكان الذي تُكتب فيه البيانات
-      const favsRef = doc(db, "users", user.uid, "favorites", "data");
+      const favsRef = doc(db, "users", user.uid, "ourFavorites", "data");
 
       console.log("[IraqScreen] Listening to favorites:", favsRef.path);
 
@@ -276,5 +275,3 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
