@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { collection, getDocs, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, doc, query, orderBy, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
 import type { Fixture, Standing, TopScorer, PinnedMatch, Favorites, Team } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -21,9 +21,21 @@ import { FixtureItem } from '@/components/FixtureItem';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { Card, CardContent } from '@/components/ui/card';
 import { isMatchLive } from '@/lib/matchStatus';
-import { getLocalFavorites } from '@/lib/local-favorites';
+import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onManage: () => void, isAdmin: boolean}) {
     if (!match.isEnabled) return null;
@@ -394,57 +406,85 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
     
     useEffect(() => {
+        let isMounted = true;
         setLoading(true);
-        let unsubscribe: (() => void) | null = null;
 
-        if (user && db) {
-            const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            unsubscribe = onSnapshot(favsRef, (docSnap) => {
-                setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
-                setLoading(false);
-            }, (error) => {
-                if (user) { 
-                    const permissionError = new FirestorePermissionError({ path: favsRef.path, operation: 'get' });
-                    errorEmitter.emit('permission-error', permissionError);
+        const fetchAllData = async () => {
+            let favs: Partial<Favorites> = {};
+
+            if (user && db) {
+                const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+                try {
+                    const docSnap = await getDoc(favsRef);
+                    if (docSnap.exists()) {
+                        favs = docSnap.data() as Favorites;
+                    }
+                } catch (e) {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
                 }
-                setFavorites(getLocalFavorites());
-                setLoading(false);
-            });
-        } else {
-            setFavorites(getLocalFavorites());
+            } else {
+                favs = getLocalFavorites();
+            }
+
+            if (!isMounted) return;
+            setFavorites(favs);
+
+            const leagueId = favs?.ourLeagueId;
+            if (leagueId && favs?.leagues?.[leagueId]) {
+                // League details are already in favorites, no need to fetch again.
+            } else if (leagueId) {
+                // Fetch league details if ID exists but details are missing (e.g., old data structure)
+                try {
+                    const res = await fetch(`/api/football/leagues?id=${leagueId}`);
+                    const data = await res.json();
+                    if (isMounted && data.response?.[0]) {
+                        const league = data.response[0].league;
+                        setFavorites(currentFavs => ({
+                            ...currentFavs,
+                            leagues: {
+                                ...currentFavs.leagues,
+                                [leagueId]: { leagueId: league.id, name: league.name, logo: league.logo }
+                            }
+                        }));
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch league details", e);
+                }
+            }
+
             setLoading(false);
-        }
-        
-        return () => {
-            if (unsubscribe) unsubscribe();
         };
 
-    }, [user, db]);
+        fetchAllData();
 
+        if (db) {
+            const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
+            const q = query(pinnedMatchesRef);
+            const unsub = onSnapshot(q, (snapshot) => {
+                const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch));
+                if (isMounted) {
+                    setPinnedMatches(matches);
+                }
+            }, (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
+            });
+            return () => {
+                isMounted = false;
+                unsub();
+            };
+        } else {
+             return () => { isMounted = false; };
+        }
+    }, [user, db]);
+    
     const ourLeagueData = useMemo(() => {
         const leagueId = favorites?.ourLeagueId;
-        if (!leagueId) return null;
+        if (!leagueId || !favorites?.leagues?.[leagueId]) return null;
         
-        const leagueDetails = favorites?.leagues?.[leagueId];
-        return leagueDetails ? { id: leagueId, name: leagueDetails.name, logo: leagueDetails.logo } : null;
-
+        const leagueDetails = favorites.leagues[leagueId];
+        return { id: leagueId, name: leagueDetails.name, logo: leagueDetails.logo };
     }, [favorites.ourLeagueId, favorites.leagues]);
 
-
-    useEffect(() => {
-        if (!db) { return; }
-        const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
-        const q = query(pinnedMatchesRef);
-        const unsub = onSnapshot(q, (snapshot) => {
-            const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch));
-            setPinnedMatches(matches);
-        }, (serverError) => {
-            const permissionError = new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
-        });
-        return () => unsub();
-    }, [db]);
-    
     const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}).sort((a,b) => a.name.localeCompare(b.name)), [favorites.ourBallTeams]);
 
     return (

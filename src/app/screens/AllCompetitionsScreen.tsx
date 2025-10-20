@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -39,7 +40,7 @@ const getCachedData = <T>(key: string): { data: T; lastFetched: number } | null 
         const cachedData = localStorage.getItem(key);
         if (!cachedData) return null;
         const parsed = JSON.parse(cachedData);
-        if (parsed.lastFetched && Date.now() - parsed.lastFetched > CACHE_EXPIRATION_MS) {
+        if (!parsed || !parsed.lastFetched || Date.now() - parsed.lastFetched > CACHE_EXPIRATION_MS) {
             localStorage.removeItem(key);
             return null;
         }
@@ -113,8 +114,19 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const getName = useCallback((type: 'league' | 'team' | 'country' | 'continent', id: string | number, defaultName: string) => {
         if (!defaultName) return '';
-        const firestoreMap = type === 'league' ? customNames.leagues : type === 'team' ? customNames.teams : type === 'country' ? customNames.countries : customNames.continents;
-        return firestoreMap?.get(id as any) || (hardcodedTranslations[type + 's']?.[id] ?? defaultName);
+        const mapKey = type === 'league' ? 'leagues' : type === 'team' ? 'teams' : type === 'country' ? 'countries' : 'continents';
+        const firestoreMap = customNames[mapKey];
+        
+        const customName = firestoreMap?.get(id as any);
+        if (customName) return customName;
+        
+        const hardcodedKey = `${type}s` as 'leagues' | 'teams' | 'countries' | 'continents';
+        const hardcodedTranslation = hardcodedTranslations[hardcodedKey];
+        if (hardcodedTranslation && (id in hardcodedTranslation)) {
+            return hardcodedTranslation[id as any];
+        }
+
+        return defaultName;
     }, [customNames]);
 
     const fetchAllData = useCallback(async (forceRefresh = false) => {
@@ -126,11 +138,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 return;
             };
             try {
-                const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, teamsSnapshot] = await Promise.all([
-                    getDocs(collection(db, 'leagueCustomizations')),
-                    getDocs(collection(db, 'countryCustomizations')),
-                    getDocs(collection(db, 'continentCustomizations')),
-                    getDocs(collection(db, 'teamCustomizations'))
+                 const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, teamsSnapshot] = await Promise.all([
+                    isAdmin ? getDocs(collection(db, 'leagueCustomizations')) : Promise.resolve(null),
+                    isAdmin ? getDocs(collection(db, 'countryCustomizations')) : Promise.resolve(null),
+                    isAdmin ? getDocs(collection(db, 'continentCustomizations')) : Promise.resolve(null),
+                    isAdmin ? getDocs(collection(db, 'teamCustomizations')) : Promise.resolve(null),
                 ]);
 
                 const fetchedCustomNames = {
@@ -164,7 +176,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 } catch (e) { console.warn("Could not check cache-buster."); }
             }
             
-            if (cached?.data?.managedCompetitions && cached.data.managedCompetitions.length > 0 && !forceRefresh && cached.lastFetched > serverLastUpdated) {
+             if (cached?.data?.managedCompetitions && cached.data.managedCompetitions.length > 0 && !forceRefresh && cached.lastFetched > serverLastUpdated) {
                 setManagedCompetitions(cached.data.managedCompetitions);
                 return; 
             }
@@ -191,7 +203,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         
         setLoadingClubData(false);
 
-    }, [db, toast]);
+    }, [db, toast, isAdmin]);
 
 
     const fetchNationalTeams = useCallback(async () => {
@@ -419,6 +431,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             : deleteDoc(doc(db, collectionName, docId));
 
         op.then(() => {
+            // Optimistically update the UI instead of a full refetch
             setCustomNames(prev => {
                 const mapType = type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type;
                 const newMap = new Map(prev[mapType as 'teams' | 'leagues' | 'countries' | 'continents']);
@@ -428,8 +441,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 } else {
                     newMap.delete(id as any);
                 }
-                const updatedNames = { ...prev, [mapType]: newMap };
-                return updatedNames;
+                return { ...prev, [mapType]: newMap };
             });
             toast({ title: 'نجاح', description: 'تم حفظ التغييرات.' });
         }).catch(serverError => {
