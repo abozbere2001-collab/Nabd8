@@ -430,9 +430,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             if (favorites.crownedLeagues) {
                 const crownedLeagueId = Object.keys(favorites.crownedLeagues)[0];
                 if (crownedLeagueId) {
-                    // A league is already crowned
                     if (Number(crownedLeagueId) === leagueItem.leagueId) {
-                        // Uncrowning the same league
                         setCrownConfirmationState({ isOpen: true, item: leagueItem });
                         return;
                     }
@@ -443,7 +441,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                         const canChange = new Date().getTime() - crownedData.crownedAt.toDate().getTime() > thirtyDaysInMillis;
                         if (!canChange) {
                             toast({
-                                variant: 'destructive',
                                 title: 'لا يمكن التغيير الآن',
                                 description: 'لا يمكنك تغيير دوريك المتوج إلا بعد مرور 30 يومًا على اختيارك الحالي.',
                             });
@@ -452,20 +449,17 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     }
                 }
             }
-            // No league crowned, or it's been more than 30 days
             setCrownConfirmationState({ isOpen: true, item: leagueItem });
-        } else { // It's a team
+        } else {
             const teamItem = item as Team;
             const isCrowned = !!favorites.crownedTeams?.[teamItem.id];
             if (isCrowned) {
-                // Uncrowning a team
                 const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
                 const fieldPath = `crownedTeams.${teamItem.id}`;
                 updateDoc(favDocRef, { [fieldPath]: deleteField() }).catch(err => {
                     errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: { [fieldPath]: 'DELETED' } }));
                 });
             } else {
-                // Crowning a team, open dialog to add a note
                 setRenameItem({
                     type: 'team',
                     id: teamItem.id,
@@ -487,11 +481,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         let updateData: { crownedLeagues: { [key: string]: CrownedLeague } | {} };
     
         if (isCurrentlyCrowned) {
-            // Uncrowning the currently crowned league
             updateData = { crownedLeagues: {} }; 
             toast({ title: 'نجاح', description: `تم إزالة تتويج ${item.name}.` });
         } else {
-            // Crowning a new league (replaces any old one)
             const crownData: CrownedLeague = { 
                 leagueId: item.leagueId, 
                 name: item.name, 
@@ -813,6 +805,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
 
 
 

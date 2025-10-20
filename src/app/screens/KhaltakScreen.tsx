@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -452,8 +453,12 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
     }
     
     if (!data || data.length === 0) {
-        return <div className="text-center text-muted-foreground py-10">لا توجد بيانات متاحة حاليًا.</div>;
+        const message = activeTab === 'predictions' || activeTab === 'matches'
+            ? 'لا توجد مباريات متاحة للتوقع لهذا اليوم.'
+            : 'لا توجد بيانات متاحة حاليًا.';
+        return <div className="text-center text-muted-foreground py-10">{message}</div>;
     }
+
 
     if (activeTab === 'matches') {
         return (
@@ -732,3 +737,4 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
