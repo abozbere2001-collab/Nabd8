@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
@@ -7,7 +8,7 @@ import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteField, writeBatch } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { Loader2, Pencil, Shirt, Star, Heart } from 'lucide-react';
+import { Loader2, Pencil, Shirt, Star } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -76,7 +77,7 @@ interface TeamData {
     };
 }
 
-const TeamHeader = ({ team, venue, onStar, onHeart, isStarred, isHearted, isAdmin, onRename }: { team: Team, venue: TeamData['venue'], onStar: () => void, onHeart: () => void, isStarred: boolean, isHearted: boolean, isAdmin: boolean, onRename: () => void }) => {
+const TeamHeader = ({ team, venue, onStar, isStarred, isAdmin, onRename }: { team: Team, venue: TeamData['venue'], onStar: () => void, isStarred: boolean, isAdmin: boolean, onRename: () => void }) => {
     return (
         <Card className="mb-4 overflow-hidden">
             <div className="relative h-24 bg-gradient-to-r from-primary/20 to-accent/20" style={{backgroundImage: `url(${venue?.image})`, backgroundSize: 'cover', backgroundPosition: 'center'}}>
@@ -86,9 +87,6 @@ const TeamHeader = ({ team, venue, onStar, onHeart, isStarred, isHearted, isAdmi
                     <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="absolute top-2 left-2 flex items-center gap-1 z-10">
-                     <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/20 hover:bg-black/40" onClick={onHeart}>
-                        <Heart className={cn("h-5 w-5", isHearted ? "text-red-500 fill-current" : "text-white/80")} />
-                    </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/20 hover:bg-black/40" onClick={onStar}>
                         <Star className={cn("h-5 w-5", isStarred ? "text-yellow-400 fill-current" : "text-white/80")} />
                     </Button>
@@ -504,47 +502,37 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
         setFavorites(getLocalFavorites());
         return;
     };
-    const starredFavRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    const ourFavRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
     
-    const unsubStarred = onSnapshot(starredFavRef, (docSnap) => {
-        setFavorites(prev => ({...prev, ...docSnap.data()}));
-    });
-    const unsubOur = onSnapshot(ourFavRef, (docSnap) => {
-        setFavorites(prev => ({...prev, ...docSnap.data()}));
+    const unsub = onSnapshot(favRef, (docSnap) => {
+        setFavorites(docSnap.exists() ? docSnap.data() as Favorites : {});
     });
 
-    return () => {
-        unsubStarred();
-        unsubOur();
-    };
+    return () => unsub();
   }, [user, db]);
 
-  const handleFavoriteToggle = (type: 'star' | 'heart') => {
+  const handleFavoriteToggle = () => {
     if (!teamData) return;
     const { team } = teamData;
 
-    if (type === 'heart' && !favorites?.ourBallTeams?.[team.id]) {
-        handleRename();
-        return;
-    }
-    
     const currentFavorites = user && db ? favorites : getLocalFavorites();
     const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-    const favTypeKey = type === 'star' ? 'teams' : 'ourBallTeams';
-    const isFavorited = !!newFavorites[favTypeKey]?.[team.id];
+    const isFavorited = !!newFavorites.teams?.[team.id];
 
     if (isFavorited) {
-        delete newFavorites[favTypeKey][team.id];
+        delete newFavorites.teams[team.id];
     } else {
-        if (!newFavorites[favTypeKey]) newFavorites[favTypeKey] = {};
-        newFavorites[favTypeKey][team.id] = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
+        if (!newFavorites.teams) newFavorites.teams = {};
+        newFavorites.teams[team.id] = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
     }
     
     if (user && db) {
-        const favDocRef = type === 'star' ? doc(db, 'users', user.uid, 'favorites', 'data') : doc(db, 'users', user.uid, 'ourFavorites', 'data');
-        setDoc(favDocRef, newFavorites, { merge: true }).catch(err => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'write', requestResourceData: newFavorites }));
+        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const fieldPath = `teams.${team.id}`;
+        const updateData = isFavorited ? { [fieldPath]: deleteField() } : { [fieldPath]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
+
+        updateDoc(favDocRef, updateData).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
         });
     } else {
         setLocalFavorites(newFavorites);
@@ -556,17 +544,15 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   const handleRename = () => {
     if (!teamData) return;
     const { team } = teamData;
-    const note = (favorites.ourBallTeams?.[team.id] as any)?.note || '';
     setRenameItem({
         id: team.id,
         name: displayTitle || team.name,
-        note: note,
         type: 'team',
         originalData: team,
     });
   };
 
-  const handleSaveRename = async (type: string, id: number, newName: string, newNote?: string) => {
+  const handleSaveRename = async (type: string, id: number, newName: string) => {
     if (!teamData || !db) return;
     const { team } = teamData;
     
@@ -579,26 +565,6 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
       }
       setDisplayTitle(newName || team.name);
       toast({ title: 'نجاح', description: 'تم تحديث الاسم المخصص للفريق.' });
-    }
-
-    if (user) {
-      const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-      const fieldPath = `ourBallTeams.${id}`;
-      const favData: any = { 
-          teamId: team.id, 
-          name: team.name, 
-          logo: team.logo, 
-          type: team.national ? 'National' : 'Club',
-      };
-      if (newNote && newNote.length > 0) {
-        favData.note = newNote;
-      }
-      
-      const updateData = { [fieldPath]: favData };
-
-      await setDoc(favDocRef, updateData, { merge: true }).catch(err => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
-      });
     }
 
     setRenameItem(null);
@@ -627,7 +593,6 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   }
 
   const isStarred = !!favorites.teams?.[teamId];
-  const isHearted = !!favorites.ourBallTeams?.[teamId];
 
   return (
     <div className="flex flex-col bg-background h-full">
@@ -640,18 +605,16 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
           <RenameDialog
               isOpen={!!renameItem}
               onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-              item={renameItem}
-              onSave={(type, id, name, note) => handleSaveRename(type, Number(id), name, note)}
+              item={{...renameItem, purpose: 'rename'}}
+              onSave={(type, id, name) => handleSaveRename(type, Number(id), name)}
           />
       )}
       <div className="flex-1 overflow-y-auto p-1">
         <TeamHeader 
             team={{...teamData.team, name: displayTitle || teamData.team.name}}
             venue={teamData.venue} 
-            onStar={() => handleFavoriteToggle('star')}
-            onHeart={() => handleFavoriteToggle('heart')}
+            onStar={handleFavoriteToggle}
             isStarred={isStarred}
-            isHearted={isHearted}
             isAdmin={isAdmin}
             onRename={handleRename}
         />

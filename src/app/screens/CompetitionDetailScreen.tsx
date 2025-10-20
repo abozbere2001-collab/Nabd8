@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
-import { Star, Pencil, Heart, Copy, Trash2, Loader2 } from 'lucide-react';
+import { Star, Pencil, Copy, Trash2, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -350,60 +350,40 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     }
   }, [loading, fixtures, firstUpcomingMatchIndex]);
   
-    const handleFavoriteToggle = (team: Team, type: 'star' | 'heart') => {
+    const handleFavoriteToggle = (team: Team) => {
         if (!user) {
             toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
             return;
         }
-
-        if (type === 'heart' && !favorites?.ourBallTeams?.[team.id]) {
-             handleOpenRename('team', team.id, team, true); // Open dialog for note
-        } else {
-             updateFavorites(team, type, !!(type === 'star' ? favorites?.teams?.[team.id] : favorites?.ourBallTeams?.[team.id]));
-        }
-    };
-    
-    const updateFavorites = (team: Team, type: 'star' | 'heart', isCurrentlyFavorited: boolean, note?: string) => {
-        if (!user || !db) return;
+        if (!db) return;
 
         const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
         
+        const fieldPath = `teams.${team.id}`;
+        const isCurrentlyFavorited = !!favorites?.teams?.[team.id];
+
         let updateData: { [key: string]: any };
 
-        if (type === 'star') {
-            const fieldPath = `teams.${team.id}`;
-            if (isCurrentlyFavorited) {
-                updateData = { [fieldPath]: deleteField() };
-            } else {
-                updateData = { [fieldPath]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
-            }
-        } else { // heart
-            const fieldPath = `ourBallTeams.${team.id}`;
-            if (isCurrentlyFavorited && !note) {
-                 updateData = { [fieldPath]: deleteField() };
-            } else {
-                const favData: any = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
-                if (note) favData.note = note;
-                updateData = { [fieldPath]: favData };
-            }
+        if (isCurrentlyFavorited) {
+            updateData = { [fieldPath]: deleteField() };
+        } else {
+            updateData = { [fieldPath]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
         }
         
-        setDoc(favRef, updateData, { merge: true }).catch(serverError => {
+        updateDoc(favRef, updateData).catch(serverError => {
             const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
             errorEmitter.emit('permission-error', permissionError);
         });
     }
   
-  const handleOpenRename = (type: RenameType, id: number, originalData: any, isForNote: boolean = false) => {
-    const purpose: 'rename' | 'note' = isForNote ? 'note' : 'rename';
+  const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
+    const purpose: 'rename' = 'rename';
     
     if (purpose === 'rename' && !isAdmin) return;
 
     if (type === 'team') {
         const currentName = getDisplayName('team', id, originalData.name);
-        const userNote = (favorites?.ourBallTeams?.[id] as any)?.note || '';
-        const adminNote = isAdmin ? customNames?.adminNotes.get(id) || '' : '';
-        setRenameItem({ id, name: currentName, note: purpose === 'note' ? userNote : adminNote, type, purpose, originalData });
+        setRenameItem({ id, name: currentName, type, purpose, originalData });
     } else if (type === 'player') {
         const currentName = getDisplayName('player', id, originalData.name);
         setRenameItem({ id, name: currentName, type, purpose, originalData });
@@ -412,16 +392,12 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     }
   };
 
-  const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote?: string) => {
+  const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
     if (!renameItem) return;
     
     const { originalData, purpose } = renameItem;
 
-    if (purpose === 'note' && user && !user.isAnonymous) {
-        const team = originalData as Team;
-        const isHearted = !!favorites?.ourBallTeams?.[team.id];
-        updateFavorites(team, 'heart', isHearted, newNote);
-    } else if (purpose === 'rename' && isAdmin && db) {
+    if (purpose === 'rename' && isAdmin && db) {
         const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
         if (newName && newName !== originalData.name) {
@@ -523,7 +499,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
           isOpen={!!renameItem}
           onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
           item={renameItem}
-          onSave={handleSaveRenameOrNote}
+          onSave={(type, id, name) => handleSaveRename(type, id, name)}
         />}
        <div className="flex-1 overflow-y-auto p-1">
         <CompetitionHeaderCard league={{ name: displayTitle, logo }} teamsCount={teams.length} />
@@ -657,7 +633,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
                     {teams.map(({ team }) => {
                         const displayName = getDisplayName('team', team.id, team.name);
-                        const isOurBallTeam = !!favorites?.ourBallTeams?.[team.id];
                         const isFavoritedTeam = !!favorites?.teams?.[team.id];
                         
                         return (
@@ -672,18 +647,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             <span className="font-semibold text-sm">
                                 {displayName}
                             </span>
-                             <div className="absolute top-1 right-1 flex">
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleFavoriteToggle(team, 'heart');
-                                }}>
-                                    <Heart className={cn("h-5 w-5", isOurBallTeam ? "text-red-500 fill-current" : "text-muted-foreground/50")} />
-                                </Button>
-                            </div>
                             <div className="absolute top-1 left-1 flex">
                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {
                                     e.stopPropagation();
-                                    handleFavoriteToggle(team, 'star');
+                                    handleFavoriteToggle(team);
                                 }}>
                                     <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
@@ -698,5 +665,3 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
-
-    

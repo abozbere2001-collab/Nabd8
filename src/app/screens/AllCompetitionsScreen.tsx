@@ -221,10 +221,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
             }, (error) => {
                  if(error.code === 'permission-denied') {
-                    // This can happen if the rules are not yet applied or for a new user
-                    // We can choose to ignore it silently or show a message.
                     console.warn("Permission denied fetching favorites. This might be expected for new users.");
-                    setFavorites(getLocalFavorites()); // fallback to local for guests who just signed in
+                    setFavorites(getLocalFavorites());
                 } else {
                     const permissionError = new FirestorePermissionError({
                         path: favoritesRef.path,
@@ -360,74 +358,52 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         }
     };
 
-    const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
+    const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star') => {
+        const isLeague = 'leagueId' in item;
+        
         if (!user) {
-            toast({
-                variant: 'destructive',
-                title: 'ميزة للمستخدمين المسجلين',
-                description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.',
-                action: <Button onClick={() => navigate('Login')}>تسجيل الدخول</Button>
-            });
+            const currentFavorites = getLocalFavorites();
+            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+            const itemType = isLeague ? 'leagues' : 'teams';
+            const itemId = isLeague ? (item as ManagedCompetitionType).leagueId : (item as Team).id;
+
+            if (!newFavorites[itemType]) newFavorites[itemType] = {};
+
+            if (newFavorites[itemType][itemId]) {
+                delete newFavorites[itemType][itemId];
+            } else {
+                 const favData = isLeague 
+                    ? { name: item.name, leagueId: itemId, logo: item.logo }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                newFavorites[itemType][itemId] = favData;
+            }
+            setLocalFavorites(newFavorites);
+            setFavorites(newFavorites); // Update local state for UI
             return;
         }
+
         if (!db) return;
 
-        const isLeague = 'leagueId' in item;
         const itemId = isLeague ? (item as ManagedCompetitionType).leagueId : (item as Team).id;
         const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const itemType = isLeague ? 'leagues' : 'teams';
-
         const currentItem = favorites[itemType]?.[itemId];
-
-        // This is the new, safe way to update.
+        const isCurrentlyStarred = !!currentItem;
+        
         let updateData: { [key: string]: any } = {};
         
-        if (type === 'heart') {
-            const isCurrentlyHearted = currentItem?.isHearted;
-            
-            // For leagues, unheart any other league first
-            if (isLeague) {
-                Object.keys(favorites.leagues || {}).forEach(id => {
-                    const numericId = Number(id);
-                    if (favorites.leagues?.[numericId]?.isHearted && numericId !== itemId) {
-                        updateData[`leagues.${id}.isHearted`] = deleteField();
-                    }
-                });
-            }
-
-            if (currentItem) {
-                // Item exists, just toggle the heart
-                 updateData[`${itemType}.${itemId}.isHearted`] = !isCurrentlyHearted;
-            } else {
-                // Item doesn't exist, so add it with heart
-                const favData: FavoriteLeague | FavoriteTeam = isLeague
-                    ? { name: item.name, leagueId: itemId, logo: item.logo, isHearted: true }
-                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club', isHearted: true };
-                updateData[`${itemType}.${itemId}`] = favData;
-            }
-
-        } else { // Star Favorite
-            const isCurrentlyStarred = !!currentItem;
-            if (isCurrentlyStarred) {
-                // If it's hearted, just remove the star property (notificationsEnabled)
-                if (currentItem.isHearted) {
-                    updateData[`${itemType}.${itemId}.notificationsEnabled`] = deleteField();
-                } else {
-                    // Not hearted, so remove the whole item
-                    updateData[`${itemType}.${itemId}`] = deleteField();
-                }
-            } else {
-                // Not starred, so add it
-                 const favData: FavoriteLeague | FavoriteTeam = isLeague
-                    ? { name: item.name, leagueId: itemId, logo: item.logo, notificationsEnabled: true }
-                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club', notificationsEnabled: true };
-                updateData[`${itemType}.${itemId}`] = favData;
-            }
+        const fieldPath = `${itemType}.${itemId}`;
+        if (isCurrentlyStarred) {
+            updateData[fieldPath] = deleteField();
+        } else {
+            const favData = isLeague
+                ? { name: item.name, leagueId: itemId, logo: item.logo }
+                : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+            updateData[fieldPath] = favData;
         }
         
         updateDoc(favDocRef, updateData).catch(err => {
-            const permissionError = new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData });
-            errorEmitter.emit('permission-error', permissionError);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }))
         });
 
     }, [user, db, favorites, toast, navigate]);
@@ -457,30 +433,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             });
         }
         
-        if (purpose === 'note') {
-            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const itemData = originalData as Team;
-            const fieldPath = `teams.${itemData.id}`;
-            const currentFav = favorites.teams?.[itemData.id];
-
-            const favData: FavoriteTeam = {
-                name: itemData.name,
-                logo: itemData.logo,
-                teamId: itemData.id,
-                type: itemData.national ? 'National' : 'Club',
-                isHearted: true, // Hearting is implicit when adding a note
-                note: newNote || deleteField(),
-                notificationsEnabled: currentFav?.notificationsEnabled,
-            };
-
-            const updateData = { [fieldPath]: favData };
-        
-            updateDoc(favDocRef, updateData).then(() => {
-                toast({ title: 'نجاح', description: 'تم حفظ الفريق في قسم بلدي.' });
-            }).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }))
-            });
-        }
         setRenameItem(null);
     };
     
@@ -495,26 +447,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         });
     };
     
-    const handleOpenNote = (team: Team) => {
-         if (!user) {
-            toast({
-                variant: 'destructive',
-                title: 'ميزة للمستخدمين المسجلين',
-                description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.',
-                action: <Button onClick={() => navigate('Login')}>تسجيل الدخول</Button>
-            });
-            return;
-        }
-        setRenameItem({
-            type: 'team',
-            id: team.id,
-            name: team.name,
-            originalData: team,
-            note: (favorites.teams?.[team.id] as FavoriteTeam)?.note || '',
-            purpose: 'note',
-        });
-    }
-
     const handleAdminRefresh = async () => {
         localStorage.removeItem(COMPETITIONS_CACHE_KEY);
         localStorage.removeItem(TEAMS_CACHE_KEY);
@@ -549,7 +481,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
               <AccordionContent className="p-1">
                 <ul className="flex flex-col">{
                   groupedNationalTeams[continent].map(team => {
-                     const isHearted = !!favorites.teams?.[team.id]?.isHearted;
                      const isStarred = !!favorites.teams?.[team.id];
                      return (
                          <li key={team.id} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
@@ -558,9 +489,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                              <span className="text-sm truncate">{team.name}</span>
                            </div>
                            <div className="flex items-center gap-1">
-                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenNote(team); }}>
-                                <Heart className={isHearted ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                             </Button>
                              {isAdmin && (
                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team.name, nationalTeams?.find(t => t.id === team.id)?.name) }}>
                                  <Pencil className="h-4 w-4 text-muted-foreground/80" />
@@ -598,7 +526,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                        <div className="p-1">
                            <ul className="flex flex-col">{
                                (content.leagues as ManagedCompetitionType[]).map(comp => {
-                                  const isHearted = !!favorites.leagues?.[comp.leagueId]?.isHearted;
                                   const isStarred = !!favorites.leagues?.[comp.leagueId];
                                    return (
                                        <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
@@ -607,9 +534,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                <span className="text-sm truncate">{comp.name}</span>
                                            </div>
                                            <div className="flex items-center gap-1">
-                                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                                   <Heart className={isHearted ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                               </Button>
                                                {isAdmin && (
                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
                                                        <Pencil className="h-4 w-4 text-muted-foreground/80" />
@@ -639,7 +563,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                      </div>
                                    <AccordionContent className="p-1">
                                        <ul className="flex flex-col">{leagues.map(comp => {
-                                             const isHearted = !!favorites.leagues?.[comp.leagueId]?.isHearted;
                                              const isStarred = !!favorites.leagues?.[comp.leagueId];
                                            return (
                                                <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
@@ -648,9 +571,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                        <span className="text-sm truncate">{comp.name}</span>
                                                    </div>
                                                    <div className="flex items-center gap-1">
-                                                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                                            <Heart className={isHearted ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                                       </Button>
                                                        {isAdmin && (
                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
                                                                <Pencil className="h-4 w-4 text-muted-foreground/80" />

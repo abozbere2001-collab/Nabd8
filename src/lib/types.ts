@@ -159,16 +159,13 @@ export interface FavoriteLeague {
     logo: string;
     leagueId: number;
     notificationsEnabled?: boolean;
-    isHearted?: boolean;
 }
 export interface FavoriteTeam {
     name: string;
     logo: string;
     teamId: number;
     type?: 'Club' | 'National';
-    note?: string;
     notificationsEnabled?: boolean;
-    isHearted?: boolean;
 }
 
 export interface Favorites {

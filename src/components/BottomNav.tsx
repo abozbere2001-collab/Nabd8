@@ -7,45 +7,21 @@ import { FootballIcon } from './icons/FootballIcon';
 import React, { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-const IRAQ_TOUR_KEY = 'goalstack_iraq_tour_seen';
-
 interface BottomNavProps {
   activeScreen: ScreenKey;
   onNavigate: (screen: ScreenKey) => void;
 }
 
 export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
-  const [showTour, setShowTour] = useState(false);
-
+  
   const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
     { key: 'Matches', label: "المباريات", icon: Shield },
     { key: 'Competitions', label: "اختياراتي", icon: Star },
-    { key: 'MyCountry', label: "بلدي", icon: FootballIcon },
     { key: 'News', label: "أخبار", icon: Newspaper },
     { key: 'Settings', label: "المزيد", icon: MoreHorizontal },
   ];
-
-  useEffect(() => {
-    const hasSeenTour = localStorage.getItem(IRAQ_TOUR_KEY);
-    if (hasSeenTour !== 'true') {
-      const timer = setTimeout(() => {
-        setShowTour(true);
-      }, 1500); 
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  const handleTourOpenChange = (open: boolean) => {
-    if (!open) {
-      setShowTour(false);
-      localStorage.setItem(IRAQ_TOUR_KEY, 'true');
-    }
-  };
   
   const handleNavigation = (key: ScreenKey) => {
-    if (showTour) {
-        handleTourOpenChange(false);
-    }
     if (navItems.some(item => item.key === key)) {
       onNavigate(key);
     }
@@ -56,9 +32,8 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
       <nav className="flex h-full items-center justify-around px-2 max-w-md mx-auto">
         {navItems.map(({ key, label, icon: Icon }) => {
           const isActive = activeScreen === key;
-          const isMyCountryTab = key === 'MyCountry';
 
-          const NavButton = (
+          return (
              <button
               key={key}
               onClick={() => handleNavigation(key as ScreenKey)}
@@ -74,25 +49,8 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
               )}
             </button>
           );
-
-          if (isMyCountryTab) {
-            return (
-              <Popover key={key} open={showTour} onOpenChange={handleTourOpenChange}>
-                <PopoverTrigger asChild>
-                  {NavButton}
-                </PopoverTrigger>
-                <PopoverContent side="top" align="center" className="w-auto p-2">
-                  <p className="text-sm font-semibold">كل ما يخص الكرة العراقية تجده هنا</p>
-                </PopoverContent>
-              </Popover>
-            );
-          }
-
-          return NavButton;
         })}
       </nav>
     </div>
   );
 }
-
-    
