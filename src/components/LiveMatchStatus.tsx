@@ -73,7 +73,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
             };
         }
 
-        const score = `${goals.home} - ${goals.away}`;
+        const score = `${goals.away} - ${goals.home}`;
 
         if (live) {
             return {
