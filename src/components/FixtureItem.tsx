@@ -41,14 +41,16 @@ export const FixtureItem = React.memo(({ fixture, navigate, customStatus }: { fi
             onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
         >
          <main className="flex items-start justify-between gap-2">
-            <AwayTeamDisplay />
+            <HomeTeamDisplay />
             <div className="flex flex-col items-center justify-center min-w-[70px] pt-1 text-center">
                 <LiveMatchStatus fixture={fixture} customStatus={customStatus}/>
             </div>
-            <HomeTeamDisplay />
+            <AwayTeamDisplay />
          </main>
         </div>
       </div>
     );
 });
 FixtureItem.displayName = 'FixtureItem';
+
+    

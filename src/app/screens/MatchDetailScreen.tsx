@@ -226,12 +226,12 @@ const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { ev
         <div className="space-y-6 pt-4">
              <div className="flex justify-between items-center px-4">
                 <div className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8"><AvatarImage src={awayTeam.logo} /></Avatar>
-                    <span className="font-bold">{awayTeam.name}</span>
+                    <Avatar className="h-8 w-8"><AvatarImage src={homeTeam.logo} /></Avatar>
+                    <span className="font-bold">{homeTeam.name}</span>
                 </div>
                  <div className="flex items-center gap-2">
-                    <span className="font-bold">{homeTeam.name}</span>
-                    <Avatar className="h-8 w-8"><AvatarImage src={homeTeam.logo} /></Avatar>
+                    <span className="font-bold">{awayTeam.name}</span>
+                    <Avatar className="h-8 w-8"><AvatarImage src={awayTeam.logo} /></Avatar>
                 </div>
             </div>
             
@@ -243,9 +243,9 @@ const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { ev
                     const playerIn = event.assist;
 
                     return (
-                        <div key={`${event.time.elapsed}-${event.player.name}-${index}`} className={cn("relative flex my-4 items-center", isHomeEvent ? "flex-row-reverse" : "flex-row")}>
+                        <div key={`${event.time.elapsed}-${event.player.name}-${index}`} className={cn("relative flex my-4 items-center", isHomeEvent ? "flex-row" : "flex-row-reverse")}>
                            <div className="flex-1 px-4">
-                                <div className={cn("flex items-center gap-3 w-full", isHomeEvent ? "flex-row-reverse text-right" : "flex-row text-left")}>
+                                <div className={cn("flex items-center gap-3 w-full", isHomeEvent ? "flex-row text-left" : "flex-row-reverse text-right")}>
                                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background flex-shrink-0">
                                         {getEventIcon(event)}
                                     </div>
@@ -547,51 +547,14 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
       return defaultName;
     }, [customNames]);
 
-    const applyCustomNames = useCallback((data: any, type: string) => {
-        if (!data) return data;
-        if (Array.isArray(data)) {
-            return data.map(item => applyCustomNames(item, type));
-        }
-
-        const applyToPlayer = (player: PlayerType) => {
-             if (!player || !player.id) return player;
-             return {...player, name: getDisplayName('player', player.id, player.name) };
-        }
-
-        if (type === 'fixture' && data.fixture) {
-            data.league.name = getDisplayName('league', data.league.id, data.league.name);
-            data.teams.home.name = getDisplayName('team', data.teams.home.id, data.teams.home.name);
-            data.teams.away.name = getDisplayName('team', data.teams.away.id, data.teams.away.name);
-        } else if (type === 'lineups' && data.team) {
-            data.team.name = getDisplayName('team', data.team.id, data.team.name);
-            if(data.coach?.id) data.coach.name = getDisplayName('coach', data.coach.id, data.coach.name);
-            data.startXI = data.startXI.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
-            data.substitutes = data.substitutes.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
-        } else if (type === 'events' && data.player) {
-            if(data.player.id) data.player.name = getDisplayName('player', data.player.id, data.player.name);
-            if(data.assist.id) data.assist.name = getDisplayName('player', data.assist.id, data.assist.name!);
-        } else if (type === 'statistics' && data.team) {
-            data.team.name = getDisplayName('team', data.team.id, data.team.name);
-        } else if (type === 'standings' && data.team) {
-            data.team.name = getDisplayName('team', data.team.id, data.team.name);
-        }
-
-        return data;
-
-    }, [getDisplayName]);
-
 
     useEffect(() => {
         let isMounted = true;
-
-        const fetchAllData = async () => {
-            if (!fixtureId) return;
-            setLoading(true);
-            
-            try {
-                // Fetch custom names first
-                if (db) {
-                     const [teamsSnapshot, leaguesSnapshot, playersSnapshot, coachSnapshot] = await Promise.all([
+        
+        const fetchCustomNames = async () => {
+            if (db) {
+                try {
+                    const [teamsSnapshot, leaguesSnapshot, playersSnapshot, coachSnapshot] = await Promise.all([
                         getDocs(collection(db, 'teamCustomizations')),
                         getDocs(collection(db, 'leagueCustomizations')),
                         getDocs(collection(db, 'playerCustomizations')),
@@ -605,8 +568,65 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     playersSnapshot.forEach(doc => names.player.set(Number(doc.id), doc.data().customName));
                     coachSnapshot.forEach(doc => names.coach.set(Number(doc.id), doc.data().customName));
                     setCustomNames(names);
+                } catch {
+                     // Non-critical, proceed without custom names for guests
+                     setCustomNames({ team: new Map(), league: new Map(), player: new Map(), coach: new Map() });
                 }
+            }
+        };
 
+        const applyAllCustomNames = (data: any) => {
+            if (!data) return;
+            const { fixture: f, lineups: l, events: e, statistics: s, standings: st, players: p } = data;
+
+            const applyToPlayer = (player: PlayerType) => {
+                if (!player || !player.id) return player;
+                return {...player, name: getDisplayName('player', player.id, player.name) };
+            };
+
+            if (f) {
+                f.league.name = getDisplayName('league', f.league.id, f.league.name);
+                f.teams.home.name = getDisplayName('team', f.teams.home.id, f.teams.home.name);
+                f.teams.away.name = getDisplayName('team', f.teams.away.id, f.teams.away.name);
+            }
+            if (l) {
+                l.forEach((lineup: LineupData) => {
+                    lineup.team.name = getDisplayName('team', lineup.team.id, lineup.team.name);
+                    if (lineup.coach?.id) lineup.coach.name = getDisplayName('coach', lineup.coach.id, lineup.coach.name);
+                    lineup.startXI = lineup.startXI.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
+                    lineup.substitutes = lineup.substitutes.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
+                });
+            }
+            if (e) {
+                e.forEach((event: MatchEvent) => {
+                    if (event.player.id) event.player.name = getDisplayName('player', event.player.id, event.player.name);
+                    if (event.assist.id) event.assist.name = getDisplayName('player', event.assist.id, event.assist.name!);
+                });
+            }
+            if (s) {
+                 s.forEach((stat: MatchStatistics) => {
+                    stat.team.name = getDisplayName('team', stat.team.id, stat.team.name);
+                 });
+            }
+            if (st) {
+                 st.forEach((standing: Standing) => {
+                    standing.team.name = getDisplayName('team', standing.team.id, standing.team.name);
+                 });
+            }
+             if (l && p) {
+                 const detailedPlayers = p.flatMap((team: any) => team.players);
+                 return mergePlayerData(l, detailedPlayers);
+             }
+            return l;
+        };
+
+
+        const fetchAllData = async () => {
+            if (!fixtureId) return;
+            setLoading(true);
+            await fetchCustomNames();
+
+            try {
                 const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
                 if (!isMounted || !fixtureRes.ok) return;
                 const fixtureData = await fixtureRes.json();
@@ -618,47 +638,38 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     return;
                 }
                 
-                const finalFixture = applyCustomNames(currentFixture, 'fixture');
-                if(isMounted) setFixture(finalFixture);
-
-                // Fetch all other data in parallel
                 const [lineupsRes, eventsRes, statisticsRes, playersDataRes, standingsRes] = await Promise.allSettled([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/players?fixture=${fixtureId}`),
-                    fetch(`/api/football/standings?league=${finalFixture.league?.id}&season=${finalFixture.league?.season || CURRENT_SEASON}`)
+                    fetch(`/api/football/standings?league=${currentFixture.league?.id}&season=${currentFixture.league?.season || CURRENT_SEASON}`)
                 ]);
 
                 if (!isMounted) return;
-                
-                // Process lineups and merge with player ratings
-                if (lineupsRes.status === 'fulfilled' && lineupsRes.value.ok) {
-                    const lineupsData = await lineupsRes.value.json();
-                    let initialLineups = applyCustomNames(lineupsData?.response || [], 'lineups');
-                    if (playersDataRes.status === 'fulfilled' && playersDataRes.value.ok) {
-                        const playersData = await playersDataRes.value.json();
-                        if (playersData?.response) {
-                            const detailedPlayers = playersData.response.flatMap((team: any) => team.players);
-                            initialLineups = mergePlayerData(initialLineups, detailedPlayers);
-                        }
-                    }
-                    if(isMounted) setLineups(initialLineups);
-                }
 
-                // Process other data
-                if (eventsRes.status === 'fulfilled' && eventsRes.value.ok) {
-                    const eventsData = await eventsRes.value.json();
-                    if(isMounted) setEvents(applyCustomNames(eventsData?.response || [], 'events'));
-                }
-                 if (statisticsRes.status === 'fulfilled' && statisticsRes.value.ok) {
-                    const statisticsData = await statisticsRes.value.json();
-                    if(isMounted) setStatistics(applyCustomNames(statisticsData?.response || [], 'statistics'));
-                }
-                if (standingsRes.status === 'fulfilled' && standingsRes.value.ok) {
-                    const standingsData = await standingsRes.value.json();
-                    if(isMounted) setStandings(applyCustomNames(standingsData?.response?.[0]?.league?.standings[0] || [], 'standings'));
-                }
+                const lineupsData = lineupsRes.status === 'fulfilled' && lineupsRes.value.ok ? await lineupsRes.value.json() : {response: []};
+                const eventsData = eventsRes.status === 'fulfilled' && eventsRes.value.ok ? await eventsRes.value.json() : {response: []};
+                const statisticsData = statisticsRes.status === 'fulfilled' && statisticsRes.value.ok ? await statisticsRes.value.json() : {response: []};
+                const playersData = playersDataRes.status === 'fulfilled' && playersDataRes.value.ok ? await playersDataRes.value.json() : {response: []};
+                const standingsData = standingsRes.status === 'fulfilled' && standingsRes.value.ok ? await standingsRes.value.json() : {response: {0: {league: {standings: [[]]}}}};
+
+                const allData = {
+                    fixture: currentFixture,
+                    lineups: lineupsData.response,
+                    events: eventsData.response,
+                    statistics: statisticsData.response,
+                    standings: standingsData.response[0]?.league?.standings[0],
+                    players: playersData.response
+                };
+                
+                const processedLineups = applyAllCustomNames(allData);
+                
+                setFixture(allData.fixture);
+                setLineups(processedLineups);
+                setEvents(allData.events);
+                setStatistics(allData.statistics);
+                setStandings(allData.standings);
 
             } catch (error) {
                  if (isMounted) {
@@ -673,8 +684,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         fetchAllData();
 
         return () => { isMounted = false; };
-
-    }, [fixtureId, db, toast, applyCustomNames]);
+    }, [fixtureId, db, toast, getDisplayName]); // getDisplayName is stable due to useCallback
     
     useEffect(() => {
         if (!db || !fixtureId) return;
@@ -707,13 +717,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             setDoc(docRef, data)
                 .then(() => {
                     toast({ title: "نجاح", description: `تم تحديث الاسم.` });
-                     if (db) {
-                        getDocs(collection(db, collectionName)).then(snapshot => {
-                             const names = new Map<number, string>();
-                             snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
-                             setCustomNames(prev => ({...prev, [type]: names}));
-                        });
-                     }
                 })
                 .catch(serverError => {
                     const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
@@ -722,13 +725,6 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         } else {
              deleteDoc(docRef).then(() => {
                  toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` });
-                  if (db) {
-                    getDocs(collection(db, collectionName)).then(snapshot => {
-                         const names = new Map<number, string>();
-                         snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
-                         setCustomNames(prev => ({...prev, [type]: names}));
-                    });
-                 }
             }).catch(serverError => {
                  const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
                  errorEmitter.emit('permission-error', permissionError);
@@ -845,3 +841,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     );
 }
 
+
+    
