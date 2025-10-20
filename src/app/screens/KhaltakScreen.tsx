@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -341,7 +342,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   if (!user) {
     return (
        <div className="flex h-full flex-col bg-background">
-          <ScreenHeader title="دورينا" onBack={goBack} canGoBack={canGoBack} />
+          <ScreenHeader title="بلدي" onBack={goBack} canGoBack={canGoBack} />
            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
               <Crown className="h-16 w-16 text-muted-foreground mb-4"/>
               <h2 className="text-xl font-bold">ميزة حصرية للمستخدمين المسجلين</h2>
@@ -357,7 +358,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader
-        title="دورينا"
+        title="بلدي"
         onBack={goBack}
         canGoBack={canGoBack}
         actions={
@@ -398,17 +399,16 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             </TabsContent>
 
             <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
-                {crownedLeague ? (
-                    <CrownedLeagueCard key={crownedLeague.leagueId} league={crownedLeague} navigate={navigate} />
-                ) : (
-                    <div className="text-center text-muted-foreground pt-10">
-                        <p className="font-bold text-lg">لم تقم بتتويج أي بطولة بعد</p>
-                        <p>اذهب إلى البطولات واضغط على أيقونة التاج 👑</p>
-                    </div>
-                )}
+               {crownedLeague ? (
+                  <CrownedLeagueCard key={crownedLeague.leagueId} league={crownedLeague} navigate={navigate} />
+               ) : (
+                  <div className="text-center text-muted-foreground pt-10">
+                      <p className="font-bold text-lg">لم تقم بتتويج أي بطولة بعد</p>
+                      <p>اذهب إلى البطولات واضغط على أيقونة التاج 👑</p>
+                  </div>
+               )}
             </TabsContent>
         </Tabs>
     </div>
   );
 }
-

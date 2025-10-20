@@ -75,11 +75,11 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   TermsOfService: { component: TermsOfServiceScreen },
   GoPro: { component: GoProScreen },
   ManageTopScorers: { component: ManageTopScorersScreen },
-  Doreena: { component: KhaltakScreen },
+  MyCountry: { component: KhaltakScreen },
 };
 
 
-const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'News', 'Doreena', 'Settings'];
+const mainTabs: ScreenKey[] = ['Matches', 'MyCountry', 'Competitions', 'News', 'Settings'];
 
 type StackItem = {
   key: string;
@@ -157,7 +157,7 @@ export function AppContentWrapper() {
         'Matches': [{ key: 'Matches-0', screen: 'Matches' }],
         'Competitions': [{ key: 'Competitions-0', screen: 'Competitions' }],
         'News': [{ key: 'News-0', screen: 'News' }],
-        'Doreena': [{ key: 'Doreena-0', screen: 'Doreena' }],
+        'MyCountry': [{ key: 'MyCountry-0', screen: 'MyCountry' }],
         'Settings': [{ key: 'Settings-0', screen: 'Settings' }],
     },
   });
