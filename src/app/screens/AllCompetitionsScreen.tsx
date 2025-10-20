@@ -24,21 +24,21 @@ import { ProfileButton } from '../AppContentWrapper';
 
 // --- Persistent Cache Logic ---
 const COMPETITIONS_CACHE_KEY = 'goalstack_competitions_cache';
+const COUNTRIES_CACHE_KEY = 'goalstack_countries_cache';
 const TEAMS_CACHE_KEY = 'goalstack_national_teams_cache';
 const CACHE_EXPIRATION_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
-
-interface CompetitionsCache {
-    managedCompetitions: ManagedCompetitionType[];
-    customNames: { leagues: Record<string, string>, countries: Record<string, string>, continents: Record<string, string> };
-    lastFetched: number;
-}
 
 const getCachedData = <T>(key: string): { data: T; lastFetched: number } | null => {
     if (typeof window === 'undefined') return null;
     try {
         const cachedData = localStorage.getItem(key);
         if (!cachedData) return null;
-        return JSON.parse(cachedData) as { data: T; lastFetched: number };
+        const parsed = JSON.parse(cachedData);
+        // Basic check for expiration if lastFetched is present
+        if (parsed.lastFetched && Date.now() - parsed.lastFetched > CACHE_EXPIRATION_MS) {
+            return null;
+        }
+        return parsed as { data: T; lastFetched: number };
     } catch (error) {
         return null;
     }
@@ -49,6 +49,7 @@ const setCachedData = <T>(key: string, data: T) => {
     const cacheData = { data, lastFetched: Date.now() };
     localStorage.setItem(key, JSON.stringify(cacheData));
 };
+
 
 // --- TYPE DEFINITIONS ---
 interface CompetitionsByCountry {
@@ -132,7 +133,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
           } catch (e) { console.warn("Could not check cache-buster."); }
     
-          if (cached?.data && !forceRefresh && cached.lastFetched > serverLastUpdated && Date.now() - cached.lastFetched < CACHE_EXPIRATION_MS) {
+          if (cached?.data && cached.data.managedCompetitions && !forceRefresh && cached.lastFetched > serverLastUpdated) {
             return {
               competitions: cached.data.managedCompetitions,
               customNames: {
@@ -185,22 +186,46 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         };
     
         const fetchNationalTeams = async () => {
-          const cached = getCachedData<Team[]>(TEAMS_CACHE_KEY);
-          if (cached && !forceRefresh && Date.now() - cached.lastFetched < CACHE_EXPIRATION_MS) {
-            return cached.data;
-          }
-    
-          try {
-            const res = await fetch('/api/football/teams?country=all');
-            if (!res.ok) throw new Error('Failed to fetch teams');
-            const data = await res.json();
-            const teams = (data.response || []).map((r: {team: Team}) => r.team).filter((t: Team) => t.national);
-            setCachedData(TEAMS_CACHE_KEY, teams);
-            return teams;
-          } catch (error) {
-            console.error("Error fetching national teams:", error);
-            return [];
-          }
+            const cached = getCachedData<Team[]>(TEAMS_CACHE_KEY);
+            if (cached?.data) {
+                return cached.data;
+            }
+
+            toast({ title: 'جاري جلب بيانات المنتخبات...', description: 'قد تستغرق هذه العملية دقيقة في المرة الأولى.' });
+        
+            try {
+                // Step 1: Fetch all countries
+                let countries: { name: string }[] = [];
+                const cachedCountries = getCachedData<{ name: string }[]>(COUNTRIES_CACHE_KEY);
+                if (cachedCountries?.data) {
+                    countries = cachedCountries.data;
+                } else {
+                    const countriesRes = await fetch('/api/football/countries');
+                    if (!countriesRes.ok) throw new Error('Failed to fetch countries');
+                    const countriesData = await countriesRes.json();
+                    countries = countriesData.response || [];
+                    setCachedData(COUNTRIES_CACHE_KEY, countries);
+                }
+
+                // Step 2: Fetch national team for each country
+                const teamPromises = countries.map(country => 
+                    fetch(`/api/football/teams?country=${country.name}`)
+                        .then(res => res.ok ? res.json() : { response: [] })
+                        .then(data => (data.response || []).find((r: { team: Team }) => r.team.national))
+                        .catch(() => null)
+                );
+        
+                const results = await Promise.all(teamPromises);
+                const nationalTeams = results.filter(Boolean).map(r => r.team);
+                
+                setCachedData(TEAMS_CACHE_KEY, nationalTeams);
+                return nationalTeams;
+
+            } catch (error) {
+                console.error("Error fetching national teams:", error);
+                toast({ variant: 'destructive', title: "خطأ", description: "فشل في جلب بيانات المنتخبات الوطنية." });
+                return [];
+            }
         };
         
         const [clubResult, teamsResult, customTeamsSnapshot] = await Promise.all([
@@ -210,7 +235,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         ]);
     
         const teamNamesMap = new Map<number, string>();
-        customTeamsSnapshot.docs.forEach(doc => teamNamesMap.set(Number(doc.id), doc.data().customName));
+        customTeamsSnapshot?.forEach(doc => teamNamesMap.set(Number(doc.id), doc.data().customName));
         
         setManagedCompetitions(clubResult.competitions);
         setNationalTeams(teamsResult);
@@ -414,6 +439,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             await setDoc(cacheBusterRef, { competitionsLastUpdated: new Date() }, { merge: true });
             localStorage.removeItem(COMPETITIONS_CACHE_KEY);
             localStorage.removeItem(TEAMS_CACHE_KEY);
+            localStorage.removeItem(COUNTRIES_CACHE_KEY);
             await fetchAllData(true);
             toast({ title: 'نجاح', description: 'تم تحديث البيانات بنجاح.' });
         } catch (error) {
@@ -597,7 +623,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                         </AccordionTrigger>
                         <AccordionContent className="p-2">
                              <Accordion type="multiple" className="w-full space-y-2">
-                                {renderNationalTeams()}
+                                {nationalTeams === null ? <div className="flex justify-center p-4"><Loader2 className="h-6 w-6 animate-spin"/></div> : renderNationalTeams()}
                              </Accordion>
                         </AccordionContent>
                     </AccordionItem>
@@ -610,7 +636,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                         </AccordionTrigger>
                         <AccordionContent className="p-2">
                             <Accordion type="multiple" className="w-full space-y-2">
-                                {renderClubCompetitions()}
+                                {managedCompetitions === null ? <div className="flex justify-center p-4"><Loader2 className="h-6 w-6 animate-spin"/></div> : renderClubCompetitions()}
                             </Accordion>
                         </AccordionContent>
                     </AccordionItem>
@@ -632,4 +658,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
-
