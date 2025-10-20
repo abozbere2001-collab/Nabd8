@@ -313,7 +313,6 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             setIsLoading(false);
         });
     } else {
-        // Guest users have no "My Country" data
         setFavorites({});
         setIsLoading(false);
     }
@@ -386,5 +385,3 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    

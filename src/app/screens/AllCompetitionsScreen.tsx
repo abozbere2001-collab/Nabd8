@@ -214,23 +214,25 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     useEffect(() => {
         fetchAllData();
     
-        if (!user || !db) {
-            setFavorites(getLocalFavorites());
-            return;
+        let unsubscribe: (() => void) | null = null;
+        if (user && db) {
+            const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
+                setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
+            }, (error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: favoritesRef.path,
+                    operation: 'get',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+        } else {
+             setFavorites(getLocalFavorites());
         }
 
-        const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
-            setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
-        }, (error) => {
-            const permissionError = new FirestorePermissionError({
-                path: favoritesRef.path,
-                operation: 'get',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        });
-
-        return () => unsubscribe();
+        return () => {
+          if (unsubscribe) unsubscribe();
+        };
     }, [user, db, fetchAllData]);
 
 
@@ -352,56 +354,81 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     };
 
     const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
-        if (!user || user.isAnonymous) {
-            toast({ 
-                variant: 'destructive', 
-                title: 'ميزة للمستخدمين المسجلين', 
-                description: 'يرجى تسجيل الدخول لاستخدام ميزة التفضيل بالقلب.' 
+        if (!user) {
+            toast({
+                variant: 'destructive',
+                title: 'ميزة للمستخدمين المسجلين',
+                description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.',
+                action: <Button onClick={() => navigate('Login')}>تسجيل الدخول</Button>
             });
             return;
         }
+
         if (!db) return;
-    
+
         const isLeague = 'leagueId' in item;
         const itemId = isLeague ? (item as ManagedCompetitionType).leagueId : (item as Team).id;
         const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    
+        
+        const itemType = isLeague ? 'leagues' : 'teams';
+        const currentItem = favorites[itemType]?.[itemId];
+        const isHearted = currentItem?.isHearted || false;
+        const isStarred = !!currentItem; // A star is just existing in the map
+
+        let fieldPath;
+        let updateData: any;
+
         if (type === 'heart') {
             if (isLeague) {
-                const isCurrentlyHearted = favorites.ourLeagueId === itemId;
-                const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
-                setDoc(favDocRef, updateData, { merge: true })
-                    .then(() => toast({ title: 'نجاح', description: `تم تحديث دوريك المفضل.` }))
-                    .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData })));
-            } else {
-                 const currentNote = (favorites.ourBallTeams?.[itemId] as any)?.note || '';
-                setRenameItem({
-                    id: itemId,
-                    name: item.name,
-                    type: 'team',
-                    purpose: 'note',
-                    note: currentNote,
-                    originalData: item
+                // Unheart any other league
+                const updates: {[key: string]: any} = {};
+                Object.keys(favorites.leagues || {}).forEach(id => {
+                    updates[`leagues.${id}.isHearted`] = false;
                 });
+                 // Heart the new one
+                fieldPath = `leagues.${itemId}.isHearted`;
+                updates[fieldPath] = !isHearted; // Toggle
+                // Make sure it's also starred
+                if (!isStarred) {
+                   updates[`leagues.${itemId}.name`] = item.name;
+                   updates[`leagues.${itemId}.logo`] = item.logo;
+                   updates[`leagues.${itemId}.leagueId`] = itemId;
+                }
+                updateDoc(favDocRef, updates).catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updates})));
+
+            } else { // Team heart
+                fieldPath = `teams.${itemId}.isHearted`;
+                updateData = { [fieldPath]: !isHearted };
+                 // Make sure it's also starred
+                if (!isStarred) {
+                   updateData[`teams.${itemId}.name`] = item.name;
+                   updateData[`teams.${itemId}.logo`] = item.logo;
+                   updateData[`teams.${itemId}.teamId`] = itemId;
+                   updateData[`teams.${itemId}.type`] = (item as Team).national ? 'National' : 'Club';
+                }
+                updateDoc(favDocRef, updateData).catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData})));
             }
+
         } else { // Star Favorite
-            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-            const currentFavorites = getLocalFavorites();
-            const isCurrentlyStarred = !!currentFavorites[itemType]?.[itemId];
-            const fieldPath = `${itemType}.${itemId}`;
-    
-            const favData = isLeague
-                ? { name: item.name, leagueId: itemId, logo: (item as ManagedCompetitionType).logo, notificationsEnabled: true }
-                : { name: item.name, teamId: itemId, logo: (item as Team).logo, type: (item as Team).national ? 'National' : 'Club', notificationsEnabled: true };
-    
-            const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
-    
-            updateDoc(favDocRef, updateData).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }))
-            });
+            fieldPath = `${itemType}.${itemId}`;
+            if (isStarred) {
+                // If it's hearted, just remove the star part by setting it to a minimal object, otherwise delete the whole field
+                if (isHearted) {
+                    updateData = { [fieldPath]: { ...currentItem, name: item.name } }; // Reset everything but hearted status
+                    delete updateData[fieldPath].notificationsEnabled; // Example of resetting
+                } else {
+                    updateData = { [fieldPath]: deleteField() };
+                }
+            } else {
+                 const favData = isLeague
+                    ? { name: item.name, leagueId: itemId, logo: item.logo, notificationsEnabled: true }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club', notificationsEnabled: true };
+                updateData = { [fieldPath]: favData };
+            }
+             updateDoc(favDocRef, updateData).catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData})));
         }
-    
-    }, [user, db, favorites, toast]);
+    }, [user, db, favorites, toast, navigate]);
+
 
 
     const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote?: string) => {
@@ -429,20 +456,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
          if (renameItem.purpose === 'note' && user && !user.isAnonymous && db) {
             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
             const itemData = renameItem.originalData as Team;
-            const fieldPath = `ourBallTeams.${itemData.id}`;
+            const fieldPath = `teams.${itemData.id}.note`;
+            const updateData = { [fieldPath]: newNote || deleteField() };
         
-            const favData = {
-                name: itemData.name,
-                teamId: itemData.id,
-                logo: itemData.logo,
-                type: itemData.national ? 'National' : 'Club',
-                ...(newNote && { note: newNote })
-            };
-        
-            const updateData = { [fieldPath]: favData };
-        
-            setDoc(favDocRef, updateData, { merge: true }).then(() => {
-                toast({ title: 'نجاح', description: 'تم حفظ الفريق في قسم بلدي.' });
+            updateDoc(favDocRef, updateData).then(() => {
+                toast({ title: 'نجاح', description: 'تم حفظ الملاحظة.' });
             }).catch(err => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }))
             });
@@ -494,27 +512,31 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
               </AccordionTrigger>
               <AccordionContent className="p-1">
                 <ul className="flex flex-col">{
-                  groupedNationalTeams[continent].map(team =>
-                    <li key={team.id} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
-                      <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
-                        <Avatar className="h-6 w-6"><AvatarImage src={team.logo} alt={team.name} /></Avatar>
-                        <span className="text-sm truncate">{team.name}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(team, 'heart'); }}>
-                           <Heart className={favorites.ourBallTeams?.[team.id] ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                        </Button>
-                        {isAdmin && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team.name, nationalTeams?.find(t => t.id === team.id)?.name) }}>
-                            <Pencil className="h-4 w-4 text-muted-foreground/80" />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(team, 'star'); }}>
-                          <Star className={favorites.teams?.[team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                        </Button>
-                      </div>
-                    </li>
-                  )
+                  groupedNationalTeams[continent].map(team => {
+                     const isHearted = !!favorites.teams?.[team.id]?.isHearted;
+                     const isStarred = !!favorites.teams?.[team.id];
+                     return (
+                         <li key={team.id} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
+                           <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
+                             <Avatar className="h-6 w-6"><AvatarImage src={team.logo} alt={team.name} /></Avatar>
+                             <span className="text-sm truncate">{team.name}</span>
+                           </div>
+                           <div className="flex items-center gap-1">
+                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(team, 'heart'); }}>
+                                <Heart className={isHearted ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                             </Button>
+                             {isAdmin && (
+                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team.name, nationalTeams?.find(t => t.id === team.id)?.name) }}>
+                                 <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                               </Button>
+                             )}
+                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(team, 'star'); }}>
+                               <Star className={isStarred ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                             </Button>
+                           </div>
+                         </li>
+                     )
+                  })
                 }</ul>
               </AccordionContent>
             </AccordionItem>
@@ -539,27 +561,31 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     {"leagues" in content ? (
                        <div className="p-1">
                            <ul className="flex flex-col">{
-                               (content.leagues as ManagedCompetitionType[]).map(comp => 
-                                   <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
-                                       <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
-                                           <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
-                                           <span className="text-sm truncate">{comp.name}</span>
-                                       </div>
-                                       <div className="flex items-center gap-1">
-                                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                               <Heart className={favorites.ourLeagueId === comp.leagueId ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                           </Button>
-                                           {isAdmin && (
-                                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
-                                                   <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                               (content.leagues as ManagedCompetitionType[]).map(comp => {
+                                  const isHearted = !!favorites.leagues?.[comp.leagueId]?.isHearted;
+                                  const isStarred = !!favorites.leagues?.[comp.leagueId];
+                                   return (
+                                       <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
+                                           <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
+                                               <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+                                               <span className="text-sm truncate">{comp.name}</span>
+                                           </div>
+                                           <div className="flex items-center gap-1">
+                                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
+                                                   <Heart className={isHearted ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                </Button>
-                                           )}
-                                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'star'); }}>
-                                               <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                           </Button>
-                                       </div>
-                                   </li>
-                               )
+                                               {isAdmin && (
+                                                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
+                                                       <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                                   </Button>
+                                               )}
+                                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'star'); }}>
+                                                   <Star className={isStarred ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                               </Button>
+                                           </div>
+                                       </li>
+                                   )
+                               })
                            }</ul>
                        </div>
                    ) : (
@@ -576,27 +602,31 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                        {isAdmin && <Button variant="ghost" size="icon" className="h-9 w-9 mr-2" onClick={(e) => { e.stopPropagation(); handleOpenRename('country', country, getName('country', country, country), country); }}><Pencil className="h-4 w-4 text-muted-foreground/80" /></Button>}
                                      </div>
                                    <AccordionContent className="p-1">
-                                       <ul className="flex flex-col">{leagues.map(comp => 
-                                           <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
-                                               <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
-                                                   <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
-                                                   <span className="text-sm truncate">{comp.name}</span>
-                                               </div>
-                                               <div className="flex items-center gap-1">
-                                                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                                        <Heart className={favorites.ourLeagueId === comp.leagueId ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                                   </Button>
-                                                   {isAdmin && (
-                                                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
-                                                           <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                       <ul className="flex flex-col">{leagues.map(comp => {
+                                             const isHearted = !!favorites.leagues?.[comp.leagueId]?.isHearted;
+                                             const isStarred = !!favorites.leagues?.[comp.leagueId];
+                                           return (
+                                               <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
+                                                   <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
+                                                       <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
+                                                       <span className="text-sm truncate">{comp.name}</span>
+                                                   </div>
+                                                   <div className="flex items-center gap-1">
+                                                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
+                                                            <Heart className={isHearted ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                        </Button>
-                                                   )}
-                                                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'star'); }}>
-                                                       <Star className={favorites.leagues?.[comp.leagueId] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                                   </Button>
-                                               </div>
-                                           </li>
-                                       )}</ul>
+                                                       {isAdmin && (
+                                                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
+                                                               <Pencil className="h-4 w-4 text-muted-foreground/80" />
+                                                           </Button>
+                                                       )}
+                                                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'star'); }}>
+                                                           <Star className={isStarred ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                       </Button>
+                                                   </div>
+                                               </li>
+                                           )
+                                       })}</ul>
                                    </AccordionContent>
                                </AccordionItem>
                            ))}
