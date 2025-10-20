@@ -1,6 +1,6 @@
 
 "use client";
-import { Star, Newspaper, MoreHorizontal, Shield } from 'lucide-react';
+import { Star, Newspaper, MoreHorizontal, Shield, UserCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ScreenKey } from '@/app/page';
 import { FootballIcon } from './icons/FootballIcon';
@@ -18,6 +18,7 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
     { key: 'Matches', label: "المباريات", icon: Shield },
     { key: 'Competitions', label: "اختياراتي", icon: Star },
     { key: 'News', label: "أخبار", icon: Newspaper },
+    { key: 'Khaltak', label: "خالتك", icon: UserCircle2 },
     { key: 'Settings', label: "المزيد", icon: MoreHorizontal },
   ];
   

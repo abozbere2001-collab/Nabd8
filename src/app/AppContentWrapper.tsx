@@ -45,6 +45,7 @@ import { LogOut, User as UserIcon } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
 import { cn } from '@/lib/utils';
 import { ManageTopScorersScreen } from './screens/ManageTopScorersScreen';
+import { KhaltakScreen } from './screens/KhaltakScreen';
 
 const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
@@ -73,10 +74,11 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   TermsOfService: { component: TermsOfServiceScreen },
   GoPro: { component: GoProScreen },
   ManageTopScorers: { component: ManageTopScorersScreen },
+  Khaltak: { component: KhaltakScreen },
 };
 
 
-const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'News', 'Settings'];
+const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'News', 'Khaltak', 'Settings'];
 
 type StackItem = {
   key: string;
@@ -154,6 +156,7 @@ export function AppContentWrapper() {
         'Matches': [{ key: 'Matches-0', screen: 'Matches' }],
         'Competitions': [{ key: 'Competitions-0', screen: 'Competitions' }],
         'News': [{ key: 'News-0', screen: 'News' }],
+        'Khaltak': [{ key: 'Khaltak-0', screen: 'Khaltak' }],
         'Settings': [{ key: 'Settings-0', screen: 'Settings' }],
     },
   });
