@@ -140,19 +140,17 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
     }
 
     return (
-        <div ref={listRef} className="flex-1 overflow-y-auto p-2">
-            <div className="space-y-2">
-                {allFixtures.map((fixture, index) => {
-                     const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || new Date(fixture.fixture.timestamp * 1000) > new Date();
-                     const isFirstUpcoming = isUpcomingOrLive && !allFixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
-                    
-                    return (
-                        <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
-                            <FixtureItem fixture={fixture} navigate={navigate} />
-                        </div>
-                    );
-                })}
-            </div>
+        <div ref={listRef} className="space-y-2">
+            {allFixtures.map((fixture, index) => {
+                 const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || new Date(fixture.fixture.timestamp * 1000) > new Date();
+                 const isFirstUpcoming = isUpcomingOrLive && !allFixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
+                
+                return (
+                    <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
+                        <FixtureItem fixture={fixture} navigate={navigate} />
+                    </div>
+                );
+            })}
         </div>
     );
 };
@@ -377,33 +375,27 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             <TabsTrigger value="doreena">دورينا</TabsTrigger>
             <TabsTrigger value="kurratna">كرتنا</TabsTrigger>
         </TabsList>
+        
         <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0 mt-0">
-          <div className="py-4 border-b">
-            <CrownedTeamScroller 
-              crownedTeams={crownedTeams} 
-              onSelectTeam={handleSelectTeam}
-              onRemove={(id) => handleRemoveCrowned('team', id)} 
-              selectedTeamId={selectedTeamId}
-            />
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {selectedTeamId ? (
-              <TeamFixturesDisplay teamId={selectedTeamId} navigate={navigate} />
-            ) : (
-              crownedTeams.length > 0 && (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                    <p>اختر فريقًا من الأعلى لعرض مبارياته.</p>
-                </div>
-              )
-            )}
-             {crownedTeams.length === 0 && (
-                <div className="text-center text-muted-foreground pt-10">
-                    <p className="font-bold text-lg">لم تقم بتتويج أي فريق بعد</p>
-                    <p>اذهب إلى الفرق واضغط على أيقونة التاج 👑</p>
-                </div>
-             )}
-          </div>
+            <div className="py-4 border-b">
+                <CrownedTeamScroller 
+                    crownedTeams={crownedTeams} 
+                    onSelectTeam={handleSelectTeam}
+                    onRemove={(id) => handleRemoveCrowned('team', id)} 
+                    selectedTeamId={selectedTeamId}
+                />
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+                {selectedTeamId ? (
+                    <TeamFixturesDisplay teamId={selectedTeamId} navigate={navigate} />
+                ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground text-center p-4">
+                        <p>اختر فريقًا من الأعلى لعرض مبارياته.</p>
+                    </div>
+                )}
+            </div>
         </TabsContent>
+
         <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 mt-0">
             {crownedLeague ? (
                 <CrownedLeagueCard key={crownedLeague.leagueId} league={crownedLeague} navigate={navigate} />
@@ -418,3 +410,5 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
