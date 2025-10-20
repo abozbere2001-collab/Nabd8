@@ -21,17 +21,39 @@ import { useToast } from '@/hooks/use-toast';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
-// --- Global Cache for Competitions Data ---
-let competitionsCache: {
-    managedCompetitions: ManagedCompetitionType[] | null;
-    customNames: { leagues: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> } | null;
-    lastFetched: number | null;
-} = {
-    managedCompetitions: null,
-    customNames: null,
-    lastFetched: null,
+// --- Persistent Cache Logic ---
+const COMPETITIONS_CACHE_KEY = 'goalstack_competitions_cache';
+const CACHE_EXPIRATION_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
+
+interface CompetitionsCache {
+    managedCompetitions: ManagedCompetitionType[];
+    customNames: { leagues: Record<string, string>, countries: Record<string, string>, continents: Record<string, string> };
+    lastFetched: number;
+}
+
+const getCachedCompetitions = (): CompetitionsCache | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+        const cachedData = localStorage.getItem(COMPETITIONS_CACHE_KEY);
+        if (!cachedData) return null;
+
+        const parsedData: CompetitionsCache = JSON.parse(cachedData);
+        if (Date.now() - parsedData.lastFetched > CACHE_EXPIRATION_MS) {
+            localStorage.removeItem(COMPETITIONS_CACHE_KEY);
+            return null; // Cache expired
+        }
+        return parsedData;
+    } catch (error) {
+        return null;
+    }
 };
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+const setCachedCompetitions = (data: Omit<CompetitionsCache, 'lastFetched'>) => {
+    if (typeof window === 'undefined') return;
+    const cacheData: CompetitionsCache = { ...data, lastFetched: Date.now() };
+    localStorage.setItem(COMPETITIONS_CACHE_KEY, JSON.stringify(cacheData));
+};
+
 
 // --- TYPE DEFINITIONS ---
 interface CompetitionsByCountry {
@@ -93,8 +115,8 @@ const WORLD_LEAGUES_KEYWORDS = ["world", "uefa", "champions league", "europa", "
 
 // --- MAIN SCREEN COMPONENT ---
 export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
-    const [managedCompetitions, setManagedCompetitions] = useState<ManagedCompetitionType[] | null>(competitionsCache.managedCompetitions);
-    const [loading, setLoading] = useState(!competitionsCache.managedCompetitions);
+    const [managedCompetitions, setManagedCompetitions] = useState<ManagedCompetitionType[] | null>(null);
+    const [loading, setLoading] = useState(true);
     const { isAdmin } = useAdmin();
     const { user } = useAuth();
     const { db } = useFirestore();
@@ -103,9 +125,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const [renameItem, setRenameItem] = useState<RenameState | null>(null);
     const [isAddOpen, setAddOpen] = useState(false);
 
-    const [customNames, setCustomNames] = useState(competitionsCache.customNames || { leagues: new Map(), countries: new Map(), continents: new Map() });
+    const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> } | null>(null);
 
     const getName = useCallback((type: 'league' | 'country' | 'continent', id: string | number, defaultName: string) => {
+        if (!customNames) return defaultName;
+
         const firestoreMap = type === 'league' ? customNames.leagues : type === 'country' ? customNames.countries : customNames.continents;
         const customName = firestoreMap?.get(id as any);
         if (customName) return customName;
@@ -140,10 +164,14 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const fetchAllData = useCallback(async () => {
         if (!db) return;
 
-        const now = Date.now();
-        if (competitionsCache.managedCompetitions && competitionsCache.customNames && competitionsCache.lastFetched && (now - competitionsCache.lastFetched < CACHE_DURATION)) {
-            setManagedCompetitions(competitionsCache.managedCompetitions);
-            setCustomNames(competitionsCache.customNames);
+        const cachedData = getCachedCompetitions();
+        if (cachedData) {
+            setManagedCompetitions(cachedData.managedCompetitions);
+            setCustomNames({
+                leagues: new Map(Object.entries(cachedData.customNames.leagues).map(([k, v]) => [Number(k), v])),
+                countries: new Map(Object.entries(cachedData.customNames.countries)),
+                continents: new Map(Object.entries(cachedData.customNames.continents)),
+            });
             setLoading(false);
             return;
         }
@@ -157,27 +185,22 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 getDocs(collection(db, 'managedCompetitions')),
             ]);
             
-            const names = {
-                leagues: new Map<number, string>(),
-                countries: new Map<string, string>(),
-                continents: new Map<string, string>(),
+            const fetchedCustomNames = {
+                leagues: Object.fromEntries(leaguesSnapshot.docs.map(doc => [doc.id, doc.data().customName])),
+                countries: Object.fromEntries(countriesSnapshot.docs.map(doc => [doc.id, doc.data().customName])),
+                continents: Object.fromEntries(continentsSnapshot.docs.map(doc => [doc.id, doc.data().customName])),
             };
-
-            leaguesSnapshot.forEach(doc => names.leagues.set(Number(doc.id), doc.data().customName));
-            countriesSnapshot.forEach(doc => names.countries.set(doc.id, doc.data().customName));
-            continentsSnapshot.forEach(doc => names.continents.set(doc.id, doc.data().customName));
             
             const fetchedCompetitions = compsSnapshot.docs.map(doc => doc.data() as ManagedCompetitionType);
-
-            // Update cache
-            competitionsCache = {
-                managedCompetitions: fetchedCompetitions,
-                customNames: names,
-                lastFetched: Date.now()
-            };
-
-            setCustomNames(names);
+            
+            setCachedCompetitions({ managedCompetitions: fetchedCompetitions, customNames: fetchedCustomNames });
+            
             setManagedCompetitions(fetchedCompetitions);
+            setCustomNames({
+                leagues: new Map(Object.entries(fetchedCustomNames.leagues).map(([k, v]) => [Number(k), v])),
+                countries: new Map(Object.entries(fetchedCustomNames.countries)),
+                continents: new Map(Object.entries(fetchedCustomNames.continents)),
+            });
 
         } catch (error) {
             console.error("Failed to fetch competitions data:", error);
@@ -239,7 +262,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     const sortedGroupedCompetitions = useMemo(() => {
-        if (!managedCompetitions) return null;
+        if (!managedCompetitions || !customNames) return null;
 
         const processedCompetitions = managedCompetitions.map(comp => ({
             ...comp,
@@ -324,7 +347,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
       if (!newName || (originalItem && newName === originalItem.name)) {
           deleteDoc(doc(db, collectionName, docId)).then(() => {
-              competitionsCache.lastFetched = null; // Invalidate cache
+              localStorage.removeItem(COMPETITIONS_CACHE_KEY); // Invalidate cache
               fetchAllData();
               toast({ title: 'نجاح', description: 'تمت إزالة الاسم المخصص.' });
           }).catch(serverError => {
@@ -334,7 +357,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
       } else {
           setDoc(doc(db, collectionName, docId), data)
               .then(() => {
-                  competitionsCache.lastFetched = null; // Invalidate cache
+                  localStorage.removeItem(COMPETITIONS_CACHE_KEY); // Invalidate cache
                   fetchAllData();
                   toast({ title: 'نجاح', description: 'تم حفظ الاسم المخصص.' });
               })
@@ -372,7 +395,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     Array.from({ length: 10 }).map((_, i) => (
                         <Skeleton key={i} className="h-12 w-full rounded-lg" />
                     ))
-                ) : managedCompetitions && managedCompetitions.length > 0 && sortedGroupedCompetitions ? (
+                ) : managedCompetitions && managedCompetitions.length > 0 && sortedGroupedCompetitions && customNames ? (
                     <Accordion type="multiple" className="w-full space-y-4" >
                         {Object.entries(sortedGroupedCompetitions).map(([continent, content]) => (
                              <AccordionItem value={continent} key={continent} className="rounded-lg border bg-card/50">
@@ -476,7 +499,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             <AddCompetitionDialog isOpen={isAddOpen} onOpenChange={(isOpen) => {
                 setAddOpen(isOpen);
                 if(!isOpen) {
-                    competitionsCache.lastFetched = null; // Invalidate cache on close to refetch
+                    localStorage.removeItem(COMPETITIONS_CACHE_KEY); // Invalidate cache on close to refetch
                     fetchAllData();
                 }
             }} />
