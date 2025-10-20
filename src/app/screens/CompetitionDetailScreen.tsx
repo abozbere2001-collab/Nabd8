@@ -28,6 +28,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { CURRENT_SEASON } from '@/lib/constants';
 import {
@@ -710,6 +711,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     
 
     
+    
+
     
 
     
