@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -28,6 +29,7 @@ interface RenameDialogProps {
     type: ItemType;
     purpose: 'rename' | 'note';
     originalData?: any;
+    originalName?: string;
   } | null;
   onSave: (type: ItemType, id: string | number, newName: string, newNote?: string) => void;
 }
@@ -102,7 +104,7 @@ export function RenameDialog({
                 id="name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder={`الاسم الأصلي: ${item?.originalData?.name || item?.name}`}
+                placeholder={`الاسم الأصلي: ${item?.originalName || item?.name}`}
                 />
             </div>
           )}

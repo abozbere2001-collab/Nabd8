@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
@@ -301,47 +302,52 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
 
    const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
+        if (!user || !db) {
+            toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+            return;
+        }
+
         const isLeague = !('national' in item);
         const itemId = item.id;
         
-        if (!user || !db) {
-             toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
-             return;
-        }
-        
-        const isStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
-        
-        if (type === 'heart') {
-             if (isLeague) {
-                 const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-                 const updateData = { ourLeagueId: itemId };
-                 setDoc(favDocRef, updateData, { merge: true }).then(() => {
-                     toast({ title: 'نجاح', description: `تم تعيين "${item.name}" كدورينا المفضل.` });
-                 }).catch(err => {
+        if (type === 'star') {
+            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+            const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
+            const fieldPath = `${itemType}.${itemId}`;
+            const updateData = isCurrentlyStarred 
+                ? { [fieldPath]: deleteField() }
+                : { [fieldPath]: { 
+                      name: item.name, 
+                      logo: isLeague ? (item as LeagueResult['league']).logo : (item as Team).logo, 
+                      ...(isLeague ? { leagueId: itemId } : { teamId: itemId, type: (item as Team).national ? 'National' : 'Club' })
+                  } };
+            setDoc(favDocRef, updateData, { merge: true }).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+            });
+        } else if (type === 'heart') {
+            const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+            if (isLeague) {
+                const leagueItem = item as LeagueResult['league'];
+                const updateData = { ourLeagueId: leagueItem.id };
+                setDoc(favDocRef, updateData, { merge: true }).then(() => {
+                    toast({ title: 'نجاح', description: `تم تعيين "${leagueItem.name}" كدورينا المفضل.` });
+                }).catch(err => {
                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
-                 });
-             } else {
+                });
+            } else {
                  const teamItem = item as Team;
+                 const note = (favorites.ourBallTeams?.[teamItem.id] as any)?.note || '';
                  setRenameItem({
                      type: 'team',
                      id: teamItem.id,
                      name: teamItem.name,
+                     originalName: teamItem.name,
                      purpose: 'note',
+                     note: note,
                      originalData: item
                  });
-             }
-
-        } else { // star
-            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-            const fieldPath = `${itemType}.${itemId}`;
-            const favData = isLeague 
-                ? { name: item.name, leagueId: itemId, logo: item.logo }
-                : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-            const updateData = { [fieldPath]: isStarred ? deleteField() : favData };
-            updateDoc(favDocRef, updateData).catch(err => {
-                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
-             });
+            }
         }
     }, [user, db, favorites, toast]);
 
@@ -380,6 +386,10 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
         const item = originalData as Team;
         const fieldPath = `ourBallTeams.${item.id}`;
+        const isCurrentlyHearted = !!favorites.ourBallTeams?.[item.id];
+        
+        // If team is already hearted and user clears the note, we keep the team. 
+        // To un-heart, they must click the heart again.
         const favData = { 
             name: item.name, 
             teamId: item.id, 
@@ -390,7 +400,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         const updateData = { [fieldPath]: favData };
 
          setDoc(favDocRef, updateData, { merge: true }).then(() => {
-            toast({ title: 'نجاح', description: 'تم حفظ التغييرات على الفريق المفضل.' });
+            toast({ title: 'نجاح', description: 'تم حفظ الملاحظة على الفريق المفضل.' });
          }).catch(err => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
         });
