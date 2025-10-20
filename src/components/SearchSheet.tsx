@@ -190,30 +190,26 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
   useEffect(() => {
     if (isOpen) {
-      buildLocalIndex();
-        let unsubStarred: (()=>void) | null = null;
-        let unsubOur: (()=>void) | null = null;
-
+        buildLocalIndex();
+        
+        let unsubscribe: (() => void) | null = null;
         if (user && db) {
-            const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-
-            unsubStarred = onSnapshot(starredFavsRef, (doc) => {
-                const favs = doc.data() as Favorites || {};
-                setFavorites(prev => ({...prev, leagues: favs.leagues, teams: favs.teams}));
+            const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
+                setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
+            }, (error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: favoritesRef.path,
+                    operation: 'get',
+                });
+                errorEmitter.emit('permission-error', permissionError);
             });
-
-            unsubOur = onSnapshot(ourFavsRef, (doc) => {
-                const favs = doc.data() as Favorites || {};
-                setFavorites(prev => ({...prev, ourLeagueId: favs.ourLeagueId, ourBallTeams: favs.ourBallTeams}));
-            });
-
         } else {
-             setFavorites(getLocalFavorites());
+            setFavorites(getLocalFavorites());
         }
+
         return () => {
-            if (unsubStarred) unsubStarred();
-            if (unsubOur) unsubOur();
+            if (unsubscribe) unsubscribe();
         }
     }
   }, [isOpen, user, db, buildLocalIndex]);
@@ -303,16 +299,16 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
 
    const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
-        const isLeague = !('national' in item);
-        const itemId = item.id;
-        
         if (!user || !db) {
             toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
             return;
         }
 
+        const isLeague = !('national' in item);
+        const itemId = item.id;
+        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+
         if (type === 'heart') {
-             const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
             if (isLeague) {
                 const isCurrentlyHearted = favorites.ourLeagueId === itemId;
                 const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
@@ -320,29 +316,30 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
                     .then(() => toast({ title: 'نجاح', description: `تم تحديث دوريك المفضل.` }))
                     .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData})));
             } else {
-                 const currentNote = (favorites.ourBallTeams?.[itemId] as any)?.note || '';
-                 setRenameItem({
-                     type: 'team',
-                     id: itemId,
-                     name: item.name,
-                     purpose: 'note',
-                     note: currentNote,
-                     originalData: item
-                 });
+                const currentNote = (favorites.ourBallTeams?.[itemId] as any)?.note || '';
+                setRenameItem({
+                    id: itemId,
+                    name: item.name,
+                    type: 'team',
+                    purpose: 'note',
+                    note: currentNote,
+                    originalData: item
+                });
             }
         } else { // star
-            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
             const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
             const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
             const fieldPath = `${itemType}.${itemId}`;
+            
             const favData = isLeague 
                 ? { name: item.name, leagueId: itemId, logo: item.logo }
                 : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+
             const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
 
-            setDoc(favDocRef, updateData, { merge: true }).catch(err => {
-                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
-            });
+            updateDoc(favDocRef, updateData).catch(err => {
+                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
+             });
         }
     }, [user, db, favorites, toast]);
 
@@ -378,7 +375,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             handleSearch(debouncedSearchTerm);
         }
     } else if (purpose === 'note' && user) {
-        const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const item = originalData as Team;
         const fieldPath = `ourBallTeams.${item.id}`;
         
@@ -394,7 +391,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
          setDoc(favDocRef, updateData, { merge: true }).then(() => {
             toast({ title: 'نجاح', description: 'تم حفظ الفريق في قسم بلدي.' });
          }).catch(err => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+            errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
         });
     }
     setRenameItem(null);

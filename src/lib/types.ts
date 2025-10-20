@@ -156,8 +156,10 @@ export interface TeamStatistics {
 
 export interface Favorites {
   userId: string;
+  // "My Country" Favorites (Heart icon)
   ourLeagueId?: number;
   ourBallTeams?: { [key:number]: Team & { note?: string } };
+  // "My Choices" Favorites (Star icon)
   leagues?: { [key: number]: {
     name: string;
     logo: string;

@@ -92,7 +92,7 @@ const FavoriteTeamsScroller = ({ teams, navigate }: { teams: (Team & {note?: str
         return (
              <div className="px-4 pb-4">
                  <div className="flex flex-col items-center justify-center text-center text-muted-foreground border-2 border-dashed rounded-lg p-6">
-                    <p className="font-bold">قسم "كرتنا" فارغ</p>
+                    <p className="font-bold">قسم "بلدي" فارغ</p>
                     <p className="text-sm">أضف فرقك ومنتخباتك المفضلة هنا بالضغط على زر القلب ❤️.</p>
                     <Button className="mt-4" size="sm" onClick={() => navigate('AllCompetitions')}>استكشاف الفرق</Button>
                 </div>
@@ -328,7 +328,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
             // Favorites Listener
             if (user) {
-                const favsRef = doc(db, "users", user.uid, "ourFavorites", "data");
+                const favsRef = doc(db, "users", user.uid, "favorites", "data");
                 const unsubFavs = onSnapshot(favsRef, (docSnap) => {
                     setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
                     setIsLoading(false);

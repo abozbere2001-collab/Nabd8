@@ -13,7 +13,7 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import type { Favorites, ManagedCompetition as ManagedCompetitionType, Team, AdminFavorite } from '@/lib/types';
+import type { Favorites, ManagedCompetition as ManagedCompetitionType, Team } from '@/lib/types';
 import { SearchSheet } from '@/components/SearchSheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
@@ -214,34 +214,24 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     useEffect(() => {
         fetchAllData();
-
+    
         if (!user || !db) {
             setFavorites(getLocalFavorites());
             return;
-        };
+        }
 
-        const unsubscribes: (() => void)[] = [];
-
-        const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const unsubStarred = onSnapshot(starredFavsRef, (doc) => {
-            const favs = doc.data() as Favorites || {};
-            setFavorites(prev => ({...prev, leagues: favs.leagues, teams: favs.teams}));
-        });
-        unsubscribes.push(unsubStarred);
-
-        const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-        const unsubOur = onSnapshot(ourFavsRef, (doc) => {
-            const favs = doc.data() as Favorites || {};
-            setFavorites(prev => ({...prev, ourLeagueId: favs.ourLeagueId, ourBallTeams: favs.ourBallTeams}));
+        const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
+            setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
         }, (error) => {
-            // This error handler is crucial. It catches permission-denied errors.
-            const permissionError = new FirestorePermissionError({path: ourFavsRef.path, operation: 'get'});
+            const permissionError = new FirestorePermissionError({
+                path: favoritesRef.path,
+                operation: 'get',
+            });
             errorEmitter.emit('permission-error', permissionError);
         });
-        unsubscribes.push(unsubOur);
-        
-        return () => unsubscribes.forEach(unsub => unsub());
 
+        return () => unsubscribe();
     }, [user, db, fetchAllData]);
 
 
@@ -364,58 +354,57 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
-        const isLeague = 'leagueId' in item;
-        const itemId = isLeague ? (item as ManagedCompetitionType).leagueId : (item as Team).id;
-
         if (!user || !db) {
             toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
             return;
         }
-
+    
+        const isLeague = 'leagueId' in item;
+        const itemId = isLeague ? (item as ManagedCompetitionType).leagueId : (item as Team).id;
+        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+    
         if (type === 'heart') {
-             const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
             if (isLeague) {
                 const isCurrentlyHearted = favorites.ourLeagueId === itemId;
                 const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
                 setDoc(favDocRef, updateData, { merge: true })
                     .then(() => toast({ title: 'نجاح', description: `تم تحديث دوريك المفضل.` }))
-                    .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData})));
+                    .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'write', requestResourceData: updateData })));
             } else {
-                 const currentNote = (favorites.ourBallTeams?.[itemId] as any)?.note || '';
-                 setRenameItem({
+                const currentNote = (favorites.ourBallTeams?.[itemId] as any)?.note || '';
+                setRenameItem({
                     id: itemId,
                     name: item.name,
                     type: 'team',
                     purpose: 'note',
                     note: currentNote,
                     originalData: item
-                 });
+                });
             }
         } else { // Star Favorite
-            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
             const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
             const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
             const fieldPath = `${itemType}.${itemId}`;
-            
-            const favData = isLeague 
+    
+            const favData = isLeague
                 ? { name: item.name, leagueId: itemId, logo: (item as ManagedCompetitionType).logo }
                 : { name: item.name, teamId: itemId, logo: (item as Team).logo, type: (item as Team).national ? 'National' : 'Club' };
-
+    
             const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
-
+    
             updateDoc(favDocRef, updateData).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }))
             });
         }
-
-    }, [user, db, favorites, toast, navigate]);
+    
+    }, [user, db, favorites, toast]);
 
 
     const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote?: string) => {
         if (!renameItem) return;
-
+        
         if (renameItem.purpose === 'rename' && isAdmin && db) {
-             const collectionName = `${type}Customizations`;
+            const collectionName = `${type}Customizations`;
             const docId = String(id);
             const originalName = renameItem?.originalName;
             const data = { customName: newName };
@@ -434,34 +423,32 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         }
         
         if (renameItem.purpose === 'note' && user && db) {
-            const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-            const itemData = renameItem?.originalData as Team;
-            
-            const favData = { 
-                name: itemData.name, 
-                teamId: itemData.id, 
-                logo: itemData.logo, 
-                type: itemData.national ? 'National' : 'Club',
-                ...(newNote && { note: newNote })
-             };
-            
-            const isHearted = !!favorites.ourBallTeams?.[itemData.id];
+            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const itemData = renameItem.originalData as Team;
+            const fieldPath = `ourBallTeams.${itemData.id}`;
             const hasNote = newNote && newNote.trim().length > 0;
-            
-            if(!isHearted && !hasNote) {
+        
+            if (!hasNote && !favorites.ourBallTeams?.[itemData.id]) {
                  setRenameItem(null);
                  return;
             }
-
-            const updateData = { [`ourBallTeams.${itemData.id}`]: favData };
-
+        
+            const favData = {
+                name: itemData.name,
+                teamId: itemData.id,
+                logo: itemData.logo,
+                type: itemData.national ? 'National' : 'Club',
+                ...(hasNote && { note: newNote })
+            };
+        
+            const updateData = { [fieldPath]: favData };
+        
             setDoc(favDocRef, updateData, { merge: true }).then(() => {
                 toast({ title: 'نجاح', description: 'تم تحديث الملاحظة على الفريق المفضل.' });
             }).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'write', requestResourceData: updateData }))
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }))
             });
         }
-
         setRenameItem(null);
     };
     
