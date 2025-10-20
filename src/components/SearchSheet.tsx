@@ -207,21 +207,22 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         return;
     }
 
-    // --- Step 1: Precise Local Search ---
+    // --- Step 1: Local Search (includes custom names) ---
     const localResults = localSearchIndex.filter(item => 
-        item.normalizedName === normalizedQuery
+        item.normalizedName.includes(normalizedQuery)
     ).map(item => ({
         [item.type.slice(0, -1)]: item.originalItem,
         type: item.type.slice(0, -1)
     } as SearchResult));
-
+    
+    // If local results are found, show them and STOP.
     if (localResults.length > 0) {
         setSearchResults(localResults);
         setLoading(false);
-        return; // Found an exact match locally, no need to search online.
+        return;
     }
-    
-    // --- Step 2: If no exact local match, search online ---
+
+    // --- Step 2: If NO local results, search online ---
     try {
         const [teamsData, leaguesData] = await Promise.all([
             fetch(`/api/football/teams?search=${query}`).then(res => res.ok ? res.json() : { response: [] }),
