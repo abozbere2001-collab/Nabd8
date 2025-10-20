@@ -45,6 +45,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User as UserIcon } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
 import { cn } from '@/lib/utils';
+import { ManageTopScorersScreen } from './screens/ManageTopScorersScreen';
 
 const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
@@ -73,6 +74,7 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   PrivacyPolicy: { component: PrivacyPolicyScreen },
   TermsOfService: { component: TermsOfServiceScreen },
   GoPro: { component: GoProScreen },
+  ManageTopScorers: { component: ManageTopScorersScreen },
 };
 
 
