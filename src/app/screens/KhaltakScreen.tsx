@@ -194,15 +194,15 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
     useEffect(() => {
         const fetchData = async () => {
             if (!activeTab || !league?.leagueId || data !== null) return;
-
+    
             setLoading(true);
             
             let url = '';
             try {
                 switch (activeTab) {
                     case 'matches':
-                        const fromDate = format(new Date(), 'yyyy-MM-dd');
-                        const toDate = format(addDays(new Date(), 14), 'yyyy-MM-dd');
+                        const fromDate = format(subDays(new Date(), 2), 'yyyy-MM-dd');
+                        const toDate = format(addDays(new Date(), 5), 'yyyy-MM-dd');
                         url = `/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&from=${fromDate}&to=${toDate}`;
                         break;
                     case 'standings':
@@ -224,7 +224,11 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
                     
                     if (activeTab === 'standings') {
                         setData(result.response[0]?.league?.standings[0] || []);
-                    } else {
+                    } else if (activeTab === 'matches') {
+                        const sortedFixtures = (result.response || []).sort((a: Fixture, b: Fixture) => a.fixture.timestamp - b.fixture.timestamp);
+                        setData(sortedFixtures);
+                    }
+                    else {
                         setData(result.response || []);
                     }
                 }
@@ -524,7 +528,7 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
                                 key={fixture.fixture.id}
                                 fixture={fixture}
                                 userPrediction={predictions[fixture.fixture.id]}
-                                onSave={handleSavePrediction}
+                                onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
                             />
                         ))
                     ) : (
