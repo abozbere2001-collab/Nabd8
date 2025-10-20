@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
@@ -313,23 +312,22 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         const itemId = item.id;
         
         if (user && db) {
-             const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-             const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-             let updateData;
+            const favDocRef = type === 'star' 
+                ? doc(db, 'users', user.uid, 'favorites', 'data')
+                : doc(db, 'users', user.uid, 'ourFavorites', 'data');
 
-             if (type === 'heart') {
+            let updateData;
+            
+            if (type === 'heart') {
                 const isCurrentlyHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
-                 if (isLeague) {
-                     updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
-                 } else {
-                     const fieldPath = `ourBallTeams.${itemId}`;
-                     const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                     updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
-                 }
-                  setDoc(ourFavsRef, updateData, { merge: true }).catch(err => {
-                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'write', requestResourceData: updateData}))
-                 });
-             } else { // star
+                if (isLeague) {
+                    updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
+                } else {
+                    const fieldPath = `ourBallTeams.${itemId}`;
+                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                    updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
+                }
+            } else { // star
                 const isCurrentlyStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
                 const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
                 const fieldPath = `${itemType}.${itemId}`;
@@ -337,10 +335,12 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
                 updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
-                setDoc(starredFavsRef, updateData, { merge: true }).catch(err => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'write', requestResourceData: updateData}))
-                });
-             }
+            }
+            
+            setDoc(favDocRef, updateData, { merge: true }).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+            });
+
         } else { // Guest user
             const currentFavorites = getLocalFavorites();
             const newFavorites = JSON.parse(JSON.stringify(currentFavorites));

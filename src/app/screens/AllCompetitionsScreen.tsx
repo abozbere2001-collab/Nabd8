@@ -331,18 +331,20 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     useEffect(() => {
         let unsub: (() => void) | null = null;
         if (user && db) {
+            // This screen only cares about STARRED favorites
             const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
             unsub = onSnapshot(starredFavsRef, (doc) => {
                 setFavorites(doc.data() as Favorites || {});
             }, (err) => {
                 if (err.code === 'permission-denied') {
-                    console.warn("Permission denied listening to favorites.");
-                    setFavorites(getLocalFavorites());
+                    console.warn("Permission denied listening to favorites. This is expected if rules are strict.");
+                    setFavorites(getLocalFavorites()); // Fallback to local
                 } else {
                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'get'}));
                 }
             });
         } else {
+            // Guest user
             setFavorites(getLocalFavorites());
         }
         return () => {
@@ -356,6 +358,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             toast({
                 title: "غير متاح هنا",
                 description: `يمكنك إضافة هذا إلى "كرتنا" من خلال البحث.`,
+                duration: 2000,
             });
             return;
         }
@@ -669,5 +672,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     );
 }
 
-
-    
