@@ -328,18 +328,16 @@ const TeamFixturesList = ({ teamId, navigate }: { teamId: number; navigate: Scre
 };
 
 
-function OurBallTab({ navigate, ourBallTeams, user, db }: { navigate: ScreenProps['navigate'], ourBallTeams: Team[], user: any, db: any }) {
+function OurBallTab({ navigate, ourBallTeams }: { navigate: ScreenProps['navigate'], ourBallTeams: Team[] }) {
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
 
     useEffect(() => {
-        // This effect runs when the list of teams changes.
-        // It ensures a team is always selected if the list is not empty.
         if (ourBallTeams.length > 0 && !ourBallTeams.some(t => t.id === selectedTeamId)) {
             setSelectedTeamId(ourBallTeams[0].id);
         } else if (ourBallTeams.length === 0) {
             setSelectedTeamId(null);
         }
-    }, [ourBallTeams]); // Removed selectedTeamId from dependencies to prevent the loop
+    }, [ourBallTeams, selectedTeamId]);
     
 
     if (ourBallTeams.length === 0) {
@@ -506,7 +504,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                          {loading ? (
                              <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
                          ) : (
-                            <OurBallTab navigate={navigate} ourBallTeams={ourBallTeams} user={user} db={db} />
+                            <OurBallTab navigate={navigate} ourBallTeams={ourBallTeams} />
                          )}
                     </TabsContent>
                 </Tabs>
