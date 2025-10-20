@@ -8,7 +8,7 @@ import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy, Loader2 }
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, onSnapshot, getDocs, writeBatch, getDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot, getDocs, writeBatch, getDoc, deleteDoc, deleteField } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -372,7 +372,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     const ref = doc(db, 'users', user.uid, 'ourFavorites', 'teams');
                     const isHearted = newFavorites.ourBallTeams?.[itemId];
                     const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    setDoc(ref, isHearted ? { [itemId]: deleteField() } : { [itemId]: favData }, { merge: true })
+                    setDoc(ref, { [itemId]: isHearted ? deleteField() : favData }, { merge: true })
                         .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ref.path, operation: 'write'})));
                 }
             } else { // Star
