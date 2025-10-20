@@ -192,11 +192,12 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
     const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
     useEffect(() => {
+        if (!activeTab || !league?.leagueId) return;
+
+        setData(null);
+        setLoading(true);
+
         const fetchData = async () => {
-            if (!activeTab || !league?.leagueId || data !== null) return;
-    
-            setLoading(true);
-            
             let url = '';
             try {
                 switch (activeTab) {
@@ -243,7 +244,7 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
 
         fetchData();
 
-    }, [activeTab, league, toast, data]);
+    }, [activeTab, league, toast]);
     
     const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
 
@@ -274,29 +275,39 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
         if (isNaN(homeGoals) || isNaN(awayGoals)) return;
 
         const predictionRef = doc(db, 'leaguePredictions', `${user.uid}_${fixtureId}`);
-        const predictionData: Prediction = {
-            userId: user.uid,
-            fixtureId,
-            homeGoals,
-            awayGoals,
-            points: 0,
-            timestamp: new Date().toISOString()
-        };
-
+        
         try {
             const docSnap = await getDoc(predictionRef);
-            const isUpdating = docSnap.exists();
-
-            await setDoc(predictionRef, predictionData, { merge: true });
-
+            
+            if (docSnap.exists()) {
+                // Document exists, so update it
+                const updateData = {
+                    homeGoals: homeGoals,
+                    awayGoals: awayGoals,
+                    timestamp: new Date().toISOString()
+                };
+                await updateDoc(predictionRef, updateData);
+            } else {
+                // Document does not exist, so create it
+                const newData: Prediction = {
+                    userId: user.uid,
+                    fixtureId,
+                    homeGoals,
+                    awayGoals,
+                    points: 0,
+                    timestamp: new Date().toISOString()
+                };
+                await setDoc(predictionRef, newData);
+            }
         } catch (serverError) {
              const docSnap = await getDoc(predictionRef).catch(() => null);
              const isUpdating = docSnap?.exists() ?? false;
+             const errorData = { userId: user.uid, fixtureId, homeGoals, awayGoals };
 
              const permissionError = new FirestorePermissionError({
               path: predictionRef.path,
               operation: isUpdating ? 'update' : 'create',
-              requestResourceData: predictionData
+              requestResourceData: errorData
             });
             errorEmitter.emit('permission-error', permissionError);
         }
@@ -637,7 +648,6 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   }
   
   const handleDoreenaSubTabChange = (newTab: string) => {
-    // Reset data when changing tabs to force a refetch
     setDoreenaSubTab(newTab);
   };
   
