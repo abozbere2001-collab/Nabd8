@@ -154,21 +154,24 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     useEffect(() => {
         if (!db) return;
         setLoading(true);
-        fetchAllCustomNames();
-        const compsRef = collection(db, 'managedCompetitions');
         
-        const unsubscribe = onSnapshot(query(compsRef), (snapshot) => {
-            const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetitionType);
-            setManagedCompetitions(fetchedCompetitions);
-            setLoading(false);
-        }, (error) => {
-            setManagedCompetitions([]);
-            setLoading(false);
-            const permissionError = new FirestorePermissionError({ path: 'managedCompetitions', operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
-        });
+        const fetchData = async () => {
+            await fetchAllCustomNames();
+            try {
+                const compsRef = collection(db, 'managedCompetitions');
+                const snapshot = await getDocs(query(compsRef));
+                const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetitionType);
+                setManagedCompetitions(fetchedCompetitions);
+            } catch (error) {
+                setManagedCompetitions([]);
+                const permissionError = new FirestorePermissionError({ path: 'managedCompetitions', operation: 'list' });
+                errorEmitter.emit('permission-error', permissionError);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-        return () => unsubscribe();
+        fetchData();
     }, [db, fetchAllCustomNames]);
 
     const handleFavoriteLeague = useCallback((item: ManagedCompetitionType, type: 'star' | 'heart') => {

@@ -134,14 +134,13 @@ function OurLeagueTab({
         if (db && ourLeague?.id === IRAQI_LEAGUE_ID) {
             const scorersRef = collection(db, 'iraqiLeagueTopScorers');
             const q = query(scorersRef, orderBy('rank', 'asc'));
-            const unsubscribe = onSnapshot(q, (snapshot) => {
+            getDocs(q).then(snapshot => {
               const fetchedScorers = snapshot.docs.map((doc) => doc.data());
               setManualTopScorers(fetchedScorers);
-            }, error => {
+            }).catch(error => {
                 const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
                 errorEmitter.emit('permission-error', permissionError);
             });
-            return () => unsubscribe();
         } else {
             setManualTopScorers([]);
         }
@@ -481,14 +480,13 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         if (!db) { return; }
         const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
         const q = query(pinnedMatchesRef);
-        const unsub = onSnapshot(q, (snapshot) => {
+        getDocs(q).then(snapshot => {
             const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch));
             setPinnedMatches(matches);
-        }, (serverError) => {
+        }).catch(serverError => {
             const permissionError = new FirestorePermissionError({ path: pinnedMatchesRef.path, operation: 'list' });
             errorEmitter.emit('permission-error', permissionError);
         });
-        return () => unsub();
     }, [db]);
     
     const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}).sort((a,b) => a.name.localeCompare(b.name)), [favorites.ourBallTeams]);

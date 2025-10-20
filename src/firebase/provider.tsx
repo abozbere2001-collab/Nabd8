@@ -54,43 +54,26 @@ export const FirebaseProvider = ({
     setUser(firebaseUser);
     setIsLoading(true);
 
-    const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
-    const userDocRef = doc(firestore, 'users', firebaseUser.uid);
-
     try {
-        const adminDocPromise = getDoc(adminDocRef)
-            .then(docSnap => docSnap.exists())
-            .catch(error => {
-                if (error.code === 'permission-denied') {
-                    return false;
-                }
-                const permissionError = new FirestorePermissionError({ path: adminDocRef.path, operation: 'get' });
-                errorEmitter.emit('permission-error', permissionError);
-                throw permissionError;
-            });
+        const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
+        const adminDoc = await getDoc(adminDocRef).catch(() => null);
+        setIsAdmin(adminDoc?.exists() || false);
 
-        const userDocPromise = getDoc(userDocRef).catch(serverError => {
-            const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'get' });
-            errorEmitter.emit('permission-error', permissionError);
-            throw permissionError;
-        });
+        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
 
-        const [isAdminStatus, userDoc] = await Promise.all([
-            adminDocPromise,
-            userDocPromise
-        ]);
-
-        setIsAdmin(isAdminStatus);
-        
         if (userDoc.exists()) {
             setProUser(userDoc.data()?.isProUser || false);
         } else {
-            await handleNewUser(firebaseUser, firestore);
-            setProUser(false);
+             // We no longer call handleNewUser here to prevent recurrent writes.
+             // It will be called explicitly on sign-up / sign-in flows.
+             setProUser(false);
         }
 
     } catch (error) {
-        console.error("Failed to check user status, this might be expected for some operations.", error);
+        // Log error but don't block the UI, as some errors might be expected
+        // (e.g., permission denied for guests trying to read admin doc).
+        console.warn("Failed to check user status, this might be expected.", error);
     } finally {
         setIsLoading(false);
     }

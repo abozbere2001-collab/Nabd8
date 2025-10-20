@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -10,7 +11,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Trash2, Loader2, Search } from 'lucide-react';
 import { useAdmin, useFirestore } from '@/firebase/provider';
-import { collection, onSnapshot, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, deleteDoc, getDocs } from 'firebase/firestore';
 import type { NewsArticle } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -45,18 +46,17 @@ export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const newsCollectionRef = collection(db, 'news');
     const q = query(newsCollectionRef, orderBy('timestamp', 'desc'));
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    getDocs(q).then(snapshot => {
       const fetchedNews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NewsArticle));
       setNews(fetchedNews);
       setLoading(false);
-    }, (error) => {
+    }).catch(error => {
       console.error("Error fetching news:", error);
       const permissionError = new FirestorePermissionError({ path: 'news', operation: 'list' });
       errorEmitter.emit('permission-error', permissionError);
       setLoading(false);
     });
 
-    return () => unsubscribe();
   }, [db]);
   
   const handleDelete = (articleId: string) => {
@@ -66,6 +66,7 @@ export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     deleteDoc(docRef)
         .then(() => {
             toast({ title: "نجاح", description: "تم حذف الخبر بنجاح." });
+            setNews(prevNews => prevNews.filter(article => article.id !== articleId));
         })
         .catch(serverError => {
             const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
