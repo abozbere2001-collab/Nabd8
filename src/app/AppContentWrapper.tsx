@@ -6,7 +6,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { MatchesScreen } from './screens/MatchesScreen';
 import { CompetitionsScreen } from './screens/CompetitionsScreen';
 import { AllCompetitionsScreen } from './screens/AllCompetitionsScreen';
-import { MyCountryScreen } from './screens/IraqScreen';
+import { IraqScreen } from './screens/IraqScreen';
 import { NewsScreen } from './screens/NewsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
@@ -51,7 +51,7 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
   Competitions: { component: CompetitionsScreen },
   AllCompetitions: { component: AllCompetitionsScreen },
-  MyCountry: { component: MyCountryScreen },
+  MyCountry: { component: IraqScreen },
   News: { component: NewsScreen },
   Settings: { component: SettingsScreen },
   CompetitionDetails: { component: CompetitionDetailScreen },

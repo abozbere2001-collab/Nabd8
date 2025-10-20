@@ -8,7 +8,7 @@ import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy, Loader2 }
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, onSnapshot, getDocs, writeBatch, getDoc, deleteDoc, deleteField, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot, getDocs, writeBatch, getDoc, deleteDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -330,19 +330,28 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     useEffect(() => {
-        let unsubscribe: (() => void) | null = null;
+        let unsubscribe: (() => void)[] = [];
         if (user && db) {
-            const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            unsubscribe = onSnapshot(docRef, (doc) => {
-                setFavorites(doc.data() as Favorites || { userId: user.uid });
-            }, (error) => {
-                if (user) errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'get' }));
-                setFavorites(getLocalFavorites());
+            const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const ourLeagueRef = doc(db, 'users', user.uid, 'ourFavorites', 'league');
+            const ourTeamsRef = doc(db, 'users', user.uid, 'ourFavorites', 'teams');
+
+            const unsub1 = onSnapshot(starredFavsRef, (doc) => {
+                const favs = doc.data() as Favorites || { userId: user.uid };
+                setFavorites(prev => ({...prev, leagues: favs.leagues, teams: favs.teams}));
             });
+            const unsub2 = onSnapshot(ourLeagueRef, (doc) => {
+                setFavorites(prev => ({...prev, ourLeagueId: doc.exists() ? doc.data().leagueId : undefined}));
+            });
+            const unsub3 = onSnapshot(ourTeamsRef, (doc) => {
+                setFavorites(prev => ({...prev, ourBallTeams: doc.exists() ? doc.data() : {}}));
+            });
+            unsubscribe.push(unsub1, unsub2, unsub3);
+
         } else {
             setFavorites(getLocalFavorites());
         }
-        return () => { if (unsubscribe) unsubscribe(); };
+        return () => { unsubscribe.forEach(unsub => unsub()); };
     }, [user, db]);
 
      const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
@@ -352,58 +361,53 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const currentFavorites = user && db ? favorites : getLocalFavorites();
         const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
 
-        let updateData: any = {};
-        let fieldToUpdate: string = '';
-
-        if (type === 'heart') {
-            if (isLeague) {
-                fieldToUpdate = 'ourLeagueId';
-                if (newFavorites.ourLeagueId === itemId) {
-                    delete newFavorites.ourLeagueId;
-                    updateData[fieldToUpdate] = deleteField();
-                } else {
-                    newFavorites.ourLeagueId = itemId;
-                    updateData[fieldToUpdate] = itemId;
-                }
-            } else { // Team
-                fieldToUpdate = `ourBallTeams.${itemId}`;
-                if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
-                if (newFavorites.ourBallTeams[itemId]) {
-                    delete newFavorites.ourBallTeams[itemId];
-                    updateData[fieldToUpdate] = deleteField();
-                } else {
+        if (user && db) { // Logged-in user
+            if (type === 'heart') {
+                if (isLeague) {
+                    const ref = doc(db, 'users', user.uid, 'ourFavorites', 'league');
+                    const isHearted = newFavorites.ourLeagueId === itemId;
+                    const operation = isHearted ? deleteDoc(ref) : setDoc(ref, { leagueId: itemId, name: item.name, logo: item.logo });
+                    operation.catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ref.path, operation: 'write'})));
+                } else { // Team
+                    const ref = doc(db, 'users', user.uid, 'ourFavorites', 'teams');
+                    const isHearted = newFavorites.ourBallTeams?.[itemId];
                     const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    newFavorites.ourBallTeams[itemId] = favData;
-                    updateData[fieldToUpdate] = favData;
+                    setDoc(ref, isHearted ? { [itemId]: deleteField() } : { [itemId]: favData }, { merge: true })
+                        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ref.path, operation: 'write'})));
                 }
-            }
-        } else { // Star
-            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-            fieldToUpdate = `${itemType}.${itemId}`;
-            if (!newFavorites[itemType]) newFavorites[itemType] = {};
-
-            if (newFavorites[itemType]?.[itemId]) {
-                delete newFavorites[itemType]![itemId];
-                updateData[fieldToUpdate] = deleteField();
-            } else {
+            } else { // Star
+                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+                const ref = doc(db, 'users', user.uid, 'favorites', 'data');
+                const isStarred = newFavorites[itemType]?.[itemId];
                 const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                newFavorites[itemType]![itemId] = favData;
-                updateData[fieldToUpdate] = favData;
+                setDoc(ref, { [itemType]: { [itemId]: isStarred ? deleteField() : favData } }, { merge: true })
+                     .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ref.path, operation: 'write'})));
             }
-        }
-
-        setFavorites(newFavorites);
-
-        if (user && db) {
-            const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            updateDoc(favRef, updateData).catch(serverError => {
-                setFavorites(currentFavorites); // Revert on error
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData }));
-            });
-        } else {
+        } else { // Guest user
+            if (type === 'heart') {
+                if (isLeague) {
+                    if (newFavorites.ourLeagueId === itemId) delete newFavorites.ourLeagueId;
+                    else newFavorites.ourLeagueId = itemId;
+                } else {
+                    if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
+                    if (newFavorites.ourBallTeams[itemId]) delete newFavorites.ourBallTeams[itemId];
+                    else newFavorites.ourBallTeams[itemId] = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                }
+            } else {
+                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+                 if (!newFavorites[itemType]) newFavorites[itemType] = {};
+                if (newFavorites[itemType]?.[itemId]) delete newFavorites[itemType]![itemId];
+                else {
+                     const favData = isLeague 
+                        ? { name: item.name, leagueId: itemId, logo: item.logo }
+                        : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                    newFavorites[itemType]![itemId] = favData;
+                }
+            }
             setLocalFavorites(newFavorites);
+            setFavorites(newFavorites);
         }
     }, [user, db, favorites]);
 

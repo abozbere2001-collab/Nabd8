@@ -6,8 +6,8 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
-import { collection, onSnapshot, doc, query, getDoc } from 'firebase/firestore';
-import type { PinnedMatch, Favorites, Team } from '@/lib/types';
+import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import type { PinnedMatch, Team } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,6 @@ import { ProfileButton } from '../AppContentWrapper';
 import { OurLeagueTab } from '@/components/my-country/OurLeagueTab';
 import { OurBallTab } from '@/components/my-country/OurBallTab';
 import { getLocalFavorites } from '@/lib/local-favorites';
-import { hardcodedTranslations }from '@/lib/hardcoded-translations';
 
 function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onManage: () => void, isAdmin: boolean}) {
     if (!match.isEnabled) return null;
@@ -53,71 +52,83 @@ function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onM
     );
 }
 
-export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user, db } = useAuth();
     const { isAdmin } = useAdmin();
     
-    const [favorites, setFavorites] = useState<Partial<Favorites>>({});
+    const [ourLeagueId, setOurLeagueId] = useState<number | null>(null);
+    const [ourBallTeams, setOurBallTeams] = useState<Team[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
     const [leagueDetails, setLeagueDetails] = useState<{ id: number; name: string; logo: string; } | null>(null);
     const [loadingLeague, setLoadingLeague] = useState(false);
 
 
     useEffect(() => {
-        setIsLoading(true);
-        // Initially set favorites from local storage for guest users or as a fallback.
-        const localFavs = getLocalFavorites();
-        setFavorites(localFavs); 
-        
-        // If the user is logged in, set up a listener to Firestore, which will override local data.
-        if (user && db) {
-            const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const unsubscribe = onSnapshot(favsRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    setFavorites(docSnap.data() as Favorites);
-                } else {
-                    setFavorites({}); // User has no favorites in Firestore
-                }
-                setIsLoading(false);
-            }, (error) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-                setFavorites(getLocalFavorites()); // Fallback to local on error
-                setIsLoading(false);
-            });
-            return () => unsubscribe();
-        } else {
-            // If there's no user, we are done loading (with local data).
-            setIsLoading(false);
-        }
-    }, [user, db]);
+      let leagueUnsub: (() => void) | null = null;
+      let teamsUnsub: (() => void) | null = null;
+      
+      setIsLoading(true);
 
-     const ourLeagueId = useMemo(() => favorites?.ourLeagueId, [favorites]);
-     const ourBallTeams = useMemo(() => Object.values(favorites?.ourBallTeams || {}).sort((a, b) => a.name.localeCompare(b.name)), [favorites?.ourBallTeams]);
+      if (user && db) {
+        // --- Setup Firestore listeners for logged-in user ---
+
+        const ourLeagueRef = doc(db, 'users', user.uid, 'ourFavorites', 'league');
+        leagueUnsub = onSnapshot(ourLeagueRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setOurLeagueId(docSnap.data().leagueId);
+            } else {
+                setOurLeagueId(null);
+            }
+             setIsLoading(false);
+        }, (error) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: ourLeagueRef.path, operation: 'get' }));
+            setIsLoading(false);
+        });
+        
+        const ourTeamsRef = doc(db, 'users', user.uid, 'ourFavorites', 'teams');
+        teamsUnsub = onSnapshot(ourTeamsRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setOurBallTeams(Object.values(docSnap.data()));
+            } else {
+                setOurBallTeams([]);
+            }
+             setIsLoading(false);
+        }, (error) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: ourTeamsRef.path, operation: 'get' }));
+             setIsLoading(false);
+        });
+
+      } else {
+        // --- Fallback to local storage for guest user ---
+        const localFavs = getLocalFavorites();
+        setOurLeagueId(localFavs.ourLeagueId || null);
+        setOurBallTeams(Object.values(localFavs.ourBallTeams || {}));
+        setIsLoading(false);
+      }
+      
+      return () => {
+        if (leagueUnsub) leagueUnsub();
+        if (teamsUnsub) teamsUnsub();
+      };
+    }, [user, db]);
 
     useEffect(() => {
         if (ourLeagueId) {
             setLoadingLeague(true);
-            const leagueName = hardcodedTranslations.leagues[ourLeagueId];
-            if(leagueName) {
-                 setLeagueDetails({ id: ourLeagueId, name: leagueName, logo: `https://media.api-sports.io/football/leagues/${ourLeagueId}.png` });
-                 setLoadingLeague(false);
-            } else if (db) {
-                getDoc(doc(db, 'managedCompetitions', String(ourLeagueId)))
-                    .then(docSnap => {
-                        if (docSnap.exists()) {
-                            const data = docSnap.data();
-                            setLeagueDetails({ id: ourLeagueId, name: data.name, logo: data.logo });
-                        } else {
-                            setLeagueDetails(null); // League not found in managed competitions
-                        }
-                    })
-                    .catch(console.error)
-                    .finally(() => setLoadingLeague(false));
-            } else {
-                 setLeagueDetails(null);
-                 setLoadingLeague(false);
-            }
+             getDoc(doc(db, 'managedCompetitions', String(ourLeagueId)))
+                .then(docSnap => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        setLeagueDetails({ id: ourLeagueId, name: data.name, logo: data.logo });
+                    } else {
+                        // Fallback if not in managed competitions
+                         setLeagueDetails({ id: ourLeagueId, name: `League ${ourLeagueId}`, logo: `https://media.api-sports.io/football/leagues/${ourLeagueId}.png` });
+                    }
+                })
+                .catch(console.error)
+                .finally(() => setLoadingLeague(false));
         } else {
             setLeagueDetails(null);
         }
@@ -203,3 +214,4 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
+
