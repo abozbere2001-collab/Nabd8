@@ -90,7 +90,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         return () => unsub();
     }, [db]);
     
-    const ourLeagueId = favorites?.ourLeagueId;
+    const ourLeagueId = useMemo(() => favorites?.ourLeagueId, [favorites]);
     const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}).sort((a, b) => a.name.localeCompare(b.name)), [favorites.ourBallTeams]);
 
     return (
