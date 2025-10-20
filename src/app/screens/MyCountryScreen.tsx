@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -223,4 +222,3 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
-
