@@ -58,7 +58,6 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     
     const [favorites, setFavorites] = useState<Partial<Favorites>>({});
     const [isLoading, setIsLoading] = useState(true);
-
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
 
     useEffect(() => {
@@ -67,54 +66,53 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         let pinnedMatchesUnsubscribe: (() => void) | null = null;
         let favoritesInitialized = false;
         let pinnedInitialized = false;
-      
+
         const tryFinishLoading = () => {
-          if (favoritesInitialized && pinnedInitialized) {
-            setIsLoading(false);
-          }
+            if (favoritesInitialized && pinnedInitialized) {
+                setIsLoading(false);
+            }
         };
-      
+
         if (user && db) {
-          const favsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data'); 
-          
-          favoritesUnsubscribe = onSnapshot(favsRef, (docSnap) => {
-            const data = docSnap.exists() ? (docSnap.data() as Favorites) : {};
-            setFavorites(data || {});
-            favoritesInitialized = true;
-            tryFinishLoading();
-          }, (error) => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-            setFavorites(getLocalFavorites()); // Fallback to local on permission error
-            favoritesInitialized = true;
-            tryFinishLoading();
-          });
+            const favsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+            favoritesUnsubscribe = onSnapshot(favsRef, (docSnap) => {
+                const data = docSnap.exists() ? (docSnap.data() as Favorites) : {};
+                setFavorites(data || {});
+                favoritesInitialized = true;
+                tryFinishLoading();
+            }, (error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
+                setFavorites(getLocalFavorites()); // Fallback to local on permission error
+                favoritesInitialized = true;
+                tryFinishLoading();
+            });
         } else {
-          setFavorites(getLocalFavorites());
-          favoritesInitialized = true;
+            setFavorites(getLocalFavorites());
+            favoritesInitialized = true;
         }
-      
+
         if (db) {
-          const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
-          const q = query(pinnedMatchesRef);
-          pinnedMatchesUnsubscribe = onSnapshot(q, (snapshot) => {
-            const matches = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as PinnedMatch));
-            setPinnedMatches(matches);
-            pinnedInitialized = true;
-            tryFinishLoading();
-          }, (serverError) => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
-            pinnedInitialized = true;
-            tryFinishLoading();
-          });
+            const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
+            const q = query(pinnedMatchesRef);
+            pinnedMatchesUnsubscribe = onSnapshot(q, (snapshot) => {
+                const matches = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as PinnedMatch));
+                setPinnedMatches(matches);
+                pinnedInitialized = true;
+                tryFinishLoading();
+            }, (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
+                pinnedInitialized = true;
+                tryFinishLoading();
+            });
         } else {
-             pinnedInitialized = true;
+            pinnedInitialized = true;
         }
 
         tryFinishLoading(); // Initial check in case db is not available
-      
+
         return () => {
-          if (favoritesUnsubscribe) favoritesUnsubscribe();
-          if (pinnedMatchesUnsubscribe) pinnedMatchesUnsubscribe();
+            if (favoritesUnsubscribe) favoritesUnsubscribe();
+            if (pinnedMatchesUnsubscribe) pinnedMatchesUnsubscribe();
         };
     }, [user, db]);
     
