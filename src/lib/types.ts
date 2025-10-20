@@ -180,6 +180,7 @@ export interface CrownedLeague {
     name: string;
     logo: string;
     note: string;
+    crownedAt: any; // Firestore Timestamp
 }
 
 export interface Favorites {
@@ -232,16 +233,6 @@ export interface UserProfile {
   onboardingComplete?: boolean;
 }
 
-export interface GlobalPredictionMatch {
-  fixtureId: number;
-  leagueId: number;
-  date: string;
-}
-
-export interface DailyGlobalPredictions {
-  selectedByAdmin: boolean;
-  selectedMatches: GlobalPredictionMatch[];
-}
 
 export interface SeasonPrediction {
   userId: string;
