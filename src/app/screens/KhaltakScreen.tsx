@@ -7,7 +7,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileButton } from '../AppContentWrapper';
 import { Button } from '@/components/ui/button';
-import { Crown, Search, X, Loader2 } from 'lucide-react';
+import { Crown, Search, X, Loader2, Trophy, BarChart, Users as UsersIcon } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { useAuth, useFirestore } from '@/firebase/provider';
 import type { CrownedTeam, Favorites, Fixture, CrownedLeague, Standing, TopScorer, Prediction, Team, Player } from '@/lib/types';
@@ -25,6 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { format, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import PredictionCard from '@/components/PredictionCard';
+import { FootballIcon } from '@/components/icons/FootballIcon';
 
 const CrownedTeamScroller = ({
   crownedTeams,
@@ -390,8 +391,8 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-  const [mainTab, setMainTab] = useState('kurratna');
-  const [doreenaSubTab, setDoreenaSubTab] = useState('matches');
+  const [mainTab, setMainTab] = useState('doreena');
+  const [doreenaSubTab, setDoreenaSubTab] = useState('predictions');
 
   useEffect(() => {
     if (!user || !db) return;
@@ -479,8 +480,8 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       />
       <Tabs value={mainTab} onValueChange={setMainTab} className="flex flex-1 flex-col min-h-0">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="doreena">دورينا</TabsTrigger>
           <TabsTrigger value="kurratna">كرتنا</TabsTrigger>
+          <TabsTrigger value="doreena">دورينا</TabsTrigger>
         </TabsList>
         
         <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
@@ -507,9 +508,9 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           {crownedLeague ? (
              <Tabs value={doreenaSubTab} onValueChange={setDoreenaSubTab} className="flex flex-1 flex-col min-h-0 p-1">
                  <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="matches">المباريات</TabsTrigger>
-                    <TabsTrigger value="standings">الترتيب</TabsTrigger>
                     <TabsTrigger value="scorers">الهدافين</TabsTrigger>
+                    <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                    <TabsTrigger value="matches">المباريات</TabsTrigger>
                     <TabsTrigger value="predictions">التوقعات</TabsTrigger>
                  </TabsList>
                  <div className="flex-1 overflow-y-auto mt-2">
@@ -534,6 +535,5 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
 
     
