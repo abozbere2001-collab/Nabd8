@@ -3,16 +3,15 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import type { ScreenProps } from "@/app/page";
-import { useFirestore, useAdmin, useAuth } from "@/firebase/provider";
+import { useFirestore, useAuth } from "@/firebase/provider";
 import { collection, onSnapshot, doc, query, getDoc } from "firebase/firestore";
 import type { PinnedMatch, Team, Favorites, Fixture, Standing, TopScorer } from "@/lib/types";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { Button } from "@/components/ui/button";
-import { Search, Pin, Edit, Loader2 } from "lucide-react";
+import { Search, Pin, Loader2 } from "lucide-react";
 import { SearchSheet } from "@/components/SearchSheet";
 import { ProfileButton } from "../AppContentWrapper";
-import { getLocalFavorites } from "@/lib/local-favorites";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { FixtureItem } from "@/components/FixtureItem";
@@ -326,6 +325,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
   const ourBallTeams = useMemo(() => Object.values(favorites?.ourBallTeams ?? {}), [favorites]);
   const ourLeagueId = favorites?.ourLeagueId;
+  const hasHeartFavorites = ourBallTeams.length > 0 || !!ourLeagueId;
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -361,7 +361,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             <div className="space-y-6">
                 <FavoriteTeamsScroller teams={ourBallTeams} navigate={navigate} />
                 <OurLeagueDetails leagueId={ourLeagueId} db={db} navigate={navigate} />
-                 {ourBallTeams.length === 0 && !ourLeagueId && (
+                 {!hasHeartFavorites && (
                      <div className="px-4">
                         <div className="flex flex-col items-center justify-center text-center text-muted-foreground border-2 border-dashed rounded-lg p-6">
                             <p className="font-bold">قسم "بلدي" فارغ</p>
