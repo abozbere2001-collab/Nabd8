@@ -304,52 +304,44 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         const isLeague = !('national' in item);
         const itemId = item.id;
         
-        const isStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
-        const isHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
+        if (!user || !db) {
+             toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+             return;
+        }
         
-        if (user && db) {
-            if (type === 'heart') {
-                const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-                let updateData;
-                if (isLeague) {
-                    updateData = { ourLeagueId: isHearted ? deleteField() : itemId };
-                } else {
-                    const fieldPath = `ourBallTeams.${itemId}`;
-                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    updateData = { [fieldPath]: isHearted ? deleteField() : favData };
-                }
-                setDoc(favDocRef, updateData, { merge: true }).catch(err => {
+        const isStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
+        
+        if (type === 'heart') {
+             if (isLeague) {
+                 const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+                 const updateData = { ourLeagueId: itemId };
+                 setDoc(favDocRef, updateData, { merge: true }).then(() => {
+                     toast({ title: 'نجاح', description: `تم تعيين "${item.name}" كدورينا المفضل.` });
+                 }).catch(err => {
                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
-                });
-            } else { // star
-                const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-                const fieldPath = `${itemType}.${itemId}`;
-                const favData = isLeague 
-                    ? { name: item.name, leagueId: itemId, logo: item.logo }
-                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                const updateData = { [fieldPath]: isStarred ? deleteField() : favData };
-                updateDoc(favDocRef, updateData).catch(err => {
-                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
                  });
-            }
-        } else { // Guest user
-            const currentFavorites = getLocalFavorites();
-            if (type === 'heart') {
-                toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
-            } else {
-                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-                 if (!currentFavorites[itemType]) currentFavorites[itemType] = {};
-                if (currentFavorites[itemType]?.[itemId]) delete currentFavorites[itemType]![itemId];
-                else {
-                     const favData = isLeague 
-                        ? { name: item.name, leagueId: itemId, logo: item.logo }
-                        : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    currentFavorites[itemType]![itemId] = favData;
-                }
-                setLocalFavorites(currentFavorites);
-                setFavorites(currentFavorites);
-            }
+             } else {
+                 const teamItem = item as Team;
+                 setRenameItem({
+                     type: 'team',
+                     id: teamItem.id,
+                     name: teamItem.name,
+                     purpose: 'note',
+                     originalData: item
+                 });
+             }
+
+        } else { // star
+            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+            const fieldPath = `${itemType}.${itemId}`;
+            const favData = isLeague 
+                ? { name: item.name, leagueId: itemId, logo: item.logo }
+                : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+            const updateData = { [fieldPath]: isStarred ? deleteField() : favData };
+            updateDoc(favDocRef, updateData).catch(err => {
+                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
+             });
         }
     }, [user, db, favorites, toast]);
 
@@ -384,6 +376,24 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         if(debouncedSearchTerm) {
             handleSearch(debouncedSearchTerm);
         }
+    } else if (purpose === 'note' && user) {
+        const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+        const item = originalData as Team;
+        const fieldPath = `ourBallTeams.${item.id}`;
+        const favData = { 
+            name: item.name, 
+            teamId: item.id, 
+            logo: item.logo, 
+            type: item.national ? 'National' : 'Club',
+            ...(newNote && { note: newNote })
+         };
+        const updateData = { [fieldPath]: favData };
+
+         setDoc(favDocRef, updateData, { merge: true }).then(() => {
+            toast({ title: 'نجاح', description: 'تم حفظ التغييرات على الفريق المفضل.' });
+         }).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+        });
     }
     setRenameItem(null);
   };

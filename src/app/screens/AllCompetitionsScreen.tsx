@@ -378,23 +378,33 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 setStarredFavorites(newFavorites);
             }
         } else if (type === 'heart') {
-             // Open dialog to add note (for teams) or just add to ourFavorites (for leagues)
-             if (!user) {
+             if (!user || !db) {
                 toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
                 return;
              }
-             const purpose: 'note' = 'note';
-             const note = ''; // In a real app, you might fetch existing note if any
-             const originalName = isLeague ? (item as ManagedCompetitionType).name : (item as Team).name;
-             setRenameItem({
-                 type: isLeague ? 'league' : 'team',
-                 id: itemId,
-                 name: originalName,
-                 originalName: originalName,
-                 purpose: purpose,
-                 note: note,
-                 originalData: item
-             });
+
+             if (isLeague) {
+                 const leagueItem = item as ManagedCompetitionType;
+                 const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+                 const updateData = { ourLeagueId: leagueItem.leagueId };
+                 setDoc(favDocRef, updateData, { merge: true }).then(() => {
+                     toast({ title: 'نجاح', description: `تم تعيين "${leagueItem.name}" كدورينا المفضل.` });
+                 }).catch(err => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+                 });
+             } else {
+                 const teamItem = item as Team;
+                 const note = (starredFavorites.ourBallTeams?.[teamItem.id] as any)?.note || '';
+                 setRenameItem({
+                     type: 'team',
+                     id: teamItem.id,
+                     name: teamItem.name,
+                     originalName: teamItem.name,
+                     purpose: 'note',
+                     note: note,
+                     originalData: item
+                 });
+             }
         }
     }, [user, db, starredFavorites, toast]);
 
@@ -403,7 +413,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         if (!db) return;
 
         if (renameItem?.purpose === 'rename' && isAdmin) {
-            // Admin-specific name customization
             const collectionName = `${type}Customizations`;
             const docId = String(id);
             const originalName = renameItem?.originalName;
@@ -432,23 +441,21 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             });
 
         } else if (renameItem?.purpose === 'note' && user) {
-            // Heart favorite logic (for both users and admins)
+            // Heart favorite logic for teams
             const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-            const isLeague = renameItem.type === 'league';
-            const itemId = renameItem.id;
-            const item = renameItem.originalData as (Team | ManagedCompetitionType);
-            
-            let updateData;
-            if (isLeague) {
-                updateData = { ourLeagueId: itemId };
-            } else {
-                const teamItem = item as Team;
-                const fieldPath = `ourBallTeams.${itemId}`;
-                const favData = { name: teamItem.name, teamId: itemId, logo: teamItem.logo, type: teamItem.national ? 'National' : 'Club', note: newNote };
-                updateData = { [fieldPath]: favData };
-            }
+            const item = renameItem.originalData as Team;
+            const fieldPath = `ourBallTeams.${item.id}`;
+            const favData = { 
+                name: item.name, 
+                teamId: item.id, 
+                logo: item.logo, 
+                type: item.national ? 'National' : 'Club',
+                ...(newNote && { note: newNote })
+             };
+            const updateData = { [fieldPath]: favData };
+
              setDoc(favDocRef, updateData, { merge: true }).then(() => {
-                toast({ title: 'نجاح', description: 'تمت الإضافة إلى مفضلة "بلدي".' });
+                toast({ title: 'نجاح', description: 'تم حفظ التغييرات على الفريق المفضل.' });
              }).catch(err => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
             });

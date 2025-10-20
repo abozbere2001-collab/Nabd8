@@ -80,7 +80,7 @@ export function RenameDialog({
   }
 
   const showNameField = isAdmin && item?.purpose === 'rename';
-  const showNoteField = item?.type === 'team' && item?.purpose === 'note';
+  const showNoteField = item?.purpose === 'note';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
