@@ -1,8 +1,6 @@
-
-
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy, Loader2 } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
@@ -369,7 +367,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
                 setDoc(favDocRef, updateData, { merge: true })
                     .then(() => toast({ title: 'نجاح', description: `تم تحديث دوريك المفضل.` }))
-                    .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'write', requestResourceData: updateData })));
+                    .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData })));
             } else {
                 const currentNote = (favorites.ourBallTeams?.[itemId] as any)?.note || '';
                 setRenameItem({
@@ -387,8 +385,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             const fieldPath = `${itemType}.${itemId}`;
     
             const favData = isLeague
-                ? { name: item.name, leagueId: itemId, logo: (item as ManagedCompetitionType).logo }
-                : { name: item.name, teamId: itemId, logo: (item as Team).logo, type: (item as Team).national ? 'National' : 'Club' };
+                ? { name: item.name, leagueId: itemId, logo: (item as ManagedCompetitionType).logo, notificationsEnabled: true }
+                : { name: item.name, teamId: itemId, logo: (item as Team).logo, type: (item as Team).national ? 'National' : 'Club', notificationsEnabled: true };
     
             const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
     
@@ -428,7 +426,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             const fieldPath = `ourBallTeams.${itemData.id}`;
             const hasNote = newNote && newNote.trim().length > 0;
         
-            if (!hasNote && !favorites.ourBallTeams?.[itemData.id]) {
+            const existingFav = favorites.ourBallTeams?.[itemData.id];
+            
+            if (!hasNote && !existingFav) {
                  setRenameItem(null);
                  return;
             }

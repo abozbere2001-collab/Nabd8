@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
@@ -298,7 +296,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 }, [localSearchIndex]);
 
 
-   const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
+    const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
         if (!user || !db) {
             toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
             return;
@@ -314,7 +312,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
                 const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
                 setDoc(favDocRef, updateData, { merge: true })
                     .then(() => toast({ title: 'نجاح', description: `تم تحديث دوريك المفضل.` }))
-                    .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData})));
+                    .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData})));
             } else {
                 const currentNote = (favorites.ourBallTeams?.[itemId] as any)?.note || '';
                 setRenameItem({
@@ -332,8 +330,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             const fieldPath = `${itemType}.${itemId}`;
             
             const favData = isLeague 
-                ? { name: item.name, leagueId: itemId, logo: item.logo }
-                : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                ? { name: item.name, leagueId: itemId, logo: item.logo, notificationsEnabled: true }
+                : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club', notificationsEnabled: true };
 
             const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
 

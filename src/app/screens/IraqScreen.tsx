@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -25,12 +24,8 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 // --- Pinned Match Component ---
 function PinnedMatchCard({
   match,
-  onManage,
-  isAdmin,
 }: {
   match: PinnedMatch;
-  onManage: () => void;
-  isAdmin: boolean;
 }) {
   if (!match.isEnabled) return null;
 
@@ -71,17 +66,6 @@ function PinnedMatchCard({
       <p className="text-center text-xs text-muted-foreground mt-2">
         {match.competitionName}
       </p>
-      {isAdmin && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="absolute top-1 left-1"
-          onClick={onManage}
-        >
-          <Edit className="h-4 w-4 mr-1" />
-          تعديل
-        </Button>
-      )}
     </div>
   );
 }
@@ -374,7 +358,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 pt-4">
             {pinnedMatches.map((match) => (
-                <PinnedMatchCard key={match.id} match={match} onManage={() => navigate("ManagePinnedMatch", { matchId: match.id })} isAdmin={isAdmin}/>
+                <PinnedMatchCard key={match.id} match={match} />
             ))}
         </div>
         
