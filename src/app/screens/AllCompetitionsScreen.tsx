@@ -439,7 +439,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     if (crownedData?.crownedAt?.toDate) {
                         const thirtyDaysInMillis = 30 * 24 * 60 * 60 * 1000;
                         const canChange = new Date().getTime() - crownedData.crownedAt.toDate().getTime() > thirtyDaysInMillis;
-                        if (!canChange) {
+                        if (!canChange && !isAdmin) { // Admin can bypass
                             toast({
                                 title: 'لا يمكن التغيير الآن',
                                 description: 'لا يمكنك تغيير دوريك المتوج إلا بعد مرور 30 يومًا على اختيارك الحالي.',
@@ -805,6 +805,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
 
 
 

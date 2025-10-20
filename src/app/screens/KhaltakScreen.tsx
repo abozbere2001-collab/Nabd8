@@ -8,9 +8,9 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileButton } from '../AppContentWrapper';
 import { Button } from '@/components/ui/button';
-import { Crown, Search, X, Loader2, Trophy, BarChart, Users as UsersIcon } from 'lucide-react';
+import { Crown, Search, X, Loader2, Trophy, BarChart, Users as UsersIcon, RefreshCw } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
-import { useAuth, useFirestore } from '@/firebase/provider';
+import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import type { CrownedTeam, Favorites, Fixture, CrownedLeague, Standing, TopScorer, Prediction, Team, Player, UserScore } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -452,13 +452,58 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
     
-    if (!data || data.length === 0) {
-        const message = activeTab === 'predictions' || activeTab === 'matches'
-            ? 'لا توجد مباريات متاحة للتوقع لهذا اليوم.'
-            : 'لا توجد بيانات متاحة حاليًا.';
-        return <div className="text-center text-muted-foreground py-10">{message}</div>;
+    if (activeTab === 'predictions') {
+         return (
+             <Tabs defaultValue="voting" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="prizes">الجوائز</TabsTrigger>
+                    <TabsTrigger value="leaderboard">الترتيب</TabsTrigger>
+                    <TabsTrigger value="voting">تصويت</TabsTrigger>
+                </TabsList>
+                <TabsContent value="voting" className="mt-4 space-y-4">
+                     {(data as Fixture[]) && (data as Fixture[]).length > 0 ? (
+                        (data as Fixture[]).map(fixture => (
+                            <PredictionCard 
+                                key={fixture.fixture.id}
+                                fixture={fixture}
+                                userPrediction={predictions[fixture.fixture.id]}
+                                onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
+                            />
+                        ))
+                    ) : (
+                        <div className="text-center text-muted-foreground pt-10">
+                            <p>لا توجد مباريات متاحة للتوقع لهذا اليوم.</p>
+                        </div>
+                    )}
+                </TabsContent>
+                <TabsContent value="leaderboard" className="mt-4">
+                    <Card>
+                       <CardHeader className="flex-row items-center justify-between">
+                            <CardTitle>لوحة الصدارة</CardTitle>
+                            <Button onClick={handleCalculateLeaguePoints} disabled={calculatingPoints} size="sm">
+                                {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : "احتساب النقاط"}
+                            </Button>
+                       </CardHeader>
+                       <CardContent className="p-0">
+                            <LeaderboardDisplay leaderboard={leaderboard} loadingLeaderboard={loadingLeaderboard} />
+                       </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="prizes" className="mt-4">
+                    <Card>
+                       <CardContent className="p-10 text-center text-muted-foreground">
+                            <p className="text-lg font-bold">قريبًا...</p>
+                            <p>سيتم الإعلان عن جوائز دورينا هنا.</p>
+                       </CardContent>
+                    </Card>
+                </TabsContent>
+             </Tabs>
+         );
     }
-
+    
+    if (!data || data.length === 0) {
+        return <div className="text-center text-muted-foreground py-10">لا توجد بيانات متاحة حاليًا.</div>;
+    }
 
     if (activeTab === 'matches') {
         return (
@@ -530,55 +575,6 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
         );
     }
 
-    if (activeTab === 'predictions') {
-         return (
-             <Tabs defaultValue="voting" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="prizes">الجوائز</TabsTrigger>
-                    <TabsTrigger value="leaderboard">الترتيب</TabsTrigger>
-                    <TabsTrigger value="voting">تصويت</TabsTrigger>
-                </TabsList>
-                <TabsContent value="voting" className="mt-4 space-y-4">
-                     {(data as Fixture[]).length > 0 ? (
-                        (data as Fixture[]).map(fixture => (
-                            <PredictionCard 
-                                key={fixture.fixture.id}
-                                fixture={fixture}
-                                userPrediction={predictions[fixture.fixture.id]}
-                                onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
-                            />
-                        ))
-                    ) : (
-                        <div className="text-center text-muted-foreground pt-10">
-                            <p>لا توجد مباريات متاحة للتوقع لهذا اليوم.</p>
-                        </div>
-                    )}
-                </TabsContent>
-                <TabsContent value="leaderboard" className="mt-4">
-                    <Card>
-                       <CardHeader className="flex-row items-center justify-between">
-                            <CardTitle>لوحة الصدارة</CardTitle>
-                            <Button onClick={handleCalculateLeaguePoints} disabled={calculatingPoints} size="sm">
-                                {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : "احتساب النقاط"}
-                            </Button>
-                       </CardHeader>
-                       <CardContent className="p-0">
-                            <LeaderboardDisplay leaderboard={leaderboard} loadingLeaderboard={loadingLeaderboard} />
-                       </CardContent>
-                    </Card>
-                </TabsContent>
-                <TabsContent value="prizes" className="mt-4">
-                    <Card>
-                       <CardContent className="p-10 text-center text-muted-foreground">
-                            <p className="text-lg font-bold">قريبًا...</p>
-                            <p>سيتم الإعلان عن جوائز دورينا هنا.</p>
-                       </CardContent>
-                    </Card>
-                </TabsContent>
-             </Tabs>
-         );
-    }
-
     return null;
 };
 
@@ -586,11 +582,13 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
 
 export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { user } = useAuth();
-  const { db } = useFirestore();
+  const { isAdmin, db } = useAdmin();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [mainTab, setMainTab] = useState<'doreena' | 'kurratna'>('doreena');
   const [doreenaSubTab, setDoreenaSubTab] = useState('predictions');
+  const [calculatingAllPoints, setCalculatingAllPoints] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!user || !db) return;
@@ -647,6 +645,103 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setDoreenaSubTab(newTab);
   };
   
+    const handleCalculateAllPoints = useCallback(async () => {
+    if (!db) return;
+    setCalculatingAllPoints(true);
+    toast({ title: 'بدء الاحتساب الشامل', description: 'جاري تحديث نقاط جميع الدوريات...' });
+
+    try {
+        const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+        const crownedLeaguesSnap = await getDocs(query(collection(db, 'users'), where('crownedLeagues', '!=', null)));
+        const allLeagueIds = new Set<number>();
+        crownedLeaguesSnap.forEach(userDoc => {
+            const favs = userDoc.data() as Favorites;
+            if (favs.crownedLeagues) {
+                Object.keys(favs.crownedLeagues).forEach(leagueId => allLeagueIds.add(Number(leagueId)));
+            }
+        });
+
+        if (allLeagueIds.size === 0) {
+            toast({ title: 'لا توجد دوريات', description: 'لم يقم أي مستخدم بتتويج أي دوري بعد.' });
+            setCalculatingAllPoints(false);
+            return;
+        }
+
+        const leagueFixturePromises = Array.from(allLeagueIds).map(leagueId =>
+            fetch(`/api/football/fixtures?date=${yesterday}&league=${leagueId}&season=${CURRENT_SEASON}`).then(res => res.json())
+        );
+
+        const allFixturesResponses = await Promise.all(leagueFixturePromises);
+        const allFinishedFixtures = allFixturesResponses.flatMap(data => (data.response || []).filter((f: Fixture) => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short)));
+
+        if (allFinishedFixtures.length === 0) {
+            toast({ title: 'لا توجد مباريات', description: 'لا توجد مباريات منتهية لاحتساب نقاطها.' });
+            setCalculatingAllPoints(false);
+            return;
+        }
+        
+        const allFixtureIds = allFinishedFixtures.map(f => f.fixture.id);
+        const predictionsRef = collection(db, 'leaguePredictions');
+        const predictionsQuery = query(predictionsRef, where('fixtureId', 'in', allFixtureIds));
+        const predictionsSnapshot = await getDocs(predictionsQuery);
+
+        const predictionsToUpdate: { ref: any, points: number }[] = [];
+        predictionsSnapshot.forEach(doc => {
+            const prediction = doc.data() as Prediction;
+            const fixture = allFinishedFixtures.find(f => f.fixture.id === prediction.fixtureId);
+            if (fixture) {
+                const points = calculatePoints(prediction, fixture);
+                if (prediction.points !== points) {
+                    predictionsToUpdate.push({ ref: doc.ref, points });
+                }
+            }
+        });
+        
+        // Update predictions points in batches
+        let pointsBatch = writeBatch(db);
+        for(let i = 0; i < predictionsToUpdate.length; i++) {
+            pointsBatch.update(predictionsToUpdate[i].ref, { points: predictionsToUpdate[i].points });
+            if ((i + 1) % 500 === 0) {
+                await pointsBatch.commit();
+                pointsBatch = writeBatch(db);
+            }
+        }
+        await pointsBatch.commit();
+
+        // Recalculate total scores for all users in all leagues
+        let leaderboardBatch = writeBatch(db);
+        for (const leagueId of allLeagueIds) {
+            const usersInLeagueSnap = await getDocs(query(collection(db, 'leagueLeaderboards', String(leagueId), 'users')));
+            const userIdsInLeague = usersInLeagueSnap.docs.map(d => d.id);
+            
+            for (const userId of userIdsInLeague) {
+                 const userPredsRef = collection(db, 'leaguePredictions');
+                 const userPredsQuery = query(userPredsRef, where('userId', '==', userId));
+                 const userPredsSnap = await getDocs(userPredsQuery);
+                 
+                 let totalPoints = 0;
+                 userPredsSnap.forEach(predDoc => {
+                     const pred = predDoc.data() as Prediction;
+                     if(pred.leagueId === leagueId && pred.points) {
+                         totalPoints += pred.points;
+                     }
+                 });
+
+                 const leaderboardRef = doc(db, 'leagueLeaderboards', String(leagueId), 'users', userId);
+                 leaderboardBatch.update(leaderboardRef, { totalPoints: totalPoints });
+            }
+        }
+        await leaderboardBatch.commit();
+        
+        toast({ title: 'اكتمل التحديث الشامل', description: 'تم تحديث جميع النقاط بنجاح.' });
+    } catch (error) {
+        console.error("Error calculating all points:", error);
+        toast({ variant: 'destructive', title: 'خطأ شامل', description: 'فشل تحديث النقاط لجميع الدوريات.' });
+    } finally {
+        setCalculatingAllPoints(false);
+    }
+}, [db, toast]);
+
   if (!user) {
     return (
        <div className="flex h-full flex-col bg-background">
@@ -671,6 +766,12 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         canGoBack={canGoBack}
         actions={
           <div className="flex items-center gap-1">
+              {isAdmin && mainTab === 'doreena' && (
+                  <Button onClick={handleCalculateAllPoints} disabled={calculatingAllPoints} size="sm" variant="outline">
+                      {calculatingAllPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
+                      <span className="mr-2 hidden sm:inline">تحديث كل النقاط</span>
+                  </Button>
+              )}
               <SearchSheet navigate={navigate}>
                   <Button variant="ghost" size="icon">
                       <Search className="h-5 w-5" />
@@ -737,4 +838,5 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
 
