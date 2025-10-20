@@ -68,7 +68,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         let pinnedInitialized = false;
 
         const tryFinishLoading = () => {
-            if (favoritesInitialized && pinnedInitialized) {
+            if ((!favoritesUnsubscribe || favoritesInitialized) && (!pinnedMatchesUnsubscribe || pinnedInitialized)) {
                 setIsLoading(false);
             }
         };
@@ -76,13 +76,12 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         if (user && db) {
             const favsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
             favoritesUnsubscribe = onSnapshot(favsRef, (docSnap) => {
-                const data = docSnap.exists() ? (docSnap.data() as Favorites) : {};
-                setFavorites(data || {});
+                setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
                 favoritesInitialized = true;
                 tryFinishLoading();
             }, (error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-                setFavorites(getLocalFavorites()); // Fallback to local on permission error
+                setFavorites({}); // Don't fall back to local for logged in user with error
                 favoritesInitialized = true;
                 tryFinishLoading();
             });
@@ -101,14 +100,15 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 tryFinishLoading();
             }, (serverError) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
+                setPinnedMatches([]);
                 pinnedInitialized = true;
                 tryFinishLoading();
             });
         } else {
-            pinnedInitialized = true;
+             pinnedInitialized = true;
         }
 
-        tryFinishLoading(); // Initial check in case db is not available
+        tryFinishLoading(); 
 
         return () => {
             if (favoritesUnsubscribe) favoritesUnsubscribe();
@@ -138,50 +138,52 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 }
             />
             
-            {isLoading ? (
-                <div className="flex-1 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+            <div className="flex-1 flex flex-col min-h-0">
+                <div className="px-4 pt-4">
+                    {pinnedMatches.map(match => (
+                        <PinnedMatchCard
+                            key={match.id}
+                            match={match}
+                            onManage={() => navigate('ManagePinnedMatch', { matchId: match.id })}
+                            isAdmin={isAdmin}
+                        />
+                    ))}
+                    {isAdmin && pinnedMatches.filter(m => m.isEnabled).length === 0 && (
+                        <Button className="w-full mb-2" onClick={() => navigate('ManagePinnedMatch', { matchId: null })}>
+                            <Pin className="ml-2 h-4 w-4" />
+                            إضافة مباراة للتثبيت
+                        </Button>
+                    )}
                 </div>
-            ) : (
-                <div className="flex-1 flex flex-col min-h-0">
-                    <div className="px-4 pt-4">
-                        {pinnedMatches.map(match => (
-                            <PinnedMatchCard
-                                key={match.id}
-                                match={match}
-                                onManage={() => navigate('ManagePinnedMatch', { matchId: match.id })}
-                                isAdmin={isAdmin}
-                            />
-                        ))}
-                        {isAdmin && pinnedMatches.filter(m => m.isEnabled).length === 0 && (
-                            <Button className="w-full mb-2" onClick={() => navigate('ManagePinnedMatch', { matchId: null })}>
-                                <Pin className="ml-2 h-4 w-4" />
-                                إضافة مباراة للتثبيت
-                            </Button>
-                        )}
-                    </div>
 
-                    <Tabs defaultValue="our-ball" className="w-full flex-1 flex flex-col min-h-0">
-                        <div className="sticky top-0 bg-background z-10 px-1 pt-1">
-                             <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
-                                <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-11 bg-transparent p-0">
-                                    <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
-                                    <TabsTrigger value="our-league">دورينا</TabsTrigger>
-                                </TabsList>
-                            </div>
+                <Tabs defaultValue="our-ball" className="w-full flex-1 flex flex-col min-h-0">
+                    <div className="sticky top-0 bg-background z-10 px-1 pt-1">
+                         <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
+                            <TabsList className="grid w-full grid-cols-2 flex-row-reverse h-11 bg-transparent p-0">
+                                <TabsTrigger value="our-ball">كرتنا</TabsTrigger>
+                                <TabsTrigger value="our-league">دورينا</TabsTrigger>
+                            </TabsList>
                         </div>
-                        <TabsContent value="our-league" className="flex-1 overflow-auto">
+                    </div>
+                    <TabsContent value="our-league" className="flex-1 overflow-auto">
+                        {isLoading ? (
+                             <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>
+                        ) : (
                              <OurLeagueTab
                                 navigate={navigate}
                                 leagueId={ourLeagueId}
                             />
-                        </TabsContent>
-                        <TabsContent value="our-ball" className="pt-0 flex-1 overflow-auto">
+                        )}
+                    </TabsContent>
+                    <TabsContent value="our-ball" className="pt-0 flex-1 overflow-auto">
+                         {isLoading ? (
+                             <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>
+                        ) : (
                             <OurBallTab navigate={navigate} ourBallTeams={ourBallTeams} />
-                        </TabsContent>
-                    </Tabs>
-                </div>
-            )}
+                        )}
+                    </TabsContent>
+                </Tabs>
+            </div>
         </div>
     );
 }
