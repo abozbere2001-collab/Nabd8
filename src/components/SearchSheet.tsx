@@ -194,8 +194,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         return;
     }
 
-    // --- Local Search First ---
-    // 1. Search local leagues
+    // --- Step 1: Perform immediate local search and update UI ---
+    // Search local leagues
     const localLeagues = cachedData?.managedCompetitions || [];
     localLeagues.forEach(comp => {
         const leagueName = getDisplayName('league', comp.leagueId, comp.name);
@@ -210,7 +210,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         }
     });
 
-    // 2. Search local custom team names
+    // Search local custom team names
     const customTeamNamePromises: Promise<void>[] = [];
     customTeamNames.forEach((name, id) => {
         if (normalizeArabic(name).includes(normalizedQuery)) {
@@ -227,35 +227,39 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             }
         }
     });
-
+    
     await Promise.all(customTeamNamePromises);
     setSearchResults(Array.from(resultsMap.values())); // Show local results immediately
 
-    // --- API Search in Parallel ---
+    // --- Step 2: Perform API search in the background ---
     try {
         const [teamsData, leaguesData] = await Promise.all([
-            fetch(`/api/football/teams?search=${query}`).then(res => res.json()),
-            fetch(`/api/football/leagues?search=${query}`).then(res => res.json())
+            fetch(`/api/football/teams?search=${query}`).then(res => res.ok ? res.json() : { response: [] }),
+            fetch(`/api/football/leagues?search=${query}`).then(res => res.ok ? res.json() : { response: [] })
         ]);
         
+        // Use a new map for merging to avoid race conditions with state updates
+        const finalResultsMap = new Map(resultsMap);
+
         if (teamsData.response) {
             teamsData.response.forEach((r: TeamResult) => {
                 const key = `team-${r.team.id}`;
-                if (!resultsMap.has(key)) {
-                    resultsMap.set(key, { ...r, type: 'team' });
+                if (!finalResultsMap.has(key)) {
+                    finalResultsMap.set(key, { ...r, type: 'team' });
                 }
             });
         }
         if (leaguesData.response) {
             leaguesData.response.forEach((r: LeagueResult) => {
                 const key = `league-${r.league.id}`;
-                if (!resultsMap.has(key)) {
-                    resultsMap.set(key, { ...r, type: 'league' });
+                if (!finalResultsMap.has(key)) {
+                    finalResultsMap.set(key, { ...r, type: 'league' });
                 }
             });
         }
         
-        setSearchResults(Array.from(resultsMap.values()));
+        // Update the state with the final merged list
+        setSearchResults(Array.from(finalResultsMap.values()));
 
     } catch (error) {
         console.error("API Search Error: ", error);
@@ -388,8 +392,25 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   }, [searchResults, getDisplayName]);
 
   const renderContent = () => {
-    if (loading) {
-      return <div className="flex justify-center items-center h-full"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    if (loading && !debouncedSearchTerm) {
+        return null;
+    }
+
+    if (loading && debouncedSearchTerm) {
+        // Show local results even while remote is loading
+        if (processedSearchResults.length > 0) {
+            return (
+                <>
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2"><Loader2 className="h-5 w-5 animate-spin" /></div>
+                    {processedSearchResults.map(result => {
+                        const item = result.type === 'team' ? result.team : result.league;
+                        const isFavorited = !!favorites?.[result.type]?.[item.id];
+                        return <ItemRow key={`${result.type}-${item.id}`} item={item} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, result.type)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(result.type, item.id, item)} />;
+                    })}
+                </>
+            );
+        }
+        return <div className="flex justify-center items-center h-full"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
     
     if (debouncedSearchTerm) {
@@ -442,7 +463,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
                 <Button variant={itemType === 'leagues' ? 'secondary' : 'ghost'} size="sm" onClick={() => setItemType('leagues')}>البطولات</Button>
             </div>
         )}
-        <div className="mt-4 flex-1 overflow-y-auto space-y-1 pr-2">
+        <div className="mt-4 flex-1 overflow-y-auto space-y-1 pr-2 relative">
           {renderContent()}
         </div>
         
@@ -458,5 +479,3 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
-
-    
