@@ -375,7 +375,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   const popularItems = itemType === 'teams' ? POPULAR_TEAMS : POPULAR_LEAGUES;
   const popularItemsToShow = showAllPopular ? popularItems : popularItems.slice(0, 6);
   
-  const processedSearchResults = useMemo(() => {
+  const processedSearchResults = React.useMemo(() => {
     return searchResults.map(result => {
         if(result.type === 'team') {
            return {...result, team: {...result.team, name: getDisplayName('team', result.team.id, result.team.name)}};
@@ -458,5 +458,3 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
-
-    
