@@ -376,8 +376,8 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             <TabsTrigger value="kurratna">كرتنا</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0 mt-0">
-            <div className="py-4 border-b">
+        <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
+           <div className="py-4 border-b">
                 <CrownedTeamScroller 
                     crownedTeams={crownedTeams} 
                     onSelectTeam={handleSelectTeam}
@@ -396,7 +396,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             </div>
         </TabsContent>
 
-        <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 mt-0">
+        <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
             {crownedLeague ? (
                 <CrownedLeagueCard key={crownedLeague.leagueId} league={crownedLeague} navigate={navigate} />
             ) : (
