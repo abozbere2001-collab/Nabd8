@@ -419,26 +419,43 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             ? !!favorites.crownedLeagues?.[id]
             : !!favorites.crownedTeams?.[id];
 
-        if (isCrowned && isLeague) {
+        if (isLeague) {
             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            updateDoc(favDocRef, { crownedLeagues: {} }).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: { crownedLeagues: {} } }));
+            let updateData: { crownedLeagues: { [key: string]: CrownedLeague } | {} };
+    
+            if (isCrowned) {
+                // If it's already crowned, uncrown it by setting an empty object.
+                updateData = { crownedLeagues: {} };
+                toast({ title: 'نجاح', description: `تم إزالة تتويج ${item.name}.` });
+            } else {
+                // If a new league is crowned, it replaces the old one.
+                const crownData: CrownedLeague = { leagueId: Number(id), name: item.name, logo: item.logo, note: '' };
+                updateData = { crownedLeagues: { [id]: crownData } };
+                toast({ title: 'نجاح', description: `تم تتويج ${item.name}.` });
+            }
+    
+            updateDoc(favDocRef, updateData).catch(serverError => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
             });
-        } else if (isCrowned && !isLeague) {
-            const fieldPath = `crownedTeams.${id}`;
-            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            updateDoc(favDocRef, { [fieldPath]: deleteField() }).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: { [fieldPath]: 'DELETED' } }));
-            });
-        }
-        else {
-            setRenameItem({
-                type: isLeague ? 'league' : 'team',
-                id: id,
-                name: item.name,
-                originalData: item,
-                purpose: 'crown'
-            });
+
+        } else { // It's a team
+            if (isCrowned) {
+                // Uncrowning a team
+                const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+                const fieldPath = `crownedTeams.${id}`;
+                updateDoc(favDocRef, { [fieldPath]: deleteField() }).catch(err => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: { [fieldPath]: 'DELETED' } }));
+                });
+            } else {
+                // Crowning a team, open dialog to add a note
+                setRenameItem({
+                    type: 'team',
+                    id: id,
+                    name: item.name,
+                    originalData: item,
+                    purpose: 'crown'
+                });
+            }
         }
     };
 
@@ -448,21 +465,12 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         
         const { originalData, purpose } = renameItem;
 
-        if (purpose === 'crown' && user && db) {
-            const isLeague = type === 'league';
+        if (purpose === 'crown' && user && db && type === 'team') {
             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const fieldPath = `crownedTeams.${id}`;
+            const crownData = { teamId: Number(id), name: originalData.name, logo: originalData.logo, note: newNote } as CrownedTeam;
+            const updateData = { [fieldPath]: crownData };
             
-            let updateData: { [key: string]: any };
-
-            if(isLeague) {
-                 const crownData = { [id]: { leagueId: Number(id), name: originalData.name, logo: originalData.logo, note: newNote } as CrownedLeague };
-                 updateData = { crownedLeagues: crownData };
-            } else {
-                const fieldPath = `crownedTeams.${id}`;
-                const crownData = { teamId: Number(id), name: originalData.name, logo: originalData.logo, note: newNote } as CrownedTeam;
-                updateData = { [fieldPath]: crownData };
-            }
-
             updateDoc(favDocRef, updateData).then(() => {
                 toast({ title: 'نجاح', description: `تم تتويج ${originalData.name}.` });
             }).catch(serverError => {
@@ -740,3 +748,4 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
