@@ -342,12 +342,12 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const unsubStarred = onSnapshot(starredFavsRef, (doc) => {
             const favs = doc.data() as Favorites || {};
             setFavorites(prev => ({...prev, leagues: favs.leagues, teams: favs.teams}));
-        }, () => { setFavorites(prev => ({...prev, ...getLocalFavorites()})); });
+        });
         
         const unsubOur = onSnapshot(ourFavsRef, (doc) => {
              const favs = doc.data() as Favorites || {};
              setFavorites(prev => ({...prev, ourLeagueId: favs.ourLeagueId, ourBallTeams: favs.ourBallTeams}));
-        }, () => { setFavorites(prev => ({...prev, ...getLocalFavorites()})); });
+        });
 
         return () => {
             unsubStarred();
@@ -390,16 +390,14 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
             const fieldPath = `${itemType}.${itemId}`;
             
-            const updateData = isCurrentlyStarred 
-                ? { [fieldPath]: deleteField() }
-                : { [fieldPath]: { 
-                      name: item.name, 
-                      logo: isLeague ? (item as ManagedCompetitionType).logo : (item as Team).logo,
-                      ...(isLeague ? { leagueId: itemId } : { teamId: itemId, type: (item as Team).national ? 'National' : 'Club' })
-                  } };
+            const favData = isLeague 
+                ? { name: item.name, leagueId: itemId, logo: (item as ManagedCompetitionType).logo }
+                : { name: item.name, teamId: itemId, logo: (item as Team).logo, type: (item as Team).national ? 'National' : 'Club' };
 
-            updateDoc(favDocRef, updateData).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
+            const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
+
+            setDoc(favDocRef, updateData, { merge: true }).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
             });
         }
 
@@ -407,9 +405,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote?: string) => {
-        if (!db) return;
+        if (!renameItem) return;
 
-        if (isAdmin && type !== 'status' && type !== 'player' && item?.purpose === 'rename') {
+        if (renameItem.purpose === 'rename' && isAdmin && db) {
              const collectionName = `${type}Customizations`;
             const docId = String(id);
             const originalName = renameItem?.originalName;
@@ -428,7 +426,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             });
         }
         
-        if (type === 'team' && item?.purpose === 'note' && user) {
+        if (renameItem.purpose === 'note' && user && db) {
             const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
             const itemData = renameItem?.originalData as Team;
             const isCurrentlyHearted = !!favorites.ourBallTeams?.[itemData.id];

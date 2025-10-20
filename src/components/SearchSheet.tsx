@@ -303,52 +303,46 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
 
    const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
+        const isLeague = !('national' in item);
+        const itemId = item.id;
+        
         if (!user || !db) {
             toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
             return;
         }
 
-        const isLeague = !('national' in item);
-        const itemId = item.id;
-        
-        if (type === 'star') {
-            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-            const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
-            const fieldPath = `${itemType}.${itemId}`;
-            const updateData = isCurrentlyStarred 
-                ? { [fieldPath]: deleteField() }
-                : { [fieldPath]: { 
-                      name: item.name, 
-                      logo: isLeague ? (item as LeagueResult['league']).logo : (item as Team).logo, 
-                      ...(isLeague ? { leagueId: itemId } : { teamId: itemId, type: (item as Team).national ? 'National' : 'Club' })
-                  } };
-            setDoc(favDocRef, updateData, { merge: true }).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
-            });
-        } else if (type === 'heart') {
-            const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+        if (type === 'heart') {
+             const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
             if (isLeague) {
-                const leagueItem = item as LeagueResult['league'];
-                const isCurrentlyHearted = favorites.ourLeagueId === leagueItem.id;
-                const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : leagueItem.id };
-                setDoc(favDocRef, updateData, { merge: true }).then(() => {
-                    toast({ title: 'نجاح', description: `تم تحديث "${leagueItem.name}" كدورينا المفضل.` });
-                }).catch(err => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
-                });
+                const isCurrentlyHearted = favorites.ourLeagueId === itemId;
+                const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
+                setDoc(favDocRef, updateData, { merge: true })
+                    .then(() => toast({ title: 'نجاح', description: `تم تحديث دوريك المفضل.` }))
+                    .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData})));
             } else {
-                 const teamItem = item as Team;
-                 const currentNote = (favorites.ourBallTeams?.[teamItem.id] as any)?.note || '';
+                 const currentNote = (favorites.ourBallTeams?.[itemId] as any)?.note || '';
                  setRenameItem({
                      type: 'team',
-                     id: teamItem.id,
-                     name: teamItem.name,
+                     id: itemId,
+                     name: item.name,
                      purpose: 'note',
                      note: currentNote,
                      originalData: item
                  });
             }
+        } else { // star
+            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+            const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
+            const fieldPath = `${itemType}.${itemId}`;
+            const favData = isLeague 
+                ? { name: item.name, leagueId: itemId, logo: item.logo }
+                : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+            const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
+
+            setDoc(favDocRef, updateData, { merge: true }).catch(err => {
+                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+            });
         }
     }, [user, db, favorites, toast]);
 
