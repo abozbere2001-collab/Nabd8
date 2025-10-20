@@ -201,8 +201,8 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
             try {
                 switch (activeTab) {
                     case 'matches':
-                        const fromDate = format(subDays(new Date(), 2), 'yyyy-MM-dd');
-                        const toDate = format(addDays(new Date(), 5), 'yyyy-MM-dd');
+                        const fromDate = format(new Date(), 'yyyy-MM-dd');
+                        const toDate = format(addDays(new Date(), 14), 'yyyy-MM-dd');
                         url = `/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&from=${fromDate}&to=${toDate}`;
                         break;
                     case 'standings':
@@ -282,14 +282,24 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
             points: 0,
             timestamp: new Date().toISOString()
         };
-        setDoc(predictionRef, predictionData, { merge: true }).catch(error => {
-            const permissionError = new FirestorePermissionError({
+
+        try {
+            const docSnap = await getDoc(predictionRef);
+            const isUpdating = docSnap.exists();
+
+            await setDoc(predictionRef, predictionData, { merge: true });
+
+        } catch (serverError) {
+             const docSnap = await getDoc(predictionRef).catch(() => null);
+             const isUpdating = docSnap?.exists() ?? false;
+
+             const permissionError = new FirestorePermissionError({
               path: predictionRef.path,
-              operation: 'create',
+              operation: isUpdating ? 'update' : 'create',
               requestResourceData: predictionData
             });
             errorEmitter.emit('permission-error', permissionError);
-        });
+        }
     }, [user, db]);
     
 
@@ -626,6 +636,11 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setSelectedTeamId(teamId);
   }
   
+  const handleDoreenaSubTabChange = (newTab: string) => {
+    // Reset data when changing tabs to force a refetch
+    setDoreenaSubTab(newTab);
+  };
+  
   if (!user) {
     return (
        <div className="flex h-full flex-col bg-background">
@@ -687,7 +702,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
         <TabsContent value="doreena" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
           {crownedLeague ? (
-             <Tabs value={doreenaSubTab} onValueChange={setDoreenaSubTab} className="flex flex-1 flex-col min-h-0 p-1">
+             <Tabs value={doreenaSubTab} onValueChange={handleDoreenaSubTabChange} className="flex flex-1 flex-col min-h-0 p-1">
                  <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="scorers">الهدافين</TabsTrigger>
                     <TabsTrigger value="standings">الترتيب</TabsTrigger>
