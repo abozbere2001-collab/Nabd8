@@ -8,17 +8,16 @@ import type { Fixture, Standing, TopScorer } from '@/lib/types';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { FixtureItem } from '@/components/FixtureItem';
 import { isMatchLive } from '@/lib/matchStatus';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Users } from 'lucide-react';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users } from 'lucide-react';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 
-const IRAQI_LEAGUE_ID = 542; // Assuming this is the constant ID for the Iraqi League
+const IRAQI_LEAGUE_ID = 542;
 
 interface OurLeagueTabProps {
     navigate: ScreenProps['navigate'];
@@ -118,7 +117,7 @@ export function OurLeagueTab({ navigate, ourLeague }: OurLeagueTabProps) {
 
 
     return (
-      <div className="flex flex-col">
+      <div className="flex flex-col px-4">
         <div className="flex items-center gap-3 p-3 rounded-lg bg-card border mb-4 cursor-pointer" onClick={() => navigate('CompetitionDetails', { leagueId: ourLeague.id, title: ourLeague.name, logo: ourLeague.logo })}>
              <Avatar className="h-10 w-10 p-1 border">
                 <AvatarImage src={ourLeague.logo} className="object-contain" />
@@ -238,4 +237,3 @@ export function OurLeagueTab({ navigate, ourLeague }: OurLeagueTabProps) {
       </div>
     );
 }
-

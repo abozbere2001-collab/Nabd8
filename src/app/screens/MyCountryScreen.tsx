@@ -71,7 +71,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
             }, (error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-                setFavorites({}); // Fallback to empty on error
+                setFavorites({});
             });
         } else {
             setFavorites(getLocalFavorites());
@@ -86,7 +86,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             });
         }
         
-        // A simple timeout to ensure data has a moment to populate, preventing flashes of empty content.
+        // A simple timeout to ensure data has a moment to populate.
         const loadingTimer = setTimeout(() => setIsLoading(false), 500);
 
         return () => {
@@ -96,11 +96,14 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         };
     }, [user, db]);
 
-    const ourLeagueData = useMemo(() => {
+    const ourLeague = useMemo(() => {
         const leagueId = favorites?.ourLeagueId;
         if (!leagueId) return null;
-        // The structure for 'ourLeague' is just the ID. Details come from 'leagues' map.
+        
+        // The structure from `AllCompetitionsScreen` saves the full favorite league object in the `leagues` map.
+        // We retrieve the details from there.
         const leagueDetails = favorites.leagues?.[leagueId];
+        
         return leagueDetails ? { ...leagueDetails, id: leagueId } : null;
     }, [favorites.ourLeagueId, favorites.leagues]);
 
@@ -159,7 +162,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         <TabsContent value="our-league" className="flex-1">
                              <OurLeagueTab
                                 navigate={navigate}
-                                ourLeague={ourLeagueData}
+                                ourLeague={ourLeague}
                             />
                         </TabsContent>
                         <TabsContent value="our-ball" className="pt-0 flex-1 flex flex-col min-h-0">

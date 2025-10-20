@@ -157,11 +157,7 @@ export interface TeamStatistics {
 export interface Favorites {
   userId: string;
   ourLeagueId?: number;
-  ourBallTeams?: { [key:number]: {
-    teamId: number;
-    name: string;
-    logo: string;
-  }};
+  ourBallTeams?: { [key:number]: Team & { note?: string } };
   leagues?: { [key: number]: {
     name: string;
     logo: string;
@@ -269,6 +265,14 @@ export interface PinnedMatch {
     competitionName: string;
     matchDate: string;
     matchTime: string;
+}
+
+export interface ManualTopScorer {
+  rank: number;
+  playerName: string;
+  teamName: string;
+  goals: number;
+  playerPhoto: string;
 }
 
 export interface MatchCustomization {
