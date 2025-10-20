@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
@@ -329,22 +330,22 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
             if (isLeague) {
                 const leagueItem = item as LeagueResult['league'];
-                const updateData = { ourLeagueId: leagueItem.id };
+                const isCurrentlyHearted = favorites.ourLeagueId === leagueItem.id;
+                const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : leagueItem.id };
                 setDoc(favDocRef, updateData, { merge: true }).then(() => {
-                    toast({ title: 'نجاح', description: `تم تعيين "${leagueItem.name}" كدورينا المفضل.` });
+                    toast({ title: 'نجاح', description: `تم تحديث "${leagueItem.name}" كدورينا المفضل.` });
                 }).catch(err => {
                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
                 });
             } else {
                  const teamItem = item as Team;
-                 const note = (favorites.ourBallTeams?.[teamItem.id] as any)?.note || '';
+                 const currentNote = (favorites.ourBallTeams?.[teamItem.id] as any)?.note || '';
                  setRenameItem({
                      type: 'team',
                      id: teamItem.id,
                      name: teamItem.name,
-                     originalName: teamItem.name,
                      purpose: 'note',
-                     note: note,
+                     note: currentNote,
                      originalData: item
                  });
             }
@@ -386,10 +387,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
         const item = originalData as Team;
         const fieldPath = `ourBallTeams.${item.id}`;
-        const isCurrentlyHearted = !!favorites.ourBallTeams?.[item.id];
         
-        // If team is already hearted and user clears the note, we keep the team. 
-        // To un-heart, they must click the heart again.
         const favData = { 
             name: item.name, 
             teamId: item.id, 
@@ -400,7 +398,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         const updateData = { [fieldPath]: favData };
 
          setDoc(favDocRef, updateData, { merge: true }).then(() => {
-            toast({ title: 'نجاح', description: 'تم حفظ الملاحظة على الفريق المفضل.' });
+            toast({ title: 'نجاح', description: 'تم حفظ الفريق في قسم بلدي.' });
          }).catch(err => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
         });

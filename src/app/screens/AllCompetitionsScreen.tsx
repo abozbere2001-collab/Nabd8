@@ -75,11 +75,11 @@ type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coac
 interface RenameState {
   id: string | number;
   name: string;
-  originalName?: string;
   type: RenameType;
   purpose: 'rename' | 'note';
   note?: string;
   originalData?: any;
+  originalName?: string;
 }
 
 // --- CONSTANTS ---
@@ -358,39 +358,50 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
         const isLeague = 'leagueId' in item;
+        const itemId = isLeague ? (item as ManagedCompetitionType).leagueId : (item as Team).id;
 
-        if (type === 'heart') {
-            if (isLeague) {
-                navigate('CompetitionDetails', { title: item.name, leagueId: (item as ManagedCompetitionType).leagueId, logo: item.logo });
-            } else {
-                navigate('TeamDetails', { teamId: (item as Team).id });
-            }
-            return;
-        }
-
-        // Handle 'star' favorites
         if (!user || !db) {
             toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
             return;
         }
 
-        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-        const itemId = isLeague ? (item as ManagedCompetitionType).leagueId : (item as Team).id;
-        const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
-        const fieldPath = `${itemType}.${itemId}`;
-        
-        const updateData = isCurrentlyStarred 
-            ? { [fieldPath]: deleteField() }
-            : { [fieldPath]: { 
-                  name: item.name, 
-                  logo: isLeague ? (item as ManagedCompetitionType).logo : (item as Team).logo,
-                  ...(isLeague ? { leagueId: itemId } : { teamId: itemId, type: (item as Team).national ? 'National' : 'Club' })
-              } };
+        if (type === 'heart') {
+             const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+            if (isLeague) {
+                const isCurrentlyHearted = favorites.ourLeagueId === itemId;
+                const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
+                setDoc(favDocRef, updateData, { merge: true })
+                    .then(() => toast({ title: 'نجاح', description: `تم تحديث دوريك المفضل.` }))
+                    .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData})));
+            } else {
+                 const currentNote = (favorites.ourBallTeams?.[itemId] as any)?.note || '';
+                 setRenameItem({
+                    id: itemId,
+                    name: item.name,
+                    type: 'team',
+                    purpose: 'note',
+                    note: currentNote,
+                    originalData: item
+                 });
+            }
+        } else { // Star Favorite
+            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+            const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
+            const fieldPath = `${itemType}.${itemId}`;
+            
+            const updateData = isCurrentlyStarred 
+                ? { [fieldPath]: deleteField() }
+                : { [fieldPath]: { 
+                      name: item.name, 
+                      logo: isLeague ? (item as ManagedCompetitionType).logo : (item as Team).logo,
+                      ...(isLeague ? { leagueId: itemId } : { teamId: itemId, type: (item as Team).national ? 'National' : 'Club' })
+                  } };
 
-        updateDoc(favDocRef, updateData).catch(err => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
-        });
+            updateDoc(favDocRef, updateData).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
+            });
+        }
 
     }, [user, db, favorites, toast, navigate]);
 
@@ -398,7 +409,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote?: string) => {
         if (!db) return;
 
-        if (isAdmin && type !== 'status' && type !== 'player') {
+        if (isAdmin && type !== 'status' && type !== 'player' && item?.purpose === 'rename') {
              const collectionName = `${type}Customizations`;
             const docId = String(id);
             const originalName = renameItem?.originalName;
@@ -416,6 +427,28 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 errorEmitter.emit('permission-error', permissionError);
             });
         }
+        
+        if (type === 'team' && item?.purpose === 'note' && user) {
+            const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+            const itemData = renameItem?.originalData as Team;
+            const isCurrentlyHearted = !!favorites.ourBallTeams?.[itemData.id];
+            
+            const favData = { 
+                name: itemData.name, 
+                teamId: itemData.id, 
+                logo: itemData.logo, 
+                type: itemData.national ? 'National' : 'Club',
+                ...(newNote && { note: newNote })
+             };
+            
+            const updateData = { [`ourBallTeams.${itemData.id}`]: isCurrentlyHearted && !newNote ? deleteField() : favData };
+
+            setDoc(favDocRef, updateData, { merge: true }).then(() => {
+                toast({ title: 'نجاح', description: 'تم تحديث الملاحظة على الفريق المفضل.' });
+            }).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'write', requestResourceData: updateData }))
+            });
+        }
 
         setRenameItem(null);
     };
@@ -428,7 +461,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             name: name,
             originalName: originalName || name,
             purpose: 'rename',
-            note: '',
         });
     };
 
@@ -652,7 +684,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 isOpen={!!renameItem}
                 onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
                 item={renameItem}
-                onSave={(type, id, newName, note) => handleSaveRenameOrNote(type, id, newName, note)}
+                onSave={handleSaveRenameOrNote}
             />}
             <AddCompetitionDialog isOpen={isAddOpen} onOpenChange={(isOpen) => {
                 setAddOpen(isOpen);
