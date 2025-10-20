@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
@@ -203,7 +203,7 @@ const DetailsTab = ({ fixture, statistics }: { fixture: Fixture | null, statisti
 const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { events: MatchEvent[] | null, homeTeam: Fixture['teams']['home'], awayTeam: Fixture['teams']['away'], highlightsOnly: boolean }) => {
     if (!events) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     
-    const filteredEvents = useMemo(() => {
+    const filteredEvents = React.useMemo(() => {
         if (!highlightsOnly) return events;
         return events.filter(e => e.type === 'Goal' || (e.type === 'Card' && e.detail.includes('Red')));
     }, [events, highlightsOnly]);
@@ -476,13 +476,13 @@ const StandingsTab = ({ standings, fixture, navigate }: { standings: Standing[] 
     );
 };
 
-const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, statistics: any[] }[]): LineupData[] => {
-    if (!playersData || playersData.length === 0 || !lineups || lineups.length === 0) {
-        return lineups;
+const mergePlayerData = (baseLineups: LineupData[], detailedPlayers: { player: Player, statistics: any[] }[]): LineupData[] => {
+    if (!detailedPlayers || detailedPlayers.length === 0) {
+        return baseLineups;
     }
 
     const playersMap = new Map<number, { player: Player, statistics: any[] }>();
-    playersData.forEach(p => {
+    detailedPlayers.forEach(p => {
         if (p.player.id) {
             playersMap.set(p.player.id, p);
         }
@@ -500,7 +500,6 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
                 
                 const mergedPlayer: PlayerType = {
                     ...lineupPlayer,
-                    // Prioritize detailed info, but fallback to lineup info
                     name: detailedPlayerInfo.player.name || lineupPlayer.name,
                     photo: detailedPlayerInfo.player.photo || lineupPlayer.photo,
                     rating: rating || lineupPlayer.rating,
@@ -511,7 +510,7 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
         });
     };
 
-    return lineups.map(lineup => ({
+    return baseLineups.map(lineup => ({
         ...lineup,
         startXI: updatePlayerInList(lineup.startXI),
         substitutes: updatePlayerInList(lineup.substitutes)
@@ -585,44 +584,35 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         if (isInitialLoad) setLoading(true);
 
         try {
-            if (isInitialLoad && !fixture) {
-                 const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
-                 const fixtureData = await fixtureRes.json();
-                 const currentFixture = fixtureData.response?.[0];
-                 if (!currentFixture) throw new Error("Fixture not found");
-                 setFixture(applyCustomNames(currentFixture, 'fixture'));
-            }
-           
-            const [eventsRes, statisticsRes, lineupsRes, playersRes] = await Promise.all([
-                fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
-                fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
+            // Step 1: Fetch essential data that's usually available first.
+            const [fixtureRes, lineupsRes, eventsRes, statisticsRes] = await Promise.all([
+                isInitialLoad && !fixture ? fetch(`/api/football/fixtures?id=${fixtureId}`) : Promise.resolve(null),
                 fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
-                fetch(`/api/football/fixtures/players?fixture=${fixtureId}`),
+                fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
+                fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`)
             ]);
 
-            const eventsData = await eventsRes.json();
-            const statisticsData = await statisticsRes.json();
             const lineupsData = await lineupsRes.json();
-            const playersData = await playersRes.json();
+            setLineups(applyCustomNames(lineupsData.response || [], 'lineups'));
             
+            const eventsData = await eventsRes.json();
             setEvents(applyCustomNames(eventsData.response || [], 'events'));
+
+            const statisticsData = await statisticsRes.json();
             setStatistics(applyCustomNames(statisticsData.response || [], 'statistics'));
             
-            let finalLineups = lineupsData.response || [];
-            const detailedPlayers = playersData.response || [];
-            
-            if (detailedPlayers.length > 0 && finalLineups.length > 0) {
-                 const allPlayersFromFixture = detailedPlayers.flatMap((team: any) => team.players);
-                 finalLineups = mergePlayerData(finalLineups, allPlayersFromFixture);
+            let currentFixture = fixture;
+            if (fixtureRes) {
+                const fixtureData = await fixtureRes.json();
+                currentFixture = fixtureData.response?.[0];
+                if (!currentFixture) throw new Error("Fixture not found");
+                setFixture(applyCustomNames(currentFixture, 'fixture'));
             }
 
-            setLineups(applyCustomNames(finalLineups, 'lineups'));
-            
-             setFixture(prevFixture => {
-                if (!prevFixture) return null;
-                const matchSeason = prevFixture.league?.season || CURRENT_SEASON;
-                const currentLeagueId = prevFixture.league.id;
-                
+            // Step 2: Fetch standings.
+            if(currentFixture) {
+                const matchSeason = currentFixture.league?.season || CURRENT_SEASON;
+                const currentLeagueId = currentFixture.league.id;
                 if(currentLeagueId) {
                     fetch(`/api/football/standings?league=${currentLeagueId}&season=${matchSeason}`)
                         .then(res => res.json())
@@ -630,8 +620,18 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                              setStandings(applyCustomNames(standingsData?.response?.[0]?.league?.standings[0] || [], 'standings'));
                         });
                 }
-                return prevFixture;
-            });
+            }
+
+            // Step 3: Asynchronously fetch detailed player data for ratings and merge it.
+            fetch(`/api/football/fixtures/players?fixture=${fixtureId}`)
+                .then(res => res.json())
+                .then(playersData => {
+                    const detailedPlayers = playersData.response || [];
+                    if (detailedPlayers.length > 0) {
+                        const allPlayersFromFixture = detailedPlayers.flatMap((team: any) => team.players);
+                        setLineups(prevLineups => mergePlayerData(prevLineups || [], allPlayersFromFixture));
+                    }
+                });
     
         } catch (error) {
             console.error("Failed to fetch match details:", error);
@@ -816,3 +816,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+

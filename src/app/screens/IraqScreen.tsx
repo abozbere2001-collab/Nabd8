@@ -7,7 +7,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
-import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc } from 'firebase/firestore';
 import type { PinnedMatch, Team, Favorites } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -68,19 +68,15 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
     useEffect(() => {
         setIsLoading(true);
-        if (!db) { // Handles guest user case initially
-            const localFavs = getLocalFavorites();
-            setOurLeagueId(localFavs.ourLeagueId || null);
-            setOurBallTeams(Object.values(localFavs.ourBallTeams || {}));
-            setIsLoading(false);
-            return;
-        }
+        // This effect will run once when the user status is known.
+        // It sets up the correct listener for favorites.
+        
+        let unsubscribe: (() => void) | null = null;
       
-        let ourFavsUnsub: (() => void) | null = null;
-      
-        if (user) {
+        if (user && db) {
+            // LOGGED-IN USER: Listen to Firestore
             const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-            ourFavsUnsub = onSnapshot(ourFavsRef, (docSnap) => {
+            unsubscribe = onSnapshot(ourFavsRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data() as Favorites;
                     setOurLeagueId(data.ourLeagueId || null);
@@ -95,7 +91,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 setIsLoading(false);
             });
         } else {
-            // This now correctly handles the transition from logged-in to guest
+            // GUEST USER: Read from local storage
             const localFavs = getLocalFavorites();
             setOurLeagueId(localFavs.ourLeagueId || null);
             setOurBallTeams(Object.values(localFavs.ourBallTeams || {}));
@@ -103,20 +99,19 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         }
       
         return () => {
-            if (ourFavsUnsub) ourFavsUnsub();
+            if (unsubscribe) unsubscribe();
         };
     }, [user, db]);
 
     useEffect(() => {
+        // This effect fetches league details whenever ourLeagueId changes.
         if (ourLeagueId && db) {
             setLoadingLeague(true);
-             getDoc(doc(db, 'managedCompetitions', String(ourLeagueId)))
+             doc(db, 'managedCompetitions', String(ourLeagueId)).get()
                 .then(docSnap => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         setLeagueDetails({ id: ourLeagueId, name: data.name, logo: data.logo });
-                    } else {
-                         setLeagueDetails({ id: ourLeagueId, name: `League ${ourLeagueId}`, logo: `https://media.api-sports.io/football/leagues/${ourLeagueId}.png` });
                     }
                 })
                 .catch(console.error)
@@ -128,6 +123,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
 
     useEffect(() => {
+        // This effect for pinned matches runs independently.
         if (!db) return;
         const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
         const q = query(pinnedMatchesRef);
