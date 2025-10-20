@@ -52,5 +52,3 @@ export const FixtureItem = React.memo(({ fixture, navigate, customStatus }: { fi
     );
 });
 FixtureItem.displayName = 'FixtureItem';
-
-    
