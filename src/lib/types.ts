@@ -168,11 +168,19 @@ export interface FavoriteTeam {
     notificationsEnabled?: boolean;
 }
 
+export interface CrownedTeam {
+  teamId: number;
+  name: string;
+  logo: string;
+  note: string;
+}
+
 export interface Favorites {
   userId: string;
   leagues?: { [key: number]: FavoriteLeague };
   teams?: { [key: number]: FavoriteTeam };
   players?: { [key: number]: any };
+  crownedTeams?: { [key: number]: CrownedTeam }; // User-specific crowned teams
   notificationsEnabled?: {
     news?: boolean;
     comments?: boolean;

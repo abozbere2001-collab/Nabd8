@@ -338,7 +338,7 @@
         }
       },
       {
-        "path": "/users/{userId}/favorites",
+        "path": "/users/{userId}/favorites/data",
         "definition": {
           "entityName": "UserFavorites",
           "schema": {
@@ -446,5 +446,3 @@
   }
 }
 
-
-    

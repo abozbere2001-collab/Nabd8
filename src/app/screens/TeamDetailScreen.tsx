@@ -8,7 +8,7 @@ import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteField, writeBatch } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { Loader2, Pencil, Shirt, Star } from 'lucide-react';
+import { Loader2, Pencil, Shirt, Star, Crown } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { Team, Player, Fixture, Standing, TeamStatistics, Favorites, AdminFavorite } from '@/lib/types';
+import type { Team, Player, Fixture, Standing, TeamStatistics, Favorites, AdminFavorite, CrownedTeam } from '@/lib/types';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { FixtureItem } from '@/components/FixtureItem';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -77,7 +77,7 @@ interface TeamData {
     };
 }
 
-const TeamHeader = ({ team, venue, onStar, isStarred, isAdmin, onRename }: { team: Team, venue: TeamData['venue'], onStar: () => void, isStarred: boolean, isAdmin: boolean, onRename: () => void }) => {
+const TeamHeader = ({ team, venue, onStar, isStarred, onCrown, isCrowned, isAdmin, onRename }: { team: Team, venue: TeamData['venue'], onStar: () => void, isStarred: boolean, onCrown: () => void, isCrowned: boolean, isAdmin: boolean, onRename: () => void }) => {
     return (
         <Card className="mb-4 overflow-hidden">
             <div className="relative h-24 bg-gradient-to-r from-primary/20 to-accent/20" style={{backgroundImage: `url(${venue?.image})`, backgroundSize: 'cover', backgroundPosition: 'center'}}>
@@ -89,6 +89,9 @@ const TeamHeader = ({ team, venue, onStar, isStarred, isAdmin, onRename }: { tea
                 <div className="absolute top-2 left-2 flex items-center gap-1 z-10">
                     <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/20 hover:bg-black/40" onClick={onStar}>
                         <Star className={cn("h-5 w-5", isStarred ? "text-yellow-400 fill-current" : "text-white/80")} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/20 hover:bg-black/40" onClick={onCrown}>
+                        <Crown className={cn("h-5 w-5", isCrowned ? "text-yellow-400 fill-current" : "text-white/80")} />
                     </Button>
                      {isAdmin && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/20 hover:bg-black/40" onClick={onRename}>
@@ -446,7 +449,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   const [displayTitle, setDisplayTitle] = useState<string | undefined>(undefined);
   const [teamData, setTeamData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [renameItem, setRenameItem] = useState<{ id: number, name: string, note?: string, type: 'team', originalData: any } | null>(null);
+  const [renameItem, setRenameItem] = useState<{ id: number; name: string; note?: string; type: 'team' | 'crown'; originalData: any; } | null>(null);
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
 
 
@@ -540,6 +543,22 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     }
   };
 
+  const handleOpenCrownDialog = () => {
+    if (!teamData) return;
+    if (!user) {
+        toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+        return;
+    }
+    const { team } = teamData;
+    const currentNote = favorites?.crownedTeams?.[team.id]?.note || '';
+    setRenameItem({
+        id: team.id,
+        name: displayTitle || team.name,
+        type: 'crown',
+        originalData: team,
+        note: currentNote,
+    });
+  };
 
   const handleRename = () => {
     if (!teamData) return;
@@ -552,19 +571,35 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     });
   };
 
-  const handleSaveRename = async (type: string, id: number, newName: string) => {
+  const handleSaveRenameOrNote = async (type: 'team' | 'crown', id: number, newName: string, newNote: string = '') => {
     if (!teamData || !db) return;
     const { team } = teamData;
     
-    if (isAdmin) {
-      const customNameRef = doc(db, 'teamCustomizations', String(id));
-      if (newName && newName !== team.name) {
-        await setDoc(customNameRef, { customName: newName });
-      } else {
-        await deleteDoc(customNameRef);
-      }
-      setDisplayTitle(newName || team.name);
-      toast({ title: 'نجاح', description: 'تم تحديث الاسم المخصص للفريق.' });
+    if (type === 'crown' && user) {
+        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const fieldPath = `crownedTeams.${id}`;
+        const crownedTeamData: CrownedTeam = {
+            teamId: id,
+            name: team.name,
+            logo: team.logo,
+            note: newNote,
+        };
+        const updateData = { [fieldPath]: crownedTeamData };
+
+        updateDoc(favRef, updateData).then(() => {
+            toast({ title: 'نجاح', description: `تم تتويج فريق ${team.name}.` });
+        }).catch(serverError => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData }));
+        });
+    } else if (type === 'team' && isAdmin) {
+        const customNameRef = doc(db, 'teamCustomizations', String(id));
+        if (newName && newName !== team.name) {
+            await setDoc(customNameRef, { customName: newName });
+        } else {
+            await deleteDoc(customNameRef);
+        }
+        setDisplayTitle(newName || team.name);
+        toast({ title: 'نجاح', description: 'تم تحديث الاسم المخصص للفريق.' });
     }
 
     setRenameItem(null);
@@ -593,6 +628,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   }
 
   const isStarred = !!favorites.teams?.[teamId];
+  const isCrowned = !!favorites.crownedTeams?.[teamId];
 
   return (
     <div className="flex flex-col bg-background h-full">
@@ -605,8 +641,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
           <RenameDialog
               isOpen={!!renameItem}
               onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-              item={{...renameItem, purpose: 'rename'}}
-              onSave={(type, id, name) => handleSaveRename(type, Number(id), name)}
+              item={{...renameItem, purpose: renameItem.type === 'crown' ? 'crown' : 'rename'}}
+              onSave={(type, id, name, note) => handleSaveRenameOrNote(type as 'team' | 'crown', Number(id), name, note)}
           />
       )}
       <div className="flex-1 overflow-y-auto p-1">
@@ -615,6 +651,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
             venue={teamData.venue} 
             onStar={handleFavoriteToggle}
             isStarred={isStarred}
+            onCrown={handleOpenCrownDialog}
+            isCrowned={isCrowned}
             isAdmin={isAdmin}
             onRename={handleRename}
         />

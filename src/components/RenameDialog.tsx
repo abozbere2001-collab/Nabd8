@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -16,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from './ui/textarea';
 import { useAdmin } from '@/firebase/provider';
 
-type ItemType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
+type ItemType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status' | 'crown';
 
 interface RenameDialogProps {
   isOpen: boolean;
@@ -26,7 +27,7 @@ interface RenameDialogProps {
     name: string;
     note?: string;
     type: ItemType;
-    purpose: 'rename' | 'note';
+    purpose: 'rename' | 'note' | 'crown';
     originalData?: any;
     originalName?: string;
   } | null;
@@ -65,23 +66,26 @@ export function RenameDialog({
     country: 'الدولة',
     coach: 'المدرب',
     status: 'الحالة',
+    crown: 'الفريق',
   };
 
   const getTitle = () => {
     if (!item) return '';
+    if (item.purpose === 'crown') return `تتويج ${item.name}`;
     if (item.purpose === 'note') return `إضافة ملاحظة على ${item.name}`;
     return `تعديل اسم ${itemTypeMap[item.type]}`;
   }
   
   const getDescription = () => {
       if (!item) return '';
+      if(item.purpose === 'crown') return 'أضف ملاحظة خاصة لهذا الفريق المتوج لعرضها في قسم "خالتك".'
       if(item.purpose === 'note') return 'سيتم حفظ هذا العنصر مع ملاحظتك في قسم "بلدي".';
       if(isAdmin && item.purpose === 'rename') return `أدخل الاسم الجديد (الترجمة). اتركه فارغًا للعودة للاسم الأصلي.`;
       return '';
   }
 
   const showNameField = isAdmin && item?.purpose === 'rename';
-  const showNoteField = item?.purpose === 'note';
+  const showNoteField = item?.purpose === 'note' || item?.purpose === 'crown';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -134,5 +138,3 @@ export function RenameDialog({
     </Dialog>
   );
 }
-
-    
