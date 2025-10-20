@@ -207,9 +207,9 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         return;
     }
 
-    // --- Step 1: Instant Local Search ---
+    // --- Step 1: Precise Local Search ---
     const localResults = localSearchIndex.filter(item => 
-        item.normalizedName.includes(normalizedQuery)
+        item.normalizedName === normalizedQuery
     ).map(item => ({
         [item.type.slice(0, -1)]: item.originalItem,
         type: item.type.slice(0, -1)
@@ -218,10 +218,10 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     if (localResults.length > 0) {
         setSearchResults(localResults);
         setLoading(false);
-        return; // Found results locally, stop here.
+        return; // Found an exact match locally, no need to search online.
     }
     
-    // --- Step 2: If no local results, search online ---
+    // --- Step 2: If no exact local match, search online ---
     try {
         const [teamsData, leaguesData] = await Promise.all([
             fetch(`/api/football/teams?search=${query}`).then(res => res.ok ? res.json() : { response: [] }),
@@ -421,7 +421,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             isOpen={!!renameItem}
             onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
             item={renameItem}
-            onSave={(type, id, name, note) => handleSaveRename(type, id, name, note)}
+            onSave={(type, id, name, note) => handleSaveRename(type as RenameType, id, name, note)}
           />
         )}
       </SheetContent>
