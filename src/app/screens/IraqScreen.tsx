@@ -66,13 +66,19 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
     useEffect(() => {
         setIsLoading(true);
+        // Initially set favorites from local storage for guest users or as a fallback.
         const localFavs = getLocalFavorites();
-        setFavorites(localFavs); // Set local favorites initially
+        setFavorites(localFavs); 
         
+        // If the user is logged in, set up a listener to Firestore, which will override local data.
         if (user && db) {
             const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
             const unsubscribe = onSnapshot(favsRef, (docSnap) => {
-                setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
+                if (docSnap.exists()) {
+                    setFavorites(docSnap.data() as Favorites);
+                } else {
+                    setFavorites({}); // User has no favorites in Firestore
+                }
                 setIsLoading(false);
             }, (error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
@@ -81,7 +87,8 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             });
             return () => unsubscribe();
         } else {
-            setIsLoading(false); // No user, so no loading from firestore
+            // If there's no user, we are done loading (with local data).
+            setIsLoading(false);
         }
     }, [user, db]);
 
@@ -101,11 +108,14 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         if (docSnap.exists()) {
                             const data = docSnap.data();
                             setLeagueDetails({ id: ourLeagueId, name: data.name, logo: data.logo });
+                        } else {
+                            setLeagueDetails(null); // League not found in managed competitions
                         }
                     })
                     .catch(console.error)
                     .finally(() => setLoadingLeague(false));
             } else {
+                 setLeagueDetails(null);
                  setLoadingLeague(false);
             }
         } else {
