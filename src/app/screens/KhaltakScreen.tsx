@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -310,7 +309,6 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
   const crownedLeague = useMemo(() => {
     if (!favorites.crownedLeagues || Object.keys(favorites.crownedLeagues).length === 0) return null;
-    // Since there's only one, get the first one.
     const leagueId = Object.keys(favorites.crownedLeagues)[0];
     return favorites.crownedLeagues[Number(leagueId)] || null;
   }, [favorites.crownedLeagues]);
@@ -379,7 +377,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             <TabsTrigger value="doreena">دورينا</TabsTrigger>
             <TabsTrigger value="kurratna">كرتنا</TabsTrigger>
         </TabsList>
-        <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0">
+        <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0 mt-0">
           <div className="py-4 border-b">
             <CrownedTeamScroller 
               crownedTeams={crownedTeams} 
@@ -388,7 +386,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
               selectedTeamId={selectedTeamId}
             />
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4">
             {selectedTeamId ? (
               <TeamFixturesDisplay teamId={selectedTeamId} navigate={navigate} />
             ) : (
@@ -406,7 +404,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
              )}
           </div>
         </TabsContent>
-        <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 space-y-4 mt-0">
+        <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 mt-0">
             {crownedLeague ? (
                 <CrownedLeagueCard key={crownedLeague.leagueId} league={crownedLeague} navigate={navigate} />
             ) : (
