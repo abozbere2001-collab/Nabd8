@@ -109,7 +109,7 @@ const FixturesList = React.memo(({
     if (noMatches) {
         const message = activeTab === 'my-results'
             ? "لا توجد مباريات لمفضلاتك هذا اليوم."
-            : "لا توجد مباريات لهذا اليوم.";
+            : "لا توجد مباريات مباشرة حاليًا.";
         return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
                 <p>{message}</p>
@@ -239,8 +239,8 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
 type TabName = 'my-results' | 'all-matches';
 
 const tabs: {id: TabName, label: string}[] = [
+    { id: 'all-matches', label: 'مباشر' },
     { id: 'my-results', label: 'نتائجي' },
-    { id: 'all-matches', label: 'كل المباريات' },
 ];
 
 // Main Screen Component
@@ -284,7 +284,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                 localCustomNames = { leagues: leagueNames, teams: teamNames };
                 setCustomNamesCache(localCustomNames);
             } catch (e) {
-                // Non-critical, proceed without custom names
                 console.warn("Could not fetch custom names, proceeding without them.");
                 localCustomNames = { leagues: new Map(), teams: new Map() };
                 setCustomNamesCache(localCustomNames);
@@ -304,7 +303,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             return defaultName;
         };
 
-        const url = `/api/football/fixtures?date=${dateKey}`;
+        const url = activeTab === 'all-matches' ? '/api/football/fixtures?live=all' : `/api/football/fixtures?date=${dateKey}`;
         const response = await fetch(url, { signal: abortSignal });
         if (!response.ok) throw new Error(`Failed to fetch fixtures`);
         
@@ -371,12 +370,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   useEffect(() => {
       if (isVisible && selectedDateKey) {
-          if (matchesCache.has(selectedDateKey)) {
+          const cacheKey = activeTab === 'all-matches' ? 'live' : selectedDateKey;
+          if (matchesCache.has(cacheKey)) {
               setLoading(false);
               return;
           }
           const controller = new AbortController();
-          fetchAndProcessData(selectedDateKey, controller.signal);
+          fetchAndProcessData(cacheKey, controller.signal);
           return () => controller.abort();
       }
   }, [selectedDateKey, activeTab, isVisible, fetchAndProcessData, matchesCache]);
@@ -389,9 +389,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const handleTabChange = (value: string) => {
     const tabValue = value as TabName;
     setActiveTab(tabValue);
-    if ((tabValue === 'my-results' || tabValue === 'all-matches') && selectedDateKey && !matchesCache.has(selectedDateKey)) {
+    const cacheKey = tabValue === 'all-matches' ? 'live' : selectedDateKey;
+
+    if (cacheKey && !matchesCache.has(cacheKey)) {
         const controller = new AbortController();
-        fetchAndProcessData(selectedDateKey, controller.signal);
+        fetchAndProcessData(cacheKey, controller.signal);
         return () => controller.abort();
     }
   };
@@ -401,7 +403,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const favoritedLeagueIds = useMemo(() => currentFavorites?.leagues ? Object.keys(currentFavorites.leagues).map(Number) : [], [currentFavorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
   
-  const currentFixtures = selectedDateKey ? matchesCache.get(selectedDateKey) || [] : [];
+  const cacheKey = activeTab === 'all-matches' ? 'live' : selectedDateKey || '';
+  const currentFixtures = matchesCache.get(cacheKey) || [];
     
   return (
     <div className="flex h-full flex-col bg-background">
@@ -429,7 +432,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                         ))}
                     </TabsList>
                 </div>
-                 {selectedDateKey && (
+                 {selectedDateKey && activeTab === 'my-results' && (
                      <div className="relative bg-card py-2 border-x border-b rounded-b-lg shadow-md -mt-1">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                         <Button 
