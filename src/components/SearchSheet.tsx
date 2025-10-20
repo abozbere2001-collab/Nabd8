@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, writeBatch, deleteField, onSnapshot } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
 import type { Favorites, AdminFavorite, ManagedCompetition, Team } from '@/lib/types';
@@ -472,4 +472,3 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
-
