@@ -117,13 +117,13 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const mapKey = type === 'league' ? 'leagues' : type === 'team' ? 'teams' : type === 'country' ? 'countries' : 'continents';
         const firestoreMap = customNames[mapKey];
         
-        const customName = firestoreMap?.get(id as any);
+        const customName = firestoreMap.get(id as any);
         if (customName) return customName;
         
         const hardcodedKey = `${type}s` as 'leagues' | 'teams' | 'countries' | 'continents';
         const hardcodedTranslation = hardcodedTranslations[hardcodedKey];
-        if (hardcodedTranslation && (id in hardcodedTranslation)) {
-            return hardcodedTranslation[id as any];
+        if (hardcodedTranslation && (id in hardcodedTranslations[hardcodedKey as keyof typeof hardcodedTranslations])) {
+            return hardcodedTranslations[hardcodedKey as keyof typeof hardcodedTranslations][id as any];
         }
 
         return defaultName;
@@ -139,10 +139,10 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             };
             try {
                  const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, teamsSnapshot] = await Promise.all([
-                    isAdmin ? getDocs(collection(db, 'leagueCustomizations')) : Promise.resolve(null),
-                    isAdmin ? getDocs(collection(db, 'countryCustomizations')) : Promise.resolve(null),
-                    isAdmin ? getDocs(collection(db, 'continentCustomizations')) : Promise.resolve(null),
-                    isAdmin ? getDocs(collection(db, 'teamCustomizations')) : Promise.resolve(null),
+                    getDocs(collection(db, 'leagueCustomizations')),
+                    getDocs(collection(db, 'countryCustomizations')),
+                    getDocs(collection(db, 'continentCustomizations')),
+                    getDocs(collection(db, 'teamCustomizations')),
                 ]);
 
                 const fetchedCustomNames = {
@@ -203,7 +203,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         
         setLoadingClubData(false);
 
-    }, [db, toast, isAdmin]);
+    }, [db, toast]);
 
 
     const fetchNationalTeams = useCallback(async () => {
@@ -454,20 +454,25 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const handleAdminRefresh = async () => {
         if (!db) return;
         toast({ title: 'بدء التحديث...', description: 'جاري تحديث بيانات البطولات والمنتخبات لجميع المستخدمين.' });
-        try {
-            const cacheBusterRef = doc(db, 'appConfig', 'cache');
-            await setDoc(cacheBusterRef, { competitionsLastUpdated: new Date() }, { merge: true });
-            localStorage.removeItem(COMPETITIONS_CACHE_KEY);
-            localStorage.removeItem(TEAMS_CACHE_KEY);
-            localStorage.removeItem(COUNTRIES_CACHE_KEY);
-            await fetchAllData(true);
-            await fetchNationalTeams();
-            toast({ title: 'نجاح', description: 'تم تحديث البيانات بنجاح.' });
-        } catch (error) {
-            const permissionError = new FirestorePermissionError({ path: 'appConfig/cache', operation: 'write' });
-            errorEmitter.emit('permission-error', permissionError);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في فرض التحديث.' });
-        }
+        
+        // Optimistically clear local cache to force a refetch for the admin
+        localStorage.removeItem(COMPETITIONS_CACHE_KEY);
+        localStorage.removeItem(TEAMS_CACHE_KEY);
+        localStorage.removeItem(COUNTRIES_CACHE_KEY);
+        
+        // Attempt to update the Firestore timestamp to trigger refetch for other users
+        const cacheBusterRef = doc(db, 'appConfig', 'cache');
+        setDoc(cacheBusterRef, { competitionsLastUpdated: new Date() }, { merge: true })
+            .catch(error => {
+                const permissionError = new FirestorePermissionError({ path: 'appConfig/cache', operation: 'write' });
+                errorEmitter.emit('permission-error', permissionError);
+                toast({ variant: 'destructive', title: 'خطأ في الصلاحيات', description: 'فشل في فرض التحديث للآخرين.' });
+            });
+        
+        // Refetch data for the admin user regardless of Firestore success
+        await fetchAllData(true);
+        await fetchNationalTeams();
+        toast({ title: 'نجاح', description: 'تم تحديث البيانات بنجاح.' });
     };
 
 
@@ -680,3 +685,4 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
