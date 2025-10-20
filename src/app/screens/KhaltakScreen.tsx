@@ -203,7 +203,7 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
                 switch (activeTab) {
                     case 'matches':
                         const fromDate = format(new Date(), 'yyyy-MM-dd');
-                        const toDate = format(addDays(new Date(), 14), 'yyyy-MM-dd');
+                        const toDate = format(addDays(new Date(), 7), 'yyyy-MM-dd');
                         url = `/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&from=${fromDate}&to=${toDate}`;
                         break;
                     case 'standings':
@@ -273,14 +273,13 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
         const homeGoals = parseInt(homeGoalsStr, 10);
         const awayGoals = parseInt(awayGoalsStr, 10);
         if (isNaN(homeGoals) || isNaN(awayGoals)) return;
-
+    
         const predictionRef = doc(db, 'leaguePredictions', `${user.uid}_${fixtureId}`);
         
         try {
             const docSnap = await getDoc(predictionRef);
             
             if (docSnap.exists()) {
-                // Document exists, so update it
                 const updateData = {
                     homeGoals: homeGoals,
                     awayGoals: awayGoals,
@@ -288,7 +287,6 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
                 };
                 await updateDoc(predictionRef, updateData);
             } else {
-                // Document does not exist, so create it
                 const newData: Prediction = {
                     userId: user.uid,
                     fixtureId,
@@ -303,7 +301,7 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
              const docSnap = await getDoc(predictionRef).catch(() => null);
              const isUpdating = docSnap?.exists() ?? false;
              const errorData = { userId: user.uid, fixtureId, homeGoals, awayGoals };
-
+    
              const permissionError = new FirestorePermissionError({
               path: predictionRef.path,
               operation: isUpdating ? 'update' : 'create',
@@ -352,7 +350,6 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
             predictionsToUpdate.forEach(p => batch.update(p.ref, { points: p.points }));
             await batch.commit();
             
-            // Now, recalculate total points for each user in this league
             const allUsersInLeagueSnap = await getDocs(query(collection(db, 'leagueLeaderboards', String(league.leagueId), 'users')));
             const userIds = allUsersInLeagueSnap.docs.map(d => d.id);
             
@@ -378,7 +375,6 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
             await pointsBatch.commit();
             
             toast({ title: 'اكتمل الاحتساب', description: 'تم تحديث جميع النقاط في لوحة صدارة الدوري.' });
-            fetchLeaderboard(); // Refresh leaderboard
         } catch (error: any) {
             console.error("Error calculating league points:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل احتساب النقاط.' });
@@ -408,8 +404,10 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
 
     const LeaderboardDisplay = () => {
          useEffect(() => {
-            fetchLeaderboard();
-        }, [fetchLeaderboard]);
+            if (activeTab === 'predictions') {
+                fetchLeaderboard();
+            }
+        }, [activeTab, fetchLeaderboard]);
 
         if (loadingLeaderboard) {
             return (
@@ -741,5 +739,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
 
     
