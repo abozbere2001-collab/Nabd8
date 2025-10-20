@@ -21,7 +21,6 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
     const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
     const live = isMatchLive(status);
     const fixtureDate = new Date(date);
-    const hasStarted = status.short !== 'NS' && status.short !== 'TBD' && status.short !== 'PST';
 
     useEffect(() => {
         let interval: NodeJS.Timeout | null = null;
@@ -49,10 +48,9 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    const liveDisplayTime = formatTime(elapsedSeconds);
-    const isFinished = ['FT', 'AET', 'PEN'].includes(status.short);
-
     const renderStatus = () => {
+        const hasStarted = status.short !== 'NS' && status.short !== 'TBD';
+        
         if (customStatus && customStatus.trim() && !hasStarted) {
              return {
                 main: customStatus,
@@ -66,11 +64,12 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
         if (live) {
             return {
                 main: score,
-                sub: status.short === 'HT' ? 'استراحة' : liveDisplayTime ? liveDisplayTime : 'مباشر',
+                sub: status.short === 'HT' ? 'استراحة' : formatTime(elapsedSeconds) ?? 'مباشر',
                 isLive: true
             };
         }
-        if (isFinished) {
+
+        if (['FT', 'AET', 'PEN'].includes(status.short)) {
             return {
                 main: score,
                 sub: status.long,
@@ -86,6 +85,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
             return { main: "لم تحدد", sub: "", isLive: false };
         }
 
+        // Default: Not Started
         return {
             main: format(fixtureDate, "HH:mm"),
             sub: getRelativeDay(fixtureDate),
