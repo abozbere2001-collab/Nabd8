@@ -47,10 +47,6 @@ import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
 
 function SeasonSelector({ season, onSeasonChange, isAdmin }: { season: number, onSeasonChange: (newSeason: number) => void, isAdmin: boolean }) {
-    if (!isAdmin) {
-        return <p className="text-center text-xs text-muted-foreground pt-2 pb-1">عرض بيانات موسم {season}</p>;
-    }
-
     const seasons = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + 2 - i);
 
     return (
@@ -205,19 +201,32 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       await fetchAllCustomNames();
 
       try {
-        const [standingsRes, scorersRes, teamsRes] = await Promise.all([
+        const [standingsRes, scorersRes, teamsRes, fixturesRes] = await Promise.all([
           fetch(`/api/football/standings?league=${leagueId}&season=${season}`),
           fetch(`/api/football/players/topscorers?league=${leagueId}&season=${season}`),
-          fetch(`/api/football/teams?league=${leagueId}&season=${season}`)
+          fetch(`/api/football/teams?league=${leagueId}&season=${season}`),
+          fetch(`/api/football/fixtures?league=${leagueId}&season=${season}`)
         ]);
 
         const standingsData = await standingsRes.json();
         const scorersData = await scorersRes.json();
         const teamsData = await teamsRes.json();
+        const fixturesData = await fixturesRes.json();
         
-        if (standingsData.response[0]?.league?.standings[0]) setStandings(standingsData.response[0].league.standings[0]);
-        if (scorersData.response) setTopScorers(scorersData.response);
-        if (teamsData.response) setTeams(teamsData.response);
+        setStandings(standingsData.response[0]?.league?.standings[0] || []);
+        setTopScorers(scorersData.response || []);
+        setTeams(teamsData.response || []);
+        
+        if(fixturesData.response) {
+            const sortedFixtures = [...fixturesData.response].sort((a:Fixture,b:Fixture) => a.fixture.timestamp - b.fixture.timestamp);
+            setFixtures(sortedFixtures);
+            if(!initialTitle && fixturesData.response.length > 0) {
+                 const hardcodedName = hardcodedTranslations.leagues[fixturesData.response[0].league.id];
+                 setDisplayTitle(hardcodedName || fixturesData.response[0].league.name);
+            }
+        } else {
+            setFixtures([]);
+        }
 
       } catch (error) {
         console.error("Failed to fetch competition details:", error);
@@ -226,29 +235,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
       }
     }
     fetchData();
-  }, [leagueId, season, fetchAllCustomNames]);
+  }, [leagueId, season, fetchAllCustomNames, initialTitle]);
   
-  useEffect(() => {
-      async function fetchFixtures() {
-        if (!leagueId) return;
-        try {
-            const fixturesRes = await fetch(`/api/football/fixtures?league=${leagueId}&season=${season}`);
-            const fixturesData = await fixturesRes.json();
-            if(fixturesData.response) {
-                const sortedFixtures = [...fixturesData.response].sort((a:Fixture,b:Fixture) => a.fixture.timestamp - b.fixture.timestamp);
-                setFixtures(sortedFixtures);
-                if(!initialTitle && fixturesData.response.length > 0) {
-                     const hardcodedName = hardcodedTranslations.leagues[fixturesData.response[0].league.id];
-                     setDisplayTitle(hardcodedName || fixturesData.response[0].league.name);
-                }
-            }
-        } catch (error) {
-            console.error("Failed to fetch fixtures:", error);
-        }
-    }
-    fetchFixtures();
-  }, [leagueId, season, initialTitle]);
-
 
   const firstUpcomingMatchIndex = useMemo(() => {
     return fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
@@ -462,7 +450,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         <Tabs defaultValue="matches" className="w-full">
            <div className="sticky top-0 bg-background z-10 px-1 pt-1">
              <div className="bg-card rounded-b-lg border-x border-b shadow-md">
-              <SeasonSelector season={season} onSeasonChange={setSeason} isAdmin={isAdmin} />
+              <SeasonSelector season={season} onSeasonChange={setSeason} isAdmin={true} />
               <TabsList className="grid w-full grid-cols-4 rounded-none h-12 p-0 bg-transparent">
                 <TabsTrigger value="matches">المباريات</TabsTrigger>
                 <TabsTrigger value="standings">الترتيب</TabsTrigger>
@@ -632,4 +620,5 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 }
     
 
+    
     
