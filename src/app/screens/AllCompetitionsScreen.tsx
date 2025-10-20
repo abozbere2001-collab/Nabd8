@@ -28,14 +28,25 @@ const COUNTRIES_CACHE_KEY = 'goalstack_countries_cache';
 const TEAMS_CACHE_KEY = 'goalstack_national_teams_cache';
 const CACHE_EXPIRATION_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
 
+interface CompetitionsCache {
+    managedCompetitions: ManagedCompetitionType[];
+    customNames: {
+        leagues: Record<string, string>;
+        countries: Record<string, string>;
+        continents: Record<string, string>;
+    };
+    lastFetched: number;
+}
+
+
 const getCachedData = <T>(key: string): { data: T; lastFetched: number } | null => {
     if (typeof window === 'undefined') return null;
     try {
         const cachedData = localStorage.getItem(key);
         if (!cachedData) return null;
         const parsed = JSON.parse(cachedData);
-        // Basic check for expiration if lastFetched is present
         if (parsed.lastFetched && Date.now() - parsed.lastFetched > CACHE_EXPIRATION_MS) {
+            localStorage.removeItem(key);
             return null;
         }
         return parsed as { data: T; lastFetched: number };
@@ -137,9 +148,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             return {
               competitions: cached.data.managedCompetitions,
               customNames: {
-                leagues: new Map(Object.entries(cached.data.customNames.leagues || {})),
-                countries: new Map(Object.entries(cached.data.customNames.countries || {})),
-                continents: new Map(Object.entries(cached.data.customNames.continents || {}))
+                leagues: new Map(Object.entries(cached.data.customNames?.leagues || {})),
+                countries: new Map(Object.entries(cached.data.customNames?.countries || {})),
+                continents: new Map(Object.entries(cached.data.customNames?.continents || {}))
               }
             };
           }
@@ -187,7 +198,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     
         const fetchNationalTeams = async () => {
             const cached = getCachedData<Team[]>(TEAMS_CACHE_KEY);
-            if (cached?.data) {
+            if (cached?.data && cached.data.length > 0) {
                 return cached.data;
             }
 
@@ -231,11 +242,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const [clubResult, teamsResult, customTeamsSnapshot] = await Promise.all([
           fetchClubData(),
           fetchNationalTeams(),
-          isAdmin ? getDocs(collection(db, 'teamCustomizations')) : Promise.resolve({ docs: [] })
+          isAdmin ? getDocs(collection(db, 'teamCustomizations')) : Promise.resolve(null)
         ]);
     
         const teamNamesMap = new Map<number, string>();
-        customTeamsSnapshot?.forEach(doc => teamNamesMap.set(Number(doc.id), doc.data().customName));
+        customTeamsSnapshot?.docs?.forEach(doc => teamNamesMap.set(Number(doc.id), doc.data().customName));
         
         setManagedCompetitions(clubResult.competitions);
         setNationalTeams(teamsResult);
@@ -307,7 +318,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
         const grouped: TeamsByContinent = {};
         processedTeams.forEach(team => {
-            const continent = countryToContinent[team.name] || "Other";
+            const continent = countryToContinent[team.country || team.name] || "Other";
             if (!grouped[continent]) grouped[continent] = [];
             grouped[continent].push(team);
         });
@@ -658,3 +669,5 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
+    
