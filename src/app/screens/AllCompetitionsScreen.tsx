@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy } from 'lucide-react';
+import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy, Loader2 } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -656,6 +656,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
-
-
-    
