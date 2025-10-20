@@ -84,7 +84,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             tryFinishLoading();
           }, (error) => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-            setFavorites({});
+            setFavorites({}); // Don't clear on permission error, maybe they have local favs
             favoritesInitialized = true;
             tryFinishLoading();
           });
@@ -108,6 +108,9 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             pinnedInitialized = true;
             tryFinishLoading();
           });
+        } else {
+            pinnedInitialized = true;
+            tryFinishLoading();
         }
       
         return () => {
