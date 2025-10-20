@@ -121,12 +121,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         if (customName) return customName;
         
         const hardcodedKey = `${type}s` as 'leagues' | 'teams' | 'countries' | 'continents';
-        const hardcodedTranslation = hardcodedTranslations[hardcodedKey];
-        // @ts-ignore
-        if (hardcodedTranslation && (id in hardcodedTranslation)) {
-             // @ts-ignore
-            return hardcodedTranslation[id];
-        }
+        const hardcodedName = hardcodedTranslations[hardcodedKey]?.[id];
+        if (hardcodedName) return hardcodedName;
 
         return defaultName;
     }, [customNames]);
@@ -354,7 +350,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const currentFavorites = user && db ? favorites : getLocalFavorites();
         const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
         
-        let updateData: any;
+        let updateData: any = {};
 
         if (itemType === 'leagues') {
             const comp = item as ManagedCompetitionType;
@@ -436,15 +432,13 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             // Optimistically update the UI instead of a full refetch
             setCustomNames(prev => {
                 const mapType = type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type;
-                // @ts-ignore
-                const newMap = new Map(prev[mapType]);
+                const newMap = new Map(prev[mapType as keyof typeof prev]);
 
                 if (newName && newName.trim() && newName !== originalName) {
                     newMap.set(id as any, newName);
                 } else {
                     newMap.delete(id as any);
                 }
-                // @ts-ignore
                 return { ...prev, [mapType]: newMap };
             });
             toast({ title: 'نجاح', description: 'تم حفظ التغييرات.' });
@@ -456,29 +450,28 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     };
 
     const handleAdminRefresh = async () => {
-        toast({ title: 'بدء التحديث...', description: 'جاري تحديث بيانات البطولات والمنتخبات لجميع المستخدمين.' });
-        
         // Optimistically clear local cache to force a refetch for the admin
         localStorage.removeItem(COMPETITIONS_CACHE_KEY);
         localStorage.removeItem(TEAMS_CACHE_KEY);
         localStorage.removeItem(COUNTRIES_CACHE_KEY);
+        toast({ title: 'بدء التحديث...', description: 'جاري تحديث بيانات البطولات والمنتخبات.' });
         
         // Attempt to update the Firestore timestamp to trigger refetch for other users
         if (db) {
             const cacheBusterRef = doc(db, 'appConfig', 'cache');
             setDoc(cacheBusterRef, { competitionsLastUpdated: new Date() }, { merge: true })
                 .catch(error => {
-                    // This might fail if rules are not set up, but we proceed with the client-side refresh anyway.
                     // The permission error will be emitted for the developer to see.
+                    // The client-side refresh proceeds regardless.
                     const permissionError = new FirestorePermissionError({ path: 'appConfig/cache', operation: 'write', requestResourceData: { competitionsLastUpdated: '...' } });
                     errorEmitter.emit('permission-error', permissionError);
                     toast({ variant: 'destructive', title: 'خطأ في الصلاحيات', description: 'فشل في فرض التحديث للآخرين. تحقق من قواعد الأمان.' });
                 });
         }
         
-        // Refetch data for the admin user regardless of Firestore success
+        // Refetch data for the admin user
         await fetchAllData(true);
-        await fetchNationalTeams();
+        await fetchNationalTeams(); // This will also be forced due to cleared cache
         toast({ title: 'نجاح', description: 'تم تحديث البيانات بنجاح.' });
     };
 
@@ -510,7 +503,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                           </Button>
                         )}
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(team, 'star'); }}>
-                          <Star className={favorites.teams?.[team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/ ৫০"} />
+                          <Star className={favorites.teams?.[team.id] ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                         </Button>
                       </div>
                     </li>
@@ -692,3 +685,4 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
