@@ -579,95 +579,105 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     }, [getDisplayName]);
 
 
-    const fetchData = useCallback(async (isInitialLoad: boolean) => {
-        if (!fixtureId) return;
-        if (isInitialLoad) setLoading(true);
+    useEffect(() => {
+        let isMounted = true;
+    
+        const fetchAllData = async () => {
+            if (!fixtureId) return;
+            setLoading(true);
+    
+            try {
+                // Step 1: Fetch custom names
+                if (db) {
+                    const [teamsSnapshot, leaguesSnapshot, playersSnapshot, coachSnapshot] = await Promise.all([
+                        getDocs(collection(db, 'teamCustomizations')),
+                        getDocs(collection(db, 'leagueCustomizations')),
+                        getDocs(collection(db, 'playerCustomizations')),
+                        getDocs(collection(db, 'coachCustomizations')),
+                    ]);
+                    if (!isMounted) return;
 
-        try {
-            // Step 1: Fetch essential data that's usually available first.
-            const [fixtureRes, lineupsRes, eventsRes, statisticsRes] = await Promise.all([
-                isInitialLoad && !fixture ? fetch(`/api/football/fixtures?id=${fixtureId}`) : Promise.resolve(null),
-                fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
-                fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
-                fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`)
-            ]);
-
-            const lineupsData = await lineupsRes.json();
-            setLineups(applyCustomNames(lineupsData.response || [], 'lineups'));
-            
-            const eventsData = await eventsRes.json();
-            setEvents(applyCustomNames(eventsData.response || [], 'events'));
-
-            const statisticsData = await statisticsRes.json();
-            setStatistics(applyCustomNames(statisticsData.response || [], 'statistics'));
-            
-            let currentFixture = fixture;
-            if (fixtureRes) {
+                    const names: { [key: string]: Map<number, string> } = { team: new Map(), league: new Map(), player: new Map(), coach: new Map() };
+                    teamsSnapshot.forEach(doc => names.team.set(Number(doc.id), doc.data().customName));
+                    leaguesSnapshot.forEach(doc => names.league.set(Number(doc.id), doc.data().customName));
+                    playersSnapshot.forEach(doc => names.player.set(Number(doc.id), doc.data().customName));
+                    coachSnapshot.forEach(doc => names.coach.set(Number(doc.id), doc.data().customName));
+                    setCustomNames(names);
+                }
+    
+                // Step 2: Fetch all initial data concurrently
+                const [fixtureRes, lineupsRes, eventsRes, statisticsRes] = await Promise.all([
+                    fetch(`/api/football/fixtures?id=${fixtureId}`),
+                    fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
+                    fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
+                    fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`)
+                ]);
+    
+                if (!isMounted) return;
+    
                 const fixtureData = await fixtureRes.json();
-                currentFixture = fixtureData.response?.[0];
-                if (!currentFixture) throw new Error("Fixture not found");
+                const lineupsData = await lineupsRes.json();
+                const eventsData = await eventsRes.json();
+                const statisticsData = await statisticsRes.json();
+    
+                const currentFixture = fixtureData.response?.[0];
+                if (!currentFixture) {
+                    toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على المباراة.' });
+                    setLoading(false);
+                    return;
+                }
+                
+                // Apply names immediately after fetching
                 setFixture(applyCustomNames(currentFixture, 'fixture'));
-            }
-
-            // Step 2: Fetch standings.
-            if(currentFixture) {
-                const matchSeason = currentFixture.league?.season || CURRENT_SEASON;
-                const currentLeagueId = currentFixture.league.id;
-                if(currentLeagueId) {
-                    fetch(`/api/football/standings?league=${currentLeagueId}&season=${matchSeason}`)
+                setLineups(applyCustomNames(lineupsData.response || [], 'lineups'));
+                setEvents(applyCustomNames(eventsData.response || [], 'events'));
+                setStatistics(applyCustomNames(statisticsData.response || [], 'statistics'));
+    
+                setLoading(false); // Stop main loading indicator
+    
+                // Step 3: Fetch non-critical data (standings, detailed players)
+                const leagueId = currentFixture.league?.id;
+                const season = currentFixture.league?.season || CURRENT_SEASON;
+    
+                if (leagueId) {
+                    fetch(`/api/football/standings?league=${leagueId}&season=${season}`)
                         .then(res => res.json())
                         .then(standingsData => {
-                             setStandings(applyCustomNames(standingsData?.response?.[0]?.league?.standings[0] || [], 'standings'));
-                        });
+                            if (isMounted) {
+                                setStandings(applyCustomNames(standingsData?.response?.[0]?.league?.standings[0] || [], 'standings'));
+                            }
+                        }).catch(e => console.error("Could not fetch standings", e));
+                }
+    
+                fetch(`/api/football/fixtures/players?fixture=${fixtureId}`)
+                    .then(res => res.json())
+                    .then(playersData => {
+                        if (isMounted && playersData.response) {
+                            const detailedPlayers = playersData.response.flatMap((team: any) => team.players);
+                            setLineups(prevLineups => {
+                                if (prevLineups) {
+                                    return mergePlayerData(prevLineups, detailedPlayers);
+                                }
+                                return prevLineups;
+                            });
+                        }
+                    }).catch(e => console.error("Could not fetch detailed players", e));
+    
+            } catch (error) {
+                if(isMounted) {
+                    console.error("Failed to fetch match details:", error);
+                    toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحميل بيانات المباراة.' });
+                    setLoading(false);
                 }
             }
-
-            // Step 3: Asynchronously fetch detailed player data for ratings and merge it.
-            fetch(`/api/football/fixtures/players?fixture=${fixtureId}`)
-                .then(res => res.json())
-                .then(playersData => {
-                    const detailedPlayers = playersData.response || [];
-                    if (detailedPlayers.length > 0) {
-                        const allPlayersFromFixture = detailedPlayers.flatMap((team: any) => team.players);
-                        setLineups(prevLineups => mergePlayerData(prevLineups || [], allPlayersFromFixture));
-                    }
-                });
-    
-        } catch (error) {
-            console.error("Failed to fetch match details:", error);
-        } finally {
-            if (isInitialLoad) setLoading(false);
-        }
-    }, [fixtureId, fixture, applyCustomNames]);
-    
-    useEffect(() => {
-        const fetchAndApplyNames = async () => {
-             if (!db) return;
-             try {
-                const [teamsSnapshot, leaguesSnapshot, playersSnapshot, coachSnapshot] = await Promise.all([
-                    getDocs(collection(db, 'teamCustomizations')),
-                    getDocs(collection(db, 'leagueCustomizations')),
-                    getDocs(collection(db, 'playerCustomizations')),
-                    getDocs(collection(db, 'coachCustomizations')),
-                ]);
-                const names: {[key: string]: Map<number, string>} = {
-                    team: new Map(), league: new Map(), player: new Map(), coach: new Map()
-                };
-                teamsSnapshot.forEach(doc => names.team.set(Number(doc.id), doc.data().customName));
-                leaguesSnapshot.forEach(doc => names.league.set(Number(doc.id), doc.data().customName));
-                playersSnapshot.forEach(doc => names.player.set(Number(doc.id), doc.data().customName));
-                coachSnapshot.forEach(doc => names.coach.set(Number(doc.id), doc.data().customName));
-                
-                setCustomNames(names);
-
-            } catch (e) {
-                console.error("Error fetching custom names:", e);
-            }
         };
-
-        fetchAndApplyNames().then(() => fetchData(true));
-    }, [fixtureId, db, fetchData]);
-
+    
+        fetchAllData();
+    
+        return () => { isMounted = false; };
+    
+    }, [fixtureId, db, toast, applyCustomNames]);
+    
     useEffect(() => {
         if (!db || !fixtureId) return;
 
@@ -699,7 +709,14 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             setDoc(docRef, data)
                 .then(() => {
                     toast({ title: "نجاح", description: `تم تحديث الاسم.` });
-                    fetchData(false);
+                    // Re-fetch custom names to update UI
+                     if (db) {
+                        getDocs(collection(db, collectionName)).then(snapshot => {
+                             const names = new Map<number, string>();
+                             snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
+                             setCustomNames(prev => ({...prev, [type]: names}));
+                        });
+                     }
                 })
                 .catch(serverError => {
                     const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
@@ -708,7 +725,13 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         } else {
              deleteDoc(docRef).then(() => {
                  toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` });
-                 fetchData(false);
+                  if (db) {
+                    getDocs(collection(db, collectionName)).then(snapshot => {
+                         const names = new Map<number, string>();
+                         snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
+                         setCustomNames(prev => ({...prev, [type]: names}));
+                    });
+                 }
             }).catch(serverError => {
                  const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
                  errorEmitter.emit('permission-error', permissionError);
