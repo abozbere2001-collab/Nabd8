@@ -188,7 +188,7 @@ export interface Favorites {
   teams?: { [key: number]: FavoriteTeam };
   players?: { [key: number]: any };
   crownedTeams?: { [key: number]: CrownedTeam };
-  crownedLeagues?: { [key: number]: CrownedLeague };
+  crownedLeagues?: { [key: string]: CrownedLeague };
   notificationsEnabled?: {
     news?: boolean;
     comments?: boolean;
@@ -273,15 +273,15 @@ export interface ManagedCompetition {
 }
 
 export interface PinnedMatch {
-    id?: string;
-    isEnabled: boolean;
-    homeTeamName: string;
-    homeTeamLogo: string;
-    awayTeamName: string;
-    awayTeamLogo: string;
-    competitionName: string;
-    matchDate: string;
-    matchTime: string;
+  id?: string;
+  isEnabled: boolean;
+  homeTeamName: string;
+  homeTeamLogo: string;
+  awayTeamName: string;
+  awayTeamLogo: string;
+  competitionName: string;
+  matchDate: string;
+  matchTime: string;
 }
 
 export interface ManualTopScorer {

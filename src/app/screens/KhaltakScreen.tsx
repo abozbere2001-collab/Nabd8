@@ -308,9 +308,11 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     return Object.values(favorites.crownedTeams);
   }, [favorites.crownedTeams]);
 
-  const crownedLeagues = useMemo(() => {
-    if (!favorites.crownedLeagues) return [];
-    return Object.values(favorites.crownedLeagues);
+  const crownedLeague = useMemo(() => {
+    if (!favorites.crownedLeagues || Object.keys(favorites.crownedLeagues).length === 0) return null;
+    // Since there's only one, get the first one.
+    const leagueId = Object.keys(favorites.crownedLeagues)[0];
+    return favorites.crownedLeagues[Number(leagueId)] || null;
   }, [favorites.crownedLeagues]);
   
   useEffect(() => {
@@ -326,8 +328,10 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const handleRemoveCrowned = (type: 'team' | 'league', id: number) => {
     if (!user || !db) return;
     const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    const fieldPath = type === 'team' ? `crownedTeams.${id}` : `crownedLeagues.${id}`;
-    updateDoc(favRef, { [fieldPath]: deleteField() })
+    const fieldPath = type === 'team' ? `crownedTeams.${id}` : `crownedLeagues`;
+    const updateData = type === 'team' ? { [fieldPath]: deleteField() } : { crownedLeagues: {} };
+    
+    updateDoc(favRef, updateData)
       .catch(err => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: { [fieldPath]: 'DELETED' } }));
       });
@@ -402,11 +406,10 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
              )}
           </div>
         </TabsContent>
-        <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 space-y-4">
-            {crownedLeagues.map(league => (
-                <CrownedLeagueCard key={league.leagueId} league={league} navigate={navigate} />
-            ))}
-            {crownedLeagues.length === 0 && (
+        <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 space-y-4 mt-0">
+            {crownedLeague ? (
+                <CrownedLeagueCard key={crownedLeague.leagueId} league={crownedLeague} navigate={navigate} />
+            ) : (
                 <div className="text-center text-muted-foreground pt-10">
                     <p className="font-bold text-lg">لم تقم بتتويج أي بطولة بعد</p>
                     <p>اذهب إلى البطولات واضغط على أيقونة التاج 👑</p>

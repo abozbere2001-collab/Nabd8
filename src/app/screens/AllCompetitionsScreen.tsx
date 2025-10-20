@@ -413,24 +413,27 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         }
         
         const isLeague = 'leagueId' in item;
-        const itemType = isLeague ? 'league' : 'team';
         const id = isLeague ? item.leagueId : item.id;
         
         const isCrowned = isLeague
             ? !!favorites.crownedLeagues?.[id]
             : !!favorites.crownedTeams?.[id];
 
-        if (isCrowned) {
-            // Un-crown it
-            const fieldPath = isLeague ? `crownedLeagues.${id}` : `crownedTeams.${id}`;
+        if (isCrowned && isLeague) {
+            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            updateDoc(favDocRef, { crownedLeagues: {} }).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: { crownedLeagues: {} } }));
+            });
+        } else if (isCrowned && !isLeague) {
+            const fieldPath = `crownedTeams.${id}`;
             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
             updateDoc(favDocRef, { [fieldPath]: deleteField() }).catch(err => {
-                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: { [fieldPath]: 'DELETED'} }))
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: { [fieldPath]: 'DELETED' } }));
             });
-        } else {
-            // Open dialog to crown it
+        }
+        else {
             setRenameItem({
-                type: itemType as 'league' | 'team',
+                type: isLeague ? 'league' : 'team',
                 id: id,
                 name: item.name,
                 originalData: item,
@@ -448,13 +451,17 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         if (purpose === 'crown' && user && db) {
             const isLeague = type === 'league';
             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const fieldPath = isLeague ? `crownedLeagues.${id}` : `crownedTeams.${id}`;
-
-            const crownData = isLeague 
-                ? { leagueId: Number(id), name: originalData.name, logo: originalData.logo, note: newNote } as CrownedLeague
-                : { teamId: Number(id), name: originalData.name, logo: originalData.logo, note: newNote } as CrownedTeam;
             
-            const updateData = { [fieldPath]: crownData };
+            let updateData: { [key: string]: any };
+
+            if(isLeague) {
+                 const crownData = { [id]: { leagueId: Number(id), name: originalData.name, logo: originalData.logo, note: newNote } as CrownedLeague };
+                 updateData = { crownedLeagues: crownData };
+            } else {
+                const fieldPath = `crownedTeams.${id}`;
+                const crownData = { teamId: Number(id), name: originalData.name, logo: originalData.logo, note: newNote } as CrownedTeam;
+                updateData = { [fieldPath]: crownData };
+            }
 
             updateDoc(favDocRef, updateData).then(() => {
                 toast({ title: 'نجاح', description: `تم تتويج ${originalData.name}.` });
