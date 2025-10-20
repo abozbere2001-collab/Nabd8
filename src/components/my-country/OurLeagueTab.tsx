@@ -21,10 +21,9 @@ const IRAQI_LEAGUE_ID = 542;
 interface OurLeagueTabProps {
     navigate: ScreenProps['navigate'];
     ourLeague: { id: number; name: string; logo: string; } | null;
-    isLoading: boolean;
 }
 
-export function OurLeagueTab({ navigate, ourLeague, isLoading: isOurLeagueLoading }: OurLeagueTabProps) {
+export function OurLeagueTab({ navigate, ourLeague }: OurLeagueTabProps) {
     const { isAdmin, db } = useAdmin();
     const [loadingData, setLoadingData] = useState(true);
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
@@ -41,6 +40,10 @@ export function OurLeagueTab({ navigate, ourLeague, isLoading: isOurLeagueLoadin
     useEffect(() => {
         if (!ourLeague) {
             setLoadingData(false);
+            setFixtures([]);
+            setStandings([]);
+            setTopScorers([]);
+            setManualTopScorers([]);
             return;
         }
 
@@ -106,10 +109,6 @@ export function OurLeagueTab({ navigate, ourLeague, isLoading: isOurLeagueLoadin
         }
     }, [loadingData, sortedFixtures]);
     
-    if (isOurLeagueLoading) {
-        return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>;
-    }
-
     if (!ourLeague) {
          return (
             <div className="text-center text-muted-foreground py-10 px-4">
@@ -136,7 +135,7 @@ export function OurLeagueTab({ navigate, ourLeague, isLoading: isOurLeagueLoadin
                 <p className="text-sm text-muted-foreground">دورينا المفضل</p>
             </div>
         </div>
-
+        
         {loadingData ? <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div> :
             <Tabs defaultValue="matches" className="w-full">
                 <div className="sticky top-0 bg-background z-10 -mx-4 px-1">
