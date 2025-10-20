@@ -12,7 +12,7 @@ import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import type { Favorites, ManagedCompetition as ManagedCompetitionType, Team } from '@/lib/types';
+import type { Favorites, ManagedCompetition as ManagedCompetitionType, Team, FavoriteTeam, FavoriteLeague } from '@/lib/types';
 import { SearchSheet } from '@/components/SearchSheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
@@ -220,11 +220,18 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
             }, (error) => {
-                const permissionError = new FirestorePermissionError({
-                    path: favoritesRef.path,
-                    operation: 'get',
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                 if(error.code === 'permission-denied') {
+                    // This can happen if the rules are not yet applied or for a new user
+                    // We can choose to ignore it silently or show a message.
+                    console.warn("Permission denied fetching favorites. This might be expected for new users.");
+                    setFavorites(getLocalFavorites()); // fallback to local for guests who just signed in
+                } else {
+                    const permissionError = new FirestorePermissionError({
+                        path: favoritesRef.path,
+                        operation: 'get',
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
+                }
             });
         } else {
              setFavorites(getLocalFavorites());
@@ -363,104 +370,113 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             });
             return;
         }
-
         if (!db) return;
 
         const isLeague = 'leagueId' in item;
         const itemId = isLeague ? (item as ManagedCompetitionType).leagueId : (item as Team).id;
         const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        
         const itemType = isLeague ? 'leagues' : 'teams';
+
         const currentItem = favorites[itemType]?.[itemId];
-        const isHearted = currentItem?.isHearted || false;
-        const isStarred = !!currentItem; // A star is just existing in the map
 
-        let fieldPath;
-        let updateData: any;
-
+        // This is the new, safe way to update.
+        let updateData: { [key: string]: any } = {};
+        
         if (type === 'heart') {
+            const isCurrentlyHearted = currentItem?.isHearted;
+            
+            // For leagues, unheart any other league first
             if (isLeague) {
-                // Unheart any other league
-                const updates: {[key: string]: any} = {};
                 Object.keys(favorites.leagues || {}).forEach(id => {
-                    updates[`leagues.${id}.isHearted`] = false;
+                    const numericId = Number(id);
+                    if (favorites.leagues?.[numericId]?.isHearted && numericId !== itemId) {
+                        updateData[`leagues.${id}.isHearted`] = deleteField();
+                    }
                 });
-                 // Heart the new one
-                fieldPath = `leagues.${itemId}.isHearted`;
-                updates[fieldPath] = !isHearted; // Toggle
-                // Make sure it's also starred
-                if (!isStarred) {
-                   updates[`leagues.${itemId}.name`] = item.name;
-                   updates[`leagues.${itemId}.logo`] = item.logo;
-                   updates[`leagues.${itemId}.leagueId`] = itemId;
-                }
-                updateDoc(favDocRef, updates).catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updates})));
+            }
 
-            } else { // Team heart
-                fieldPath = `teams.${itemId}.isHearted`;
-                updateData = { [fieldPath]: !isHearted };
-                 // Make sure it's also starred
-                if (!isStarred) {
-                   updateData[`teams.${itemId}.name`] = item.name;
-                   updateData[`teams.${itemId}.logo`] = item.logo;
-                   updateData[`teams.${itemId}.teamId`] = itemId;
-                   updateData[`teams.${itemId}.type`] = (item as Team).national ? 'National' : 'Club';
-                }
-                updateDoc(favDocRef, updateData).catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData})));
+            if (currentItem) {
+                // Item exists, just toggle the heart
+                 updateData[`${itemType}.${itemId}.isHearted`] = !isCurrentlyHearted;
+            } else {
+                // Item doesn't exist, so add it with heart
+                const favData: FavoriteLeague | FavoriteTeam = isLeague
+                    ? { name: item.name, leagueId: itemId, logo: item.logo, isHearted: true }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club', isHearted: true };
+                updateData[`${itemType}.${itemId}`] = favData;
             }
 
         } else { // Star Favorite
-            fieldPath = `${itemType}.${itemId}`;
-            if (isStarred) {
-                // If it's hearted, just remove the star part by setting it to a minimal object, otherwise delete the whole field
-                if (isHearted) {
-                    updateData = { [fieldPath]: { ...currentItem, name: item.name } }; // Reset everything but hearted status
-                    delete updateData[fieldPath].notificationsEnabled; // Example of resetting
+            const isCurrentlyStarred = !!currentItem;
+            if (isCurrentlyStarred) {
+                // If it's hearted, just remove the star property (notificationsEnabled)
+                if (currentItem.isHearted) {
+                    updateData[`${itemType}.${itemId}.notificationsEnabled`] = deleteField();
                 } else {
-                    updateData = { [fieldPath]: deleteField() };
+                    // Not hearted, so remove the whole item
+                    updateData[`${itemType}.${itemId}`] = deleteField();
                 }
             } else {
-                 const favData = isLeague
+                // Not starred, so add it
+                 const favData: FavoriteLeague | FavoriteTeam = isLeague
                     ? { name: item.name, leagueId: itemId, logo: item.logo, notificationsEnabled: true }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club', notificationsEnabled: true };
-                updateData = { [fieldPath]: favData };
+                updateData[`${itemType}.${itemId}`] = favData;
             }
-             updateDoc(favDocRef, updateData).catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData})));
         }
+        
+        updateDoc(favDocRef, updateData).catch(err => {
+            const permissionError = new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData });
+            errorEmitter.emit('permission-error', permissionError);
+        });
+
     }, [user, db, favorites, toast, navigate]);
 
 
 
     const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote?: string) => {
-        if (!renameItem) return;
+        if (!renameItem || !user || !db) return;
         
-        if (renameItem.purpose === 'rename' && isAdmin && db) {
+        const { originalData, purpose } = renameItem;
+        
+        if (purpose === 'rename' && isAdmin) {
             const collectionName = `${type}Customizations`;
-            const docId = String(id);
-            const originalName = renameItem?.originalName;
+            const docRef = doc(db, collectionName, String(id));
             const data = { customName: newName };
 
-            const op = (newName && newName.trim() && newName !== originalName)
-                ? setDoc(doc(db, collectionName, docId), data)
-                : deleteDoc(doc(db, collectionName, docId));
+            const op = (newName && newName.trim() && newName !== renameItem.originalName)
+                ? setDoc(docRef, data)
+                : deleteDoc(docRef);
 
             op.then(() => {
                 fetchAllData(true);
                 toast({ title: 'نجاح', description: 'تم حفظ التغييرات.' });
             }).catch(serverError => {
-                const permissionError = new FirestorePermissionError({ path: doc(db, collectionName, docId).path, operation: 'write', requestResourceData: data });
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'write', requestResourceData: data });
                 errorEmitter.emit('permission-error', permissionError);
             });
         }
         
-         if (renameItem.purpose === 'note' && user && !user.isAnonymous && db) {
+        if (purpose === 'note') {
             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const itemData = renameItem.originalData as Team;
-            const fieldPath = `teams.${itemData.id}.note`;
-            const updateData = { [fieldPath]: newNote || deleteField() };
+            const itemData = originalData as Team;
+            const fieldPath = `teams.${itemData.id}`;
+            const currentFav = favorites.teams?.[itemData.id];
+
+            const favData: FavoriteTeam = {
+                name: itemData.name,
+                logo: itemData.logo,
+                teamId: itemData.id,
+                type: itemData.national ? 'National' : 'Club',
+                isHearted: true, // Hearting is implicit when adding a note
+                note: newNote || deleteField(),
+                notificationsEnabled: currentFav?.notificationsEnabled,
+            };
+
+            const updateData = { [fieldPath]: favData };
         
             updateDoc(favDocRef, updateData).then(() => {
-                toast({ title: 'نجاح', description: 'تم حفظ الملاحظة.' });
+                toast({ title: 'نجاح', description: 'تم حفظ الفريق في قسم بلدي.' });
             }).catch(err => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }))
             });
@@ -478,6 +494,26 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             purpose: 'rename',
         });
     };
+    
+    const handleOpenNote = (team: Team) => {
+         if (!user) {
+            toast({
+                variant: 'destructive',
+                title: 'ميزة للمستخدمين المسجلين',
+                description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.',
+                action: <Button onClick={() => navigate('Login')}>تسجيل الدخول</Button>
+            });
+            return;
+        }
+        setRenameItem({
+            type: 'team',
+            id: team.id,
+            name: team.name,
+            originalData: team,
+            note: (favorites.teams?.[team.id] as FavoriteTeam)?.note || '',
+            purpose: 'note',
+        });
+    }
 
     const handleAdminRefresh = async () => {
         localStorage.removeItem(COMPETITIONS_CACHE_KEY);
@@ -522,7 +558,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                              <span className="text-sm truncate">{team.name}</span>
                            </div>
                            <div className="flex items-center gap-1">
-                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(team, 'heart'); }}>
+                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenNote(team); }}>
                                 <Heart className={isHearted ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                              </Button>
                              {isAdmin && (
