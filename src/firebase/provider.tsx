@@ -12,6 +12,14 @@ import { handleNewUser } from '@/lib/firebase-client';
 import { FirestorePermissionError } from './errors';
 import { errorEmitter } from './error-emitter';
 
+// --- Admin Management ---
+// Add UIDs of permanent admins here. This provides a fallback if the admins collection is not accessible.
+const ADMIN_UIDS = [
+    'qptIHofUmhVs5qGCxDiIfIyqBck1', // abozbere2001@gmail.com
+    'SAGRALNAREY_UID_PLACEHOLDER', // sagralnarey@gmail.com - REPLACE WITH ACTUAL UID
+];
+
+
 interface FirebaseContextProps {
   firebaseApp: FirebaseApp | null;
   firestore: Firestore | null;
@@ -43,7 +51,7 @@ export const FirebaseProvider = ({
   const [isLoading, setIsLoading] = useState(true);
 
   const checkUserStatus = useCallback(async (firebaseUser: User | null) => {
-    if (!firebaseUser || !firestore) {
+    if (!firebaseUser) {
         setUser(null);
         setIsAdmin(false);
         setProUser(false);
@@ -54,26 +62,37 @@ export const FirebaseProvider = ({
     setUser(firebaseUser);
     setIsLoading(true);
 
+    // Check against the hardcoded list first for immediate access
+    const isHardcodedAdmin = ADMIN_UIDS.includes(firebaseUser.uid);
+    if (isHardcodedAdmin) {
+        setIsAdmin(true);
+    }
+
     try {
-        const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
-        const adminDoc = await getDoc(adminDocRef).catch(() => null);
-        setIsAdmin(adminDoc?.exists() || false);
+        if (firestore) {
+            // Also check the Firestore 'admins' collection
+            const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
+            const adminDoc = await getDoc(adminDocRef).catch(() => null);
+            
+            // A user is admin if they are in the hardcoded list OR in the DB collection
+            setIsAdmin(isHardcodedAdmin || (adminDoc?.exists() ?? false));
 
-        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
+            const userDocRef = doc(firestore, 'users', firebaseUser.uid);
+            const userDoc = await getDoc(userDocRef);
 
-        if (userDoc.exists()) {
-            setProUser(userDoc.data()?.isProUser || false);
+            if (userDoc.exists()) {
+                setProUser(userDoc.data()?.isProUser || false);
+            } else {
+                 setProUser(false);
+            }
         } else {
-             // We no longer call handleNewUser here to prevent recurrent writes.
-             // It will be called explicitly on sign-up / sign-in flows.
-             setProUser(false);
+            // Fallback to only hardcoded list if firestore is not available
+            setIsAdmin(isHardcodedAdmin);
         }
 
     } catch (error) {
-        // Log error but don't block the UI, as some errors might be expected
-        // (e.g., permission denied for guests trying to read admin doc).
-        console.warn("Failed to check user status, this might be expected.", error);
+        console.warn("Failed to check user status from Firestore, falling back to defaults.", error);
+        setIsAdmin(isHardcodedAdmin); // Fallback to hardcoded admin status on error
     } finally {
         setIsLoading(false);
     }
