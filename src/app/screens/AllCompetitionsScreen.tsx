@@ -87,12 +87,12 @@ interface RenameState {
 // --- CONSTANTS ---
 const countryToContinent: { [key: string]: string } = {
     "World": "World", "England": "Europe", "Spain": "Europe", "Germany": "Europe", "Italy": "Europe", "France": "Europe", "Netherlands": "Europe", "Portugal": "Europe", "Belgium": "Europe", "Russia": "Europe", "Turkey": "Europe", "Greece": "Europe", "Switzerland": "Europe", "Austria": "Europe", "Denmark": "Europe", "Scotland": "Europe", "Sweden": "Europe", "Norway": "Europe", "Poland": "Europe", "Ukraine": "Europe", "Czech-Republic": "Europe", "Croatia": "Europe", "Romania": "Europe", "Serbia": "Europe", "Hungary": "Europe", "Finland": "Europe", "Ireland": "Europe", "Northern-Ireland": "Europe", "Wales": "Europe", "Iceland": "Europe", "Albania": "Europe", "Georgia": "Europe", "Latvia": "Europe", "Estonia": "Europe", "Lithuania": "Europe", "Luxembourg": "Europe", "Faroe-Islands": "Europe", "Malta": "Europe", "Andorra": "Europe", "San-Marino": "Europe", "Gibraltar": "Europe", "Kosovo": "Europe", "Bosnia-and-Herzegovina": "Europe", "Slovakia": "Europe", "Slovenia": "Europe", "Bulgaria": "Europe", "Cyprus": "Europe", "Azerbaijan": "Europe", "Armenia": "Europe", "Belarus": "Europe", "Moldova": "Europe", "North-Macedonia": "Europe", "Montenegro": "Europe",
-    "Saudi-Arabia": "Asia", "Japan": "Asia", "South-Korea": "Asia", "China": "Asia", "Qatar": "Asia", "UAE": "Asia", "Iran": "Asia", "Iraq": "Asia", "Uzbekistan": "Asia", "Australia": "Asia", "Jordan": "Asia", "Syria": "Asia", "Lebanon": "Asia", "Oman": "Asia", "Kuwait": "Kuwait", "Bahrain": "Bahrain", "India": "Asia", "Thailand": "Asia", "Vietnam": "Asia", "Malaysia": "Asia", "Indonesia": "Asia", "Singapore": "Singapore", "Philippines": "Asia", "Hong-Kong": "Asia", "Palestine": "Asia", "Tajikistan": "Asia", "Turkmenistan": "Asia", "Kyrgyzstan": "Asia", "Bangladesh": "Asia", "Maldives": "Asia", "Cambodia": "Asia", "Myanmar": "Asia",
-    "Egypt": "Africa", "Morocco": "Africa", "Tunisia": "Africa", "Algeria": "Africa", "Nigeria": "Africa", "Senegal": "Africa", "Ghana": "Africa", "Ivory-Coast": "Africa", "Cameroon": "Africa", "South-Africa": "Africa", "DR-Congo": "Africa", "Mali": "Africa", "Burkina-Faso": "Africa", "Guinea": "Africa", "Zambia": "Africa", "Cape-Verde": "Africa", "Uganda": "Africa", "Kenya": "Africa", "Tanzania": "Africa", "Sudan": "Sudan", "Libya": "Africa", "Angola": "Africa", "Zimbabwe": "Africa", "Ethiopia": "Africa",
-    "USA": "North America", "Mexico": "North America", "Canada": "North America", "Costa-Rica": "North America", "Honduras": "North America", "Panama": "North America", "Jamaica": "North America", "El-Salvador": "North America", "Trinidad-and-Tobago": "North America", "Guatemala": "North America", "Nicaragua": "North America", "Cuba": "North America",
-    "Brazil": "South America", "Argentina": "South America", "Colombia": "South America", "Chile": "South America", "Uruguay": "South America", "Peru": "South America", "Ecuador": "South America", "Paraguay": "South America", "Venezuela": "South America", "Bolivia": "Bolivia",
-    "New-Zealand": "Oceania", "Fiji": "Oceania",
-    "Other": "Other"
+    "Saudi Arabia": "Asia", "Japan": "Asia", "South Korea": "Asia", "China": "Asia", "Qatar": "Asia", "United Arab Emirates": "Asia", "Iran": "Asia", "Iraq": "Asia", "Uzbekistan": "Asia", "Australia": "Asia", "Jordan": "Asia", "Syria": "Asia", "Lebanon": "Asia", "Oman": "Asia", "Kuwait": "Asia", "Bahrain": "Asia", "India": "Asia", "Thailand": "Asia", "Vietnam": "Asia", "Malaysia": "Asia", "Indonesia": "Asia", "Singapore": "Asia", "Philippines": "Asia", "Hong Kong": "Asia", "Palestine": "Asia", "Tajikistan": "Asia", "Turkmenistan": "Asia", "Kyrgyzstan": "Asia", "Bangladesh": "Asia", "Maldives": "Asia", "Cambodia": "Asia", "Myanmar": "Asia",
+    "Egypt": "Africa", "Morocco": "Africa", "Tunisia": "Africa", "Algeria": "Africa", "Nigeria": "Africa", "Senegal": "Africa", "Ghana": "Africa", "Ivory Coast": "Africa", "Cameroon": "Africa", "South Africa": "Africa", "DR Congo": "Africa", "Mali": "Africa", "Burkina Faso": "Africa", "Guinea": "Africa", "Zambia": "Africa", "Cape Verde": "Africa", "Uganda": "Africa", "Kenya": "Africa", "Tanzania": "Africa", "Sudan": "Africa", "Libya": "Africa", "Angola": "Africa", "Zimbabwe": "Africa", "Ethiopia": "Africa",
+    "USA": "North America", "Mexico": "North America", "Canada": "North America", "Costa Rica": "North America", "Honduras": "North America", "Panama": "North America", "Jamaica": "North America", "El Salvador": "North America", "Trinidad and Tobago": "North America", "Guatemala": "North America", "Nicaragua": "North America", "Cuba": "North America",
+    "Brazil": "South America", "Argentina": "South America", "Colombia": "South America", "Chile": "South America", "Uruguay": "South America", "Peru": "South America", "Ecuador": "South America", "Paraguay": "South America", "Venezuela": "South America", "Bolivia": "South America",
+    "New Zealand": "Oceania", "Fiji": "Oceania",
+    "International": "World",
 };
 
 const continentOrder = ["World", "Europe", "Asia", "Africa", "South America", "North America", "Oceania", "Other"];
@@ -109,7 +109,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const [renameItem, setRenameItem] = useState<RenameState | null>(null);
     const [isAddOpen, setAddOpen] = useState(false);
     
-    const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> } | null>(null);
+    const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> }>({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
 
     const [managedCompetitions, setManagedCompetitions] = useState<ManagedCompetitionType[] | null>(null);
     const [nationalTeams, setNationalTeams] = useState<Team[] | null>(null);
@@ -118,8 +118,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     const getName = useCallback((type: 'league' | 'team' | 'country' | 'continent', id: string | number, defaultName: string) => {
-        if (!customNames) return defaultName;
-
+        if (!defaultName) return '';
         const firestoreMap = type === 'league' ? customNames.leagues : type === 'team' ? customNames.teams : type === 'country' ? customNames.countries : customNames.continents;
         const customName = firestoreMap?.get(id as any);
         if (customName) return customName;
@@ -147,10 +146,10 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
           serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
         } catch (e) { console.warn("Could not check cache-buster."); }
   
-        if (cached?.data && cached.data.managedCompetitions && !forceRefresh && cached.lastFetched > serverLastUpdated) {
+        if (cached?.data?.managedCompetitions && !forceRefresh && cached.lastFetched > serverLastUpdated) {
             setManagedCompetitions(cached.data.managedCompetitions);
             setCustomNames(prev => ({
-                ...prev!,
+                ...prev,
                 leagues: new Map(Object.entries(cached.data.customNames?.leagues || {})),
                 countries: new Map(Object.entries(cached.data.customNames?.countries || {})),
                 continents: new Map(Object.entries(cached.data.customNames?.continents || {}))
@@ -189,7 +188,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
   
           setManagedCompetitions(fetchedCompetitions);
            setCustomNames(prev => ({
-              ...prev!,
+              ...prev,
               leagues: fetchedCustomNames.leagues,
               countries: fetchedCustomNames.countries,
               continents: fetchedCustomNames.continents
@@ -252,42 +251,34 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         }
     }, [toast]);
     
-    const handleNationalTeamsAccordionOpen = () => {
-        if (!nationalTeams && !loadingNationalTeams) {
+    const handleNationalTeamsAccordionOpen = (value: string[]) => {
+        if (value.includes('national-teams') && !nationalTeams && !loadingNationalTeams) {
             fetchNationalTeams();
         }
     };
 
 
     useEffect(() => {
-        const fetchInitialCustomNames = async () => {
+        const fetchInitialData = async () => {
             if (!db) {
-                setCustomNames({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
-                return;
-            };
-            try {
-                const [teamsSnapshot, customTeamsSnapshot] = await Promise.all([
-                    getDocs(collection(db, 'teamCustomizations')),
-                    isAdmin ? getDocs(collection(db, 'teamCustomizations')) : Promise.resolve(null)
-                ]);
-                
-                const teamNamesMap = new Map<number, string>();
-                const snapshotToUse = isAdmin ? customTeamsSnapshot : teamsSnapshot;
-                snapshotToUse?.docs?.forEach(doc => teamNamesMap.set(Number(doc.id), doc.data().customName));
-                
-                setCustomNames(prev => ({ ...prev!, teams: teamNamesMap }));
-            } catch (error) {
-                console.warn("Could not fetch team custom names", error);
+                 setCustomNames({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
+            } else {
+                 try {
+                    const teamsSnapshot = isAdmin ? await getDocs(collection(db, 'teamCustomizations')) : null;
+                    const teamNamesMap = new Map<number, string>();
+                    teamsSnapshot?.docs?.forEach(doc => teamNamesMap.set(Number(doc.id), doc.data().customName));
+                    setCustomNames(prev => ({ ...prev, teams: teamNamesMap }));
+                } catch (error) {
+                    console.warn("Could not fetch team custom names", error);
+                }
             }
+            fetchClubData();
         };
-
-        fetchInitialCustomNames();
-        fetchClubData();
-
+        fetchInitialData();
     }, [fetchClubData, db, isAdmin]);
 
     const sortedGroupedCompetitions = useMemo(() => {
-        if (!managedCompetitions || !customNames) return null;
+        if (!managedCompetitions) return null;
         const processedCompetitions = managedCompetitions.map(comp => ({ ...comp, name: getName('league', comp.leagueId, comp.name) }));
 
         const grouped: GroupedClubCompetitions = {};
@@ -332,7 +323,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [managedCompetitions, getName, customNames]);
     
     const groupedNationalTeams = useMemo(() => {
-        if (!nationalTeams || !customNames) return null;
+        if (!nationalTeams) return null;
 
         const processedTeams = nationalTeams.map(team => ({
             ...team,
@@ -610,7 +601,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }
 
 
-    if (loadingClubData || !customNames) {
+    if (loadingClubData) {
         return (
              <div className="flex h-full flex-col bg-background">
                 <ScreenHeader title="كل البطولات" onBack={goBack} canGoBack={canGoBack} />
@@ -649,11 +640,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 }
             />
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                 <Accordion type="multiple" className="w-full space-y-4" onValueChange={(value) => {
-                     if (value.includes('national-teams')) {
-                         handleNationalTeamsAccordionOpen();
-                     }
-                 }}>
+                 <Accordion type="multiple" className="w-full space-y-4" onValueChange={handleNationalTeamsAccordionOpen}>
                     <AccordionItem value="national-teams" className="rounded-lg border bg-card/50">
                         <AccordionTrigger className="px-4 py-3 hover:no-underline">
                             <div className="flex items-center gap-3">
