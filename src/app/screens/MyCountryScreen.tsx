@@ -348,10 +348,7 @@ function OurBallTab({ navigate, ourBallTeams, user, db }: { navigate: ScreenProp
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
 
     useEffect(() => {
-        if (ourBallTeams.length > 0 && !selectedTeamId) {
-            setSelectedTeamId(ourBallTeams[0].id);
-        } else if (ourBallTeams.length > 0 && selectedTeamId && !ourBallTeams.some(t => t.id === selectedTeamId)) {
-            // If the selected team is no longer in the list, select the first one
+        if (ourBallTeams.length > 0 && !ourBallTeams.some(t => t.id === selectedTeamId)) {
             setSelectedTeamId(ourBallTeams[0].id);
         } else if (ourBallTeams.length === 0) {
             setSelectedTeamId(null);
@@ -452,13 +449,15 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     useEffect(() => {
         if (!db) { return; }
         const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
-        getDocs(query(pinnedMatchesRef)).then(snapshot => {
+        const q = query(pinnedMatchesRef);
+        const unsub = onSnapshot(q, (snapshot) => {
             const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch));
             setPinnedMatches(matches);
-        }).catch(serverError => {
-            const permissionError = new FirestorePermissionError({ path: pinnedMatchesRef.path, operation: 'list' });
+        }, (serverError) => {
+            const permissionError = new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' });
             errorEmitter.emit('permission-error', permissionError);
         });
+        return () => unsub();
     }, [db]);
     
     const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}).sort((a,b) => a.name.localeCompare(b.name)), [favorites.ourBallTeams]);
