@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -588,14 +587,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
 
         const fetchAllData = async () => {
             if (!fixtureId) return;
-
-            if (initialFixture) {
-                setFixture(initialFixture);
-            } else {
-                setLoading(true);
-            }
+            setLoading(true);
             
             try {
+                // Fetch custom names first
                 if (db) {
                      const [teamsSnapshot, leaguesSnapshot, playersSnapshot, coachSnapshot] = await Promise.all([
                         getDocs(collection(db, 'teamCustomizations')),
@@ -613,46 +608,53 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     setCustomNames(names);
                 }
 
-                const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
-                if (!isMounted) return;
-                const fixtureData = await fixtureRes.json();
-                const currentFixture = fixtureData.response?.[0];
+                // Fetch all data in parallel
+                const [fixtureRes, lineupsRes, eventsRes, statisticsRes] = await Promise.all([
+                    fetch(`/api/football/fixtures?id=${fixtureId}`),
+                    fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
+                    fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
+                    fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
+                ]);
 
+                if (!isMounted) return;
+
+                const fixtureData = await fixtureRes.json();
+                const lineupsData = await lineupsRes.json();
+                const eventsData = await eventsRes.json();
+                const statisticsData = await statisticsRes.json();
+
+                const currentFixture = fixtureData.response?.[0];
                 if (!currentFixture) {
                     toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على المباراة.' });
                     setLoading(false);
                     return;
                 }
+
+                const initialLineups = applyCustomNames(lineupsData?.response || [], 'lineups');
                 
                 setFixture(applyCustomNames(currentFixture, 'fixture'));
-                setLoading(false);
+                setEvents(applyCustomNames(eventsData?.response || [], 'events'));
+                setStatistics(applyCustomNames(statisticsData?.response || [], 'statistics'));
+                setLineups(initialLineups);
 
+
+                // Fetch standings and player ratings after getting league/fixture info
                 const { league } = currentFixture;
                 const leagueId = league?.id;
                 const season = league?.season || CURRENT_SEASON;
 
-                const fetchLineupsPromise = fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`).then(res => res.json());
-                const fetchEventsPromise = fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).then(res => res.json());
-                const fetchStatisticsPromise = fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`).then(res => res.json());
-                const fetchStandingsPromise = leagueId ? fetch(`/api/football/standings?league=${leagueId}&season=${season}`).then(res => res.json()) : Promise.resolve(null);
+                if (leagueId) {
+                    const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${season}`);
+                     if (isMounted) {
+                        const standingsData = await standingsRes.json();
+                        setStandings(applyCustomNames(standingsData?.response?.[0]?.league?.standings[0] || [], 'standings'));
+                    }
+                }
                 
-                const [lineupsData, eventsData, statisticsData, standingsData] = await Promise.all([fetchLineupsPromise, fetchEventsPromise, fetchStatisticsPromise, fetchStandingsPromise]);
-                
-                if (!isMounted) return;
-
-                const initialLineups = applyCustomNames(lineupsData?.response || [], 'lineups');
-                setLineups(initialLineups);
-                setEvents(applyCustomNames(eventsData?.response || [], 'events'));
-                setStatistics(applyCustomNames(statisticsData?.response || [], 'statistics'));
-                setStandings(applyCustomNames(standingsData?.response?.[0]?.league?.standings[0] || [], 'standings'));
-                
-                // Fetch player ratings and merge them
                 const playersDataRes = await fetch(`/api/football/fixtures/players?fixture=${fixtureId}`);
-                if (!isMounted) return;
-
-                if (playersDataRes.ok) {
+                if (isMounted && playersDataRes.ok) {
                     const playersData = await playersDataRes.json();
-                     if (playersData?.response) {
+                    if (playersData?.response) {
                         const detailedPlayers = playersData.response.flatMap((team: any) => team.players);
                         setLineups(prevLineups => prevLineups ? mergePlayerData(prevLineups, detailedPlayers) : null);
                     }
@@ -662,8 +664,9 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                  if (isMounted) {
                     console.error("Failed to fetch match details:", error);
                     toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحميل بيانات المباراة.' });
-                    setLoading(false);
                 }
+            } finally {
+                if (isMounted) setLoading(false);
             }
         };
 
@@ -754,7 +757,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     };
 
 
-    if (loading && !fixture) {
+    if (loading) {
         return (
             <div className="flex h-full flex-col bg-background">
                 <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} />
