@@ -348,37 +348,29 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
         if (isNaN(homeGoals) || isNaN(awayGoals)) return;
     
         const predictionRef = doc(db, 'leaguePredictions', `${user.uid}_${fixtureId}`);
+        const isUpdating = (await getDoc(predictionRef).catch(() => null))?.exists() ?? false;
         
-        try {
-            const docSnap = await getDoc(predictionRef);
+        const predictionData: Prediction = {
+            userId: user.uid,
+            fixtureId,
+            homeGoals,
+            awayGoals,
+            points: 0,
+            timestamp: new Date().toISOString()
+        };
+        
+        const operation = isUpdating
+            ? updateDoc(predictionRef, { homeGoals, awayGoals, timestamp: predictionData.timestamp })
+            : setDoc(predictionRef, predictionData);
             
-            if (docSnap.exists()) {
-                await updateDoc(predictionRef, {
-                    homeGoals: homeGoals,
-                    awayGoals: awayGoals,
-                    timestamp: new Date().toISOString()
-                });
-            } else {
-                await setDoc(predictionRef, {
-                    userId: user.uid,
-                    fixtureId,
-                    homeGoals,
-                    awayGoals,
-                    points: 0,
-                    timestamp: new Date().toISOString()
-                } as Prediction);
-            }
-        } catch (serverError) {
-             const isUpdating = (await getDoc(predictionRef).catch(() => null))?.exists() ?? false;
-             const errorData = { userId: user.uid, fixtureId, homeGoals, awayGoals };
-    
+        operation.catch(serverError => {
              const permissionError = new FirestorePermissionError({
                 path: predictionRef.path,
                 operation: isUpdating ? 'update' : 'create',
-                requestResourceData: errorData
+                requestResourceData: isUpdating ? { homeGoals, awayGoals } : predictionData
             });
             errorEmitter.emit('permission-error', permissionError);
-        }
+        });
     }, [user, db]);
     
 
@@ -472,6 +464,7 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
     }
 
     if (activeTab === 'standings') {
+        const validStandings = (data as Standing[]).filter(s => s && s.team);
         return (
             <Table>
                 <TableHeader>
@@ -483,14 +476,14 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {(data as Standing[]).map((s) => (
+                    {validStandings.map((s) => (
                         <TableRow key={s.team.id} onClick={() => navigate('TeamDetails', { teamId: s.team.id })} className="cursor-pointer">
                             <TableCell className="text-center font-bold">{s.points}</TableCell>
                             <TableCell className="text-center">{s.all?.played || 0}</TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-2 justify-end">
-                                    <span>{s.team.name}</span>
-                                    <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
+                                    <span>{s.team?.name}</span>
+                                    <Avatar className="h-6 w-6"><AvatarImage src={s.team?.logo} /></Avatar>
                                 </div>
                             </TableCell>
                             <TableCell className="font-bold">{s.rank}</TableCell>
@@ -739,5 +732,3 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
