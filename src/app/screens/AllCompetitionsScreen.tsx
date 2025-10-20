@@ -8,7 +8,7 @@ import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy, Loader2 }
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, onSnapshot, getDocs, writeBatch, getDoc, deleteDoc, deleteField } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot, getDocs, writeBatch, getDoc, deleteDoc, deleteField, updateDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -343,7 +343,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         return () => { if (unsubscribe) unsubscribe(); };
     }, [user, db]);
 
-    const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
+     const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
         const itemId = 'leagueId' in item ? item.leagueId : item.id;
         const itemType: 'leagues' | 'teams' = 'leagueId' in item ? 'leagues' : 'teams';
 
@@ -363,7 +363,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     newFavorites.ourLeagueId = itemId;
                     updateData = { ourLeagueId: itemId };
                 }
-            } else { 
+            } else { // Star
                 const isCurrentlyStarred = !!newFavorites.leagues?.[itemId];
                 if (isCurrentlyStarred) {
                     if (newFavorites.leagues) delete newFavorites.leagues[itemId];
@@ -388,7 +388,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     newFavorites.ourBallTeams[itemId] = favData;
                     updateData = { [`ourBallTeams.${itemId}`]: favData };
                 }
-            } else {
+            } else { // Star
                  const isCurrentlyStarred = !!newFavorites.teams?.[itemId];
                 if (isCurrentlyStarred) {
                     if (newFavorites.teams) delete newFavorites.teams[itemId];
@@ -406,7 +406,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
         if (user && db) {
             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            setDoc(favRef, updateData, { merge: true }).catch(serverError => {
+            updateDoc(favRef, updateData).catch(serverError => {
                 setFavorites(currentFavorites);
                 const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
                 errorEmitter.emit('permission-error', permissionError);
