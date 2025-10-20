@@ -333,12 +333,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         if (user && db) {
             const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
             unsub = onSnapshot(starredFavsRef, (doc) => {
-                setFavorites(prev => ({...prev, leagues: doc.data()?.leagues, teams: doc.data()?.teams}));
+                setFavorites(doc.data() as Favorites || {});
             }, (err) => {
-                // This screen only needs `favorites`, not `ourFavorites`.
-                // Don't emit error for `ourFavorites` which user might not have access to.
                 if (err.code === 'permission-denied') {
-                    console.warn("Permission denied listening to favorites. This may be expected for certain user roles.");
+                    console.warn("Permission denied listening to favorites.");
+                    setFavorites(getLocalFavorites());
                 } else {
                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'get'}));
                 }
@@ -352,66 +351,50 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [user, db]);
 
      const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
+        // This screen should only handle 'star' favorites.
+        if (type === 'heart') {
+            toast({
+                title: "غير متاح هنا",
+                description: `يمكنك إضافة هذا إلى "كرتنا" من خلال البحث.`,
+            });
+            return;
+        }
+
         const isLeague = 'leagueId' in item;
         const itemId = isLeague ? item.leagueId : item.id;
-        
+        const itemKey = isLeague ? 'leagues' : 'teams';
+
         if (user && db) {
-             const docPath = type === 'star' ? 'favorites' : 'ourFavorites';
-             const favDocRef = doc(db, 'users', user.uid, docPath, 'data');
-             let updateData: { [key: string]: any };
-             const currentFavs = type === 'star' ? favorites : (favorites.ourBallTeams || {});
-             
-             if (type === 'heart') {
-                const isCurrentlyHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
-                 if (isLeague) {
-                     updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
-                 } else {
-                     const fieldPath = `ourBallTeams.${itemId}`;
-                     const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                     updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
-                 }
-             } else { // star
-                const itemKey = isLeague ? 'leagues' : 'teams';
-                const isCurrentlyStarred = !!favorites[itemKey]?.[itemId];
-                const fieldPath = `${itemKey}.${itemId}`;
-                const favData = isLeague
-                    ? { name: item.name, leagueId: itemId, logo: item.logo }
-                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
-             }
+             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+             const isCurrentlyStarred = !!favorites[itemKey]?.[itemId];
+             const fieldPath = `${itemKey}.${itemId}`;
+             const favData = isLeague
+                ? { name: item.name, leagueId: itemId, logo: item.logo }
+                : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+             const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
 
              setDoc(favDocRef, updateData, { merge: true }).catch(err => {
                  errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
              });
-
         } else { // Guest user
             const currentFavorites = getLocalFavorites();
             const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-
-            if (type === 'heart') {
-                if (isLeague) {
-                    if (newFavorites.ourLeagueId === itemId) delete newFavorites.ourLeagueId;
-                    else newFavorites.ourLeagueId = itemId;
-                } else {
-                    if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
-                    if (newFavorites.ourBallTeams[itemId]) delete newFavorites.ourBallTeams[itemId];
-                    else newFavorites.ourBallTeams[itemId] = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                }
-            } else { // Star
-                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-                 if (!newFavorites[itemType]) newFavorites[itemType] = {};
-                if (newFavorites[itemType]?.[itemId]) delete newFavorites[itemType]![itemId];
-                else {
-                     const favData = isLeague 
-                        ? { name: item.name, leagueId: itemId, logo: item.logo }
-                        : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    newFavorites[itemType]![itemId] = favData;
-                }
+            
+            if (!newFavorites[itemKey]) newFavorites[itemKey] = {};
+            
+            if (newFavorites[itemKey]?.[itemId]) {
+                delete newFavorites[itemKey]![itemId];
+            } else {
+                 const favData = isLeague 
+                    ? { name: item.name, leagueId: itemId, logo: item.logo }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                newFavorites[itemKey]![itemId] = favData;
             }
+            
             setLocalFavorites(newFavorites);
             setFavorites(newFavorites);
         }
-    }, [user, db, favorites]);
+    }, [user, db, favorites, toast]);
 
      const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
         if (!db) return;
@@ -686,3 +669,5 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     );
 }
 
+
+    
