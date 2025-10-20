@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -29,7 +28,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { CURRENT_SEASON } from '@/lib/constants';
 import {
@@ -74,8 +72,8 @@ const setCachedData = (key: string, value: any, ttl = CACHE_DURATION_MS) => {
 
 type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
 
-function SeasonSelector({ season, onSeasonChange, isAdmin }: { season: number, onSeasonChange: (newSeason: number) => void, isAdmin: boolean }) {
-    const seasons = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + 2 - i);
+function SeasonSelector({ season, onSeasonChange }: { season: number, onSeasonChange: (newSeason: number) => void }) {
+    const seasons = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + 3 - i);
 
     return (
         <div className="flex items-center justify-center gap-2 px-4 pt-2 pb-1 text-xs text-muted-foreground">
@@ -220,7 +218,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
 
   useEffect(() => {
-    async function fetchData() {
+    const findActiveSeasonAndFetchData = async () => {
         if (!leagueId) {
             setLoading(false);
             return;
@@ -228,10 +226,47 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         setLoading(true);
         await fetchAllCustomNames();
 
-        try {
-            const cacheKey = `competition_data_${leagueId}_${season}`;
-            const cachedData = getCachedData(cacheKey);
+        const seasonsToTry = [CURRENT_SEASON, CURRENT_SEASON + 1, CURRENT_SEASON -1, CURRENT_SEASON + 2, CURRENT_SEASON - 2];
+        let activeSeason = CURRENT_SEASON;
+        let foundData = false;
 
+        for (const year of seasonsToTry) {
+            try {
+                const cacheKey = `competition_data_${leagueId}_${year}`;
+                let cachedData = getCachedData(cacheKey);
+
+                if (cachedData) {
+                    foundData = true;
+                    activeSeason = year;
+                    setSeason(year);
+                    break;
+                }
+                
+                const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${year}`);
+                const standingsData = await standingsRes.json();
+
+                if (standingsData.response?.[0]?.league?.standings?.[0]?.length > 0) {
+                    foundData = true;
+                    activeSeason = year;
+                    setSeason(year);
+                    break;
+                }
+            } catch (error) {
+                console.warn(`No data found for season ${year}`);
+            }
+        }
+        fetchDataForSeason(activeSeason);
+    };
+
+    const fetchDataForSeason = async (seasonToFetch: number) => {
+        if (!leagueId) return;
+        setLoading(true);
+        if (customNames === null) await fetchAllCustomNames();
+
+        try {
+            const cacheKey = `competition_data_${leagueId}_${seasonToFetch}`;
+            const cachedData = getCachedData(cacheKey);
+            
             if (cachedData) {
                 setStandings(cachedData.standings || []);
                 setTopScorers(cachedData.topScorers || []);
@@ -243,10 +278,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 }
             } else {
                 const [standingsRes, scorersRes, teamsRes, fixturesRes] = await Promise.all([
-                    fetch(`/api/football/standings?league=${leagueId}&season=${season}`),
-                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${season}`),
-                    fetch(`/api/football/teams?league=${leagueId}&season=${season}`),
-                    fetch(`/api/football/fixtures?league=${leagueId}&season=${season}`)
+                    fetch(`/api/football/standings?league=${leagueId}&season=${seasonToFetch}`),
+                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${seasonToFetch}`),
+                    fetch(`/api/football/teams?league=${leagueId}&season=${seasonToFetch}`),
+                    fetch(`/api/football/fixtures?league=${leagueId}&season=${seasonToFetch}`)
                 ]);
 
                 const standingsData = await standingsRes.json();
@@ -282,7 +317,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             setLoading(false);
         }
     }
-    fetchData();
+
+    if (season !== CURRENT_SEASON) {
+        fetchDataForSeason(season);
+    } else {
+        findActiveSeasonAndFetchData();
+    }
+
   }, [leagueId, season, fetchAllCustomNames, initialTitle]);
   
 
@@ -498,7 +539,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         <Tabs defaultValue="matches" className="w-full">
            <div className="sticky top-0 bg-background z-10 px-1 pt-1">
              <div className="bg-card rounded-b-lg border-x border-b shadow-md">
-              <SeasonSelector season={season} onSeasonChange={setSeason} isAdmin={true} />
+              <SeasonSelector season={season} onSeasonChange={setSeason} />
               <TabsList className="grid w-full grid-cols-4 rounded-none h-12 p-0 bg-transparent">
                 <TabsTrigger value="matches">المباريات</TabsTrigger>
                 <TabsTrigger value="standings">الترتيب</TabsTrigger>
@@ -669,4 +710,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     
 
     
+    
+
     
