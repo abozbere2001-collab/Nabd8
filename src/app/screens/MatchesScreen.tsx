@@ -274,19 +274,26 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     try {
         let localCustomNames = customNamesCache;
         if (!localCustomNames && db) {
-            const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
-                getDocs(collection(db, 'leagueCustomizations')),
-                getDocs(collection(db, 'teamCustomizations'))
-            ]);
-            
-            if (abortSignal.aborted) return;
-            
-            const leagueNames = new Map<number, string>();
-            leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
-            const teamNames = new Map<number, string>();
-            teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-            localCustomNames = { leagues: leagueNames, teams: teamNames };
-            setCustomNamesCache(localCustomNames);
+            try {
+                const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+                    getDocs(collection(db, 'leagueCustomizations')),
+                    getDocs(collection(db, 'teamCustomizations'))
+                ]);
+                
+                if (abortSignal.aborted) return;
+                
+                const leagueNames = new Map<number, string>();
+                leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+                const teamNames = new Map<number, string>();
+                teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+                localCustomNames = { leagues: leagueNames, teams: teamNames };
+                setCustomNamesCache(localCustomNames);
+            } catch (e) {
+                // Non-critical, proceed without custom names
+                console.warn("Could not fetch custom names, proceeding without them.");
+                localCustomNames = { leagues: new Map(), teams: new Map() };
+                setCustomNamesCache(localCustomNames);
+            }
         }
 
 
@@ -468,3 +475,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    
