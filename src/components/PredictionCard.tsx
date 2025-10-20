@@ -75,17 +75,17 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
             <CardContent className="p-3">
                 <div className="flex items-center justify-between gap-1">
                      <div className="flex flex-col items-center gap-1 flex-1 justify-end truncate">
-                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                        <span className="font-semibold text-xs text-center truncate w-full">{fixture.teams.home.name}</span>
+                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                        <span className="font-semibold text-xs text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                     <div className="flex items-center gap-1">
                         <Input 
                             type="number" 
                             className="w-10 h-9 text-center text-md font-bold" 
                             min="0" 
-                            value={homeValue}
-                            onChange={handleHomeChange}
-                            id={`home-${fixture.fixture.id}`}
+                            value={awayValue}
+                            onChange={handleAwayChange}
+                            id={`away-${fixture.fixture.id}`}
                             disabled={isPredictionDisabled}
                         />
                          <div className={cn(
@@ -93,22 +93,22 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
                              isMatchLiveOrFinished ? getPredictionStatusColors() : "text-sm",
                             )}>
                              {isMatchLiveOrFinished
-                               ? `${fixture.goals.home ?? 0} - ${fixture.goals.away ?? 0}`
+                               ? `${fixture.goals.away ?? 0} - ${fixture.goals.home ?? 0}`
                                : format(new Date(fixture.fixture.date), "HH:mm")}
                          </div>
                         <Input 
                             type="number" 
                             className="w-10 h-9 text-center text-md font-bold" 
                             min="0"
-                            value={awayValue}
-                            onChange={handleAwayChange}
-                            id={`away-${fixture.fixture.id}`}
+                            value={homeValue}
+                            onChange={handleHomeChange}
+                            id={`home-${fixture.fixture.id}`}
                             disabled={isPredictionDisabled}
                         />
                     </div>
                    <div className="flex flex-col items-center gap-1 flex-1 truncate">
-                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                        <span className="font-semibold text-xs text-center truncate w-full">{fixture.teams.away.name}</span>
+                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                        <span className="font-semibold text-xs text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                 </div>
                  <div className="text-center text-xs text-muted-foreground mt-2">

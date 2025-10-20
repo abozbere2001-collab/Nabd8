@@ -17,7 +17,7 @@ const getRelativeDay = (date: Date) => {
 
 // Live Timer Component
 export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixture: FixtureType, large?: boolean, customStatus?: string | null }) => {
-    const { status, date } = fixture.fixture;
+    const { status, date, goals } = fixture.fixture;
     const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
     const live = isMatchLive(status);
     const fixtureDate = new Date(date);
@@ -60,16 +60,19 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
                 isLive: false
             };
         }
+        
+        const score = `${goals.home ?? '-'} - ${goals.away ?? '-'}`;
+
         if (live) {
             return {
-                main: `${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`,
+                main: score,
                 sub: status.short === 'HT' ? 'استراحة' : liveDisplayTime ? liveDisplayTime : 'مباشر',
                 isLive: true
             };
         }
         if (isFinished) {
             return {
-                main: `${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`,
+                main: score,
                 sub: status.long,
                 isLive: false
             };
