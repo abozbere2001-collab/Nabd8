@@ -1,44 +1,28 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { collection, getDocs, doc, query, orderBy, onSnapshot, updateDoc, deleteField } from 'firebase/firestore';
+import { collection, getDocs, doc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
 import type { Fixture, Standing, TopScorer, PinnedMatch, Favorites, Team } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
-import { Users, Search, Pin, Edit, Trash2, Loader2, Trophy } from 'lucide-react';
+import { Search, Pin, Edit, Loader2 } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
 import { FixtureItem } from '@/components/FixtureItem';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { useToast } from '@/hooks/use-toast';
 import { isMatchLive } from '@/lib/matchStatus';
-import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
+import { getLocalFavorites } from '@/lib/local-favorites';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-
-const IRAQI_LEAGUE_ID = 542;
 
 function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onManage: () => void, isAdmin: boolean}) {
     if (!match.isEnabled) return null;
@@ -83,7 +67,7 @@ function OurLeagueTab({
     navigate: ScreenProps['navigate'],
     ourLeague: { id: number; name: string; logo: string } | null;
 }) {
-    const { isAdmin, db } = useAdmin();
+    const { db } = useFirestore();
     const [loading, setLoading] = useState(true);
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
     const [standings, setStandings] = useState<Standing[]>([]);
@@ -130,7 +114,7 @@ function OurLeagueTab({
 
         fetchLeagueData();
 
-    }, [ourLeague, db]);
+    }, [ourLeague]);
     
     useEffect(() => {
         if (!loading && listRef.current) {
@@ -157,7 +141,7 @@ function OurLeagueTab({
             </div>
         );
     }
-
+    
     return (
       <div className="flex flex-col">
         <div className="flex items-center gap-3 p-3 rounded-lg bg-card border mb-4 cursor-pointer" onClick={() => navigate('CompetitionDetails', { leagueId: ourLeague.id, title: ourLeague.name, logo: ourLeague.logo })}>
@@ -348,12 +332,14 @@ function OurBallTab({ navigate, ourBallTeams, user, db }: { navigate: ScreenProp
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
 
     useEffect(() => {
+        // This effect runs when the list of teams changes.
+        // It ensures a team is always selected if the list is not empty.
         if (ourBallTeams.length > 0 && !ourBallTeams.some(t => t.id === selectedTeamId)) {
             setSelectedTeamId(ourBallTeams[0].id);
         } else if (ourBallTeams.length === 0) {
             setSelectedTeamId(null);
         }
-    }, [ourBallTeams, selectedTeamId]);
+    }, [ourBallTeams]); // Removed selectedTeamId from dependencies to prevent the loop
     
 
     if (ourBallTeams.length === 0) {
@@ -528,3 +514,5 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
+
+    
