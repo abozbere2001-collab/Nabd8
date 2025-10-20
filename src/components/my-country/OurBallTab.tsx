@@ -5,13 +5,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { ScreenProps } from '@/app/page';
 import type { Team, Fixture } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { FixtureItem } from '@/components/FixtureItem';
 import { isMatchLive } from '@/lib/matchStatus';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 
 const TeamFixtures = ({ teamId, navigate }: { teamId: number, navigate: ScreenProps['navigate'] }) => {
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
@@ -61,7 +62,7 @@ const TeamFixtures = ({ teamId, navigate }: { teamId: number, navigate: ScreenPr
     }
 
     return (
-        <div ref={listRef} className="space-y-2 max-h-96 overflow-y-auto">
+        <div ref={listRef} className="space-y-2 max-h-96 overflow-y-auto p-2">
             {fixtures.map((fixture, index) => {
                  const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || new Date(fixture.fixture.timestamp * 1000) > new Date();
                  const isFirstUpcoming = isUpcomingOrLive && !fixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
@@ -82,7 +83,13 @@ interface OurBallTabProps {
 }
 
 export function OurBallTab({ navigate, ourBallTeams }: OurBallTabProps) {
-    if (ourBallTeams.length === 0) {
+    const [activeTeamId, setActiveTeamId] = useState<number | null>(null);
+
+    const handleTeamClick = (teamId: number) => {
+        setActiveTeamId(prevId => (prevId === teamId ? null : teamId));
+    };
+
+    if (!ourBallTeams || ourBallTeams.length === 0) {
         return (
             <div className="text-center text-muted-foreground py-10 px-4">
                 <p className="text-lg font-semibold">قسم "كرتنا" فارغ</p>
@@ -91,30 +98,44 @@ export function OurBallTab({ navigate, ourBallTeams }: OurBallTabProps) {
             </div>
         );
     }
+    
+    // Fallback for local storage favorites which might use teamId
+    const getKey = (team: any) => team.id || team.teamId;
+
 
     return (
         <div className="px-1 py-4">
-            <Accordion type="single" collapsible className="w-full space-y-2">
-                {ourBallTeams.map((team) => (
-                    <AccordionItem value={`team-${team.id}`} key={team.id} className="border-b-0">
-                         <AccordionTrigger className="p-3 rounded-lg border bg-card flex items-center gap-3 h-16 hover:no-underline data-[state=open]:bg-accent data-[state=open]:text-accent-foreground">
-                            <div className="flex-1 flex items-center gap-3">
-                                <Avatar className="h-10 w-10">
-                                    <AvatarImage src={team.logo} alt={team.name} />
-                                    <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
-                                </Avatar>
-                                <div>
-                                    <p className="font-bold">{team.name}</p>
-                                    {(team as any).note && <p className="text-xs text-muted-foreground">{(team as any).note}</p>}
-                                </div>
-                            </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pt-2">
-                            <TeamFixtures teamId={team.id} navigate={navigate} />
-                        </AccordionContent>
-                    </AccordionItem>
+            <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex w-max space-x-4 px-4 flex-row-reverse">
+                    {ourBallTeams.map((team, index) => (
+                        <div
+                            key={getKey(team)}
+                            onClick={() => handleTeamClick(getKey(team))}
+                            className={cn(
+                                "flex flex-col items-center gap-2 w-20 text-center cursor-pointer transition-transform duration-200",
+                                activeTeamId === getKey(team) ? "scale-110" : "scale-100"
+                            )}
+                        >
+                            <Avatar className={cn("h-14 w-14 border-2 transition-colors", activeTeamId === getKey(team) ? "border-primary" : "border-border")}>
+                                <AvatarImage src={team.logo} />
+                                <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-xs font-medium truncate w-full">{team.name}</span>
+                        </div>
+                    ))}
+                </div>
+                <ScrollBar orientation="horizontal" className="h-1.5 mt-2" />
+            </ScrollArea>
+            
+            <div className="mt-4 px-2 space-y-2">
+                {ourBallTeams.map(team => (
+                    <Collapsible key={getKey(team)} open={activeTeamId === getKey(team)} onOpenChange={() => handleTeamClick(getKey(team))}>
+                        <CollapsibleContent>
+                            <TeamFixtures teamId={getKey(team)} navigate={navigate} />
+                        </CollapsibleContent>
+                    </Collapsible>
                 ))}
-            </Accordion>
+            </div>
         </div>
     );
 }
