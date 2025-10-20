@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -191,12 +192,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     if (user && db) {
         const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const unsub = onSnapshot(favDocRef, (doc) => {
-            setFavorites(doc.data() as Favorites || { userId: user.uid });
+            setFavorites(doc.data() as Favorites || {});
         }, (error) => {
-            if (error.code === 'permission-denied') {
-                setFavorites(getLocalFavorites()); // Fallback for guests or permission issues
-                return;
-            }
             const permissionError = new FirestorePermissionError({ path: favDocRef.path, operation: 'get' });
             errorEmitter.emit('permission-error', permissionError);
         });
@@ -370,27 +367,28 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         if (!user || !db) return;
 
         const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const field = type === 'star' ? 'teams' : 'ourBallTeams';
-        const fieldPath = `${field}.${team.id}`;
         
         let updateData: { [key: string]: any };
 
-        if (isCurrentlyFavorited) {
-            updateData = { [fieldPath]: deleteField() };
-        } else {
-            const favData: any = {
-                teamId: team.id, 
-                name: team.name, 
-                logo: team.logo, 
-                type: team.national ? 'National' : 'Club'
-            };
-            if (type === 'heart' && note) {
-                favData.note = note;
+        if (type === 'star') {
+            const fieldPath = `teams.${team.id}`;
+            if (isCurrentlyFavorited) {
+                updateData = { [fieldPath]: deleteField() };
+            } else {
+                updateData = { [fieldPath]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
             }
-            updateData = { [fieldPath]: favData };
+        } else { // heart
+            const fieldPath = `ourBallTeams.${team.id}`;
+            if (isCurrentlyFavorited && !note) {
+                 updateData = { [fieldPath]: deleteField() };
+            } else {
+                const favData: any = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
+                if (note) favData.note = note;
+                updateData = { [fieldPath]: favData };
+            }
         }
         
-        updateDoc(favRef, updateData).catch(serverError => {
+        setDoc(favRef, updateData, { merge: true }).catch(serverError => {
             const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
             errorEmitter.emit('permission-error', permissionError);
         });
@@ -419,7 +417,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     
     const { originalData, purpose } = renameItem;
 
-    if (purpose === 'note') {
+    if (purpose === 'note' && user && !user.isAnonymous) {
         const team = originalData as Team;
         const isHearted = !!favorites?.ourBallTeams?.[team.id];
         updateFavorites(team, 'heart', isHearted, newNote);
@@ -700,13 +698,5 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
-    
-
-    
-    
-
-    
-
-    
 
     

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
@@ -297,13 +298,39 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
 
     const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
-        if (!user || !db) {
-            toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+        const isLeague = !('national' in item);
+        const itemId = item.id;
+        
+        if (!user || user.isAnonymous) {
+            if (type === 'heart') {
+                toast({
+                    variant: 'destructive',
+                    title: 'ميزة للمستخدمين المسجلين',
+                    description: 'يرجى تسجيل الدخول لاستخدام ميزة التفضيل بالقلب.',
+                });
+                return;
+            }
+            // Handle star for guest
+            const currentFavorites = getLocalFavorites();
+            const newFavorites = { ...currentFavorites };
+            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+
+            if (!newFavorites[itemType]) newFavorites[itemType] = {};
+
+            if (newFavorites[itemType]?.[itemId]) {
+                delete newFavorites[itemType]![itemId];
+            } else {
+                const favData = isLeague 
+                    ? { name: item.name, leagueId: itemId, logo: item.logo }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                newFavorites[itemType]![itemId] = favData;
+            }
+            setLocalFavorites(newFavorites);
+            setFavorites(newFavorites);
             return;
         }
 
-        const isLeague = !('national' in item);
-        const itemId = item.id;
+        if (!db) return;
         const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
 
         if (type === 'heart') {
@@ -356,10 +383,10 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   };
   
   const handleSaveRenameOrNote = async (type: RenameType, id: string | number, newName: string, newNote?: string) => {
-    if (!renameItem || !db) return;
+    if (!renameItem) return;
     const { originalData, purpose } = renameItem;
 
-    if (purpose === 'rename' && isAdmin) {
+    if (purpose === 'rename' && isAdmin && db) {
         const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
         if (newName && newName !== originalData.name) {
@@ -372,7 +399,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         if(debouncedSearchTerm) {
             handleSearch(debouncedSearchTerm);
         }
-    } else if (purpose === 'note' && user) {
+    } else if (purpose === 'note' && user && !user.isAnonymous && db) {
         const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const item = originalData as Team;
         const fieldPath = `ourBallTeams.${item.id}`;
@@ -467,3 +494,5 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
+
+    

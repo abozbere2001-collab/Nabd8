@@ -75,15 +75,7 @@ function PinnedMatchCard({
 // --- Favorite Teams Horizontal Scroll ---
 const FavoriteTeamsScroller = ({ teams, navigate }: { teams: (Team & {note?: string})[], navigate: ScreenProps['navigate']}) => {
     if (!teams || teams.length === 0) {
-        return (
-             <div className="px-4 pb-4">
-                 <div className="flex flex-col items-center justify-center text-center text-muted-foreground border-2 border-dashed rounded-lg p-6">
-                    <p className="font-bold">قسم "كرتنا" فارغ</p>
-                    <p className="text-sm">أضف فرقك المفضلة بالضغط على زر القلب ❤️ بجانب أي فريق.</p>
-                    <Button className="mt-4" size="sm" onClick={() => navigate('AllCompetitions')}>استكشاف الفرق</Button>
-                </div>
-            </div>
-        );
+        return null;
     }
 
     return (
@@ -180,15 +172,7 @@ const TeamDetailsLoader = ({ leagueId, db, children }: { leagueId: number, db: a
     }
 
     if (!data) {
-        return (
-            <div className="px-4">
-                <div className="flex flex-col items-center justify-center text-center text-muted-foreground border-2 border-dashed rounded-lg p-6">
-                    <p className="font-bold">اختر دوريك المفضل</p>
-                    <p className="text-sm">اذهب إلى "كل البطولات" واضغط على زر القلب ❤️ بجانب دوريك المفضل ليظهر هنا.</p>
-                    <Button className="mt-4" size="sm" onClick={() => (window as any).appNavigate('AllCompetitions')}>استكشاف البطولات</Button>
-                </div>
-            </div>
-        );
+        return null;
     }
 
     return <>{children(data)}</>;
@@ -197,15 +181,7 @@ const TeamDetailsLoader = ({ leagueId, db, children }: { leagueId: number, db: a
 // --- Our League Details Component ---
 const OurLeagueDetails = ({ leagueId, db, navigate }: { leagueId: number | undefined, db: any, navigate: ScreenProps['navigate'] }) => {
     if (!leagueId) {
-         return (
-             <div className="px-4">
-                <div className="flex flex-col items-center justify-center text-center text-muted-foreground border-2 border-dashed rounded-lg p-6">
-                    <p className="font-bold">اختر دوريك المفضل</p>
-                    <p className="text-sm">اذهب إلى "كل البطولات" واضغط على زر القلب ❤️ بجانب دوريك المفضل ليظهر هنا.</p>
-                    <Button className="mt-4" size="sm" onClick={() => navigate('AllCompetitions')}>استكشاف البطولات</Button>
-                </div>
-            </div>
-        );
+         return null;
     }
 
     return (
@@ -310,46 +286,41 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
 
   useEffect(() => {
-    setIsLoading(true);
-    let unsubscribes: (() => void)[] = [];
+    if (!db) {
+        setIsLoading(false);
+        return;
+    }
 
-    const setupListeners = async () => {
-        if (db) {
-            const pinnedMatchesRef = collection(db, "pinnedIraqiMatches");
-            const q = query(pinnedMatchesRef);
-            const unsubPinned = onSnapshot(q, (snapshot) => {
-                const matches = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as PinnedMatch));
-                setPinnedMatches(matches);
-            }, (serverError) => {
-                errorEmitter.emit("permission-error", new FirestorePermissionError({ path: "pinnedIraqiMatches", operation: "list" }));
-            });
-            unsubscribes.push(unsubPinned);
-        }
+    const pinnedMatchesRef = collection(db, "pinnedIraqiMatches");
+    const q = query(pinnedMatchesRef);
+    const unsubPinned = onSnapshot(q, (snapshot) => {
+        const matches = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as PinnedMatch));
+        setPinnedMatches(matches);
+    }, (serverError) => {
+        errorEmitter.emit("permission-error", new FirestorePermissionError({ path: "pinnedIraqiMatches", operation: "list" }));
+    });
 
-        if (user && db) {
-            const favsRef = doc(db, "users", user.uid, "favorites", "data");
-            const unsubFavs = onSnapshot(favsRef, (docSnap) => {
-                setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
-                setIsLoading(false);
-            }, (error) => {
-                 if (error.code === 'permission-denied') {
-                    setFavorites(getLocalFavorites());
-                 } else {
-                    errorEmitter.emit("permission-error", new FirestorePermissionError({ path: favsRef.path, operation: "get" }));
-                    setFavorites({});
-                 }
-                setIsLoading(false);
-            });
-            unsubscribes.push(unsubFavs);
-        } else {
-             setFavorites(getLocalFavorites());
-             setIsLoading(false);
-        }
-    };
+    let unsubFavs = () => {};
+    if (user) {
+        setIsLoading(true);
+        const favsRef = doc(db, "users", user.uid, "favorites", "data");
+        unsubFavs = onSnapshot(favsRef, (docSnap) => {
+            setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
+            setIsLoading(false);
+        }, (error) => {
+            errorEmitter.emit("permission-error", new FirestorePermissionError({ path: favsRef.path, operation: "get" }));
+            setFavorites({});
+            setIsLoading(false);
+        });
+    } else {
+        setFavorites({}); // Guests have no "Our Ball" favorites
+        setIsLoading(false);
+    }
     
-    setupListeners();
-
-    return () => unsubscribes.forEach(unsub => unsub());
+    return () => {
+        unsubPinned();
+        unsubFavs();
+    };
 
   }, [user, db]);
 
@@ -378,13 +349,32 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         
         {isLoading ? (
             <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+        ) : !user ? (
+             <div className="px-4 pt-4">
+                 <div className="flex flex-col items-center justify-center text-center text-muted-foreground border-2 border-dashed rounded-lg p-6">
+                    <p className="font-bold">محتوى حصري للمستخدمين</p>
+                    <p className="text-sm">قم بتسجيل الدخول لحفظ فرقك ودوريك المفضل وعرضها هنا.</p>
+                    <Button className="mt-4" size="sm" onClick={() => navigate('Login')}>تسجيل الدخول</Button>
+                </div>
+            </div>
         ) : (
             <div className="space-y-6">
                 <FavoriteTeamsScroller teams={ourBallTeams} navigate={navigate} />
                 <OurLeagueDetails leagueId={ourLeagueId} db={db} navigate={navigate} />
+                 {ourBallTeams.length === 0 && !ourLeagueId && (
+                     <div className="px-4">
+                        <div className="flex flex-col items-center justify-center text-center text-muted-foreground border-2 border-dashed rounded-lg p-6">
+                            <p className="font-bold">قسم "بلدي" فارغ</p>
+                            <p className="text-sm">أضف فرقك ودوريك المفضل بالضغط على زر القلب ❤️.</p>
+                            <Button className="mt-4" size="sm" onClick={() => navigate('AllCompetitions')}>استكشاف</Button>
+                        </div>
+                    </div>
+                )}
             </div>
         )}
       </div>
     </div>
   );
 }
+
+    
