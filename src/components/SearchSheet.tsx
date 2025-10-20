@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
@@ -76,9 +75,10 @@ const normalizeArabic = (text: string) => {
     .replace(/[\u064B-\u0652]/g, "") // Remove harakat
     .replace(/[أإآ]/g, "ا")
     .replace(/ة/g, "ه")
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
+    .replace(/آ/g, "ا") // Also handle Madda
+    .replace(/ى/g, "ي") // Alef Maksura to Yeh
+    .toLowerCase()
+    .trim();
 };
 
 
@@ -246,7 +246,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     }
     
     const localResults = localSearchIndex.filter(item => 
-        item.normalizedName.includes(normalizedQuery)
+        item.name.toLowerCase().includes(query.toLowerCase()) || item.normalizedName.includes(normalizedQuery)
     );
 
     const apiSearchPromises = [
@@ -311,16 +311,14 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         const isLeague = !('national' in item);
         const itemId = item.id;
         
-        if (user && db) {
-            const favDocRef = type === 'star' 
-                ? doc(db, 'users', user.uid, 'favorites', 'data')
-                : doc(db, 'users', user.uid, 'ourFavorites', 'data');
+        let favDocRef: any;
+        let updateData: any;
 
-            let updateData;
-            
+        if (user && db) {
             if (type === 'heart') {
+                favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
                 const isCurrentlyHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
-                if (isLeague) {
+                 if (isLeague) {
                     updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
                 } else {
                     const fieldPath = `ourBallTeams.${itemId}`;
@@ -328,6 +326,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
                     updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
                 }
             } else { // star
+                favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
                 const isCurrentlyStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
                 const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
                 const fieldPath = `${itemType}.${itemId}`;
@@ -336,15 +335,14 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
                 updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
             }
-            
-            setDoc(favDocRef, updateData, { merge: true }).catch(err => {
+             setDoc(favDocRef, updateData, { merge: true }).catch(err => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
             });
 
         } else { // Guest user
             const currentFavorites = getLocalFavorites();
             const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-
+            
             if (type === 'heart') {
                 if (isLeague) {
                     if (newFavorites.ourLeagueId === itemId) delete newFavorites.ourLeagueId;

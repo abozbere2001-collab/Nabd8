@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -329,75 +328,93 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     useEffect(() => {
-        let unsub: (() => void) | null = null;
-        if (user && db) {
-            // This screen only cares about STARRED favorites
-            const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            unsub = onSnapshot(starredFavsRef, (doc) => {
-                setFavorites(doc.data() as Favorites || {});
-            }, (err) => {
-                if (err.code === 'permission-denied') {
-                    console.warn("Permission denied listening to favorites. This is expected if rules are strict.");
-                    setFavorites(getLocalFavorites()); // Fallback to local
-                } else {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'get'}));
-                }
-            });
-        } else {
-            // Guest user
+        if (!user || !db) {
             setFavorites(getLocalFavorites());
-        }
-        return () => {
-            if(unsub) unsub();
-        }
-    }, [user, db]);
-
-     const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
-        // This screen should only handle 'star' favorites.
-        if (type === 'heart') {
-            toast({
-                title: "غير متاح هنا",
-                description: `يمكنك إضافة هذا إلى "كرتنا" من خلال البحث.`,
-                duration: 2000,
-            });
             return;
         }
 
+        const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+
+        const unsubStarred = onSnapshot(starredFavsRef, (doc) => {
+            setFavorites(prev => ({...prev, ...doc.data()}));
+        }, (error) => {
+            console.warn("Permission denied listening to starred favorites.", error);
+        });
+
+        const unsubOur = onSnapshot(ourFavsRef, (doc) => {
+            setFavorites(prev => ({...prev, ...doc.data()}));
+        }, (error) => {
+            console.warn("Permission denied listening to ourFavorites.", error);
+        });
+
+        return () => {
+            unsubStarred();
+            unsubOur();
+        };
+    }, [user, db]);
+
+
+    const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
         const isLeague = 'leagueId' in item;
         const itemId = isLeague ? item.leagueId : item.id;
-        const itemKey = isLeague ? 'leagues' : 'teams';
+        
+        let favDocRef: any;
+        let updateData: any;
 
         if (user && db) {
-             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-             const isCurrentlyStarred = !!favorites[itemKey]?.[itemId];
-             const fieldPath = `${itemKey}.${itemId}`;
-             const favData = isLeague
-                ? { name: item.name, leagueId: itemId, logo: item.logo }
-                : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-             const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
-
+            if (type === 'heart') {
+                favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+                const isCurrentlyHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
+                 if (isLeague) {
+                    updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
+                } else {
+                    const fieldPath = `ourBallTeams.${itemId}`;
+                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                    updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
+                }
+            } else { // star
+                favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+                const isCurrentlyStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
+                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+                const fieldPath = `${itemType}.${itemId}`;
+                const favData = isLeague 
+                    ? { name: item.name, leagueId: itemId, logo: item.logo }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
+            }
              setDoc(favDocRef, updateData, { merge: true }).catch(err => {
-                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
-             });
+                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+            });
+
         } else { // Guest user
             const currentFavorites = getLocalFavorites();
             const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
             
-            if (!newFavorites[itemKey]) newFavorites[itemKey] = {};
-            
-            if (newFavorites[itemKey]?.[itemId]) {
-                delete newFavorites[itemKey]![itemId];
+            if (type === 'heart') {
+                if (isLeague) {
+                    if (newFavorites.ourLeagueId === itemId) delete newFavorites.ourLeagueId;
+                    else newFavorites.ourLeagueId = itemId;
+                } else {
+                    if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
+                    if (newFavorites.ourBallTeams[itemId]) delete newFavorites.ourBallTeams[itemId];
+                    else newFavorites.ourBallTeams[itemId] = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                }
             } else {
-                 const favData = isLeague 
-                    ? { name: item.name, leagueId: itemId, logo: item.logo }
-                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                newFavorites[itemKey]![itemId] = favData;
+                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+                if (!newFavorites[itemType]) newFavorites[itemType] = {};
+                if (newFavorites[itemType]?.[itemId]) delete newFavorites[itemType]![itemId];
+                else {
+                    const favData = isLeague 
+                        ? { name: item.name, leagueId: itemId, logo: item.logo }
+                        : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                    newFavorites[itemType]![itemId] = favData;
+                }
             }
-            
             setLocalFavorites(newFavorites);
             setFavorites(newFavorites);
         }
-    }, [user, db, favorites, toast]);
+    }, [user, db, favorites]);
 
      const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
         if (!db) return;
@@ -671,4 +688,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
-

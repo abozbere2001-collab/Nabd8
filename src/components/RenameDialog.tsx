@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -77,7 +75,8 @@ export function RenameDialog({
   const getDescription = () => {
       if (!item) return '';
       if(item.type === 'team' && !isAdmin) return 'سيتم حفظ هذا الفريق مع ملاحظتك في قسم "كرتنا".';
-      if(isAdmin) return `أدخل القيمة الجديدة لـ ${itemTypeMap[item.type]}.`;
+      if(isAdmin && item.type !== 'status') return `أدخل الاسم الجديد لـ ${itemTypeMap[item.type]}. اتركه فارغًا للعودة للاسم الأصلي.`;
+      if(isAdmin && item.type === 'status') return `أدخل الحالة المخصصة للمباراة. اترك الحقل فارغًا لإزالته.`;
       return '';
   }
 
@@ -133,6 +132,3 @@ export function RenameDialog({
     </Dialog>
   );
 }
-
-
-
