@@ -191,10 +191,10 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   useEffect(() => {
     if (isOpen) {
       buildLocalIndex();
-      const currentFavorites = user ? favorites : getLocalFavorites();
+      const currentFavorites = user && db ? favorites : getLocalFavorites();
       setFavorites(currentFavorites);
     }
-  }, [isOpen, user, buildLocalIndex, favorites]);
+  }, [isOpen, user, db, buildLocalIndex, favorites]);
 
 
   const handleOpenChange = (open: boolean) => {
@@ -305,7 +305,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
                     delete newFavorites.ourBallTeams[itemId];
                     updateData[`ourBallTeams.${itemId}`] = deleteField();
                 } else {
-                    const favData = { name: team.name, teamId: itemId, logo: team.logo, type: team.national ? 'National' : 'Club' };
+                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: team.national ? 'National' : 'Club' };
                     newFavorites.ourBallTeams[itemId] = favData;
                     updateData[`ourBallTeams.${itemId}`] = favData;
                 }
@@ -456,4 +456,3 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
-

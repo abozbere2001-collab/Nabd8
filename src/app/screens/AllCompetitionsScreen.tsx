@@ -370,7 +370,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     delete newFavorites.ourBallTeams[itemId];
                     updateData[`ourBallTeams.${itemId}`] = deleteField();
                 } else {
-                    const favData = { name: team.name, teamId: itemId, logo: team.logo, type: team.national ? 'National' : 'Club' };
+                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: team.national ? 'National' : 'Club' };
                     newFavorites.ourBallTeams[itemId] = favData;
                     updateData[`ourBallTeams.${itemId}`] = favData;
                 }
