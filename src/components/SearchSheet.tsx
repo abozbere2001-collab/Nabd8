@@ -313,36 +313,34 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         const itemId = item.id;
         
         if (user && db) {
-            const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-            const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+             const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+             const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+             let updateData;
 
-            if (type === 'heart') {
-                const isCurrentlyHearted = isLeague 
-                    ? favorites.ourLeagueId === itemId
-                    : !!favorites.ourBallTeams?.[itemId];
-
+             if (type === 'heart') {
+                const isCurrentlyHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
                  if (isLeague) {
-                    const updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
-                    setDoc(ourFavsRef, updateData, { merge: true })
-                        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'write', requestResourceData: updateData})));
-                 } else { // Team
-                    const fieldPath = `ourBallTeams.${itemId}`;
-                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    const updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
-                    updateDoc(ourFavsRef, updateData)
-                         .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'update', requestResourceData: updateData})));
+                     updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
+                 } else {
+                     const fieldPath = `ourBallTeams.${itemId}`;
+                     const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                     updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
                  }
-            } else { // Star
+                  setDoc(ourFavsRef, updateData, { merge: true }).catch(err => {
+                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'write', requestResourceData: updateData}))
+                 });
+             } else { // star
+                const isCurrentlyStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
                 const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-                const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
                 const fieldPath = `${itemType}.${itemId}`;
                 const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                const updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
-                 updateDoc(starredFavsRef, updateData)
-                     .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'update', requestResourceData: updateData})));
-            }
+                updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
+                setDoc(starredFavsRef, updateData, { merge: true }).catch(err => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'write', requestResourceData: updateData}))
+                });
+             }
         } else { // Guest user
             const currentFavorites = getLocalFavorites();
             const newFavorites = JSON.parse(JSON.stringify(currentFavorites));

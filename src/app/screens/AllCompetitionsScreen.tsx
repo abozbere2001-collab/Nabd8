@@ -101,7 +101,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const { toast } = useToast();
     
     const [favorites, setFavorites] = useState<Partial<Favorites>>({});
-    const [ourFavorites, setOurFavorites] = useState<Partial<Favorites>>({});
     const [renameItem, setRenameItem] = useState<RenameState | null>(null);
     const [isAddOpen, setAddOpen] = useState(false);
     
@@ -329,35 +328,29 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     useEffect(() => {
-        let starUnsubscribe: (() => void) | null = null;
-        let heartUnsubscribe: (() => void) | null = null;
-
+        let unsub: (() => void) | null = null;
         if (user && db) {
             const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
             const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-
-            starUnsubscribe = onSnapshot(starredFavsRef, (doc) => {
-                setFavorites(doc.data() as Favorites || { userId: user.uid });
-            }, (error) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'get'}));
-            });
             
-            heartUnsubscribe = onSnapshot(ourFavsRef, (doc) => {
-                setOurFavorites(doc.data() as Favorites || { userId: user.uid });
-            }, (error) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'get'}));
+            const starUnsub = onSnapshot(starredFavsRef, (doc) => {
+                setFavorites(prev => ({...prev, ...doc.data() as Favorites}));
             });
+            const heartUnsub = onSnapshot(ourFavsRef, (doc) => {
+                 setFavorites(prev => ({...prev, ...doc.data() as Favorites}));
+            });
+
+            unsub = () => {
+                starUnsub();
+                heartUnsub();
+            }
 
         } else {
-            const localFavs = getLocalFavorites();
-            setFavorites(localFavs);
-            setOurFavorites(localFavs);
+            setFavorites(getLocalFavorites());
         }
-
         return () => {
-            if (starUnsubscribe) starUnsubscribe();
-            if (heartUnsubscribe) heartUnsubscribe();
-        };
+            if(unsub) unsub();
+        }
     }, [user, db]);
 
      const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
@@ -365,38 +358,34 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const itemId = isLeague ? item.leagueId : item.id;
         
         if (user && db) {
-            const favDocRef = type === 'star' 
-                ? doc(db, 'users', user.uid, 'favorites', 'data')
-                : doc(db, 'users', user.uid, 'ourFavorites', 'data');
+             const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+             const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+             let updateData;
 
-            let updateData;
-            
-            if (type === 'heart') {
-                const isCurrentlyHearted = isLeague ? ourFavorites.ourLeagueId === itemId : !!ourFavorites.ourBallTeams?.[itemId];
-                if (isLeague) {
-                    updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
-                } else {
-                    const fieldPath = `ourBallTeams.${itemId}`;
-                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                    updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
-                }
-                setDoc(favDocRef, updateData, { merge: true }).catch(err => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
-                });
-
-            } else { // star
+             if (type === 'heart') {
+                const isCurrentlyHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
+                 if (isLeague) {
+                     updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
+                 } else {
+                     const fieldPath = `ourBallTeams.${itemId}`;
+                     const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                     updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
+                 }
+                  setDoc(ourFavsRef, updateData, { merge: true }).catch(err => {
+                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'write', requestResourceData: updateData}))
+                 });
+             } else { // star
+                const isCurrentlyStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
                 const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-                const isCurrentlyStarred = !!favorites[itemType]?.[itemId];
                 const fieldPath = `${itemType}.${itemId}`;
-                const favData = isLeague 
+                const favData = isLeague
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
                 updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
-
-                 updateDoc(favDocRef, updateData).catch(err => {
-                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
-                 });
-            }
+                setDoc(starredFavsRef, updateData, { merge: true }).catch(err => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'write', requestResourceData: updateData}))
+                });
+             }
         } else { // Guest user
             const currentFavorites = getLocalFavorites();
             const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
@@ -423,9 +412,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
             setLocalFavorites(newFavorites);
             setFavorites(newFavorites);
-            setOurFavorites(newFavorites);
         }
-    }, [user, db, favorites, ourFavorites]);
+    }, [user, db, favorites]);
 
      const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
         if (!db) return;
@@ -509,7 +497,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                       </div>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(team, 'heart'); }}>
-                          <Heart className={ourFavorites.ourBallTeams?.[team.id] ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                          <Heart className={favorites.ourBallTeams?.[team.id] ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                         </Button>
                         {isAdmin && (
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team.name, nationalTeams?.find(t => t.id === team.id)?.name) }}>
@@ -554,7 +542,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                        </div>
                                        <div className="flex items-center gap-1">
                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                               <Heart className={(ourFavorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                               <Heart className={(favorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                            </Button>
                                            {isAdmin && (
                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
@@ -591,7 +579,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                </div>
                                                <div className="flex items-center gap-1">
                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                                       <Heart className={(ourFavorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                       <Heart className={(favorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                    </Button>
                                                    {isAdmin && (
                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
