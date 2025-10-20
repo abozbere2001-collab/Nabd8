@@ -500,6 +500,7 @@ const mergePlayerData = (lineups: LineupData[], playersData: { player: Player, s
                 
                 const mergedPlayer: PlayerType = {
                     ...lineupPlayer,
+                    // Prioritize detailed info, but fallback to lineup info
                     name: detailedPlayerInfo.player.name || lineupPlayer.name,
                     photo: detailedPlayerInfo.player.photo || lineupPlayer.photo,
                     rating: rating || lineupPlayer.rating,
@@ -596,7 +597,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
                 fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
                 fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
-                fetch(`/api/football/fixtures/players?fixture=${fixtureId}`)
+                fetch(`/api/football/fixtures/players?fixture=${fixtureId}`),
             ]);
 
             const eventsData = await eventsRes.json();
@@ -815,4 +816,3 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
