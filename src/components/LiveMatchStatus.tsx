@@ -77,6 +77,14 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
                 isLive: false
             };
         }
+        
+        if (status.short === "PST") {
+            return { main: "مؤجلة", sub: "", isLive: false };
+        }
+        
+        if (status.short === "TBD") {
+            return { main: "لم تحدد", sub: "", isLive: false };
+        }
 
         return {
             main: format(fixtureDate, "HH:mm"),
