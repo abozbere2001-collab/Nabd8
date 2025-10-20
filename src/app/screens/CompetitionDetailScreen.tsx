@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -72,6 +71,15 @@ const setCachedData = (key: string, value: any, ttl = CACHE_DURATION_MS) => {
 
 
 type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
+interface RenameState {
+  id: string | number;
+  name: string;
+  note?: string;
+  type: RenameType;
+  purpose: 'rename' | 'note';
+  originalData?: any;
+  originalName?: string;
+}
 
 function SeasonSelector({ season, onSeasonChange }: { season: number, onSeasonChange: (newSeason: number) => void }) {
     const seasons = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + 3 - i);
@@ -120,7 +128,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const [loading, setLoading] = useState(true);
   const [displayTitle, setDisplayTitle] = useState(initialTitle);
   
-  const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, note?: string, type: RenameType, originalData: any } | null>(null);
+  const [renameItem, setRenameItem] = useState<RenameState | null>(null);
   
   const [isDeleteAlertOpen, setDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -346,29 +354,30 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   }, [loading, fixtures, firstUpcomingMatchIndex]);
   
     const handleFavoriteToggle = (team: Team, type: 'star' | 'heart') => {
-        const isCurrentlyFavorited = (type === 'star')
-            ? !!favorites?.teams?.[team.id]
-            : !!favorites?.ourBallTeams?.[team.id];
+        if (!user) {
+            toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+            return;
+        }
 
-        if (type === 'heart' && !isCurrentlyFavorited) {
-             const userNote = (favorites?.ourBallTeams?.[team.id] as any)?.note || '';
-             setRenameItem({ id: team.id, name: team.name, note: userNote, type: 'team', originalData: team });
+        if (type === 'heart' && !favorites?.ourBallTeams?.[team.id]) {
+             handleOpenRename('team', team.id, team, true); // Open dialog for note
         } else {
-             updateFavorites(team, type, isCurrentlyFavorited);
+             updateFavorites(team, type, !!(type === 'star' ? favorites?.teams?.[team.id] : favorites?.ourBallTeams?.[team.id]));
         }
     };
     
     const updateFavorites = (team: Team, type: 'star' | 'heart', isCurrentlyFavorited: boolean, note?: string) => {
-        const currentFavorites = user && db ? favorites : getLocalFavorites();
-        const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+        if (!user || !db) return;
+
+        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const field = type === 'star' ? 'teams' : 'ourBallTeams';
+        const fieldPath = `${field}.${team.id}`;
         
+        let updateData: { [key: string]: any };
+
         if (isCurrentlyFavorited) {
-            if (newFavorites[field]) {
-                delete newFavorites[field][team.id];
-            }
+            updateData = { [fieldPath]: deleteField() };
         } else {
-            if (!newFavorites[field]) newFavorites[field] = {};
             const favData: any = {
                 teamId: team.id, 
                 name: team.name, 
@@ -378,63 +387,46 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             if (type === 'heart' && note) {
                 favData.note = note;
             }
-            newFavorites[field][team.id] = favData;
+            updateData = { [fieldPath]: favData };
         }
         
-        setFavorites(newFavorites);
-
-        if (user && db) {
-            const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            
-            const updateData = isCurrentlyFavorited 
-                ? { [`${field}.${team.id}`]: deleteField() }
-                : { [`${field}.${team.id}`]: newFavorites[field][team.id] };
-
-            updateDoc(favRef, updateData).catch(serverError => {
-                setFavorites(currentFavorites); // Revert on error
-                const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
-                errorEmitter.emit('permission-error', permissionError);
-            });
-        } else {
-            setLocalFavorites(newFavorites);
-        }
+        updateDoc(favRef, updateData).catch(serverError => {
+            const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
+            errorEmitter.emit('permission-error', permissionError);
+        });
     }
   
-  const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
-    if (!customNames) return;
+  const handleOpenRename = (type: RenameType, id: number, originalData: any, isForNote: boolean = false) => {
+    const purpose: 'rename' | 'note' = isForNote ? 'note' : 'rename';
+    
+    if (purpose === 'rename' && !isAdmin) return;
 
     if (type === 'team') {
         const currentName = getDisplayName('team', id, originalData.name);
         const userNote = (favorites?.ourBallTeams?.[id] as any)?.note || '';
-        const adminNote = isAdmin ? customNames.adminNotes.get(id) || '' : '';
-        
-        setRenameItem({ id, name: currentName, note: isAdmin ? adminNote : userNote, type, originalData });
-
+        const adminNote = isAdmin ? customNames?.adminNotes.get(id) || '' : '';
+        setRenameItem({ id, name: currentName, note: purpose === 'note' ? userNote : adminNote, type, purpose, originalData });
     } else if (type === 'player') {
         const currentName = getDisplayName('player', id, originalData.name);
-        setRenameItem({ id, name: currentName, type, originalData });
-
+        setRenameItem({ id, name: currentName, type, purpose, originalData });
     } else if (type === 'league' && leagueId) {
-        setRenameItem({ type: 'league', id: leagueId, name: displayTitle || '', originalData: {name: initialTitle} });
+        setRenameItem({ type: 'league', id: leagueId, name: displayTitle || '', purpose, originalData: {name: initialTitle} });
     }
   };
 
-  const handleSaveRename = async (type: RenameType, id: string | number, newName: string, newNote?: string) => {
+  const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote?: string) => {
     if (!renameItem) return;
     
-    // User adding/editing a note via heart button
-    if (type === 'team' && renameItem.originalData) {
-        const team = renameItem.originalData as Team;
+    const { originalData, purpose } = renameItem;
+
+    if (purpose === 'note') {
+        const team = originalData as Team;
         const isHearted = !!favorites?.ourBallTeams?.[team.id];
         updateFavorites(team, 'heart', isHearted, newNote);
-    }
-    
-    // Admin rename logic
-    if (isAdmin && db) {
-        const originalName = renameItem.originalData?.name;
+    } else if (purpose === 'rename' && isAdmin && db) {
         const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
-        if (newName && newName !== originalName) {
+        if (newName && newName !== originalData.name) {
             const data = { customName: newName };
             setDoc(docRef, data).then(() => {
                 fetchAllCustomNames();
@@ -533,7 +525,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
           isOpen={!!renameItem}
           onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
           item={renameItem}
-          onSave={(type, id, newName, note) => handleSaveRename(type, id, newName, note)}
+          onSave={handleSaveRenameOrNote}
         />}
        <div className="flex-1 overflow-y-auto p-1">
         <CompetitionHeaderCard league={{ name: displayTitle, logo }} teamsCount={teams.length} />
@@ -711,6 +703,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     
 
     
+    
+
     
 
     
