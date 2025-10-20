@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -331,24 +332,17 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         let unsub: (() => void) | null = null;
         if (user && db) {
             const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-            
-            const starUnsub = onSnapshot(starredFavsRef, (doc) => {
+            unsub = onSnapshot(starredFavsRef, (doc) => {
                 setFavorites(prev => ({...prev, leagues: doc.data()?.leagues, teams: doc.data()?.teams}));
             }, (err) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'get'}));
+                // This screen only needs `favorites`, not `ourFavorites`.
+                // Don't emit error for `ourFavorites` which user might not have access to.
+                if (err.code === 'permission-denied') {
+                    console.warn("Permission denied listening to favorites. This may be expected for certain user roles.");
+                } else {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'get'}));
+                }
             });
-            const heartUnsub = onSnapshot(ourFavsRef, (doc) => {
-                 setFavorites(prev => ({...prev, ourLeagueId: doc.data()?.ourLeagueId, ourBallTeams: doc.data()?.ourBallTeams}));
-            }, (err) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'get'}));
-            });
-
-            unsub = () => {
-                starUnsub();
-                heartUnsub();
-            }
-
         } else {
             setFavorites(getLocalFavorites());
         }
@@ -362,13 +356,12 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         const itemId = isLeague ? item.leagueId : item.id;
         
         if (user && db) {
-             const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-             const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-             let updateData;
-             let favDocRef;
-
+             const docPath = type === 'star' ? 'favorites' : 'ourFavorites';
+             const favDocRef = doc(db, 'users', user.uid, docPath, 'data');
+             let updateData: { [key: string]: any };
+             const currentFavs = type === 'star' ? favorites : (favorites.ourBallTeams || {});
+             
              if (type === 'heart') {
-                favDocRef = ourFavsRef;
                 const isCurrentlyHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
                  if (isLeague) {
                      updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
@@ -378,10 +371,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                      updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
                  }
              } else { // star
-                favDocRef = starredFavsRef;
-                const isCurrentlyStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
-                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-                const fieldPath = `${itemType}.${itemId}`;
+                const itemKey = isLeague ? 'leagues' : 'teams';
+                const isCurrentlyStarred = !!favorites[itemKey]?.[itemId];
+                const fieldPath = `${itemKey}.${itemId}`;
                 const favData = isLeague
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
@@ -405,7 +397,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     if (newFavorites.ourBallTeams[itemId]) delete newFavorites.ourBallTeams[itemId];
                     else newFavorites.ourBallTeams[itemId] = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
                 }
-            } else {
+            } else { // Star
                 const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
                  if (!newFavorites[itemType]) newFavorites[itemType] = {};
                 if (newFavorites[itemType]?.[itemId]) delete newFavorites[itemType]![itemId];
@@ -693,3 +685,4 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
