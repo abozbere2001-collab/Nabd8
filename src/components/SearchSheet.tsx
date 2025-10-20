@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from '@/components/ui/button';
-import { Search, Star, Pencil, Loader2, Heart } from 'lucide-react';
+import { Search, Star, Pencil, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenProps } from '@/app/page';
@@ -82,7 +82,7 @@ const normalizeArabic = (text: string) => {
 };
 
 
-const ItemRow = ({ item, itemType, isFavorited, isHearted, onFavoriteToggle, onResultClick, onRename, isAdmin }: { item: Item, itemType: ItemType, isFavorited: boolean, isHearted: boolean, onFavoriteToggle: (item: Item, type: 'star' | 'heart') => void, onResultClick: () => void, onRename: () => void, isAdmin: boolean }) => {
+const ItemRow = ({ item, itemType, isFavorited, onFavoriteToggle, onResultClick, onRename, isAdmin }: { item: Item, itemType: ItemType, isFavorited: boolean, onFavoriteToggle: (item: Item) => void, onResultClick: () => void, onRename: () => void, isAdmin: boolean }) => {
   return (
     <div className="flex items-center gap-2 p-1.5 border-b last:border-b-0 hover:bg-accent/50 rounded-md">
        <div className="flex-1 flex items-center gap-2 cursor-pointer" onClick={onResultClick}>
@@ -97,10 +97,7 @@ const ItemRow = ({ item, itemType, isFavorited, isHearted, onFavoriteToggle, onR
             <Pencil className="h-4 w-4 text-muted-foreground" />
         </Button>
       )}
-       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onFavoriteToggle(item, 'heart')}>
-        <Heart className={cn("h-5 w-5 text-muted-foreground/60", isHearted && "fill-current text-red-500")} />
-      </Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onFavoriteToggle(item, 'star')}>
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onFavoriteToggle(item)}>
         <Star className={cn("h-5 w-5 text-muted-foreground/60", isFavorited && "fill-current text-yellow-400")} />
       </Button>
     </div>
@@ -298,64 +295,47 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 }, [localSearchIndex]);
 
 
-    const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
-        if (!user) {
-            toast({
-                variant: 'destructive',
-                title: 'ميزة للمستخدمين المسجلين',
-                description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.',
-                action: <Button onClick={() => { setIsOpen(false); navigate('Login'); }}>تسجيل الدخول</Button>
-            });
-            return;
-        }
-
-        if (!db) return;
-
+    const handleFavorite = useCallback((item: Item) => {
         const isLeague = !('national' in item);
         const itemId = item.id;
-        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        
-        const itemType = isLeague ? 'leagues' : 'teams';
-        const currentItem = favorites[itemType]?.[itemId];
-        const isHearted = currentItem?.isHearted || false;
-        const isStarred = !!currentItem;
 
-        let fieldPath;
-        let updateData: any = {};
-
-        if (type === 'heart') {
-            if (isLeague) {
-                Object.keys(favorites.leagues || {}).forEach(id => {
-                    if (favorites.leagues?.[Number(id)].isHearted) {
-                        updateData[`leagues.${id}.isHearted`] = deleteField();
-                    }
-                });
-            }
-            fieldPath = `${itemType}.${itemId}.isHearted`;
-            updateData[fieldPath] = !isHearted;
-
-        } else { // star
-            fieldPath = `${itemType}.${itemId}`;
-            if (isStarred && !isHearted) { // if it's only starred, remove it
-                updateData[fieldPath] = deleteField();
-            } else if (isStarred && isHearted) { // if it's starred and hearted, just unstar it
-                updateData[`${fieldPath}.notificationsEnabled`] = deleteField(); 
-                // This is a proxy for being starred. We assume starred items have notifications enabled.
-                // A better approach would be an explicit `isStarred` field.
-            } else { // not starred at all
+        if (user && db) {
+            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const itemType = isLeague ? 'leagues' : 'teams';
+            const isCurrentlyFavorited = !!favorites[itemType]?.[itemId];
+            const fieldPath = `${itemType}.${itemId}`;
+            
+            let updateData;
+            if (isCurrentlyFavorited) {
+                updateData = { [fieldPath]: deleteField() };
+            } else {
                 const favData = isLeague 
-                    ? { name: item.name, leagueId: itemId, logo: item.logo, notificationsEnabled: true, isHearted: isHearted }
-                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club', notificationsEnabled: true, isHearted: isHearted };
-                updateData[fieldPath] = favData;
+                    ? { name: item.name, leagueId: itemId, logo: item.logo }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                updateData = { [fieldPath]: favData };
             }
+            updateDoc(favDocRef, updateData).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
+            });
+
+        } else { // Guest user
+            const currentFavorites = getLocalFavorites();
+            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+            if (!newFavorites[itemType]) newFavorites[itemType] = {};
+            
+            if (newFavorites[itemType]?.[itemId]) {
+                delete newFavorites[itemType]![itemId];
+            } else {
+                const favData = isLeague 
+                    ? { name: item.name, leagueId: itemId, logo: item.logo }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                newFavorites[itemType]![itemId] = favData;
+            }
+            setLocalFavorites(newFavorites);
+            setFavorites(newFavorites);
         }
-        
-        if (Object.keys(updateData).length > 0) {
-          updateDoc(favDocRef, updateData).catch(err => {
-              errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
-          });
-        }
-    }, [user, db, favorites, toast, navigate]);
+    }, [user, db, favorites]);
 
 
   const handleResultClick = (result: SearchableItem) => {
@@ -389,18 +369,6 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         if(debouncedSearchTerm) {
             handleSearch(debouncedSearchTerm);
         }
-    } else if (purpose === 'note' && user && !user.isAnonymous && db) {
-        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const item = originalData as Team;
-        const fieldPath = `teams.${item.id}.note`;
-        
-        const updateData = { [fieldPath]: newNote && newNote.trim() ? newNote : deleteField() };
-
-         setDoc(favDocRef, updateData, { merge: true }).then(() => {
-            toast({ title: 'نجاح', description: 'تم حفظ الفريق في قسم بلدي.' });
-         }).catch(err => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
-        });
     }
     setRenameItem(null);
   };
@@ -429,13 +397,10 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         <div className="space-y-2">
             {!debouncedSearchTerm && <h3 className="font-bold text-md text-center text-muted-foreground">{itemType === 'teams' ? 'الفرق الأكثر شعبية' : 'البطولات الأكثر شعبية'}</h3>}
             {itemsToRender.map(result => {
-                const isHearted = result.type === 'leagues'
-                    ? Object.values(favorites.leagues || {}).some(l => l.leagueId === result.id && l.isHearted)
-                    : !!favorites.teams?.[result.id]?.isHearted;
-                const isStarred = !!favorites[result.type]?.[result.id];
+                const isFavorited = !!favorites[result.type]?.[result.id];
                 const displayName = getDisplayName(result.type.slice(0, -1) as 'team'|'league', result.id, result.name);
 
-                return <ItemRow key={`${result.type}-${result.id}`} item={{...result.originalItem, name: displayName}} itemType={result.type} isFavorited={isStarred} isHearted={isHearted} onFavoriteToggle={handleFavorite} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(result.type as RenameType, result.id, result.originalItem)} />;
+                return <ItemRow key={`${result.type}-${result.id}`} item={{...result.originalItem, name: displayName}} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={handleFavorite} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(result.type as RenameType, result.id, result.originalItem)} />;
             })}
         </div>
     )
@@ -479,5 +444,3 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
-
-    

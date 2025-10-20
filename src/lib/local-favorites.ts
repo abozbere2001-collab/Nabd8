@@ -10,11 +10,7 @@ export const getLocalFavorites = (): Partial<Favorites> => {
     }
     try {
         const localData = window.localStorage.getItem(LOCAL_FAVORITES_KEY);
-        const parsed = localData ? JSON.parse(localData) : {};
-        // Ensure we don't return heart-based favorites for guests
-        delete parsed.ourLeagueId;
-        delete parsed.ourBallTeams;
-        return parsed;
+        return localData ? JSON.parse(localData) : {};
     } catch (error) {
         console.error("Error reading local favorites:", error);
         return {};
@@ -27,9 +23,7 @@ export const setLocalFavorites = (favorites: Partial<Favorites>) => {
         return;
     }
     try {
-        // Ensure we don't save heart-based favorites for guests
-        const { ourLeagueId, ourBallTeams, ...starredFavorites } = favorites;
-        window.localStorage.setItem(LOCAL_FAVORITES_KEY, JSON.stringify(starredFavorites));
+        window.localStorage.setItem(LOCAL_FAVORITES_KEY, JSON.stringify(favorites));
     } catch (error) {
         console.error("Error saving local favorites:", error);
     }
@@ -41,5 +35,3 @@ export const clearLocalFavorites = () => {
     }
     window.localStorage.removeItem(LOCAL_FAVORITES_KEY);
 };
-
-    
