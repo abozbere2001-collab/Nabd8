@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAdmin, useFirestore } from '@/firebase/provider';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
@@ -22,11 +22,10 @@ const IRAQI_LEAGUE_ID = 542;
 
 interface OurLeagueTabProps {
     navigate: ScreenProps['navigate'];
-    leagueDetails: { id: number; name: string; logo: string; } | null;
-    isLoading: boolean;
+    leagueId?: number;
 }
 
-export function OurLeagueTab({ navigate, leagueDetails, isLoading }: OurLeagueTabProps) {
+export function OurLeagueTab({ navigate, leagueId }: OurLeagueTabProps) {
     const { isAdmin, db } = useAdmin();
     const [loadingData, setLoadingData] = useState(true);
     
@@ -34,6 +33,7 @@ export function OurLeagueTab({ navigate, leagueDetails, isLoading }: OurLeagueTa
     const [standings, setStandings] = useState<Standing[]>([]);
     const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
     const [manualTopScorers, setManualTopScorers] = useState<any[]>([]);
+    const [leagueDetails, setLeagueDetails] = useState<{ id: number; name: string; logo: string; } | null>(null);
 
     const listRef = useRef<HTMLDivElement>(null);
 
@@ -42,8 +42,9 @@ export function OurLeagueTab({ navigate, leagueDetails, isLoading }: OurLeagueTa
     }, [fixtures]);
     
     useEffect(() => {
-        if (!leagueDetails) {
+        if (!leagueId || !db) {
             setLoadingData(false);
+            setLeagueDetails(null);
             return;
         }
 
@@ -52,10 +53,22 @@ export function OurLeagueTab({ navigate, leagueDetails, isLoading }: OurLeagueTa
 
         const fetchAllLeagueData = async () => {
             try {
+                const managedCompDoc = await getDoc(doc(db, 'managedCompetitions', String(leagueId)));
+                if (!isMounted) return;
+
+                if (managedCompDoc.exists()) {
+                    const data = managedCompDoc.data();
+                    setLeagueDetails({ id: leagueId, name: data.name, logo: data.logo });
+                } else {
+                    setLeagueDetails(null);
+                    setLoadingData(false);
+                    return;
+                }
+
                 const [fixturesRes, standingsRes, scorersRes] = await Promise.all([
-                    fetch(`/api/football/fixtures?league=${leagueDetails.id}&season=${CURRENT_SEASON}`),
-                    fetch(`/api/football/standings?league=${leagueDetails.id}&season=${CURRENT_SEASON}`),
-                    fetch(`/api/football/players/topscorers?league=${leagueDetails.id}&season=${CURRENT_SEASON}`),
+                    fetch(`/api/football/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`),
+                    fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
+                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${CURRENT_SEASON}`),
                 ]);
 
                 if (!isMounted) return;
@@ -77,7 +90,7 @@ export function OurLeagueTab({ navigate, leagueDetails, isLoading }: OurLeagueTa
         fetchAllLeagueData();
         
         let unsubscribe: (() => void) | null = null;
-        if (db && leagueDetails.id === IRAQI_LEAGUE_ID) {
+        if (leagueId === IRAQI_LEAGUE_ID) {
             const scorersRef = collection(db, 'iraqiLeagueTopScorers');
             const q = query(scorersRef, orderBy('rank', 'asc'));
             unsubscribe = onSnapshot(q, (snapshot) => {
@@ -95,7 +108,7 @@ export function OurLeagueTab({ navigate, leagueDetails, isLoading }: OurLeagueTa
             if (unsubscribe) unsubscribe();
         };
 
-    }, [leagueDetails, db]);
+    }, [leagueId, db]);
     
     useEffect(() => {
         if (!loadingData && listRef.current && sortedFixtures.length > 0) {
@@ -108,12 +121,8 @@ export function OurLeagueTab({ navigate, leagueDetails, isLoading }: OurLeagueTa
             }
         }
     }, [loadingData, sortedFixtures]);
-    
-    if (isLoading) {
-         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>;
-    }
 
-    if (!leagueDetails) {
+    if (!leagueId) {
          return (
             <div className="text-center text-muted-foreground py-10 px-4">
                 <p className="text-lg font-semibold">اختر دوريك المفضل</p>
@@ -122,8 +131,12 @@ export function OurLeagueTab({ navigate, leagueDetails, isLoading }: OurLeagueTa
             </div>
         );
     }
+    
+    if (loadingData || !leagueDetails) {
+         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>;
+    }
 
-    const showManualScorers = leagueDetails.id === IRAQI_LEAGUE_ID && manualTopScorers.length > 0;
+    const showManualScorers = leagueId === IRAQI_LEAGUE_ID && manualTopScorers.length > 0;
     const finalScorers = showManualScorers ? manualTopScorers : topScorers;
 
 
@@ -140,118 +153,116 @@ export function OurLeagueTab({ navigate, leagueDetails, isLoading }: OurLeagueTa
             </div>
         </div>
         
-        {loadingData ? (
-             <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>
-        ) : (
-             <Tabs defaultValue="matches" className="w-full">
-                <div className="sticky top-0 bg-background z-10 -mx-4 px-1">
-                    <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
-                        <TabsList className="grid w-full grid-cols-3 rounded-none h-11 p-0 flex-row-reverse bg-transparent">
-                            <TabsTrigger value="scorers">الهدافين</TabsTrigger>
-                            <TabsTrigger value="standings">الترتيب</TabsTrigger>
-                            <TabsTrigger value="matches">المباريات</TabsTrigger>
-                        </TabsList>
-                    </div>
+         <Tabs defaultValue="matches" className="w-full">
+            <div className="sticky top-0 bg-background z-10 -mx-4 px-1">
+                <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
+                    <TabsList className="grid w-full grid-cols-3 rounded-none h-11 p-0 flex-row-reverse bg-transparent">
+                        <TabsTrigger value="scorers">الهدافين</TabsTrigger>
+                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                        <TabsTrigger value="matches">المباريات</TabsTrigger>
+                    </TabsList>
                 </div>
-                <TabsContent value="matches" className="mt-0 -mx-4">
-                    <div ref={listRef} className="h-full overflow-y-auto p-4 space-y-3">
-                        {fixtures.length > 0 ? (
-                            sortedFixtures.map((fixture) => (
-                                <div key={fixture.fixture.id}>
-                                    <FixtureItem fixture={fixture} navigate={navigate} />
-                                </div>
-                            ))
-                        ) : (
-                            <p className="pt-8 text-center text-muted-foreground">لا توجد مباريات متاحة لهذا الموسم.</p>
-                        )}
-                    </div>
-                </TabsContent>
-                <TabsContent value="standings" className="p-0 mt-0 -mx-4">
-                    {standings.length > 0 ? (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="text-center">نقاط</TableHead>
-                                    <TableHead className="text-center">خ</TableHead>
-                                    <TableHead className="text-center">ت</TableHead>
-                                    <TableHead className="text-center">ف</TableHead>
-                                    <TableHead className="text-center">لعب</TableHead>
-                                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {standings.map((s) => (
-                                    <TableRow key={`${s.rank}-${s.team.id}`} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id})}>
-                                        <TableCell className="text-center font-bold">{s.points}</TableCell>
-                                        <TableCell className="text-center">{s.all.lose}</TableCell>
-                                        <TableCell className="text-center">{s.all.draw}</TableCell>
-                                        <TableCell className="text-center">{s.all.win}</TableCell>
-                                        <TableCell className="text-center">{s.all.played}</TableCell>
-                                        <TableCell className="font-medium">
-                                            <div className="flex items-center gap-2 justify-end">
-                                                <span className="truncate">{hardcodedTranslations.teams[s.team.id] || s.team.name}</span>
-                                                <Avatar className="h-6 w-6">
-                                                    <AvatarImage src={s.team.logo} alt={s.team.name} />
-                                                    <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
-                                                </Avatar>
-                                                <span>{s.rank}</span>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    ): <p className="pt-4 text-center text-muted-foreground">جدول الترتيب غير متاح حاليًا.</p>}
-                </TabsContent>
-                <TabsContent value="scorers" className="p-0 mt-0 -mx-4">
-                    {isAdmin && leagueDetails.id === IRAQI_LEAGUE_ID && (
-                        <div className="p-4">
-                            <Button className="w-full" onClick={() => navigate('ManageTopScorers')}>
-                                <Users className="ml-2 h-4 w-4" />
-                                إدارة الهدافين
-                            </Button>
-                        </div>
+            </div>
+            <TabsContent value="matches" className="mt-0 -mx-4">
+                <div ref={listRef} className="h-full overflow-y-auto p-4 space-y-3">
+                    {fixtures.length > 0 ? (
+                        sortedFixtures.map((fixture) => (
+                            <div key={fixture.fixture.id}>
+                                <FixtureItem fixture={fixture} navigate={navigate} />
+                            </div>
+                        ))
+                    ) : (
+                        <p className="pt-8 text-center text-muted-foreground">لا توجد مباريات متاحة لهذا الموسم.</p>
                     )}
-                    {finalScorers.length > 0 ? (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="text-center">الأهداف</TableHead>
-                                    <TableHead className="text-right">الفريق</TableHead>
-                                    <TableHead className="flex-1 text-right">اللاعب</TableHead>
-                                    <TableHead className="text-right w-8">#</TableHead>
+                </div>
+            </TabsContent>
+            <TabsContent value="standings" className="p-0 mt-0 -mx-4">
+                {standings.length > 0 ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-center">نقاط</TableHead>
+                                <TableHead className="text-center">خ</TableHead>
+                                <TableHead className="text-center">ت</TableHead>
+                                <TableHead className="text-center">ف</TableHead>
+                                <TableHead className="text-center">لعب</TableHead>
+                                <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {standings.map((s) => (
+                                <TableRow key={`${s.rank}-${s.team.id}`} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id})}>
+                                    <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                    <TableCell className="text-center">{s.all.lose}</TableCell>
+                                    <TableCell className="text-center">{s.all.draw}</TableCell>
+                                    <TableCell className="text-center">{s.all.win}</TableCell>
+                                    <TableCell className="text-center">{s.all.played}</TableCell>
+                                    <TableCell className="font-medium">
+                                        <div className="flex items-center gap-2 justify-end">
+                                            <span className="truncate">{hardcodedTranslations.teams[s.team.id] || s.team.name}</span>
+                                            <Avatar className="h-6 w-6">
+                                                <AvatarImage src={s.team.logo} alt={s.team.name} />
+                                                <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
+                                            </Avatar>
+                                            <span>{s.rank}</span>
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {finalScorers.map((scorer, index) => {
-                                    const playerData = showManualScorers ? { id: scorer.playerName, name: scorer.playerName, photo: scorer.playerPhoto } : scorer.player;
-                                    const teamName = showManualScorers ? scorer.teamName : scorer.statistics[0].team.name;
-                                    const goals = showManualScorers ? scorer.goals : scorer.statistics[0]?.goals.total || 0;
-                                    const rank = showManualScorers ? scorer.rank : index + 1;
-                                return (
-                                    <TableRow key={playerData.id}>
-                                        <TableCell className="text-center font-bold text-lg">{goals}</TableCell>
-                                        <TableCell>
-                                            <p className="text-xs text-muted-foreground text-right">{hardcodedTranslations.teams[scorer.statistics?.[0].team.id] || teamName}</p>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-3 justify-end">
-                                                <p className="font-semibold">{hardcodedTranslations.players[playerData.id] || playerData.name}</p>
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarImage src={playerData.photo} />
-                                                    <AvatarFallback>{playerData.name?.charAt(0)}</AvatarFallback>
-                                                </Avatar>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="font-bold">{rank}</TableCell>
-                                    </TableRow>
-                                )})}
-                            </TableBody>
-                        </Table>
-                    ) : <p className="pt-4 text-center text-muted-foreground">قائمة الهدافين غير متاحة حاليًا.</p>}
-                </TabsContent>
-             </Tabs>
-        )}
+                            ))}
+                        </TableBody>
+                    </Table>
+                ): <p className="pt-4 text-center text-muted-foreground">جدول الترتيب غير متاح حاليًا.</p>}
+            </TabsContent>
+            <TabsContent value="scorers" className="p-0 mt-0 -mx-4">
+                {isAdmin && leagueDetails.id === IRAQI_LEAGUE_ID && (
+                    <div className="p-4">
+                        <Button className="w-full" onClick={() => navigate('ManageTopScorers')}>
+                            <Users className="ml-2 h-4 w-4" />
+                            إدارة الهدافين
+                        </Button>
+                    </div>
+                )}
+                {finalScorers.length > 0 ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-center">الأهداف</TableHead>
+                                <TableHead className="text-right">الفريق</TableHead>
+                                <TableHead className="flex-1 text-right">اللاعب</TableHead>
+                                <TableHead className="text-right w-8">#</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {finalScorers.map((scorer, index) => {
+                                const playerData = showManualScorers ? { id: scorer.playerName, name: scorer.playerName, photo: scorer.playerPhoto } : scorer.player;
+                                const teamName = showManualScorers ? scorer.teamName : scorer.statistics[0].team.name;
+                                const goals = showManualScorers ? scorer.goals : scorer.statistics[0]?.goals.total || 0;
+                                const rank = showManualScorers ? scorer.rank : index + 1;
+                            return (
+                                <TableRow key={playerData.id}>
+                                    <TableCell className="text-center font-bold text-lg">{goals}</TableCell>
+                                    <TableCell>
+                                        <p className="text-xs text-muted-foreground text-right">{hardcodedTranslations.teams[scorer.statistics?.[0].team.id] || teamName}</p>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-3 justify-end">
+                                            <p className="font-semibold">{hardcodedTranslations.players[playerData.id] || playerData.name}</p>
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarImage src={playerData.photo} />
+                                                <AvatarFallback>{playerData.name?.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="font-bold">{rank}</TableCell>
+                                </TableRow>
+                            )})}
+                        </TableBody>
+                    </Table>
+                ) : <p className="pt-4 text-center text-muted-foreground">قائمة الهدافين غير متاحة حاليًا.</p>}
+            </TabsContent>
+         </Tabs>
       </div>
     );
 }
+
+    

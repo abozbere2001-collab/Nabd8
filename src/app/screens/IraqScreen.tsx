@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -7,7 +6,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
-import { collection, onSnapshot, doc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, query } from 'firebase/firestore';
 import type { PinnedMatch, Team, Favorites } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -57,73 +56,67 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user, db } = useAuth();
     const { isAdmin } = useAdmin();
     
-    const [ourFavorites, setOurFavorites] = useState<Partial<Favorites>>({});
+    const [favorites, setFavorites] = useState<Partial<Favorites>>({});
     const [isLoading, setIsLoading] = useState(true);
 
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
-    const [leagueDetails, setLeagueDetails] = useState<{ id: number; name: string; logo: string; } | null>(null);
-    const [loadingLeague, setLoadingLeague] = useState(false);
-
 
     useEffect(() => {
         setIsLoading(true);
-        let unsubscribe: (() => void) | null = null;
-      
+        let favoritesUnsubscribe: (() => void) | null = null;
+        let pinnedMatchesUnsubscribe: (() => void) | null = null;
+        let favoritesInitialized = false;
+        let pinnedInitialized = false;
+
+        const tryFinishLoading = () => {
+            if ((favoritesUnsubscribe ? favoritesInitialized : true) && (pinnedMatchesUnsubscribe ? pinnedInitialized : true)) {
+            setIsLoading(false);
+            }
+        };
+
         if (user && db) {
-            const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-            unsubscribe = onSnapshot(ourFavsRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    setOurFavorites(docSnap.data() as Favorites);
-                } else {
-                    setOurFavorites({});
-                }
-                setIsLoading(false);
+            const favsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+            favoritesUnsubscribe = onSnapshot(favsRef, (docSnap) => {
+            const data = docSnap.exists() ? (docSnap.data() as Favorites) : {};
+            setFavorites(data || {});
+            favoritesInitialized = true;
+            tryFinishLoading();
             }, (error) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: ourFavsRef.path, operation: 'get' }));
-                setIsLoading(false);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
+            setFavorites({});
+            favoritesInitialized = true;
+            tryFinishLoading();
             });
         } else {
-            setOurFavorites(getLocalFavorites());
-            setIsLoading(false);
+            const local = getLocalFavorites();
+            setFavorites(local);
+            favoritesInitialized = true;
+            tryFinishLoading();
         }
-      
+
+        if (db) {
+            const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
+            const q = query(pinnedMatchesRef);
+            pinnedMatchesUnsubscribe = onSnapshot(q, (snapshot) => {
+                const matches = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) } as PinnedMatch));
+                setPinnedMatches(matches);
+                pinnedInitialized = true;
+                tryFinishLoading();
+            }, (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
+                pinnedInitialized = true;
+                tryFinishLoading();
+            });
+        }
+
         return () => {
-            if (unsubscribe) unsubscribe();
+            if (favoritesUnsubscribe) favoritesUnsubscribe();
+            if (pinnedMatchesUnsubscribe) pinnedMatchesUnsubscribe();
         };
     }, [user, db]);
-
-    useEffect(() => {
-        const ourLeagueId = ourFavorites.ourLeagueId;
-        if (ourLeagueId && db) {
-            setLoadingLeague(true);
-             doc(db, 'managedCompetitions', String(ourLeagueId)).get()
-                .then(docSnap => {
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        setLeagueDetails({ id: ourLeagueId, name: data.name, logo: data.logo });
-                    }
-                })
-                .catch(console.error)
-                .finally(() => setLoadingLeague(false));
-        } else {
-            setLeagueDetails(null);
-        }
-    }, [ourFavorites.ourLeagueId, db]);
-
-
-    useEffect(() => {
-        if (!db) return;
-        const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
-        const q = query(pinnedMatchesRef);
-        const unsub = onSnapshot(q, (snapshot) => {
-            setPinnedMatches(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as PinnedMatch)));
-        }, (serverError) => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
-        });
-        return () => unsub();
-    }, [db]);
     
-    const ourBallTeams = useMemo(() => Object.values(ourFavorites.ourBallTeams || {}), [ourFavorites.ourBallTeams]);
+    const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}), [favorites.ourBallTeams]);
+    const ourLeagueId = useMemo(() => favorites.ourLeagueId, [favorites.ourLeagueId]);
 
 
     return (
@@ -179,8 +172,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         <TabsContent value="our-league" className="flex-1 overflow-auto">
                              <OurLeagueTab
                                 navigate={navigate}
-                                leagueDetails={leagueDetails}
-                                isLoading={loadingLeague}
+                                leagueId={ourLeagueId}
                             />
                         </TabsContent>
                         <TabsContent value="our-ball" className="pt-0 flex-1 overflow-auto">
@@ -192,3 +184,5 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         </div>
     );
 }
+
+    

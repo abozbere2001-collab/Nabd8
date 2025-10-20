@@ -59,7 +59,20 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
             };
         }
         
-        const score = `${goals?.home ?? '-'} - ${goals?.away ?? '-'}`;
+        // This check is crucial. If goals are null, it means the match hasn't started or data is missing.
+        if (goals.home === null || goals.away === null) {
+            if (status.short === "PST") return { main: "مؤجلة", sub: "", isLive: false };
+            if (status.short === "TBD") return { main: "لم تحدد", sub: "", isLive: false };
+            
+            // Default to showing the time if not started
+            return {
+                main: format(fixtureDate, "HH:mm"),
+                sub: getRelativeDay(fixtureDate),
+                isLive: false
+            };
+        }
+
+        const score = `${goals.home} - ${goals.away}`;
 
         if (live) {
             return {
@@ -77,15 +90,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
             };
         }
         
-        if (status.short === "PST") {
-            return { main: "مؤجلة", sub: "", isLive: false };
-        }
-        
-        if (status.short === "TBD") {
-            return { main: "لم تحدد", sub: "", isLive: false };
-        }
-
-        // Default: Not Started
+        // Fallback for any other state - should be rare but safe.
         return {
             main: format(fixtureDate, "HH:mm"),
             sub: getRelativeDay(fixtureDate),
@@ -119,3 +124,5 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
         </>
     );
 };
+
+    

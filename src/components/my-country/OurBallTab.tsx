@@ -85,11 +85,21 @@ interface OurBallTabProps {
 export function OurBallTab({ navigate, ourBallTeams }: OurBallTabProps) {
     const [activeTeamId, setActiveTeamId] = useState<number | null>(null);
 
+    useEffect(() => {
+        if (ourBallTeams && ourBallTeams.length > 0 && !activeTeamId) {
+            setActiveTeamId(ourBallTeams[0].teamId || ourBallTeams[0].id);
+        }
+    }, [ourBallTeams, activeTeamId]);
+
     const handleTeamClick = (teamId: number) => {
         setActiveTeamId(prevId => (prevId === teamId ? null : teamId));
     };
 
-    if (!ourBallTeams || ourBallTeams.length === 0) {
+    if (!ourBallTeams) {
+        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>;
+    }
+    
+    if (ourBallTeams.length === 0) {
         return (
             <div className="text-center text-muted-foreground py-10 px-4">
                 <p className="text-lg font-semibold">قسم "كرتنا" فارغ</p>
@@ -99,7 +109,6 @@ export function OurBallTab({ navigate, ourBallTeams }: OurBallTabProps) {
         );
     }
     
-    // This function handles getting a unique key, whether from firestore (id) or localstorage (teamId)
     const getKey = (team: any): number => team.id || team.teamId;
 
 
@@ -139,3 +148,5 @@ export function OurBallTab({ navigate, ourBallTeams }: OurBallTabProps) {
         </div>
     );
 }
+
+    
