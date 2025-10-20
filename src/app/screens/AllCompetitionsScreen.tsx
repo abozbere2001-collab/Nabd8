@@ -334,10 +334,14 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
             
             const starUnsub = onSnapshot(starredFavsRef, (doc) => {
-                setFavorites(prev => ({...prev, ...doc.data() as Favorites}));
+                setFavorites(prev => ({...prev, leagues: doc.data()?.leagues, teams: doc.data()?.teams}));
+            }, (err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'get'}));
             });
             const heartUnsub = onSnapshot(ourFavsRef, (doc) => {
-                 setFavorites(prev => ({...prev, ...doc.data() as Favorites}));
+                 setFavorites(prev => ({...prev, ourLeagueId: doc.data()?.ourLeagueId, ourBallTeams: doc.data()?.ourBallTeams}));
+            }, (err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'get'}));
             });
 
             unsub = () => {
@@ -361,8 +365,10 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
              const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
              const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
              let updateData;
+             let favDocRef;
 
              if (type === 'heart') {
+                favDocRef = ourFavsRef;
                 const isCurrentlyHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
                  if (isLeague) {
                      updateData = { ourLeagueId: isCurrentlyHearted ? deleteField() : itemId };
@@ -371,10 +377,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                      const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
                      updateData = { [fieldPath]: isCurrentlyHearted ? deleteField() : favData };
                  }
-                  setDoc(ourFavsRef, updateData, { merge: true }).catch(err => {
-                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'write', requestResourceData: updateData}))
-                 });
              } else { // star
+                favDocRef = starredFavsRef;
                 const isCurrentlyStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
                 const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
                 const fieldPath = `${itemType}.${itemId}`;
@@ -382,10 +386,12 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
                 updateData = { [fieldPath]: isCurrentlyStarred ? deleteField() : favData };
-                setDoc(starredFavsRef, updateData, { merge: true }).catch(err => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'write', requestResourceData: updateData}))
-                });
              }
+
+             setDoc(favDocRef, updateData, { merge: true }).catch(err => {
+                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+             });
+
         } else { // Guest user
             const currentFavorites = getLocalFavorites();
             const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
