@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
+import { Shirt, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, Pencil } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
@@ -21,18 +21,12 @@ import { CURRENT_SEASON } from '@/lib/constants';
 import { OddsTab } from '@/components/OddsTab';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
-import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection, onSnapshot, getDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
 
 type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'status';
 
@@ -522,157 +516,82 @@ const mergePlayerData = (baseLineups: LineupData[], detailedPlayers: { player: P
 export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixture: initialFixture }: ScreenProps & { fixtureId: number, fixture?: Fixture }) {
     const { isAdmin, db } = useAdmin();
     const { toast } = useToast();
+    
+    // State for raw data from API
     const [fixture, setFixture] = useState<Fixture | null>(initialFixture || null);
     const [lineups, setLineups] = useState<LineupData[] | null>(null);
     const [events, setEvents] = useState<MatchEvent[] | null>(null);
     const [statistics, setStatistics] = useState<MatchStatistics[] | null>(null);
     const [standings, setStandings] = useState<Standing[] | null>(null);
-    const [loading, setLoading] = useState(!initialFixture);
-    const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
-    const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> }>({});
+    const [loading, setLoading] = useState(true);
+    
+    // State for custom data
+    const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> } | null>(null);
     const [customStatus, setCustomStatus] = useState<string | null>(null);
+    const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
 
-    const getDisplayName = useCallback((type: 'team' | 'player' | 'league' | 'coach', id: number, defaultName: string) => {
-      const firestoreMap = customNames[type];
-      const customName = firestoreMap?.get(id);
-      if (customName) return customName;
-
-      if(type === 'team' || type === 'league' || type === 'player') {
-          const key = `${type}s` as 'teams' | 'leagues' | 'players';
-          const hardcodedMap = hardcodedTranslations[key];
-          const hardcodedName = hardcodedMap[id as any];
-          if(hardcodedName) return hardcodedName;
-      }
-      
-      return defaultName;
-    }, [customNames]);
-
-
+    // Fetch all data for the match
     useEffect(() => {
         let isMounted = true;
-        
-        const fetchCustomNames = async () => {
-            if (db) {
-                try {
-                    const [teamsSnapshot, leaguesSnapshot, playersSnapshot, coachSnapshot] = await Promise.all([
-                        getDocs(collection(db, 'teamCustomizations')),
-                        getDocs(collection(db, 'leagueCustomizations')),
-                        getDocs(collection(db, 'playerCustomizations')),
-                        getDocs(collection(db, 'coachCustomizations')),
-                    ]);
-                    if (!isMounted) return;
-
-                    const names: { [key: string]: Map<number, string> } = { team: new Map(), league: new Map(), player: new Map(), coach: new Map() };
-                    teamsSnapshot.forEach(doc => names.team.set(Number(doc.id), doc.data().customName));
-                    leaguesSnapshot.forEach(doc => names.league.set(Number(doc.id), doc.data().customName));
-                    playersSnapshot.forEach(doc => names.player.set(Number(doc.id), doc.data().customName));
-                    coachSnapshot.forEach(doc => names.coach.set(Number(doc.id), doc.data().customName));
-                    setCustomNames(names);
-                } catch {
-                     // Non-critical, proceed without custom names for guests
-                     setCustomNames({ team: new Map(), league: new Map(), player: new Map(), coach: new Map() });
-                }
-            }
-        };
-
-        const applyAllCustomNames = (data: any) => {
-            if (!data) return;
-            const { fixture: f, lineups: l, events: e, statistics: s, standings: st, players: p } = data;
-
-            const applyToPlayer = (player: PlayerType) => {
-                if (!player || !player.id) return player;
-                return {...player, name: getDisplayName('player', player.id, player.name) };
-            };
-
-            if (f) {
-                f.league.name = getDisplayName('league', f.league.id, f.league.name);
-                f.teams.home.name = getDisplayName('team', f.teams.home.id, f.teams.home.name);
-                f.teams.away.name = getDisplayName('team', f.teams.away.id, f.teams.away.name);
-            }
-            if (l) {
-                l.forEach((lineup: LineupData) => {
-                    lineup.team.name = getDisplayName('team', lineup.team.id, lineup.team.name);
-                    if (lineup.coach?.id) lineup.coach.name = getDisplayName('coach', lineup.coach.id, lineup.coach.name);
-                    lineup.startXI = lineup.startXI.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
-                    lineup.substitutes = lineup.substitutes.map((p: PlayerWithStats) => ({ ...p, player: applyToPlayer(p.player) }));
-                });
-            }
-            if (e) {
-                e.forEach((event: MatchEvent) => {
-                    if (event.player.id) event.player.name = getDisplayName('player', event.player.id, event.player.name);
-                    if (event.assist.id) event.assist.name = getDisplayName('player', event.assist.id, event.assist.name!);
-                });
-            }
-            if (s) {
-                 s.forEach((stat: MatchStatistics) => {
-                    stat.team.name = getDisplayName('team', stat.team.id, stat.team.name);
-                 });
-            }
-            if (st) {
-                 st.forEach((standing: Standing) => {
-                    standing.team.name = getDisplayName('team', standing.team.id, standing.team.name);
-                 });
-            }
-             if (l && p) {
-                 const detailedPlayers = p.flatMap((team: any) => team.players);
-                 return mergePlayerData(l, detailedPlayers);
-             }
-            return l;
-        };
-
+        setLoading(true);
 
         const fetchAllData = async () => {
-            if (!fixtureId) return;
-            setLoading(true);
-            await fetchCustomNames();
+            if (!fixtureId) {
+                if (isMounted) setLoading(false);
+                return;
+            }
 
             try {
-                const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
-                if (!isMounted || !fixtureRes.ok) return;
-                const fixtureData = await fixtureRes.json();
-                const currentFixture = fixtureData.response?.[0];
-
-                if (!currentFixture) {
-                    toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على المباراة.' });
-                    if(isMounted) setLoading(false);
-                    return;
-                }
-                
-                const [lineupsRes, eventsRes, statisticsRes, playersDataRes, standingsRes] = await Promise.allSettled([
+                const [
+                    fixtureRes,
+                    lineupsRes,
+                    eventsRes,
+                    statisticsRes,
+                    playersRes,
+                ] = await Promise.all([
+                    fetch(`/api/football/fixtures?id=${fixtureId}`),
                     fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`),
                     fetch(`/api/football/fixtures/players?fixture=${fixtureId}`),
-                    fetch(`/api/football/standings?league=${currentFixture.league?.id}&season=${currentFixture.league?.season || CURRENT_SEASON}`)
                 ]);
 
                 if (!isMounted) return;
 
-                const lineupsData = lineupsRes.status === 'fulfilled' && lineupsRes.value.ok ? await lineupsRes.value.json() : {response: []};
-                const eventsData = eventsRes.status === 'fulfilled' && eventsRes.value.ok ? await eventsRes.value.json() : {response: []};
-                const statisticsData = statisticsRes.status === 'fulfilled' && statisticsRes.value.ok ? await statisticsRes.value.json() : {response: []};
-                const playersData = playersDataRes.status === 'fulfilled' && playersDataRes.value.ok ? await playersDataRes.value.json() : {response: []};
-                const standingsData = standingsRes.status === 'fulfilled' && standingsRes.value.ok ? await standingsRes.value.json() : {response: {0: {league: {standings: [[]]}}}};
+                const fixtureData = fixtureRes.ok ? await fixtureRes.json() : { response: [] };
+                const currentFixture = fixtureData.response?.[0];
+                if (!currentFixture) {
+                    toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على المباراة.' });
+                    setLoading(false);
+                    return;
+                }
+                setFixture(currentFixture);
 
-                const allData = {
-                    fixture: currentFixture,
-                    lineups: lineupsData.response,
-                    events: eventsData.response,
-                    statistics: statisticsData.response,
-                    standings: standingsData.response[0]?.league?.standings[0],
-                    players: playersData.response
-                };
+                const lineupsData = lineupsRes.ok ? await lineupsRes.json() : { response: [] };
+                const eventsData = eventsRes.ok ? await eventsRes.json() : { response: [] };
+                const statisticsData = statisticsRes.ok ? await statisticsRes.json() : { response: [] };
+                const playersData = playersRes.ok ? await playersRes.json() : { response: [] };
                 
-                const processedLineups = applyAllCustomNames(allData);
+                const detailedPlayers = playersData.response.flatMap((team: any) => team.players);
+                const mergedLineups = mergePlayerData(lineupsData.response, detailedPlayers);
                 
-                setFixture(allData.fixture);
-                setLineups(processedLineups);
-                setEvents(allData.events);
-                setStatistics(allData.statistics);
-                setStandings(allData.standings);
+                setLineups(mergedLineups);
+                setEvents(eventsData.response);
+                setStatistics(statisticsData.response);
+                
+                // Fetch standings separately
+                const leagueId = currentFixture.league?.id;
+                const season = currentFixture.league?.season || CURRENT_SEASON;
+                if(leagueId) {
+                    const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${season}`);
+                    if(standingsRes.ok){
+                        const standingsData = await standingsRes.json();
+                        setStandings(standingsData.response[0]?.league?.standings[0] || []);
+                    }
+                }
 
             } catch (error) {
-                 if (isMounted) {
+                if (isMounted) {
                     console.error("Failed to fetch match details:", error);
                     toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحميل بيانات المباراة.' });
                 }
@@ -684,23 +603,104 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         fetchAllData();
 
         return () => { isMounted = false; };
-    }, [fixtureId, db, toast, getDisplayName]); // getDisplayName is stable due to useCallback
+    }, [fixtureId, toast]);
+
+    // Fetch custom names
+    useEffect(() => {
+        if (!db) {
+            setCustomNames({});
+            return;
+        }
+        const fetchCustomNames = async () => {
+            try {
+                const [teamsSnapshot, leaguesSnapshot, playersSnapshot, coachSnapshot] = await Promise.all([
+                    getDocs(collection(db, 'teamCustomizations')),
+                    getDocs(collection(db, 'leagueCustomizations')),
+                    getDocs(collection(db, 'playerCustomizations')),
+                    getDocs(collection(db, 'coachCustomizations')),
+                ]);
+
+                const names: { [key: string]: Map<number, string> } = { team: new Map(), league: new Map(), player: new Map(), coach: new Map() };
+                teamsSnapshot.forEach(doc => names.team.set(Number(doc.id), doc.data().customName));
+                leaguesSnapshot.forEach(doc => names.league.set(Number(doc.id), doc.data().customName));
+                playersSnapshot.forEach(doc => names.player.set(Number(doc.id), doc.data().customName));
+                coachSnapshot.forEach(doc => names.coach.set(Number(doc.id), doc.data().customName));
+                setCustomNames(names);
+            } catch {
+                setCustomNames({});
+            }
+        };
+        fetchCustomNames();
+    }, [db]);
     
+    // Listen for custom match status
     useEffect(() => {
         if (!db || !fixtureId) return;
-
         const customStatusRef = doc(db, 'matchCustomizations', String(fixtureId));
         const unsub = onSnapshot(customStatusRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setCustomStatus(docSnap.data().customStatus);
-            } else {
-                setCustomStatus(null);
-            }
+            setCustomStatus(docSnap.exists() ? docSnap.data().customStatus : null);
         });
         return () => unsub();
-
     }, [db, fixtureId]);
-    
+
+    // Memoized function to apply custom names
+    const getDisplayName = useCallback((type: 'team' | 'player' | 'league' | 'coach', id: number | undefined, defaultName: string) => {
+      if (!id || !customNames) return defaultName;
+      const firestoreMap = customNames[type];
+      const customName = firestoreMap?.get(id);
+      if (customName) return customName;
+
+      if(type === 'team' || type === 'league' || type === 'player') {
+          const key = `${type}s` as 'teams' | 'leagues' | 'players';
+          const hardcodedName = hardcodedTranslations[key]?.[id];
+          if(hardcodedName) return hardcodedName;
+      }
+      
+      return defaultName;
+    }, [customNames]);
+
+    // Memoized processed data
+    const processedFixture = useMemo(() => {
+        if (!fixture) return null;
+        return {
+            ...fixture,
+            league: { ...fixture.league, name: getDisplayName('league', fixture.league.id, fixture.league.name) },
+            teams: {
+                home: { ...fixture.teams.home, name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name) },
+                away: { ...fixture.teams.away, name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name) },
+            },
+        };
+    }, [fixture, getDisplayName]);
+
+    const processedLineups = useMemo(() => {
+        if (!lineups) return null;
+        return lineups.map(lineup => ({
+            ...lineup,
+            team: { ...lineup.team, name: getDisplayName('team', lineup.team.id, lineup.team.name) },
+            coach: { ...lineup.coach, name: getDisplayName('coach', lineup.coach.id, lineup.coach.name) },
+            startXI: lineup.startXI.map(p => ({ ...p, player: { ...p.player, name: getDisplayName('player', p.player.id, p.player.name) } })),
+            substitutes: lineup.substitutes.map(p => ({ ...p, player: { ...p.player, name: getDisplayName('player', p.player.id, p.player.name) } })),
+        }));
+    }, [lineups, getDisplayName]);
+
+    const processedEvents = useMemo(() => {
+        if (!events) return null;
+        return events.map(event => ({
+            ...event,
+            player: { ...event.player, name: getDisplayName('player', event.player.id, event.player.name) },
+            assist: { ...event.assist, name: getDisplayName('player', event.assist.id, event.assist.name || '') },
+        }));
+    }, [events, getDisplayName]);
+
+    const processedStandings = useMemo(() => {
+        if (!standings) return null;
+        return standings.map(s => ({
+            ...s,
+            team: { ...s.team, name: getDisplayName('team', s.team.id, s.team.name) },
+        }));
+    }, [standings, getDisplayName]);
+
+
     const handleOpenRename = (type: RenameType, id: number, name: string, originalName?: string) => {
         setRenameItem({ type, id, name, originalName: originalName || name });
     };
@@ -715,58 +715,44 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         const data = { customName: newName };
         if(newName && newName !== originalName) {
             setDoc(docRef, data)
-                .then(() => {
-                    toast({ title: "نجاح", description: `تم تحديث الاسم.` });
-                })
-                .catch(serverError => {
-                    const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
-                    errorEmitter.emit('permission-error', permissionError);
-                });
+                .then(() => toast({ title: "نجاح", description: `تم تحديث الاسم.` }))
+                .catch(serverError => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data })));
         } else {
-             deleteDoc(docRef).then(() => {
-                 toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` });
-            }).catch(serverError => {
-                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
-                 errorEmitter.emit('permission-error', permissionError);
-            });
+             deleteDoc(docRef)
+                .then(() => toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` }))
+                .catch(serverError => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' })));
         }
-
+        setCustomNames(prev => {
+            const newMap = new Map(prev?.[type]);
+            if (newName && newName !== originalName) {
+                newMap.set(Number(id), newName);
+            } else {
+                newMap.delete(Number(id));
+            }
+            return {...prev, [type]: newMap};
+        })
         setRenameItem(null);
     };
 
      const handleSaveStatus = (newName: string) => {
         if(!db) return;
         const docRef = doc(db, 'matchCustomizations', String(fixtureId));
-        const data = { customStatus: newName };
         if(newName && newName.trim().length > 0) {
-             setDoc(docRef, data, { merge: true }).catch(err => {
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data });
-                errorEmitter.emit('permission-error', permissionError);
-             });
+             setDoc(docRef, { customStatus: newName }, { merge: true })
+             .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: { customStatus: newName } })));
         } else {
-             deleteDoc(docRef).catch(err => {
-                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'delete' });
-                errorEmitter.emit('permission-error', permissionError);
-             });
+             deleteDoc(docRef)
+             .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' })));
         }
         setRenameItem(null);
     };
 
 
-    if (loading) {
+    if (loading || !processedFixture) {
         return (
             <div className="flex h-full flex-col bg-background">
                 <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} />
                 <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
-            </div>
-        );
-    }
-    
-    if (!fixture) {
-         return (
-            <div className="flex h-full flex-col bg-background">
-                <ScreenHeader title={'خطأ'} onBack={goBack} canGoBack={canGoBack} />
-                <p className="text-center p-8">لم يتم العثور على تفاصيل المباراة.</p>
             </div>
         );
     }
@@ -788,7 +774,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     return (
         <div className="flex h-full flex-col bg-background">
              <ScreenHeader 
-                title={fixture.league.name} 
+                title={processedFixture.league.name} 
                 onBack={goBack} 
                 canGoBack={canGoBack} 
                 actions={secondaryActions}
@@ -805,7 +791,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
 
             <div className="flex-1 overflow-y-auto p-1">
                 <MatchHeaderCard 
-                    fixture={fixture} 
+                    fixture={processedFixture} 
                     navigate={navigate}
                     customStatus={customStatus}
                 />
@@ -816,23 +802,22 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                         <TabsTrigger value="standings">الترتيب</TabsTrigger>
                         <TabsTrigger value="events">مُجريات</TabsTrigger>
                         <TabsTrigger value="lineups">التشكيل</TabsTrigger>
-                        
                     </TabsList>
-                    <TabsContent value="details" className="mt-4"><DetailsTab fixture={fixture} statistics={statistics} /></TabsContent>
-                    <TabsContent value="odds" className="mt-4"><OddsTab fixtureId={fixture.fixture.id} /></TabsContent>
+                    <TabsContent value="details" className="mt-4"><DetailsTab fixture={processedFixture} statistics={statistics} /></TabsContent>
+                    <TabsContent value="odds" className="mt-4"><OddsTab fixtureId={processedFixture.fixture.id} /></TabsContent>
                     <TabsContent value="standings" className="mt-4">
-                        <StandingsTab standings={standings} fixture={fixture} navigate={navigate} />
+                        <StandingsTab standings={processedStandings} fixture={processedFixture} navigate={navigate} />
                     </TabsContent>
-                    <TabsContent value="events" className="mt-4"><TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} /></TabsContent>
+                    <TabsContent value="events" className="mt-4"><TimelineTab events={processedEvents} homeTeam={processedFixture.teams.home} awayTeam={processedFixture.teams.away} /></TabsContent>
                     <TabsContent value="lineups" className="mt-4">
                         <LineupsTab 
-                            lineups={lineups} 
-                            events={events} 
+                            lineups={processedLineups} 
+                            events={processedEvents} 
                             navigate={navigate} 
                             isAdmin={isAdmin} 
                             onRename={(type, id, name, originalName) => handleOpenRename(type, id, name, originalName)}
-                            homeTeamId={fixture.teams.home.id}
-                            awayTeamId={fixture.teams.away.id}
+                            homeTeamId={processedFixture.teams.home.id}
+                            awayTeamId={processedFixture.teams.away.id}
                         />
                     </TabsContent>
                 </Tabs>
@@ -840,6 +825,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
-
 
     
