@@ -49,15 +49,15 @@ const CrownedTeamScroller = ({
         {crownedTeams.map(team => (
           <div
             key={team.teamId}
-            className="relative flex flex-col items-center gap-2 w-24 text-center cursor-pointer group"
+            className="relative flex flex-col items-center gap-1 w-24 text-center cursor-pointer group"
             onClick={() => onSelectTeam(team.teamId)}
           >
-            <Avatar className={`h-16 w-16 border-2 ${selectedTeamId === team.teamId ? 'border-primary' : 'border-yellow-400'}`}>
+            <Avatar className={`h-14 w-14 border-2 ${selectedTeamId === team.teamId ? 'border-primary' : 'border-yellow-400'}`}>
               <AvatarImage src={team.logo} />
               <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <span className="text-xs font-medium truncate w-full">{team.name}</span>
-            <p className="text-[10px] text-muted-foreground truncate w-full h-8">{team.note}</p>
+            <p className="text-[10px] text-muted-foreground truncate w-full">{team.note}</p>
             <button 
               onClick={(e) => { e.stopPropagation(); onRemove(team.teamId); }}
               className="absolute top-0 left-0 h-6 w-6 bg-background/80 rounded-full flex items-center justify-center border border-destructive"
@@ -285,6 +285,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState('kurratna');
 
   useEffect(() => {
     if (!user || !db) return;
@@ -370,43 +371,44 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           </div>
         }
       />
-      <Tabs defaultValue="kurratna" className="w-full flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="doreena">دورينا</TabsTrigger>
-            <TabsTrigger value="kurratna">كرتنا</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
-           <div className="py-4 border-b">
-                <CrownedTeamScroller 
-                    crownedTeams={crownedTeams} 
-                    onSelectTeam={handleSelectTeam}
-                    onRemove={(id) => handleRemoveCrowned('team', id)} 
-                    selectedTeamId={selectedTeamId}
-                />
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-                {selectedTeamId ? (
-                    <TeamFixturesDisplay teamId={selectedTeamId} navigate={navigate} />
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value)} className="flex flex-1 flex-col min-h-0">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="doreena">دورينا</TabsTrigger>
+                <TabsTrigger value="kurratna">كرتنا</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
+               <div className="py-4 border-b">
+                    <CrownedTeamScroller 
+                        crownedTeams={crownedTeams} 
+                        onSelectTeam={handleSelectTeam}
+                        onRemove={(id) => handleRemoveCrowned('team', id)} 
+                        selectedTeamId={selectedTeamId}
+                    />
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                    {selectedTeamId ? (
+                        <TeamFixturesDisplay teamId={selectedTeamId} navigate={navigate} />
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-muted-foreground text-center p-4">
+                            <p>اختر فريقًا من الأعلى لعرض مبارياته.</p>
+                        </div>
+                    )}
+                </div>
+            </TabsContent>
+
+            <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
+                {crownedLeague ? (
+                    <CrownedLeagueCard key={crownedLeague.leagueId} league={crownedLeague} navigate={navigate} />
                 ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground text-center p-4">
-                        <p>اختر فريقًا من الأعلى لعرض مبارياته.</p>
+                    <div className="text-center text-muted-foreground pt-10">
+                        <p className="font-bold text-lg">لم تقم بتتويج أي بطولة بعد</p>
+                        <p>اذهب إلى البطولات واضغط على أيقونة التاج 👑</p>
                     </div>
                 )}
-            </div>
-        </TabsContent>
-
-        <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
-            {crownedLeague ? (
-                <CrownedLeagueCard key={crownedLeague.leagueId} league={crownedLeague} navigate={navigate} />
-            ) : (
-                <div className="text-center text-muted-foreground pt-10">
-                    <p className="font-bold text-lg">لم تقم بتتويج أي بطولة بعد</p>
-                    <p>اذهب إلى البطولات واضغط على أيقونة التاج 👑</p>
-                </div>
-            )}
-        </TabsContent>
-      </Tabs>
+            </TabsContent>
+        </Tabs>
     </div>
   );
 }
+
