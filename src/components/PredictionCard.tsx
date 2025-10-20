@@ -130,5 +130,3 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
 };
 
 export default PredictionCard;
-
-    
