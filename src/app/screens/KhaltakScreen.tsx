@@ -182,14 +182,88 @@ const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
     return 0;
 };
 
+const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard }: { leaderboard: UserScore[], loadingLeaderboard: boolean }) => {
+    if (loadingLeaderboard) {
+        return (
+            <div className="space-y-2 p-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 p-2">
+                        <Skeleton className="h-4 w-4" />
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <div className="flex-1"><Skeleton className="h-4 w-3/4" /></div>
+                        <Skeleton className="h-4 w-8" />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    if (leaderboard.length === 0) {
+        return <p className="text-center text-muted-foreground p-8">لا يوجد مشاركون في لوحة الصدارة بعد.</p>;
+    }
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>الترتيب</TableHead>
+                    <TableHead className="text-right">المستخدم</TableHead>
+                    <TableHead className="text-center">النقاط</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {leaderboard.map(score => (
+                    <TableRow key={score.userId}>
+                        <TableCell>{score.rank}</TableCell>
+                        <TableCell className="text-right">
+                            <div className="flex items-center gap-2 justify-end">
+                                {score.userName}
+                                <Avatar className="h-6 w-6"><AvatarImage src={score.userPhoto}/></Avatar>
+                            </div>
+                        </TableCell>
+                        <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+});
+LeaderboardDisplay.displayName = 'LeaderboardDisplay';
+
+
 const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTab: string, league: CrownedLeague, navigate: ScreenProps['navigate'], user: any, db: any }) => {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
     const [calculatingPoints, setCalculatingPoints] = useState(false);
+    const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
     
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
     const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+    
+    const fetchLeaderboard = useCallback(async () => {
+        if (!db || !league) return;
+        setLoadingLeaderboard(true);
+        const leaderboardRef = collection(db, 'leagueLeaderboards', String(league.leagueId), 'users');
+        const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), limit(100));
+
+        try {
+            const snapshot = await getDocs(q);
+            let rank = 1;
+            const newScores = snapshot.docs.map(doc => ({ ...(doc.data() as UserScore), rank: rank++ }));
+            setLeaderboard(newScores);
+        } catch (error) {
+            console.error("Error fetching league leaderboard:", error);
+        } finally {
+            setLoadingLeaderboard(false);
+        }
+    }, [db, league]);
+    
+    useEffect(() => {
+        if (activeTab === 'predictions') {
+            fetchLeaderboard();
+        }
+    }, [activeTab, fetchLeaderboard]);
 
     useEffect(() => {
         if (!activeTab || !league?.leagueId) return;
@@ -246,7 +320,6 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
 
     }, [activeTab, league, toast]);
     
-    const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
 
     useEffect(() => {
         if (activeTab !== 'predictions' || !data || !user || !db) return;
@@ -280,32 +353,29 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
             const docSnap = await getDoc(predictionRef);
             
             if (docSnap.exists()) {
-                const updateData = {
+                await updateDoc(predictionRef, {
                     homeGoals: homeGoals,
                     awayGoals: awayGoals,
                     timestamp: new Date().toISOString()
-                };
-                await updateDoc(predictionRef, updateData);
+                });
             } else {
-                const newData: Prediction = {
+                await setDoc(predictionRef, {
                     userId: user.uid,
                     fixtureId,
                     homeGoals,
                     awayGoals,
                     points: 0,
                     timestamp: new Date().toISOString()
-                };
-                await setDoc(predictionRef, newData);
+                } as Prediction);
             }
         } catch (serverError) {
-             const docSnap = await getDoc(predictionRef).catch(() => null);
-             const isUpdating = docSnap?.exists() ?? false;
+             const isUpdating = (await getDoc(predictionRef).catch(() => null))?.exists() ?? false;
              const errorData = { userId: user.uid, fixtureId, homeGoals, awayGoals };
     
              const permissionError = new FirestorePermissionError({
-              path: predictionRef.path,
-              operation: isUpdating ? 'update' : 'create',
-              requestResourceData: errorData
+                path: predictionRef.path,
+                operation: isUpdating ? 'update' : 'create',
+                requestResourceData: errorData
             });
             errorEmitter.emit('permission-error', permissionError);
         }
@@ -375,85 +445,15 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
             await pointsBatch.commit();
             
             toast({ title: 'اكتمل الاحتساب', description: 'تم تحديث جميع النقاط في لوحة صدارة الدوري.' });
+            fetchLeaderboard(); // Refetch after calculation
         } catch (error: any) {
             console.error("Error calculating league points:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل احتساب النقاط.' });
         } finally {
             setCalculatingPoints(false);
         }
-    }, [db, league.leagueId, toast]);
+    }, [db, league.leagueId, toast, fetchLeaderboard]);
 
-    const fetchLeaderboard = useCallback(async () => {
-        if (!db) return;
-        setLoadingLeaderboard(true);
-        const leaderboardRef = collection(db, 'leagueLeaderboards', String(league.leagueId), 'users');
-        const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), limit(100));
-
-        try {
-            const snapshot = await getDocs(q);
-            let rank = 1;
-            const newScores = snapshot.docs.map(doc => ({ ...(doc.data() as UserScore), rank: rank++ }));
-            setLeaderboard(newScores);
-        } catch (error) {
-            console.error("Error fetching league leaderboard:", error);
-        } finally {
-            setLoadingLeaderboard(false);
-        }
-    }, [db, league.leagueId]);
-
-
-    const LeaderboardDisplay = () => {
-         useEffect(() => {
-            if (activeTab === 'predictions') {
-                fetchLeaderboard();
-            }
-        }, [activeTab, fetchLeaderboard]);
-
-        if (loadingLeaderboard) {
-            return (
-                <div className="space-y-2 p-4">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="flex items-center gap-4 p-2">
-                            <Skeleton className="h-4 w-4" />
-                            <Skeleton className="h-8 w-8 rounded-full" />
-                            <div className="flex-1"><Skeleton className="h-4 w-3/4" /></div>
-                            <Skeleton className="h-4 w-8" />
-                        </div>
-                    ))}
-                </div>
-            )
-        }
-
-        if (leaderboard.length === 0) {
-            return <p className="text-center text-muted-foreground p-8">لا يوجد مشاركون في لوحة الصدارة بعد.</p>
-        }
-
-        return (
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>الترتيب</TableHead>
-                        <TableHead className="text-right">المستخدم</TableHead>
-                        <TableHead className="text-center">النقاط</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {leaderboard.map(score => (
-                        <TableRow key={score.userId}>
-                            <TableCell>{score.rank}</TableCell>
-                            <TableCell className="text-right">
-                                <div className="flex items-center gap-2 justify-end">
-                                    {score.userName}
-                                    <Avatar className="h-6 w-6"><AvatarImage src={score.userPhoto}/></Avatar>
-                                </div>
-                            </TableCell>
-                            <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        )
-    }
 
     if (loading) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
@@ -565,7 +565,7 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
                             </Button>
                        </CardHeader>
                        <CardContent className="p-0">
-                            <LeaderboardDisplay />
+                            <LeaderboardDisplay leaderboard={leaderboard} loadingLeaderboard={loadingLeaderboard} />
                        </CardContent>
                     </Card>
                 </TabsContent>
@@ -739,7 +739,3 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
-
-    
