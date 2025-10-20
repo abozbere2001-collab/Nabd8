@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import type { ScreenProps } from "@/app/page";
 import { useFirestore, useAdmin, useAuth } from "@/firebase/provider";
 import { collection, onSnapshot, doc, query, getDoc } from "firebase/firestore";
@@ -77,8 +78,8 @@ const FavoriteTeamsScroller = ({ teams, navigate }: { teams: (Team & {note?: str
         return (
              <div className="px-4 pb-4">
                  <div className="flex flex-col items-center justify-center text-center text-muted-foreground border-2 border-dashed rounded-lg p-6">
-                    <p className="font-bold">قسم "بلدي" فارغ</p>
-                    <p className="text-sm">أضف فرقك ومنتخباتك المفضلة هنا بالضغط على زر القلب ❤️.</p>
+                    <p className="font-bold">قسم "كرتنا" فارغ</p>
+                    <p className="text-sm">أضف فرقك المفضلة بالضغط على زر القلب ❤️ بجانب أي فريق.</p>
                     <Button className="mt-4" size="sm" onClick={() => navigate('AllCompetitions')}>استكشاف الفرق</Button>
                 </div>
             </div>
@@ -132,25 +133,25 @@ const OurLeagueDetails = ({ leagueId, navigate }: { leagueId: number | undefined
         setLoadingData(true);
 
         const fetchAllLeagueData = async () => {
-            if (!db) {
+             if (!db) {
                 setLoadingData(false);
                 return;
             }
             try {
-                // Get managed competition details first
                 const managedCompDoc = await getDoc(doc(db, 'managedCompetitions', String(leagueId)));
                 if (!isMounted) return;
 
                 if (managedCompDoc.exists()) {
                     const data = managedCompDoc.data();
-                    setLeagueDetails({ id: leagueId, name: data.name, logo: data.logo });
+                    const name = hardcodedTranslations.leagues[leagueId] || data.name;
+                    setLeagueDetails({ id: leagueId, name: name, logo: data.logo });
                 } else {
-                    // Fallback to API if not in managed list
                     const leagueRes = await fetch(`/api/football/leagues?id=${leagueId}`);
                     const leagueApiData = await leagueRes.json();
                      if (isMounted && leagueApiData.response?.[0]) {
                         const { league } = leagueApiData.response[0];
-                        setLeagueDetails({ id: league.id, name: league.name, logo: league.logo });
+                         const name = hardcodedTranslations.leagues[leagueId] || league.name;
+                        setLeagueDetails({ id: league.id, name: name, logo: league.logo });
                     } else {
                         setLeagueDetails(null);
                         setLoadingData(false);
@@ -158,7 +159,6 @@ const OurLeagueDetails = ({ leagueId, navigate }: { leagueId: number | undefined
                     }
                 }
                 
-                // Fetch fixtures, standings, scorers
                 const [fixturesRes, standingsRes, scorersRes] = await Promise.all([
                     fetch(`/api/football/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`),
                     fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`),
@@ -289,18 +289,16 @@ const OurLeagueDetails = ({ leagueId, navigate }: { leagueId: number | undefined
 // --- Main Screen ---
 export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { user, db } = useAuth();
-  const { isAdmin } = useAdmin();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
 
   useEffect(() => {
     setIsLoading(true);
-    const unsubscribes: (() => void)[] = [];
+    let unsubscribes: (() => void)[] = [];
 
     const setupListeners = async () => {
         if (db) {
-            // Pinned Matches Listener
             const pinnedMatchesRef = collection(db, "pinnedIraqiMatches");
             const q = query(pinnedMatchesRef);
             const unsubPinned = onSnapshot(q, (snapshot) => {
@@ -310,26 +308,26 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 errorEmitter.emit("permission-error", new FirestorePermissionError({ path: "pinnedIraqiMatches", operation: "list" }));
             });
             unsubscribes.push(unsubPinned);
+        }
 
-            // Favorites Listener
-            if (user) {
-                const favsRef = doc(db, "users", user.uid, "favorites", "data");
-                const unsubFavs = onSnapshot(favsRef, (docSnap) => {
-                    setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
-                    setIsLoading(false);
-                }, (error) => {
+        if (user && db) {
+            const favsRef = doc(db, "users", user.uid, "favorites", "data");
+            const unsubFavs = onSnapshot(favsRef, (docSnap) => {
+                setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
+                setIsLoading(false);
+            }, (error) => {
+                 if (error.code === 'permission-denied') {
+                    setFavorites(getLocalFavorites());
+                 } else {
                     errorEmitter.emit("permission-error", new FirestorePermissionError({ path: favsRef.path, operation: "get" }));
                     setFavorites({});
-                    setIsLoading(false);
-                });
-                unsubscribes.push(unsubFavs);
-            } else {
-                 setFavorites(getLocalFavorites());
-                 setIsLoading(false);
-            }
+                 }
+                setIsLoading(false);
+            });
+            unsubscribes.push(unsubFavs);
         } else {
-            setFavorites(getLocalFavorites());
-            setIsLoading(false);
+             setFavorites(getLocalFavorites());
+             setIsLoading(false);
         }
     };
     
@@ -374,5 +372,3 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
