@@ -37,6 +37,33 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+// --- Caching Logic ---
+const CACHE_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const getCachedData = (key: string) => {
+    if (typeof window === 'undefined') return null;
+    const itemStr = localStorage.getItem(key);
+    if (!itemStr) return null;
+    const item = JSON.parse(itemStr);
+    const now = new Date();
+    if (now.getTime() > item.expiry) {
+        localStorage.removeItem(key);
+        return null;
+    }
+    return item.value;
+};
+
+const setCachedData = (key: string, value: any, ttl = CACHE_DURATION_MS) => {
+    if (typeof window === 'undefined') return;
+    const now = new Date();
+    const item = {
+        value: value,
+        expiry: now.getTime() + ttl,
+    };
+    localStorage.setItem(key, JSON.stringify(item));
+};
+// --------------------
+
 
 interface TeamData {
     team: Team;
@@ -117,11 +144,23 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
     useEffect(() => {
         const fetchPlayers = async () => {
             setLoading(true);
+            const cacheKey = `team_players_${teamId}_${CURRENT_SEASON}`;
+            const cachedPlayers = getCachedData(cacheKey);
+
+            if (cachedPlayers) {
+                setPlayers(cachedPlayers);
+                await fetchCustomNames();
+                setLoading(false);
+                return;
+            }
+
             try {
                 const res = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`);
                 const data = await res.json();
                 if (data.response) {
-                    setPlayers(data.response.map((p: any) => p.player));
+                    const fetchedPlayers = data.response.map((p: any) => p.player);
+                    setPlayers(fetchedPlayers);
+                    setCachedData(cacheKey, fetchedPlayers);
                 }
                 await fetchCustomNames();
             } catch (error) {
@@ -549,13 +588,15 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
       const isFavorited = !!favorites?.ourBallTeams?.[team.id];
       const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
       const fieldPath = `ourBallTeams.${id}`;
-      const favData = { 
+      const favData: any = { 
           teamId: team.id, 
           name: team.name, 
           logo: team.logo, 
           type: team.national ? 'National' : 'Club',
-          note: newNote && newNote.length > 0 ? newNote : deleteField()
       };
+      if (newNote && newNote.length > 0) {
+        favData.note = newNote;
+      }
       
       const updateData = { [fieldPath]: favData };
 
