@@ -20,7 +20,6 @@ import { ProfileButton } from '../AppContentWrapper';
 import type { Fixture as FixtureType, Favorites } from '@/lib/types';
 import { FixtureItem } from '@/components/FixtureItem';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
-import { GlobalPredictionsScreen } from './GlobalPredictionsScreen';
 import { getLocalFavorites } from '@/lib/local-favorites';
 import { POPULAR_LEAGUES } from '@/lib/popular-data';
 
@@ -171,9 +170,6 @@ const FixturesList = React.memo(({
 FixturesList.displayName = 'FixturesList';
 
 
-const MemoizedGlobalPredictions = React.memo(GlobalPredictionsScreen);
-
-
 // Date Scroller
 const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
 
@@ -240,12 +236,11 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
     );
 }
 
-type TabName = 'my-results' | 'all-matches' | 'predictions';
+type TabName = 'my-results' | 'all-matches';
 
 const tabs: {id: TabName, label: string}[] = [
     { id: 'my-results', label: 'نتائجي' },
-    // The 'all-matches' tab is now hidden from the UI
-    { id: 'predictions', label: 'التوقعات' },
+    { id: 'all-matches', label: 'كل المباريات' },
 ];
 
 // Main Screen Component
@@ -375,8 +370,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   
   useEffect(() => {
-      if (activeTab === 'predictions') return;
-
       if (isVisible && selectedDateKey) {
           if (matchesCache.has(selectedDateKey)) {
               setLoading(false);
@@ -396,7 +389,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const handleTabChange = (value: string) => {
     const tabValue = value as TabName;
     setActiveTab(tabValue);
-    if ((tabValue === 'my-results') && selectedDateKey && !matchesCache.has(selectedDateKey)) {
+    if ((tabValue === 'my-results' || tabValue === 'all-matches') && selectedDateKey && !matchesCache.has(selectedDateKey)) {
         const controller = new AbortController();
         fetchAndProcessData(selectedDateKey, controller.signal);
         return () => controller.abort();
@@ -436,7 +429,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                         ))}
                     </TabsList>
                 </div>
-                 {activeTab !== 'predictions' && selectedDateKey && (
+                 {selectedDateKey && (
                      <div className="relative bg-card py-2 border-x border-b rounded-b-lg shadow-md -mt-1">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                         <Button 
@@ -465,15 +458,19 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             </TabsContent>
             
             <TabsContent value="all-matches" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0" hidden={activeTab !== 'all-matches'}>
-                {/* This content is now effectively hidden as the tab is removed */}
+                 <FixturesList 
+                    fixtures={currentFixtures}
+                    loading={loading}
+                    activeTab={activeTab}
+                    favoritedLeagueIds={favoritedLeagueIds}
+                    favoritedTeamIds={favoritedTeamIds}
+                    hasAnyFavorites={hasAnyFavorites}
+                    navigate={navigate}
+                />
             </TabsContent>
 
-            <TabsContent value="predictions" className="flex-1 overflow-y-auto p-0 mt-0" hidden={activeTab !== 'predictions'}>
-                <MemoizedGlobalPredictions navigate={navigate} goBack={goBack} canGoBack={canGoBack} />
-            </TabsContent>
         </Tabs>
     </div>
   );
 }
 
-    

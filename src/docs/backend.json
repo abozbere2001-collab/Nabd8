@@ -440,6 +440,26 @@
           "schema": { "type": "object", "properties": { "isEnabled": { "type": "boolean" }, "homeTeamName": { "type": "string" }, "homeTeamLogo": { "type": "string" }, "awayTeamName": { "type": "string" }, "awayTeamLogo": { "type": "string" }, "competitionName": { "type": "string" }, "matchDate": { "type": "string" }, "matchTime": { "type": "string" } } },
           "description": "Stores the details of a pinned Iraqi match, managed by an admin."
         }
+      },
+      {
+        "path": "/leaguePredictions/{predictionId}",
+        "definition": {
+          "entityName": "Prediction",
+          "schema": {
+            "$ref": "#/backend/entities/Prediction"
+          },
+          "description": "Stores user predictions for specific league matches."
+        }
+      },
+      {
+        "path": "/leagueLeaderboards/{leagueId}/users/{userId}",
+        "definition": {
+          "entityName": "UserScore",
+          "schema": {
+            "$ref": "#/backend/entities/UserScore"
+          },
+          "description": "Stores user scores for a specific league leaderboard."
+        }
       }
     ],
     "reasoning": "The Firestore data structure is designed to support the Goal Stack application, focusing on user-specific data, shared entities like competitions and teams, and admin-managed content such as news.  The key principle is Authorization Independence, achieved through denormalization.  For instance, user favorites (teams, competitions, matches) are stored under the `/users/{userId}/favorites` collection, and if a team or competition's details are needed, they are queried directly without requiring a `get()` call to the user document during security rule evaluation. Admin roles are determined by the existence of a document in the `/admins/{adminId}` collection. This structure supports the QAPs (Rules are not Filters) requirement by allowing direct queries on collections like `/competitions` and `/teams` with appropriate security rules based on user roles or ownership, without needing complex filtering in the rules themselves.\n\nFor data that needs collaborative authorization (if any), a membership map in the relevant document would be used.\n\nThis approach maximizes security and minimizes rule complexity."
