@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -7,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
 import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
-import type { PinnedMatch, Team } from '@/lib/types';
+import type { PinnedMatch, Team, Favorites } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
@@ -66,56 +67,48 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
 
     useEffect(() => {
-      let leagueUnsub: (() => void) | null = null;
-      let teamsUnsub: (() => void) | null = null;
-      
-      setIsLoading(true);
-
-      if (user && db) {
-        // --- Setup Firestore listeners for logged-in user ---
-
-        const ourLeagueRef = doc(db, 'users', user.uid, 'ourFavorites', 'league');
-        leagueUnsub = onSnapshot(ourLeagueRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setOurLeagueId(docSnap.data().leagueId);
-            } else {
-                setOurLeagueId(null);
-            }
-             setIsLoading(false);
-        }, (error) => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: ourLeagueRef.path, operation: 'get' }));
+        setIsLoading(true);
+        if (!db) { // Handles guest user case initially
+            const localFavs = getLocalFavorites();
+            setOurLeagueId(localFavs.ourLeagueId || null);
+            setOurBallTeams(Object.values(localFavs.ourBallTeams || {}));
             setIsLoading(false);
-        });
-        
-        const ourTeamsRef = doc(db, 'users', user.uid, 'ourFavorites', 'teams');
-        teamsUnsub = onSnapshot(ourTeamsRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setOurBallTeams(Object.values(docSnap.data()));
-            } else {
-                setOurBallTeams([]);
-            }
-             setIsLoading(false);
-        }, (error) => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: ourTeamsRef.path, operation: 'get' }));
-             setIsLoading(false);
-        });
-
-      } else {
-        // --- Fallback to local storage for guest user ---
-        const localFavs = getLocalFavorites();
-        setOurLeagueId(localFavs.ourLeagueId || null);
-        setOurBallTeams(Object.values(localFavs.ourBallTeams || {}));
-        setIsLoading(false);
-      }
+            return;
+        }
       
-      return () => {
-        if (leagueUnsub) leagueUnsub();
-        if (teamsUnsub) teamsUnsub();
-      };
+        let ourFavsUnsub: (() => void) | null = null;
+      
+        if (user) {
+            const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+            ourFavsUnsub = onSnapshot(ourFavsRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data() as Favorites;
+                    setOurLeagueId(data.ourLeagueId || null);
+                    setOurBallTeams(Object.values(data.ourBallTeams || {}));
+                } else {
+                    setOurLeagueId(null);
+                    setOurBallTeams([]);
+                }
+                setIsLoading(false);
+            }, (error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: ourFavsRef.path, operation: 'get' }));
+                setIsLoading(false);
+            });
+        } else {
+            // This now correctly handles the transition from logged-in to guest
+            const localFavs = getLocalFavorites();
+            setOurLeagueId(localFavs.ourLeagueId || null);
+            setOurBallTeams(Object.values(localFavs.ourBallTeams || {}));
+            setIsLoading(false);
+        }
+      
+        return () => {
+            if (ourFavsUnsub) ourFavsUnsub();
+        };
     }, [user, db]);
 
     useEffect(() => {
-        if (ourLeagueId) {
+        if (ourLeagueId && db) {
             setLoadingLeague(true);
              getDoc(doc(db, 'managedCompetitions', String(ourLeagueId)))
                 .then(docSnap => {
@@ -123,7 +116,6 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         const data = docSnap.data();
                         setLeagueDetails({ id: ourLeagueId, name: data.name, logo: data.logo });
                     } else {
-                        // Fallback if not in managed competitions
                          setLeagueDetails({ id: ourLeagueId, name: `League ${ourLeagueId}`, logo: `https://media.api-sports.io/football/leagues/${ourLeagueId}.png` });
                     }
                 })
