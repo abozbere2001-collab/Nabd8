@@ -95,7 +95,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             if(leagueName) {
                  setLeagueDetails({ id: ourLeagueId, name: leagueName, logo: `https://media.api-sports.io/football/leagues/${ourLeagueId}.png` });
                  setLoadingLeague(false);
-            } else {
+            } else if (db) {
                 getDoc(doc(db, 'managedCompetitions', String(ourLeagueId)))
                     .then(docSnap => {
                         if (docSnap.exists()) {
@@ -105,6 +105,8 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                     })
                     .catch(console.error)
                     .finally(() => setLoadingLeague(false));
+            } else {
+                 setLoadingLeague(false);
             }
         } else {
             setLeagueDetails(null);

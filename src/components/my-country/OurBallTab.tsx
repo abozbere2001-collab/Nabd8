@@ -99,15 +99,15 @@ export function OurBallTab({ navigate, ourBallTeams }: OurBallTabProps) {
         );
     }
     
-    // Fallback for local storage favorites which might use teamId
-    const getKey = (team: any) => team.id || team.teamId;
+    // This function handles getting a unique key, whether from firestore (id) or localstorage (teamId)
+    const getKey = (team: any): number => team.id || team.teamId;
 
 
     return (
         <div className="px-1 py-4">
             <ScrollArea className="w-full whitespace-nowrap">
                 <div className="flex w-max space-x-4 px-4 flex-row-reverse">
-                    {ourBallTeams.map((team, index) => (
+                    {ourBallTeams.map((team) => (
                         <div
                             key={getKey(team)}
                             onClick={() => handleTeamClick(getKey(team))}

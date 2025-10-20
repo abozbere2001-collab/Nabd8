@@ -28,7 +28,7 @@ export function ProfileScreen({ navigate, goBack, canGoBack, headerActions }: Sc
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !db) {
         setLoading(false);
         return;
     };

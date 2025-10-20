@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -41,7 +40,10 @@ export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { toast } = useToast();
   
   useEffect(() => {
-    if (!db) return;
+    if (!db) {
+        setLoading(false);
+        return;
+    }
     setLoading(true);
     const newsCollectionRef = collection(db, 'news');
     const q = query(newsCollectionRef, orderBy('timestamp', 'desc'));
@@ -89,7 +91,7 @@ export function NewsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                       <Search className="h-5 w-5" />
                   </Button>
               </SearchSheet>
-              <ProfileButton onProfileClick={() => navigate('Profile')} />
+              <ProfileButton />
           </div>
         }
       />

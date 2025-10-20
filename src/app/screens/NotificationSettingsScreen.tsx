@@ -41,8 +41,7 @@ export function NotificationSettingsScreen({ navigate, goBack, canGoBack, header
         setCustomNames({ leagues: leagueNames, teams: teamNames });
 
     } catch (error) {
-        const permissionError = new FirestorePermissionError({ path: 'customizations collections', operation: 'list' });
-        errorEmitter.emit('permission-error', permissionError);
+        // This is expected for guests or users without permissions
     }
   }, [db]);
 
