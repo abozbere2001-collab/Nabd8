@@ -5,7 +5,7 @@ import React, { useEffect, useState, useMemo, useCallback } from "react";
 import type { ScreenProps } from "@/app/page";
 import { useFirestore, useAuth } from "@/firebase/provider";
 import { collection, onSnapshot, doc, query, getDoc } from "firebase/firestore";
-import type { PinnedMatch, Team, Favorites, Fixture, Standing, TopScorer } from "@/lib/types";
+import type { PinnedMatch, Team, Favorites, Fixture, Standing, TopScorer, FavoriteTeam, FavoriteLeague } from "@/lib/types";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CURRENT_SEASON } from "@/lib/constants";
 import { hardcodedTranslations } from "@/lib/hardcoded-translations";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { getLocalFavorites } from "@/lib/local-favorites";
 
 // --- Pinned Match Component ---
 function PinnedMatchCard({
@@ -72,7 +73,7 @@ function PinnedMatchCard({
 
 
 // --- Favorite Teams Horizontal Scroll ---
-const FavoriteTeamsScroller = ({ teams, navigate }: { teams: (Team & { note?: string })[], navigate: ScreenProps['navigate']}) => {
+const FavoriteTeamsScroller = ({ teams, navigate }: { teams: FavoriteTeam[], navigate: ScreenProps['navigate']}) => {
     if (!teams || teams.length === 0) {
         return null;
     }
@@ -83,8 +84,8 @@ const FavoriteTeamsScroller = ({ teams, navigate }: { teams: (Team & { note?: st
                 <div className="flex w-max space-x-4 flex-row-reverse">
                     {teams.map((team) => (
                         <div
-                            key={team.id}
-                            onClick={() => navigate('TeamDetails', { teamId: team.id })}
+                            key={team.teamId}
+                            onClick={() => navigate('TeamDetails', { teamId: team.teamId })}
                             className="flex flex-col items-center gap-2 w-20 text-center cursor-pointer"
                         >
                             <Avatar className="h-14 w-14 border-2 border-border">
@@ -178,7 +179,7 @@ const TeamDetailsLoader = ({ leagueId, db, children }: { leagueId: number, db: a
 }
 
 // --- Our League Details Component ---
-const OurLeagueDetails = ({ league, db, navigate }: { league: Favorites['leagues'][number] | undefined, db: any, navigate: ScreenProps['navigate'] }) => {
+const OurLeagueDetails = ({ league, db, navigate }: { league: FavoriteLeague | undefined, db: any, navigate: ScreenProps['navigate'] }) => {
     if (!league) {
          return null;
     }
@@ -368,7 +369,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             </div>
         ) : (
             <div className="space-y-6">
-                <FavoriteTeamsScroller teams={ourBallTeams as (Team & { note?: string })[]} navigate={navigate} />
+                <FavoriteTeamsScroller teams={ourBallTeams} navigate={navigate} />
                 <OurLeagueDetails league={ourLeague} db={db} navigate={navigate} />
                  {!hasHeartFavorites && (
                      <div className="px-4">
@@ -385,3 +386,5 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
