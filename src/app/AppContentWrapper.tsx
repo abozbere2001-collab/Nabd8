@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
@@ -74,11 +75,11 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   TermsOfService: { component: TermsOfServiceScreen },
   GoPro: { component: GoProScreen },
   ManageTopScorers: { component: ManageTopScorersScreen },
-  Khaltak: { component: KhaltakScreen },
+  Doreena: { component: KhaltakScreen },
 };
 
 
-const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'News', 'Khaltak', 'Settings'];
+const mainTabs: ScreenKey[] = ['Matches', 'Competitions', 'News', 'Doreena', 'Settings'];
 
 type StackItem = {
   key: string;
@@ -156,7 +157,7 @@ export function AppContentWrapper() {
         'Matches': [{ key: 'Matches-0', screen: 'Matches' }],
         'Competitions': [{ key: 'Competitions-0', screen: 'Competitions' }],
         'News': [{ key: 'News-0', screen: 'News' }],
-        'Khaltak': [{ key: 'Khaltak-0', screen: 'Khaltak' }],
+        'Doreena': [{ key: 'Doreena-0', screen: 'Doreena' }],
         'Settings': [{ key: 'Settings-0', screen: 'Settings' }],
     },
   });

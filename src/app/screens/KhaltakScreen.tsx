@@ -340,7 +340,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   if (!user) {
     return (
        <div className="flex h-full flex-col bg-background">
-          <ScreenHeader title="خالتك" onBack={goBack} canGoBack={canGoBack} />
+          <ScreenHeader title="دورينا" onBack={goBack} canGoBack={canGoBack} />
            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
               <Crown className="h-16 w-16 text-muted-foreground mb-4"/>
               <h2 className="text-xl font-bold">ميزة حصرية للمستخدمين المسجلين</h2>
@@ -356,7 +356,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader
-        title="خالتك"
+        title="دورينا"
         onBack={goBack}
         canGoBack={canGoBack}
         actions={
@@ -370,34 +370,50 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           </div>
         }
       />
-      <div className="py-4 border-b">
-        <CrownedTeamScroller 
-          crownedTeams={crownedTeams} 
-          onSelectTeam={handleSelectTeam}
-          onRemove={(id) => handleRemoveCrowned('team', id)} 
-          selectedTeamId={selectedTeamId}
-        />
-      </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {selectedTeamId ? (
-          <TeamFixturesDisplay teamId={selectedTeamId} navigate={navigate} />
-        ) : (
-          crownedTeams.length > 0 && (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-                <p>اختر فريقًا من الأعلى لعرض مبارياته.</p>
-            </div>
-          )
-        )}
-        {crownedLeagues.map(league => (
-            <CrownedLeagueCard key={league.leagueId} league={league} navigate={navigate} />
-        ))}
-         {crownedTeams.length === 0 && crownedLeagues.length === 0 && (
-            <div className="text-center text-muted-foreground pt-10">
-                <p className="font-bold text-lg">لم تقم بتتويج أي شيء بعد</p>
-                <p>اذهب إلى الفرق أو البطولات واضغط على أيقونة التاج 👑</p>
-            </div>
-         )}
-      </div>
+      <Tabs defaultValue="kurratna" className="w-full flex-1 flex flex-col min-h-0">
+        <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="doreena">دورينا</TabsTrigger>
+            <TabsTrigger value="kurratna">كرتنا</TabsTrigger>
+        </TabsList>
+        <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0">
+          <div className="py-4 border-b">
+            <CrownedTeamScroller 
+              crownedTeams={crownedTeams} 
+              onSelectTeam={handleSelectTeam}
+              onRemove={(id) => handleRemoveCrowned('team', id)} 
+              selectedTeamId={selectedTeamId}
+            />
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {selectedTeamId ? (
+              <TeamFixturesDisplay teamId={selectedTeamId} navigate={navigate} />
+            ) : (
+              crownedTeams.length > 0 && (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <p>اختر فريقًا من الأعلى لعرض مبارياته.</p>
+                </div>
+              )
+            )}
+             {crownedTeams.length === 0 && (
+                <div className="text-center text-muted-foreground pt-10">
+                    <p className="font-bold text-lg">لم تقم بتتويج أي فريق بعد</p>
+                    <p>اذهب إلى الفرق واضغط على أيقونة التاج 👑</p>
+                </div>
+             )}
+          </div>
+        </TabsContent>
+        <TabsContent value="doreena" className="flex-1 overflow-y-auto p-4 space-y-4">
+            {crownedLeagues.map(league => (
+                <CrownedLeagueCard key={league.leagueId} league={league} navigate={navigate} />
+            ))}
+            {crownedLeagues.length === 0 && (
+                <div className="text-center text-muted-foreground pt-10">
+                    <p className="font-bold text-lg">لم تقم بتتويج أي بطولة بعد</p>
+                    <p>اذهب إلى البطولات واضغط على أيقونة التاج 👑</p>
+                </div>
+            )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

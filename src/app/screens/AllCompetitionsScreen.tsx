@@ -587,9 +587,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                        <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                    </Button>
                                                )}
-                                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleCrownToggle(comp); }}>
+                                               {user && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleCrownToggle(comp); }}>
                                                    <Crown className={isCrowned ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                               </Button>
+                                               </Button>}
                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(comp); }}>
                                                    <Star className={isStarred ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                </Button>
@@ -628,9 +628,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                                <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                            </Button>
                                                        )}
-                                                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleCrownToggle(comp); }}>
+                                                       {user && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleCrownToggle(comp); }}>
                                                             <Crown className={isCrowned ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                                       </Button>
+                                                       </Button>}
                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(comp); }}>
                                                            <Star className={isStarred ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                        </Button>

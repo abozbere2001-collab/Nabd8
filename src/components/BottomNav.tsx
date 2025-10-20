@@ -1,4 +1,5 @@
 
+
 "use client";
 import { Star, Newspaper, MoreHorizontal, Shield, UserCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -6,6 +7,7 @@ import type { ScreenKey } from '@/app/page';
 import { FootballIcon } from './icons/FootballIcon';
 import React, { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Crown } from 'lucide-react';
 
 interface BottomNavProps {
   activeScreen: ScreenKey;
@@ -18,7 +20,7 @@ export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
     { key: 'Matches', label: "المباريات", icon: Shield },
     { key: 'Competitions', label: "اختياراتي", icon: Star },
     { key: 'News', label: "أخبار", icon: Newspaper },
-    { key: 'Khaltak', label: "خالتك", icon: UserCircle2 },
+    { key: 'Doreena', label: "دورينا", icon: Crown },
     { key: 'Settings', label: "المزيد", icon: MoreHorizontal },
   ];
   
