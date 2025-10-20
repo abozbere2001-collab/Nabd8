@@ -338,7 +338,7 @@
         }
       },
       {
-        "path": "/users/{userId}/favorites",
+        "path": "/users/{userId}/favorites/data",
         "definition": {
           "entityName": "UserFavorites",
           "schema": {
@@ -439,23 +439,6 @@
           "entityName": "PinnedMatch",
           "schema": { "type": "object", "properties": { "isEnabled": { "type": "boolean" }, "homeTeamName": { "type": "string" }, "homeTeamLogo": { "type": "string" }, "awayTeamName": { "type": "string" }, "awayTeamLogo": { "type": "string" }, "competitionName": { "type": "string" }, "matchDate": { "type": "string" }, "matchTime": { "type": "string" } } },
           "description": "Stores the details of a pinned Iraqi match, managed by an admin."
-        }
-      },
-      {
-        "path": "/appConfig/cache",
-        "definition": {
-          "entityName": "CacheConfig",
-          "schema": {
-            "type": "object",
-            "properties": {
-              "competitionsLastUpdated": {
-                "type": "string",
-                "format": "date-time",
-                "description": "Timestamp of the last time the competitions list was updated by an admin."
-              }
-            }
-          },
-          "description": "Stores configuration for client-side caching. Publicly readable, admin-writable."
         }
       }
     ],
