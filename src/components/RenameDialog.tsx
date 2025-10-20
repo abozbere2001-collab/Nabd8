@@ -26,6 +26,7 @@ interface RenameDialogProps {
     name: string;
     note?: string;
     type: ItemType;
+    purpose: 'rename' | 'note';
     originalData?: any;
   } | null;
   onSave: (type: ItemType, id: string | number, newName: string, newNote?: string) => void;
@@ -67,18 +68,19 @@ export function RenameDialog({
 
   const getTitle = () => {
     if (!item) return '';
-    if (item.type === 'team') return `إضافة ملاحظة على فريق ${item.name}`;
-    return `تعديل ${itemTypeMap[item.type]}`;
+    if (item.purpose === 'note') return `إضافة ملاحظة على ${item.name}`;
+    return `تعديل اسم ${itemTypeMap[item.type]}`;
   }
   
   const getDescription = () => {
       if (!item) return '';
-      if(item.type === 'team') return 'سيتم حفظ هذا الفريق مع ملاحظتك في قسم "بلدي".';
-      if(isAdmin && item.type !== 'status') return `أدخل الاسم الجديد لـ ${itemTypeMap[item.type]}. اتركه فارغًا للعودة للاسم الأصلي.`;
-      if(isAdmin && item.type === 'status') return `أدخل الحالة المخصصة للمباراة. اترك الحقل فارغًا لإزالته.`;
+      if(item.purpose === 'note') return 'سيتم حفظ هذا العنصر مع ملاحظتك في قسم "بلدي".';
+      if(isAdmin && item.purpose === 'rename') return `أدخل الاسم الجديد (الترجمة). اتركه فارغًا للعودة للاسم الأصلي.`;
       return '';
   }
 
+  const showNameField = isAdmin && item?.purpose === 'rename';
+  const showNoteField = item?.type === 'team' && item?.purpose === 'note';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -93,19 +95,19 @@ export function RenameDialog({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           
-          {isAdmin && (item?.type !== 'team') && (
+          {showNameField && (
             <div className="grid w-full items-center gap-1.5">
-                <Label htmlFor="name">{item?.type === 'status' ? 'الحالة المخصصة' : 'الاسم المخصص'}</Label>
+                <Label htmlFor="name">الاسم المخصص (للترجمة)</Label>
                 <Input
                 id="name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder={item?.type === 'status' ? 'مثال: مؤجلة' : `الاسم الأصلي: ${item?.originalData?.name || item?.name}`}
+                placeholder={`الاسم الأصلي: ${item?.originalData?.name || item?.name}`}
                 />
             </div>
           )}
 
-          {item?.type === 'team' && (
+          {showNoteField && (
             <div className="grid w-full items-center gap-1.5">
                 <Label htmlFor="note">ملاحظة (اختياري)</Label>
                 <Textarea 

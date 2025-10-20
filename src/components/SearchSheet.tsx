@@ -122,7 +122,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   const { toast } = useToast();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   
-  const [renameItem, setRenameItem] = useState<{ id: string | number, name: string, note?: string, type: RenameType, originalData?: any } | null>(null);
+  const [renameItem, setRenameItem] = useState<{ id: string | number; name: string; note?: string; type: RenameType; purpose: 'rename' | 'note'; originalData?: any; } | null>(null);
 
   const [localSearchIndex, setLocalSearchIndex] = useState<SearchableItem[]>([]);
   
@@ -199,17 +199,11 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             unsubStarred = onSnapshot(starredFavsRef, (doc) => {
                 const favs = doc.data() as Favorites || {};
                 setFavorites(prev => ({...prev, leagues: favs.leagues, teams: favs.teams}));
-            }, (error) => {
-                if(error.code === 'permission-denied') console.warn("Permission denied for starred favorites.");
-                else errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'get'}));
             });
 
             unsubOur = onSnapshot(ourFavsRef, (doc) => {
                 const favs = doc.data() as Favorites || {};
                 setFavorites(prev => ({...prev, ourLeagueId: favs.ourLeagueId, ourBallTeams: favs.ourBallTeams}));
-            }, (error) => {
-                if(error.code === 'permission-denied') console.warn("Permission denied for ourFavorites.");
-                 else errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'get'}));
             });
 
         } else {
@@ -309,47 +303,55 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
    const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
         const isLeague = !('national' in item);
         const itemId = item.id;
-        const currentFavorites = user ? favorites : getLocalFavorites();
-        const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-
-        if (type === 'heart') {
-            const isHearted = isLeague ? newFavorites.ourLeagueId === itemId : !!newFavorites.ourBallTeams?.[itemId];
-            if (isLeague) {
-                newFavorites.ourLeagueId = isHearted ? undefined : itemId;
-            } else {
-                if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
-                if (isHearted) {
-                    delete newFavorites.ourBallTeams[itemId];
+        
+        const isStarred = isLeague ? !!favorites.leagues?.[itemId] : !!favorites.teams?.[itemId];
+        const isHearted = isLeague ? favorites.ourLeagueId === itemId : !!favorites.ourBallTeams?.[itemId];
+        
+        if (user && db) {
+            if (type === 'heart') {
+                const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+                let updateData;
+                if (isLeague) {
+                    updateData = { ourLeagueId: isHearted ? deleteField() : itemId };
                 } else {
-                    newFavorites.ourBallTeams[itemId] = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                    const fieldPath = `ourBallTeams.${itemId}`;
+                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                    updateData = { [fieldPath]: isHearted ? deleteField() : favData };
                 }
-            }
-        } else { // star
-            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-            if (!newFavorites[itemType]) newFavorites[itemType] = {};
-            const isStarred = !!newFavorites[itemType]?.[itemId];
-            if (isStarred) {
-                delete newFavorites[itemType]![itemId];
-            } else {
+                setDoc(favDocRef, updateData, { merge: true }).catch(err => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+                });
+            } else { // star
+                const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+                const fieldPath = `${itemType}.${itemId}`;
                 const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                newFavorites[itemType]![itemId] = favData;
+                const updateData = { [fieldPath]: isStarred ? deleteField() : favData };
+                updateDoc(favDocRef, updateData).catch(err => {
+                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
+                 });
+            }
+        } else { // Guest user
+            const currentFavorites = getLocalFavorites();
+            if (type === 'heart') {
+                toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+            } else {
+                const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+                 if (!currentFavorites[itemType]) currentFavorites[itemType] = {};
+                if (currentFavorites[itemType]?.[itemId]) delete currentFavorites[itemType]![itemId];
+                else {
+                     const favData = isLeague 
+                        ? { name: item.name, leagueId: itemId, logo: item.logo }
+                        : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                    currentFavorites[itemType]![itemId] = favData;
+                }
+                setLocalFavorites(currentFavorites);
+                setFavorites(currentFavorites);
             }
         }
-        
-        if (user && db) {
-            const favDocRef = type === 'star' ? doc(db, 'users', user.uid, 'favorites', 'data') : doc(db, 'users', user.uid, 'ourFavorites', 'data');
-            // This setDoc overwrites the document, which is what we want for ourFavorites but might be destructive for favorites.
-            // Let's use merge for safety.
-            setDoc(favDocRef, newFavorites, { merge: true }).catch(err => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: newFavorites}))
-            });
-        } else {
-            setLocalFavorites(newFavorites);
-            setFavorites(newFavorites);
-        }
-    }, [user, db, favorites]);
+    }, [user, db, favorites, toast]);
 
   const handleResultClick = (result: SearchableItem) => {
     if (result.type === 'teams') {
@@ -362,35 +364,26 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
   const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
     const currentName = getDisplayName(type as 'team' | 'league', id, originalData.name);
-    setRenameItem({ id, name: currentName, type, originalData });
+    setRenameItem({ id, name: currentName, type, originalData, purpose: 'rename' });
   };
   
-  const handleSaveRename = async (type: RenameType, id: string | number, newName: string, newNote?: string) => {
+  const handleSaveRenameOrNote = async (type: RenameType, id: string | number, newName: string, newNote?: string) => {
     if (!renameItem || !db) return;
-    const { originalData } = renameItem;
+    const { originalData, purpose } = renameItem;
 
-    const batch = writeBatch(db);
-
-    const nameRef = doc(db, `${type}Customizations`, String(id));
-    if (newName && newName !== originalData.name) {
-        batch.set(nameRef, { customName: newName });
-    } else {
-        batch.delete(nameRef); 
-    }
-
-    try {
-        await batch.commit();
+    if (purpose === 'rename' && isAdmin) {
+        const collectionName = `${type}Customizations`;
+        const docRef = doc(db, collectionName, String(id));
+        if (newName && newName !== originalData.name) {
+            await setDoc(docRef, { customName: newName });
+        } else {
+            await deleteDoc(docRef); 
+        }
         toast({ title: 'نجاح', description: 'تم حفظ التغييرات. قد تحتاج لإعادة فتح البحث لرؤية التحديث.' });
         await buildLocalIndex();
         if(debouncedSearchTerm) {
             handleSearch(debouncedSearchTerm);
         }
-    } catch (serverError) {
-        const permissionError = new FirestorePermissionError({
-            path: `batch write for customizations`,
-            operation: 'write'
-        });
-        errorEmitter.emit('permission-error', permissionError);
     }
     setRenameItem(null);
   };
@@ -402,7 +395,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
       return <div className="flex justify-center items-center h-full"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
     
-    const itemsToRender = debouncedSearchTerm ? searchResults : popularItems.map(item => ({
+    const itemsToRender = debouncedSearchTerm ? searchResults.filter(i => i.type === itemType) : popularItems.map(item => ({
         id: item.id,
         type: itemType,
         name: item.name,
@@ -460,7 +453,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             isOpen={!!renameItem}
             onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
             item={renameItem}
-            onSave={(type, id, name, note) => handleSaveRename(type as RenameType, id, name, note)}
+            onSave={(type, id, name, note) => handleSaveRenameOrNote(type as RenameType, id, name, note)}
           />
         )}
       </SheetContent>

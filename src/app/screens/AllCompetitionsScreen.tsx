@@ -75,6 +75,7 @@ interface RenameState {
   name: string;
   originalName?: string;
   type: RenameType;
+  purpose: 'rename' | 'note';
   note?: string;
   originalData?: any;
 }
@@ -329,21 +330,18 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     useEffect(() => {
-        if (!user || !db) {
+        // This screen ONLY listens to starred favorites for the Star icon state.
+        if (user && db) {
+            const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const unsubStarred = onSnapshot(starredFavsRef, (doc) => {
+                setStarredFavorites(doc.data() as Favorites || {});
+            }, (error) => {
+                console.warn("Permission denied listening to starred favorites.", error);
+            });
+            return () => unsubStarred();
+        } else {
             setStarredFavorites(getLocalFavorites());
-            return;
         }
-        // This screen is ONLY concerned with starred favorites.
-        const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const unsubStarred = onSnapshot(starredFavsRef, (doc) => {
-            setStarredFavorites(doc.data() as Favorites || {});
-        }, (error) => {
-            console.warn("Permission denied listening to starred favorites.", error);
-        });
-
-        return () => {
-            unsubStarred();
-        };
     }, [user, db]);
 
 
@@ -380,17 +378,32 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 setStarredFavorites(newFavorites);
             }
         } else if (type === 'heart') {
-             // Open rename/note dialog to handle heart functionality
-             const note = (starredFavorites.ourBallTeams?.[itemId] as any)?.note || '';
-             handleOpenRename(isLeague ? 'league' : 'team', itemId, item.name, item.name, note);
+             // Open dialog to add note (for teams) or just add to ourFavorites (for leagues)
+             if (!user) {
+                toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+                return;
+             }
+             const purpose: 'note' = 'note';
+             const note = ''; // In a real app, you might fetch existing note if any
+             const originalName = isLeague ? (item as ManagedCompetitionType).name : (item as Team).name;
+             setRenameItem({
+                 type: isLeague ? 'league' : 'team',
+                 id: itemId,
+                 name: originalName,
+                 originalName: originalName,
+                 purpose: purpose,
+                 note: note,
+                 originalData: item
+             });
         }
-    }, [user, db, starredFavorites]);
+    }, [user, db, starredFavorites, toast]);
 
-     const handleSaveRename = (type: RenameType, id: string | number, newName: string, newNote?: string) => {
+
+     const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote?: string) => {
         if (!db) return;
 
-        // Admin-specific name customization
-        if (isAdmin && type !== 'team') {
+        if (renameItem?.purpose === 'rename' && isAdmin) {
+            // Admin-specific name customization
             const collectionName = `${type}Customizations`;
             const docId = String(id);
             const originalName = renameItem?.originalName;
@@ -417,35 +430,33 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 const permissionError = new FirestorePermissionError({ path: doc(db, collectionName, docId).path, operation: 'write', requestResourceData: data });
                 errorEmitter.emit('permission-error', permissionError);
             });
-        }
-        
-        // Heart favorite logic (for both users and admins)
-        if (renameItem?.type === 'team' || renameItem?.type === 'league') {
-             if (user) {
-                const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-                const isLeague = renameItem.type === 'league';
-                const itemId = renameItem.id;
-                
-                let updateData;
-                if (isLeague) {
-                    updateData = { ourLeagueId: itemId };
-                } else {
-                    const item = renameItem.originalData as Team;
-                    const fieldPath = `ourBallTeams.${itemId}`;
-                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: item.national ? 'National' : 'Club', note: newNote };
-                    updateData = { [fieldPath]: favData };
-                }
-                 setDoc(favDocRef, updateData, { merge: true }).catch(err => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
-                });
-                 toast({ title: 'نجاح', description: 'تمت الإضافة إلى مفضلة "بلدي".' });
-             }
-        }
 
+        } else if (renameItem?.purpose === 'note' && user) {
+            // Heart favorite logic (for both users and admins)
+            const favDocRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
+            const isLeague = renameItem.type === 'league';
+            const itemId = renameItem.id;
+            const item = renameItem.originalData as (Team | ManagedCompetitionType);
+            
+            let updateData;
+            if (isLeague) {
+                updateData = { ourLeagueId: itemId };
+            } else {
+                const teamItem = item as Team;
+                const fieldPath = `ourBallTeams.${itemId}`;
+                const favData = { name: teamItem.name, teamId: itemId, logo: teamItem.logo, type: teamItem.national ? 'National' : 'Club', note: newNote };
+                updateData = { [fieldPath]: favData };
+            }
+             setDoc(favDocRef, updateData, { merge: true }).then(() => {
+                toast({ title: 'نجاح', description: 'تمت الإضافة إلى مفضلة "بلدي".' });
+             }).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'write', requestResourceData: updateData}))
+            });
+        }
         setRenameItem(null);
     };
     
-     const handleOpenRename = (type: RenameType, id: number | string, name: string, originalName?: string, note?: string) => {
+     const handleOpenRename = (type: RenameType, id: number | string, name: string, originalName?: string) => {
         const itemToRename = type === 'team'
             ? nationalTeams?.find(t => t.id === id)
             : managedCompetitions?.find(c => c.leagueId === id);
@@ -455,7 +466,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             id: id,
             name: name,
             originalName: originalName || name,
-            note: note || '',
+            purpose: 'rename',
+            note: '',
             originalData: itemToRename
         });
     };
@@ -501,7 +513,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                       </div>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(team, 'heart'); }}>
-                           <Heart className={starredFavorites.ourBallTeams?.[team.id] ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                           <Heart className={"h-5 w-5 text-muted-foreground/50"} />
                         </Button>
                         {isAdmin && (
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team.name, nationalTeams?.find(t => t.id === team.id)?.name) }}>
@@ -546,7 +558,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                        </div>
                                        <div className="flex items-center gap-1">
                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                               <Heart className={(starredFavorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                               <Heart className={"h-5 w-5 text-muted-foreground/50"} />
                                            </Button>
                                            {isAdmin && (
                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
@@ -583,7 +595,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                </div>
                                                <div className="flex items-center gap-1">
                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                                       <Heart className={(starredFavorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                       <Heart className={"h-5 w-5 text-muted-foreground/50"} />
                                                    </Button>
                                                    {isAdmin && (
                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
@@ -680,7 +692,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 isOpen={!!renameItem}
                 onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
                 item={renameItem}
-                onSave={(type, id, newName, note) => handleSaveRename(type, id, newName, note)}
+                onSave={(type, id, newName, note) => handleSaveRenameOrNote(type, id, newName, note)}
             />}
             <AddCompetitionDialog isOpen={isAddOpen} onOpenChange={(isOpen) => {
                 setAddOpen(isOpen);
