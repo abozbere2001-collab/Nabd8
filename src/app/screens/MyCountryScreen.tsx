@@ -57,31 +57,28 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { isAdmin } = useAdmin();
     
     const [favorites, setFavorites] = useState<Partial<Favorites>>({});
-    const [isLoadingFavorites, setIsLoadingFavorites] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
 
-    // Step 1: Listen to favorites from Firestore or get from local storage
     useEffect(() => {
-        setIsLoadingFavorites(true);
+        setIsLoading(true);
         if (user && db) {
             const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
             const unsubscribe = onSnapshot(favsRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
-                setIsLoadingFavorites(false);
+                setIsLoading(false);
             }, (error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-                setFavorites({}); // Fallback
-                setIsLoadingFavorites(false);
+                setFavorites(getLocalFavorites()); // Fallback to local
+                setIsLoading(false);
             });
             return () => unsubscribe();
         } else {
-            // Guest user
             setFavorites(getLocalFavorites());
-            setIsLoadingFavorites(false);
+            setIsLoading(false);
         }
     }, [user, db]);
 
-    // Step 2: Listen to pinned matches (admin feature)
     useEffect(() => {
         if (!db) return;
         const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
@@ -93,8 +90,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         return () => unsub();
     }, [db]);
     
-    // Step 3: Memoize the derived favorite data
-    const ourLeagueId = useMemo(() => favorites?.ourLeagueId, [favorites?.ourLeagueId]);
+    const ourLeagueId = favorites?.ourLeagueId;
     const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}).sort((a, b) => a.name.localeCompare(b.name)), [favorites.ourBallTeams]);
 
     return (
@@ -115,7 +111,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 }
             />
             
-            {isLoadingFavorites ? (
+            {isLoading ? (
                 <div className="flex-1 flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-primary"/>
                 </div>
