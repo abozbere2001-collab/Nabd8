@@ -330,25 +330,14 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     useEffect(() => {
-        let unsubStarred: (()=>void) | null = null;
-        let unsubOur: (()=>void) | null = null;
-
+        let unsubscribe: (()=>void) | null = null;
         if (user && db) {
-            const starredFavsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const ourFavsRef = doc(db, 'users', user.uid, 'ourFavorites', 'data');
-
-            unsubStarred = onSnapshot(starredFavsRef, (doc) => {
-                const favs = doc.data() as Favorites || {};
-                setFavorites(prev => ({...prev, leagues: favs.leagues, teams: favs.teams}));
+            const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            unsubscribe = onSnapshot(favoritesRef, (doc) => {
+                setFavorites(doc.data() as Favorites || { userId: user.uid });
             }, (error) => {
-                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: starredFavsRef.path, operation: 'get'}));
-            });
-
-            unsubOur = onSnapshot(ourFavsRef, (doc) => {
-                const favs = doc.data() as Favorites || {};
-                setFavorites(prev => ({...prev, ourLeagueId: favs.ourLeagueId, ourBallTeams: favs.ourBallTeams}));
-            }, (error) => {
-                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: ourFavsRef.path, operation: 'get'}));
+                const permissionError = new FirestorePermissionError({path: favoritesRef.path, operation: 'get'});
+                errorEmitter.emit('permission-error', permissionError);
             });
 
         } else {
@@ -356,8 +345,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         }
 
         return () => {
-            if (unsubStarred) unsubStarred();
-            if (unsubOur) unsubOur();
+            if (unsubscribe) unsubscribe();
         };
     }, [user, db]);
 
