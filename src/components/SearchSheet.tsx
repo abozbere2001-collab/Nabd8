@@ -200,13 +200,13 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             const unsub1 = onSnapshot(starredFavsRef, (doc) => {
                 const favs = doc.data() as Favorites || { userId: user.uid };
                 setFavorites(prev => ({...prev, leagues: favs.leagues, teams: favs.teams}));
-            });
+            }, (error) => { console.error("Error listening to starred favorites:", error); });
             const unsub2 = onSnapshot(ourLeagueRef, (doc) => {
                 setFavorites(prev => ({...prev, ourLeagueId: doc.exists() ? doc.data().leagueId : undefined}));
-            });
+            }, (error) => { console.error("Error listening to our league:", error); });
             const unsub3 = onSnapshot(ourTeamsRef, (doc) => {
                 setFavorites(prev => ({...prev, ourBallTeams: doc.exists() ? doc.data() : {}}));
-            });
+            }, (error) => { console.error("Error listening to our teams:", error); });
             unsub.push(unsub1, unsub2, unsub3);
         } else {
              setFavorites(getLocalFavorites());
