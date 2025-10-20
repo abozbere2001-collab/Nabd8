@@ -251,14 +251,6 @@ export interface NewsArticle {
   timestamp: any; // Firestore ServerTimestamp
 }
 
-export interface ManualTopScorer {
-  rank: number;
-  playerName: string;
-  teamName: string;
-  goals: number;
-  playerPhoto?: string;
-}
-
 export interface ManagedCompetition {
   leagueId: number;
   name: string;

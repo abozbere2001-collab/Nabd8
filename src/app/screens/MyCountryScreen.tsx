@@ -88,8 +88,7 @@ function OurLeagueTab({
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
     const [standings, setStandings] = useState<Standing[]>([]);
     const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
-    const [manualTopScorers, setManualTopScorers] = useState<any[]>([]);
-
+    
     const listRef = useRef<HTMLDivElement>(null);
 
     const sortedFixtures = useMemo(() => {
@@ -130,20 +129,6 @@ function OurLeagueTab({
         };
 
         fetchLeagueData();
-        
-        if (db && ourLeague?.id === IRAQI_LEAGUE_ID) {
-            const scorersRef = collection(db, 'iraqiLeagueTopScorers');
-            const q = query(scorersRef, orderBy('rank', 'asc'));
-            getDocs(q).then(snapshot => {
-              const fetchedScorers = snapshot.docs.map((doc) => doc.data());
-              setManualTopScorers(fetchedScorers);
-            }).catch(error => {
-                const permissionError = new FirestorePermissionError({ path: 'iraqiLeagueTopScorers', operation: 'list' });
-                errorEmitter.emit('permission-error', permissionError);
-            });
-        } else {
-            setManualTopScorers([]);
-        }
 
     }, [ourLeague, db]);
     
@@ -172,10 +157,6 @@ function OurLeagueTab({
             </div>
         );
     }
-    
-    const showManualScorers = ourLeague.id === IRAQI_LEAGUE_ID && manualTopScorers.length > 0;
-    const finalScorers = showManualScorers ? manualTopScorers : topScorers;
-
 
     return (
       <div className="flex flex-col">
@@ -250,15 +231,7 @@ function OurLeagueTab({
             ): <p className="pt-4 text-center text-muted-foreground">جدول الترتيب غير متاح حاليًا.</p>}
           </TabsContent>
            <TabsContent value="scorers" className="p-0 mt-0 -mx-4">
-            {isAdmin && ourLeague?.id === IRAQI_LEAGUE_ID && (
-                <div className="p-4">
-                    <Button className="w-full" onClick={() => navigate('ManageTopScorers')}>
-                        <Users className="ml-2 h-4 w-4" />
-                        إدارة الهدافين
-                    </Button>
-                </div>
-            )}
-            {finalScorers.length > 0 ? (
+            {topScorers.length > 0 ? (
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -269,23 +242,23 @@ function OurLeagueTab({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {finalScorers.map((scorer, index) => {
-                            const playerData = showManualScorers ? { name: scorer.playerName, photo: scorer.playerPhoto } : scorer.player;
-                            const teamName = showManualScorers ? scorer.teamName : scorer.statistics[0].team.name;
-                            const goals = showManualScorers ? scorer.goals : scorer.statistics[0]?.goals.total || 0;
-                            const rank = showManualScorers ? scorer.rank : index + 1;
+                        {topScorers.map((scorer, index) => {
+                            const { player, statistics } = scorer;
+                            const teamName = statistics[0].team.name;
+                            const goals = statistics[0]?.goals.total || 0;
+                            const rank = index + 1;
                            return (
-                            <TableRow key={showManualScorers ? `${scorer.playerName}-${index}` : scorer.player.id}>
+                            <TableRow key={player.id}>
                                 <TableCell className="text-center font-bold text-lg">{goals}</TableCell>
                                 <TableCell>
                                      <p className="text-xs text-muted-foreground text-right">{teamName}</p>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-3 justify-end">
-                                        <p className="font-semibold">{playerData.name}</p>
+                                        <p className="font-semibold">{player.name}</p>
                                         <Avatar className="h-8 w-8">
-                                            <AvatarImage src={playerData.photo} />
-                                            <AvatarFallback>{playerData.name?.charAt(0)}</AvatarFallback>
+                                            <AvatarImage src={player.photo} />
+                                            <AvatarFallback>{player.name?.charAt(0)}</AvatarFallback>
                                         </Avatar>
                                     </div>
                                 </TableCell>
@@ -317,7 +290,7 @@ const TeamFixturesList = ({ teamId, navigate }: { teamId: number; navigate: Scre
         setLoading(true);
         const fetchFixtures = async () => {
             try {
-                const res = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`);
+                const res = await fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}&last=30`);
                 const data = await res.json();
                 const sortedFixtures = (data.response || []).sort((a: Fixture, b: Fixture) => a.fixture.timestamp - b.fixture.timestamp);
                 setFixtures(sortedFixtures);
@@ -479,8 +452,7 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     useEffect(() => {
         if (!db) { return; }
         const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
-        const q = query(pinnedMatchesRef);
-        getDocs(q).then(snapshot => {
+        getDocs(query(pinnedMatchesRef)).then(snapshot => {
             const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch));
             setPinnedMatches(matches);
         }).catch(serverError => {

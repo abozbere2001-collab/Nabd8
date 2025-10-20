@@ -20,7 +20,6 @@ import { SeasonPredictionsScreen } from './screens/SeasonPredictionsScreen';
 import { SeasonTeamSelectionScreen } from './screens/SeasonTeamSelectionScreen';
 import { SeasonPlayerSelectionScreen } from './screens/SeasonPlayerSelectionScreen';
 import { AddEditNewsScreen } from './screens/AddEditNewsScreen';
-import { ManageTopScorersScreen } from './screens/ManageTopScorersScreen';
 import { ManagePinnedMatchScreen } from './screens/ManagePinnedMatchScreen';
 import { MatchDetailScreen } from './screens/MatchDetailScreen';
 import { LoginScreen } from './screens/LoginScreen';
@@ -65,7 +64,6 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   SeasonTeamSelection: { component: SeasonTeamSelectionScreen },
   SeasonPlayerSelection: { component: SeasonPlayerSelectionScreen },
   AddEditNews: { component: AddEditNewsScreen },
-  ManageTopScorers: { component: ManageTopScorersScreen },
   ManagePinnedMatch: { component: ManagePinnedMatchScreen },
   MatchDetails: { component: MatchDetailScreen },
   Login: { component: LoginScreen },
