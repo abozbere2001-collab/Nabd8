@@ -105,10 +105,7 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     };
 
     if (user && db) {
-      // ✅ التعديل هنا: القراءة الآن من نفس المكان الذي تُكتب فيه البيانات
       const favsRef = doc(db, "users", user.uid, "ourFavorites", "data");
-
-      console.log("[IraqScreen] Listening to favorites:", favsRef.path);
 
       favoritesUnsubscribe = onSnapshot(
         favsRef,
@@ -116,15 +113,11 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           const data = docSnap.exists()
             ? (docSnap.data() as Favorites)
             : ({} as Favorites);
-
-          console.log("[IraqScreen] favorites snapshot:", data);
-
           setFavorites(data);
           favoritesInitialized = true;
           tryFinishLoading();
         },
         (error) => {
-          console.error("[IraqScreen] onSnapshot error:", error);
           errorEmitter.emit(
             "permission-error",
             new FirestorePermissionError({
@@ -138,12 +131,10 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         }
       );
     } else {
-      console.log("[IraqScreen] No user detected, using local favorites");
       setFavorites(getLocalFavorites());
       favoritesInitialized = true;
     }
 
-    // --- pinned matches ---
     if (db) {
       const pinnedMatchesRef = collection(db, "pinnedIraqiMatches");
       const q = query(pinnedMatchesRef);
@@ -154,13 +145,11 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           const matches = snapshot.docs.map(
             (doc) => ({ id: doc.id, ...(doc.data() as any) } as PinnedMatch)
           );
-          console.log("[IraqScreen] pinned matches count:", matches.length);
           setPinnedMatches(matches);
           pinnedInitialized = true;
           tryFinishLoading();
         },
         (serverError) => {
-          console.error("[IraqScreen] pinned matches error:", serverError);
           errorEmitter.emit(
             "permission-error",
             new FirestorePermissionError({
@@ -185,18 +174,8 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     };
   }, [user, db]);
 
-  const ourBallTeams = useMemo(
-    () => Object.values(favorites.ourBallTeams || {}),
-    [favorites.ourBallTeams]
-  );
-
-  const ourLeagueId = useMemo(
-    () => favorites.ourLeagueId,
-    [favorites.ourLeagueId]
-  );
-
-  console.log("[IraqScreen] ourLeagueId=", ourLeagueId);
-  console.log("[IraqScreen] ourBallTeams=", ourBallTeams);
+  const ourBallTeams = useMemo(() => Object.values(favorites?.ourBallTeams ?? {}), [favorites]);
+  const ourLeagueId = useMemo(() => favorites?.ourLeagueId, [favorites]);
 
   return (
     <div className="flex h-full flex-col bg-background">
