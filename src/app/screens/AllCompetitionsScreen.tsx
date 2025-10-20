@@ -119,7 +119,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const [renameItem, setRenameItem] = useState<RenameState | null>(null);
     const [isAddOpen, setAddOpen] = useState(false);
 
-    const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> } | null>(null);
+    const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> }> | null>(null);
 
     const getName = useCallback((type: 'league' | 'country' | 'continent', id: string | number, defaultName: string) => {
         if (!customNames) return defaultName;
@@ -155,7 +155,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         };
     }, [user, db]);
 
-    const fetchAllData = useCallback(async (forceRefresh = false) => {
+     const fetchAllData = useCallback(async (forceRefresh = false) => {
         if (!db) return;
         setLoading(true);
 
@@ -164,15 +164,19 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             let cacheIsValid = false;
 
             if (cachedData && !forceRefresh) {
-                const cacheBusterRef = doc(db, 'appConfig', 'cache');
-                const cacheBusterSnap = await getDoc(cacheBusterRef);
-                const serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
-                
-                if (cachedData.lastFetched > serverLastUpdated && Date.now() - cachedData.lastFetched < CACHE_EXPIRATION_MS) {
-                    cacheIsValid = true;
+                try {
+                    const cacheBusterRef = doc(db, 'appConfig', 'cache');
+                    const cacheBusterSnap = await getDoc(cacheBusterRef);
+                    const serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
+                    if (cachedData.lastFetched > serverLastUpdated && Date.now() - cachedData.lastFetched < CACHE_EXPIRATION_MS) {
+                        cacheIsValid = true;
+                    }
+                } catch (e) {
+                    console.warn("Could not check cache buster, proceeding as if cache is valid for now.");
+                    cacheIsValid = true; 
                 }
             }
-            
+
             if (cacheIsValid && cachedData) {
                 setManagedCompetitions(cachedData.managedCompetitions);
                 setCustomNames({
@@ -181,23 +185,29 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     continents: new Map(Object.entries(cachedData.customNames.continents)),
                 });
             } else {
-                 const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, compsSnapshot] = await Promise.all([
-                    getDocs(collection(db, 'leagueCustomizations')),
-                    getDocs(collection(db, 'countryCustomizations')),
-                    getDocs(collection(db, 'continentCustomizations')),
-                    getDocs(collection(db, 'managedCompetitions')),
-                ]);
-                
-                const fetchedCustomNames = {
-                    leagues: Object.fromEntries(leaguesSnapshot.docs.map(doc => [doc.id, doc.data().customName])),
-                    countries: Object.fromEntries(countriesSnapshot.docs.map(doc => [doc.id, doc.data().customName])),
-                    continents: Object.fromEntries(continentsSnapshot.docs.map(doc => [doc.id, doc.data().customName])),
-                };
-                
+                const compsSnapshot = await getDocs(collection(db, 'managedCompetitions'));
                 const fetchedCompetitions = compsSnapshot.docs.map(doc => doc.data() as ManagedCompetitionType);
-                
+                let fetchedCustomNames = { leagues: {}, countries: {}, continents: {} };
+
+                if (isAdmin) {
+                    try {
+                        const [leaguesSnapshot, countriesSnapshot, continentsSnapshot] = await Promise.all([
+                            getDocs(collection(db, 'leagueCustomizations')),
+                            getDocs(collection(db, 'countryCustomizations')),
+                            getDocs(collection(db, 'continentCustomizations')),
+                        ]);
+                        fetchedCustomNames = {
+                            leagues: Object.fromEntries(leaguesSnapshot.docs.map(doc => [doc.id, doc.data().customName])),
+                            countries: Object.fromEntries(countriesSnapshot.docs.map(doc => [doc.id, doc.data().customName])),
+                            continents: Object.fromEntries(continentsSnapshot.docs.map(doc => [doc.id, doc.data().customName])),
+                        };
+                    } catch (adminError) {
+                        console.warn("Admin failed to fetch customizations, displaying public data only.", adminError);
+                    }
+                }
+
                 setCachedCompetitions({ managedCompetitions: fetchedCompetitions, customNames: fetchedCustomNames });
-                
+
                 setManagedCompetitions(fetchedCompetitions);
                 setCustomNames({
                     leagues: new Map(Object.entries(fetchedCustomNames.leagues).map(([k, v]) => [Number(k), v])),
@@ -207,13 +217,15 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
         } catch (error) {
             console.error("Failed to fetch competitions data:", error);
-            setManagedCompetitions([]);
-            const permissionError = new FirestorePermissionError({ path: 'managedCompetitions or customizations', operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'managedCompetitions or appConfig/cache',
+                operation: 'list',
+            }));
+            setManagedCompetitions([]); // Set to empty array on error to stop loading
         } finally {
             setLoading(false);
         }
-    }, [db]);
+    }, [db, isAdmin]);
     
     const handleAdminRefresh = async () => {
         if (!db) return;
