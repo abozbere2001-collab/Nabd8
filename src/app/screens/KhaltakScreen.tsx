@@ -193,11 +193,10 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
 
     useEffect(() => {
         const fetchData = async () => {
-            if (!activeTab || !league?.leagueId) return;
+            if (!activeTab || !league?.leagueId || data !== null) return;
 
             setLoading(true);
-            setData(null);
-
+            
             let url = '';
             try {
                 switch (activeTab) {
@@ -213,9 +212,9 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
                         url = `/api/football/players/topscorers?league=${league.leagueId}&season=${CURRENT_SEASON}`;
                         break;
                     case 'predictions':
-                        const today = format(new Date(), 'yyyy-MM-dd');
-                        url = `/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&date=${today}`;
-                        break;
+                         const today = format(new Date(), 'yyyy-MM-dd');
+                         url = `/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&date=${today}`;
+                         break;
                 }
                 
                 if (url) {
@@ -238,11 +237,31 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
             }
         };
 
-        if (activeTab !== 'predictions') {
-            fetchData();
-        }
+        fetchData();
 
-    }, [activeTab, league, toast]);
+    }, [activeTab, league, toast, data]);
+    
+    const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
+
+    useEffect(() => {
+        if (activeTab !== 'predictions' || !data || !user || !db) return;
+        
+        const fixtureIds = (data as Fixture[]).map(f => f.fixture.id);
+        if (fixtureIds.length === 0) return;
+
+        const q = query(collection(db, 'leaguePredictions'), where('userId', '==', user.uid), where('fixtureId', 'in', fixtureIds));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const userPredictions: { [key: number]: Prediction } = {};
+            snapshot.forEach(doc => {
+                const pred = doc.data() as Prediction;
+                userPredictions[pred.fixtureId] = pred;
+            });
+            setPredictions(userPredictions);
+        });
+        return () => unsubscribe();
+        
+    }, [activeTab, data, user, db]);
+
 
     const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
         if (!user || homeGoalsStr === '' || awayGoalsStr === '' || !db) return;
@@ -269,26 +288,6 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
         });
     }, [user, db]);
     
-    const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
-
-    useEffect(() => {
-        if (activeTab !== 'predictions' || !data || !user || !db) return;
-        
-        const fixtureIds = (data as Fixture[]).map(f => f.fixture.id);
-        if (fixtureIds.length === 0) return;
-
-        const q = query(collection(db, 'leaguePredictions'), where('userId', '==', user.uid), where('fixtureId', 'in', fixtureIds));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const userPredictions: { [key: number]: Prediction } = {};
-            snapshot.forEach(doc => {
-                const pred = doc.data() as Prediction;
-                userPredictions[pred.fixtureId] = pred;
-            });
-            setPredictions(userPredictions);
-        });
-        return () => unsubscribe();
-        
-    }, [activeTab, data, user, db]);
 
      const handleCalculateLeaguePoints = useCallback(async () => {
         if (!db) return;
@@ -381,57 +380,6 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
         }
     }, [db, league.leagueId]);
 
-    useEffect(() => {
-        if (activeTab === 'predictions') {
-            fetchData();
-        }
-    }, [activeTab]);
-
-    const fetchData = useCallback(async () => {
-        if (!activeTab || !league?.leagueId) return;
-
-        setLoading(true);
-        setData(null);
-
-        let url = '';
-        try {
-            switch (activeTab) {
-                case 'matches':
-                    const fromDate = format(new Date(), 'yyyy-MM-dd');
-                    const toDate = format(addDays(new Date(), 14), 'yyyy-MM-dd');
-                    url = `/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&from=${fromDate}&to=${toDate}`;
-                    break;
-                case 'standings':
-                    url = `/api/football/standings?league=${league.leagueId}&season=${CURRENT_SEASON}`;
-                    break;
-                case 'scorers':
-                    url = `/api/football/players/topscorers?league=${league.leagueId}&season=${CURRENT_SEASON}`;
-                    break;
-                case 'predictions':
-                    const today = format(new Date(), 'yyyy-MM-dd');
-                    url = `/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&date=${today}`;
-                    break;
-            }
-            
-            if (url) {
-                const res = await fetch(url);
-                if (!res.ok) throw new Error('Failed to fetch data');
-                const result = await res.json();
-                
-                if (activeTab === 'standings') {
-                    setData(result.response[0]?.league?.standings[0] || []);
-                } else {
-                    setData(result.response || []);
-                }
-            }
-
-        } catch (error) {
-            console.error(`Error fetching ${activeTab}:`, error);
-            toast({ variant: 'destructive', title: 'خطأ', description: `فشل في جلب بيانات ${activeTab}` });
-        } finally {
-            setLoading(false);
-        }
-    }, [activeTab, league, toast]);
 
     const LeaderboardDisplay = () => {
          useEffect(() => {
@@ -576,7 +524,7 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
                                 key={fixture.fixture.id}
                                 fixture={fixture}
                                 userPrediction={predictions[fixture.fixture.id]}
-                                onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
+                                onSave={handleSavePrediction}
                             />
                         ))
                     ) : (
@@ -620,7 +568,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { db } = useFirestore();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-  const [mainTab, setMainTab] = useState('doreena');
+  const [mainTab, setMainTab] = useState<'doreena' | 'kurratna'>('doreena');
   const [doreenaSubTab, setDoreenaSubTab] = useState('predictions');
 
   useEffect(() => {
@@ -707,10 +655,10 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           </div>
         }
       />
-      <Tabs value={mainTab} onValueChange={setMainTab} className="flex flex-1 flex-col min-h-0">
+      <Tabs value={mainTab} onValueChange={(value) => setMainTab(value as any)} className="flex flex-1 flex-col min-h-0">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="kurratna">كرتنا</TabsTrigger>
-          <TabsTrigger value="doreena">دورينا</TabsTrigger>
+           <TabsTrigger value="kurratna">كرتنا</TabsTrigger>
+           <TabsTrigger value="doreena">دورينا</TabsTrigger>
         </TabsList>
         
         <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
@@ -764,3 +712,5 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
