@@ -486,7 +486,7 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
                     {(data as Standing[]).map((s) => (
                         <TableRow key={s.team.id} onClick={() => navigate('TeamDetails', { teamId: s.team.id })} className="cursor-pointer">
                             <TableCell className="text-center font-bold">{s.points}</TableCell>
-                            <TableCell className="text-center">{s.all.played}</TableCell>
+                            <TableCell className="text-center">{s.all?.played || 0}</TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-2 justify-end">
                                     <span>{s.team.name}</span>
@@ -739,3 +739,5 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
