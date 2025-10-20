@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -20,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CURRENT_SEASON } from "@/lib/constants";
 import { hardcodedTranslations } from "@/lib/hardcoded-translations";
-
+import { ScreenHeader } from "@/components/ScreenHeader";
 
 // --- Pinned Match Component ---
 function PinnedMatchCard({
