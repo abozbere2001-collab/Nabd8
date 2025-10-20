@@ -180,14 +180,14 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             if (cacheIsValid && cachedData) {
                 setManagedCompetitions(cachedData.managedCompetitions);
                 setCustomNames({
-                    leagues: new Map(Object.entries(cachedData.customNames.leagues).map(([k, v]) => [Number(k), v])),
-                    countries: new Map(Object.entries(cachedData.customNames.countries)),
-                    continents: new Map(Object.entries(cachedData.customNames.continents)),
+                    leagues: new Map(Object.entries(cachedData.customNames.leagues || {}).map(([k, v]) => [Number(k), v])),
+                    countries: new Map(Object.entries(cachedData.customNames.countries || {})),
+                    continents: new Map(Object.entries(cachedData.customNames.continents || {})),
                 });
             } else {
                 const compsSnapshot = await getDocs(collection(db, 'managedCompetitions'));
                 const fetchedCompetitions = compsSnapshot.docs.map(doc => doc.data() as ManagedCompetitionType);
-                let fetchedCustomNames = { leagues: {}, countries: {}, continents: {} };
+                let fetchedCustomNames: { leagues: Record<string, string>, countries: Record<string, string>, continents: Record<string, string> } = { leagues: {}, countries: {}, continents: {} };
 
                 if (isAdmin) {
                     try {
@@ -203,6 +203,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                         };
                     } catch (adminError) {
                         console.warn("Admin failed to fetch customizations, displaying public data only.", adminError);
+                        fetchedCustomNames = { leagues: {}, countries: {}, continents: {} };
                     }
                 }
 
@@ -217,10 +218,12 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
         } catch (error) {
             console.error("Failed to fetch competitions data:", error);
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: 'managedCompetitions or appConfig/cache',
-                operation: 'list',
-            }));
+            if (error instanceof Error && !error.message.includes('permission-denied')) {
+                 errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'managedCompetitions or appConfig/cache',
+                    operation: 'list',
+                }));
+            }
             setManagedCompetitions([]); // Set to empty array on error to stop loading
         } finally {
             setLoading(false);
