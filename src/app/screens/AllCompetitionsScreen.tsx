@@ -7,7 +7,7 @@ import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy, Loader2 }
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, onSnapshot, getDocs, writeBatch, getDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot, getDocs, writeBatch, getDoc, deleteDoc, deleteField } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProfileButton } from '../AppContentWrapper';
 
 
 // --- Persistent Cache Logic ---
@@ -77,7 +78,7 @@ const countryToContinent: { [key: string]: string } = {
     "Saudi-Arabia": "Asia", "Japan": "Asia", "South-Korea": "Asia", "China": "Asia", "Qatar": "Asia", "UAE": "Asia", "Iran": "Asia", "Iraq": "Asia", "Uzbekistan": "Asia", "Australia": "Asia", "Jordan": "Asia", "Syria": "Asia", "Lebanon": "Asia", "Oman": "Asia", "Kuwait": "Kuwait", "Bahrain": "Bahrain", "India": "Asia", "Thailand": "Asia", "Vietnam": "Asia", "Malaysia": "Asia", "Indonesia": "Asia", "Singapore": "Singapore", "Philippines": "Asia", "Hong-Kong": "Asia", "Palestine": "Asia", "Tajikistan": "Asia", "Turkmenistan": "Asia", "Kyrgyzstan": "Asia", "Bangladesh": "Asia", "Maldives": "Asia", "Cambodia": "Asia", "Myanmar": "Asia",
     "Egypt": "Africa", "Morocco": "Africa", "Tunisia": "Africa", "Algeria": "Africa", "Nigeria": "Africa", "Senegal": "Africa", "Ghana": "Africa", "Ivory-Coast": "Africa", "Cameroon": "Africa", "South-Africa": "Africa", "DR-Congo": "Africa", "Mali": "Africa", "Burkina-Faso": "Africa", "Guinea": "Africa", "Zambia": "Africa", "Cape-Verde": "Africa", "Uganda": "Africa", "Kenya": "Africa", "Tanzania": "Africa", "Sudan": "Sudan", "Libya": "Africa", "Angola": "Africa", "Zimbabwe": "Africa", "Ethiopia": "Africa",
     "USA": "North America", "Mexico": "North America", "Canada": "North America", "Costa-Rica": "North America", "Honduras": "North America", "Panama": "North America", "Jamaica": "North America", "El-Salvador": "North America", "Trinidad-and-Tobago": "North America", "Guatemala": "North America", "Nicaragua": "North America", "Cuba": "North America",
-    "Brazil": "South America", "Argentina": "South America", "Colombia": "South America", "Chile": "South America", "Uruguay": "South America", "Peru": "South America", "Ecuador": "South America", "Paraguay": "South America", "Venezuela": "South America", "Bolivia": "South America",
+    "Brazil": "South America", "Argentina": "South America", "Colombia": "South America", "Chile": "South America", "Uruguay": "South America", "Peru": "South America", "Ecuador": "South America", "Paraguay": "South America", "Venezuela": "South America", "Bolivia": "Bolivia",
     "New-Zealand": "Oceania", "Fiji": "Oceania",
     "Other": "Other"
 };
@@ -131,7 +132,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
           } catch (e) { console.warn("Could not check cache-buster."); }
     
-          if (cached && !forceRefresh && cached.lastFetched > serverLastUpdated && Date.now() - cached.lastFetched < CACHE_EXPIRATION_MS) {
+          if (cached?.data && !forceRefresh && cached.lastFetched > serverLastUpdated && Date.now() - cached.lastFetched < CACHE_EXPIRATION_MS) {
             return {
               competitions: cached.data.managedCompetitions,
               customNames: {
@@ -209,9 +210,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         ]);
     
         const teamNamesMap = new Map<number, string>();
-        if (customTeamsSnapshot && customTeamsSnapshot.docs) {
-          customTeamsSnapshot.docs.forEach(doc => teamNamesMap.set(Number(doc.id), doc.data().customName));
-        }
+        customTeamsSnapshot.docs.forEach(doc => teamNamesMap.set(Number(doc.id), doc.data().customName));
         
         setManagedCompetitions(clubResult.competitions);
         setNationalTeams(teamsResult);
@@ -563,7 +562,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     return (
         <div className="flex h-full flex-col bg-background">
             <ScreenHeader 
-                title="كل البطولات" 
+                title={"كل البطولات"} 
                 onBack={goBack} 
                 canGoBack={canGoBack} 
                 actions={
@@ -583,6 +582,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                             </Button>
                         </>
                       )}
+                      <ProfileButton />
                   </div>
                 }
             />
@@ -633,4 +633,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     );
 }
 
-    
