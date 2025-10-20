@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -375,11 +376,6 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             {pinnedMatches.map((match) => (
                 <PinnedMatchCard key={match.id} match={match} onManage={() => navigate("ManagePinnedMatch", { matchId: match.id })} isAdmin={isAdmin}/>
             ))}
-            {isAdmin && pinnedMatches.filter((m) => m.isEnabled).length === 0 && (
-                <Button className="w-full mb-2" onClick={() => navigate("ManagePinnedMatch", { matchId: null })}>
-                    <Pin className="ml-2 h-4 w-4" /> إضافة مباراة للتثبيت
-                </Button>
-            )}
         </div>
         
         {isLoading ? (
