@@ -154,25 +154,27 @@ export interface TeamStatistics {
 
 // --- Firebase Firestore Types ---
 
-export interface Favorites {
-  userId: string;
-  // "My Country" Favorites (Heart icon)
-  ourLeagueId?: number;
-  ourBallTeams?: { [key:number]: Team & { note?: string } };
-  // "My Choices" Favorites (Star icon)
-  leagues?: { [key: number]: {
+export interface FavoriteLeague {
     name: string;
     logo: string;
     leagueId: number;
     notificationsEnabled?: boolean;
-  } };
-  teams?: { [key:string]: {
+    isHearted?: boolean;
+}
+export interface FavoriteTeam {
     name: string;
     logo: string;
     teamId: number;
     type?: 'Club' | 'National';
+    note?: string;
     notificationsEnabled?: boolean;
-  } };
+    isHearted?: boolean;
+}
+
+export interface Favorites {
+  userId: string;
+  leagues?: { [key: number]: FavoriteLeague };
+  teams?: { [key: number]: FavoriteTeam };
   players?: { [key: number]: any };
   notificationsEnabled?: {
     news?: boolean;

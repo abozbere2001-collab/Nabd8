@@ -72,7 +72,7 @@ function PinnedMatchCard({
 
 
 // --- Favorite Teams Horizontal Scroll ---
-const FavoriteTeamsScroller = ({ teams, navigate }: { teams: (Team & {note?: string})[], navigate: ScreenProps['navigate']}) => {
+const FavoriteTeamsScroller = ({ teams, navigate }: { teams: (Team & { note?: string })[], navigate: ScreenProps['navigate']}) => {
     if (!teams || teams.length === 0) {
         return null;
     }
@@ -178,13 +178,13 @@ const TeamDetailsLoader = ({ leagueId, db, children }: { leagueId: number, db: a
 }
 
 // --- Our League Details Component ---
-const OurLeagueDetails = ({ leagueId, db, navigate }: { leagueId: number | undefined, db: any, navigate: ScreenProps['navigate'] }) => {
-    if (!leagueId) {
+const OurLeagueDetails = ({ league, db, navigate }: { league: Favorites['leagues'][number] | undefined, db: any, navigate: ScreenProps['navigate'] }) => {
+    if (!league) {
          return null;
     }
 
     return (
-        <TeamDetailsLoader leagueId={leagueId} db={db}>
+        <TeamDetailsLoader leagueId={league.leagueId} db={db}>
             {({ fixtures, standings, topScorers, leagueDetails }) => {
                  const sortedFixtures = useMemo(() => {
                     return [...fixtures].sort((a, b) => a.fixture.timestamp - b.fixture.timestamp);
@@ -312,7 +312,8 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             setIsLoading(false);
         });
     } else {
-        setFavorites({}); // Guests have no "Our Ball" favorites
+        // Guest users have no "My Country" data
+        setFavorites({});
         setIsLoading(false);
     }
     
@@ -323,9 +324,17 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
   }, [user, db]);
 
-  const ourBallTeams = useMemo(() => Object.values(favorites?.ourBallTeams ?? {}), [favorites]);
-  const ourLeagueId = favorites?.ourLeagueId;
-  const hasHeartFavorites = ourBallTeams.length > 0 || !!ourLeagueId;
+  const ourBallTeams = useMemo(() => {
+    if (!favorites.teams) return [];
+    return Object.values(favorites.teams).filter(t => t.isHearted);
+  }, [favorites.teams]);
+
+  const ourLeague = useMemo(() => {
+    if (!favorites.leagues) return undefined;
+    return Object.values(favorites.leagues).find(l => l.isHearted);
+  }, [favorites.leagues]);
+
+  const hasHeartFavorites = ourBallTeams.length > 0 || !!ourLeague;
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -359,8 +368,8 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             </div>
         ) : (
             <div className="space-y-6">
-                <FavoriteTeamsScroller teams={ourBallTeams} navigate={navigate} />
-                <OurLeagueDetails leagueId={ourLeagueId} db={db} navigate={navigate} />
+                <FavoriteTeamsScroller teams={ourBallTeams as (Team & { note?: string })[]} navigate={navigate} />
+                <OurLeagueDetails league={ourLeague} db={db} navigate={navigate} />
                  {!hasHeartFavorites && (
                      <div className="px-4">
                         <div className="flex flex-col items-center justify-center text-center text-muted-foreground border-2 border-dashed rounded-lg p-6">
@@ -376,5 +385,3 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
