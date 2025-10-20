@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy, Loader2 } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
@@ -19,8 +20,6 @@ import { useToast } from '@/hooks/use-toast';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileButton } from '../AppContentWrapper';
-import { hardcodedTranslations } from '@/lib/hardcoded-translations';
-
 
 // --- Persistent Cache Logic ---
 const COMPETITIONS_CACHE_KEY = 'goalstack_competitions_cache';
@@ -30,11 +29,6 @@ const CACHE_EXPIRATION_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
 
 interface CompetitionsCache {
     managedCompetitions: ManagedCompetitionType[];
-    customNames: {
-        leagues: Record<string, string>;
-        countries: Record<string, string>;
-        continents: Record<string, string>;
-    };
     lastFetched: number;
 }
 
@@ -120,14 +114,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const getName = useCallback((type: 'league' | 'team' | 'country' | 'continent', id: string | number, defaultName: string) => {
         if (!defaultName) return '';
         const firestoreMap = type === 'league' ? customNames.leagues : type === 'team' ? customNames.teams : type === 'country' ? customNames.countries : customNames.continents;
-        const customName = firestoreMap?.get(id as any);
-        if (customName) return customName;
-
-        const hardcodedKey = type === 'league' ? 'leagues' : type === 'team' ? 'teams' : type === 'country' ? 'countries' : 'continents';
-        const hardcodedName = hardcodedTranslations[hardcodedKey]?.[id as any];
-        if(hardcodedName) return hardcodedName;
-
-        return defaultName;
+        return firestoreMap?.get(id as any) || defaultName;
     }, [customNames]);
 
     const fetchAllData = useCallback(async (forceRefresh = false) => {
@@ -138,15 +125,10 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         }
 
         const fetchCustomNames = async () => {
-            const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, teamsSnapshot] = await Promise.all([
-                getDocs(collection(db, 'leagueCustomizations')),
-                getDocs(collection(db, 'countryCustomizations')),
-                getDocs(collection(db, 'continentCustomizations')),
-                getDocs(collection(db, 'teamCustomizations'))
-            ]).catch(err => {
-                console.warn("Could not fetch some customizations, this might be a permission issue for non-admins but data will still load.", err);
-                return [null, null, null, null];
-            });
+            const collections = ['leagueCustomizations', 'countryCustomizations', 'continentCustomizations', 'teamCustomizations'];
+            const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, teamsSnapshot] = await Promise.all(
+                collections.map(coll => getDocs(collection(db, coll)).catch(() => null)) // Return null on permission error for guests
+            );
 
             const fetchedCustomNames = {
                 leagues: new Map<number, string>(),
@@ -174,17 +156,17 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
             if (cached?.data?.managedCompetitions && !forceRefresh && cached.lastFetched > serverLastUpdated) {
                 setManagedCompetitions(cached.data.managedCompetitions);
-                return; // Names will be set by fetchCustomNames
+                return; 
             }
 
             try {
                 const compsSnapshot = await getDocs(collection(db, 'managedCompetitions'));
                 const fetchedCompetitions = compsSnapshot.docs.map(d => d.data() as ManagedCompetitionType);
                 setManagedCompetitions(fetchedCompetitions);
-                 setCachedData(COMPETITIONS_CACHE_KEY, { ...cached, data: { ...cached?.data, managedCompetitions: fetchedCompetitions, lastFetched: Date.now() } });
+                setCachedData(COMPETITIONS_CACHE_KEY, { managedCompetitions: fetchedCompetitions, lastFetched: Date.now() });
             } catch (error) {
                 if (error instanceof Error && (error.message.includes('permission-denied') || error.message.includes('insufficient permissions'))) {
-                    toast({ variant: "destructive", title: "خطأ في الصلاحيات", description: "فشل تحميل بيانات البطولات." });
+                    // This is expected for guests, do not show a toast.
                 }
             }
         };
@@ -430,7 +412,16 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             : deleteDoc(doc(db, collectionName, docId));
 
         op.then(() => {
-            fetchAllData(true);
+            // Update local state instead of a full refetch
+            setCustomNames(prev => {
+                const newMap = new Map(prev[type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type]);
+                if (newName && newName.trim() && newName !== originalName) {
+                    newMap.set(Number(id), newName);
+                } else {
+                    newMap.delete(Number(id));
+                }
+                return { ...prev, [type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type]: newMap };
+            });
             toast({ title: 'نجاح', description: 'تم حفظ التغييرات.' });
         }).catch(serverError => {
             const permissionError = new FirestorePermissionError({ path: doc(db, collectionName, docId).path, operation: 'write', requestResourceData: data });
