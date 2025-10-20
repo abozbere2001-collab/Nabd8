@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
@@ -19,7 +20,7 @@ import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
-import type { Favorites, AdminFavorite, ManagedCompetition } from '@/lib/types';
+import type { Favorites, AdminFavorite, ManagedCompetition, Team } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
@@ -51,17 +52,18 @@ interface SearchableItem {
 
 // --- Cache Logic ---
 const COMPETITIONS_CACHE_KEY = 'goalstack_competitions_cache';
-interface CompetitionsCache {
-    managedCompetitions: ManagedCompetition[];
-    customNames: { leagues: Record<string, string>, countries: Record<string, string>, continents: Record<string, string> };
+const TEAMS_CACHE_KEY = 'goalstack_national_teams_cache';
+interface Cache<T> {
+    data: T;
     lastFetched: number;
 }
-const getCachedCompetitions = (): CompetitionsCache | null => {
+const getCachedData = <T>(key: string): T | null => {
     if (typeof window === 'undefined') return null;
     try {
-        const cachedData = localStorage.getItem(COMPETITIONS_CACHE_KEY);
+        const cachedData = localStorage.getItem(key);
         if (!cachedData) return null;
-        return JSON.parse(cachedData) as CompetitionsCache;
+        const parsed = JSON.parse(cachedData) as Cache<T>;
+        return parsed.data;
     } catch (error) {
         return null;
     }
@@ -106,7 +108,7 @@ const ItemRow = ({ item, itemType, isFavorited, onFavoriteToggle, onResultClick,
 export function SearchSheet({ children, navigate, initialItemType }: { children: React.ReactNode, navigate: ScreenProps['navigate'], initialItemType?: ItemType }) {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchableItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   
@@ -123,17 +125,39 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   const [localSearchIndex, setLocalSearchIndex] = useState<SearchableItem[]>([]);
   
   const buildLocalIndex = useCallback(async () => {
+    setLoading(true);
     const index: SearchableItem[] = [];
-    const cachedData = getCachedCompetitions();
+    const competitionsCache = getCachedData<{managedCompetitions: ManagedCompetition[]}>(COMPETITIONS_CACHE_KEY);
+    const nationalTeamsCache = getCachedData<Team[]>(TEAMS_CACHE_KEY);
+    
+    let customTeamNames = new Map<number, string>();
+    let customLeagueNames = new Map<number, string>();
 
-    // 1. Add all managed competitions (leagues) from cache
-    if (cachedData?.managedCompetitions) {
-        cachedData.managedCompetitions.forEach(comp => {
-            const name = cachedData.customNames?.leagues?.[comp.leagueId] || hardcodedTranslations.leagues[comp.leagueId] || comp.name;
+    if(db) {
+        try {
+            const [teamsSnap, leaguesSnap] = await Promise.all([
+                getDocs(collection(db, 'teamCustomizations')),
+                getDocs(collection(db, 'leagueCustomizations'))
+            ]);
+            teamsSnap.forEach(doc => customTeamNames.set(Number(doc.id), doc.data().customName));
+            leaguesSnap.forEach(doc => customLeagueNames.set(Number(doc.id), doc.data().customName));
+        } catch (e) {
+            console.warn("Could not fetch custom names for index.");
+        }
+    }
+
+    const getName = (type: 'team' | 'league', id: number, defaultName: string) => {
+        const customMap = type === 'team' ? customTeamNames : customLeagueNames;
+        return customMap.get(id) || hardcodedTranslations[`${type}s`]?.[id] || defaultName;
+    };
+
+    if (competitionsCache?.managedCompetitions) {
+        competitionsCache.managedCompetitions.forEach(comp => {
+            const name = getName('league', comp.leagueId, comp.name);
             index.push({
                 id: comp.leagueId,
                 type: 'leagues',
-                name: name,
+                name,
                 normalizedName: normalizeArabic(name),
                 logo: comp.logo,
                 originalItem: { id: comp.leagueId, name: comp.name, logo: comp.logo }
@@ -141,35 +165,22 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         });
     }
 
-    // 2. Add custom-named teams from Firestore
-    if (db) {
-        try {
-            const teamsSnapshot = await getDocs(collection(db, 'teamCustomizations'));
-            const teamPromises = teamsSnapshot.docs.map(async (doc) => {
-                const teamId = Number(doc.id);
-                const customName = doc.data().customName;
-                 const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
-                 if (teamRes.ok) {
-                     const teamData = await teamRes.json();
-                     if (teamData.response?.[0]) {
-                        const team = teamData.response[0].team;
-                         index.push({
-                            id: team.id,
-                            type: 'teams',
-                            name: customName,
-                            normalizedName: normalizeArabic(customName),
-                            logo: team.logo,
-                            originalItem: team
-                         });
-                     }
-                 }
+    if (nationalTeamsCache) {
+        nationalTeamsCache.forEach(team => {
+            const name = getName('team', team.id, team.name);
+            index.push({
+                id: team.id,
+                type: 'teams',
+                name,
+                normalizedName: normalizeArabic(name),
+                logo: team.logo,
+                originalItem: { ...team }
             });
-            await Promise.all(teamPromises);
-        } catch (error) {
-            console.warn("Could not fetch custom team names for search index.");
-        }
+        });
     }
+    
     setLocalSearchIndex(index);
+    setLoading(false);
   }, [db]);
 
 
@@ -197,55 +208,24 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     }
   };
 
-  const handleSearch = useCallback(async (query: string) => {
+  const handleSearch = useCallback((query: string) => {
     setLoading(true);
-    setSearchResults([]);
     const normalizedQuery = normalizeArabic(query);
 
     if (!normalizedQuery) {
+        setSearchResults([]);
         setLoading(false);
         return;
     }
 
-    // --- Step 1: Local Search (includes custom names) ---
-    const localResults = localSearchIndex.filter(item => 
+    const results = localSearchIndex.filter(item => 
         item.normalizedName.includes(normalizedQuery)
-    ).map(item => ({
-        [item.type.slice(0, -1)]: item.originalItem,
-        type: item.type.slice(0, -1)
-    } as SearchResult));
+    );
     
-    // If local results are found, show them and STOP.
-    if (localResults.length > 0) {
-        setSearchResults(localResults);
-        setLoading(false);
-        return;
-    }
+    setSearchResults(results);
+    setLoading(false);
+  }, [localSearchIndex]);
 
-    // --- Step 2: If NO local results, search online ---
-    try {
-        const [teamsData, leaguesData] = await Promise.all([
-            fetch(`/api/football/teams?search=${query}`).then(res => res.ok ? res.json() : { response: [] }),
-            fetch(`/api/football/leagues?search=${query}`).then(res => res.ok ? res.json() : { response: [] })
-        ]);
-
-        const apiResults: SearchResult[] = [];
-        if (teamsData.response) {
-            apiResults.push(...teamsData.response.map((r: TeamResult) => ({ ...r, type: 'team' as const })));
-        }
-        if (leaguesData.response) {
-            apiResults.push(...leaguesData.response.map((r: LeagueResult) => ({ ...r, type: 'league' as const })));
-        }
-        
-        setSearchResults(apiResults);
-        
-    } catch (error) {
-        console.error("API Search Error: ", error);
-        toast({variant: 'destructive', title: 'خطأ في البحث', description: 'فشل الاتصال بالخادم.'});
-    } finally {
-        setLoading(false);
-    }
-  }, [localSearchIndex, toast]);
 
   useEffect(() => {
     if (debouncedSearchTerm && isOpen) {
@@ -255,7 +235,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     }
   }, [debouncedSearchTerm, handleSearch, isOpen]);
 
-  const getDisplayName = useCallback((type: 'team' | 'league', id: number, defaultName: string): string => {
+ const getDisplayName = useCallback((type: 'team' | 'league', id: number, defaultName: string): string => {
     const item = localSearchIndex.find(i => i.id === id && i.type === `${type}s`);
     return item?.name || hardcodedTranslations[`${type}s`]?.[id] || defaultName;
 }, [localSearchIndex]);
@@ -312,13 +292,11 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     });
   };
 
-  const handleResultClick = (result: SearchResult) => {
-    const item = result.type === 'team' ? result.team : result.league;
-    const displayName = getDisplayName(result.type, item.id, item.name);
-    if (result.type === 'team') {
-      navigate('TeamDetails', { teamId: result.team.id });
+  const handleResultClick = (result: SearchableItem) => {
+    if (result.type === 'teams') {
+      navigate('TeamDetails', { teamId: result.id });
     } else {
-      navigate('CompetitionDetails', { leagueId: result.league.id, title: displayName, logo: result.league.logo });
+      navigate('CompetitionDetails', { leagueId: result.id, title: result.name, logo: result.logo });
     }
     handleOpenChange(false);
   }
@@ -344,7 +322,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     try {
         await batch.commit();
         toast({ title: 'نجاح', description: 'تم حفظ التغييرات. قد تحتاج لإعادة فتح البحث لرؤية التحديث.' });
-        await buildLocalIndex(); // Rebuild the index after a change
+        await buildLocalIndex();
         if(debouncedSearchTerm) {
             handleSearch(debouncedSearchTerm);
         }
@@ -368,10 +346,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     if (debouncedSearchTerm) {
       return searchResults.length > 0 ? (
         searchResults.map(result => {
-          const item = result.type === 'team' ? result.team : result.league;
-          const isFavorited = !!favorites?.[result.type]?.[item.id];
-          const displayName = getDisplayName(result.type, item.id, item.name);
-          return <ItemRow key={`${result.type}-${item.id}`} item={{...item, name: displayName}} itemType={result.type as ItemType} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, result.type as ItemType)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(result.type as RenameType, item.id, item)} />;
+          const isFavorited = !!favorites?.[result.type]?.[result.id];
+          return <ItemRow key={`${result.type}-${result.id}`} item={result} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, result.type)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(result.type as RenameType, result.id, result.originalItem)} />;
         })
       ) : <p className="text-muted-foreground text-center pt-8">لا توجد نتائج بحث.</p>;
     }
@@ -383,9 +359,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
           const isFavorited = !!favorites?.[itemType]?.[item.id];
           const displayName = getDisplayName(itemType.slice(0,-1) as 'team' | 'league' , item.id, item.name);
           const resultType = itemType === 'teams' ? 'team' : 'league';
-          const result = { [resultType]: { ...item, name: displayName }, type: resultType } as SearchResult;
 
-          return <ItemRow key={item.id} item={{...item, name: displayName}} itemType={itemType} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, itemType)} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(resultType as RenameType, item.id, item)} />;
+          return <ItemRow key={item.id} item={{...item, name: displayName}} itemType={itemType} isFavorited={isFavorited} onFavoriteToggle={(i) => handleFavorite(i, itemType)} onResultClick={() => handleResultClick({type: resultType, [resultType]: item} as SearchResult)} isAdmin={isAdmin} onRename={() => handleOpenRename(resultType as RenameType, item.id, item)} />;
         })}
       </div>
     );

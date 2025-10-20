@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileButton } from '../AppContentWrapper';
+import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 // --- Persistent Cache Logic ---
 const COMPETITIONS_CACHE_KEY = 'goalstack_competitions_cache';
@@ -113,50 +114,65 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const getName = useCallback((type: 'league' | 'team' | 'country' | 'continent', id: string | number, defaultName: string) => {
         if (!defaultName) return '';
-        const firestoreMap = type === 'league' ? customNames.leagues : type === 'team' ? customNames.teams : type === 'country' ? customNames.countries : customNames.continents;
-        return firestoreMap?.get(id as any) || defaultName;
+        const firestoreMap = customNames[type === 'league' ? 'leagues' : type === 'team' ? 'teams' : type];
+        return firestoreMap?.get(id as any) || hardcodedTranslations[type === 'league' ? 'leagues' : type === 'team' ? 'teams' : type]?.get(id) || defaultName;
     }, [customNames]);
 
     const fetchAllData = useCallback(async (forceRefresh = false) => {
         setLoadingClubData(true);
-        if (!db) {
-            setLoadingClubData(false);
-            return;
-        }
 
         const fetchCustomNames = async () => {
-            const collections = ['leagueCustomizations', 'countryCustomizations', 'continentCustomizations', 'teamCustomizations'];
-            const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, teamsSnapshot] = await Promise.all(
-                collections.map(coll => getDocs(collection(db, coll)).catch(() => null)) // Return null on permission error for guests
-            );
-
-            const fetchedCustomNames = {
-                leagues: new Map<number, string>(),
-                countries: new Map<string, string>(),
-                continents: new Map<string, string>(),
-                teams: new Map<number, string>()
+             if (!db) {
+                setCustomNames({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
+                return;
             };
+            try {
+                const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, teamsSnapshot] = await Promise.all([
+                    getDocs(collection(db, 'leagueCustomizations')),
+                    getDocs(collection(db, 'countryCustomizations')),
+                    getDocs(collection(db, 'continentCustomizations')),
+                    getDocs(collection(db, 'teamCustomizations'))
+                ]);
 
-            leaguesSnapshot?.forEach(d => fetchedCustomNames.leagues.set(Number(d.id), d.data().customName));
-            countriesSnapshot?.forEach(d => fetchedCustomNames.countries.set(d.id, d.data().customName));
-            continentsSnapshot?.forEach(d => fetchedCustomNames.continents.set(d.id, d.data().customName));
-            teamsSnapshot?.forEach(d => fetchedCustomNames.teams.set(Number(d.id), d.data().customName));
-            
-            return fetchedCustomNames;
+                const fetchedCustomNames = {
+                    leagues: new Map<number, string>(),
+                    countries: new Map<string, string>(),
+                    continents: new Map<string, string>(),
+                    teams: new Map<number, string>()
+                };
+
+                leaguesSnapshot?.forEach(d => fetchedCustomNames.leagues.set(Number(d.id), d.data().customName));
+                countriesSnapshot?.forEach(d => fetchedCustomNames.countries.set(d.id, d.data().customName));
+                continentsSnapshot?.forEach(d => fetchedCustomNames.continents.set(d.id, d.data().customName));
+                teamsSnapshot?.forEach(d => fetchedCustomNames.teams.set(Number(d.id), d.data().customName));
+                
+                setCustomNames(fetchedCustomNames);
+
+            } catch(e) {
+                 console.warn("Could not fetch custom names, this is expected for guests/non-admins");
+                 setCustomNames({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
+            }
         };
 
         const fetchClubData = async () => {
             const cached = getCachedData<CompetitionsCache>(COMPETITIONS_CACHE_KEY);
             let serverLastUpdated = 0;
-            try {
-                const cacheBusterRef = doc(db, 'appConfig', 'cache');
-                const cacheBusterSnap = await getDoc(cacheBusterRef);
-                serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
-            } catch (e) { console.warn("Could not check cache-buster."); }
+            if (db) {
+                try {
+                    const cacheBusterRef = doc(db, 'appConfig', 'cache');
+                    const cacheBusterSnap = await getDoc(cacheBusterRef);
+                    serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
+                } catch (e) { console.warn("Could not check cache-buster."); }
+            }
 
-            if (cached?.data?.managedCompetitions && !forceRefresh && cached.lastFetched > serverLastUpdated) {
+            if (cached?.data?.managedCompetitions && cached.data.managedCompetitions.length > 0 && !forceRefresh && cached.lastFetched > serverLastUpdated) {
                 setManagedCompetitions(cached.data.managedCompetitions);
                 return; 
+            }
+
+            if (!db) {
+                setManagedCompetitions([]);
+                return;
             }
 
             try {
@@ -165,20 +181,14 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 setManagedCompetitions(fetchedCompetitions);
                 setCachedData(COMPETITIONS_CACHE_KEY, { managedCompetitions: fetchedCompetitions, lastFetched: Date.now() });
             } catch (error) {
-                if (error instanceof Error && (error.message.includes('permission-denied') || error.message.includes('insufficient permissions'))) {
-                    // This is expected for guests, do not show a toast.
-                }
+                console.error("Permission error fetching managed competitions for admin:", error);
             }
         };
 
-        const [fetchedNames] = await Promise.all([
+        await Promise.all([
             fetchCustomNames(),
             fetchClubData()
         ]);
-
-        if (fetchedNames) {
-            setCustomNames(fetchedNames);
-        }
         
         setLoadingClubData(false);
 
@@ -196,7 +206,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         toast({ title: 'جاري جلب بيانات المنتخبات...', description: 'قد تستغرق هذه العملية دقيقة في المرة الأولى.' });
     
         try {
-            // Step 1: Fetch all countries
             let countries: { name: string }[] = [];
             const cachedCountries = getCachedData<{ name: string }[]>(COUNTRIES_CACHE_KEY);
             if (cachedCountries?.data) {
@@ -209,16 +218,15 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 setCachedData(COUNTRIES_CACHE_KEY, countries);
             }
 
-            // Step 2: Fetch national team for each country
             const teamPromises = countries.map(country => 
                 fetch(`/api/football/teams?country=${country.name}`)
                     .then(res => res.ok ? res.json() : { response: [] })
-                    .then(data => (data.response || []).find((r: { team: Team }) => r.team.national))
-                    .catch(() => null)
+                    .then(data => (data.response || []).filter((r: { team: Team }) => r.team.national).map((r: { team: Team}) => r.team))
+                    .catch(() => []) // return empty array on error for a specific country
             );
     
             const results = await Promise.all(teamPromises);
-            const nationalTeamsData = results.filter(Boolean).map(r => r.team);
+            const nationalTeamsData = results.flat(); // Flatten the array of arrays
             
             setCachedData(TEAMS_CACHE_KEY, nationalTeamsData);
             setNationalTeams(nationalTeamsData);
@@ -399,7 +407,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         }
     }, [user, db, favorites]);
 
-    const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
+     const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
         if (!db) return;
         const collectionName = `${type}Customizations`;
         const docId = String(id);
@@ -412,7 +420,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             : deleteDoc(doc(db, collectionName, docId));
 
         op.then(() => {
-            // Update local state instead of a full refetch
             setCustomNames(prev => {
                 const newMap = new Map(prev[type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type]);
                 if (newName && newName.trim() && newName !== originalName) {
@@ -420,7 +427,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 } else {
                     newMap.delete(Number(id));
                 }
-                return { ...prev, [type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type]: newMap };
+                const updatedNames = { ...prev, [type === 'team' ? 'teams' : type === 'league' ? 'leagues' : type]: newMap };
+                return updatedNames;
             });
             toast({ title: 'نجاح', description: 'تم حفظ التغييرات.' });
         }).catch(serverError => {
@@ -614,7 +622,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 }
             />
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                 <Accordion type="multiple" className="w-full space-y-4" onValueChange={handleNationalTeamsAccordionOpen}>
+                 <Accordion type="multiple" className="w-full space-y-4" onValueChange={handleNationalTeamsAccordionOpen} defaultValue={["club-competitions"]}>
                     <AccordionItem value="national-teams" className="rounded-lg border bg-card/50">
                         <AccordionTrigger className="px-4 py-3 hover:no-underline">
                             <div className="flex items-center gap-3">
