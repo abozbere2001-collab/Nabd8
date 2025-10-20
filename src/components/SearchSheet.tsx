@@ -281,49 +281,50 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
 
   const handleFavorite = useCallback((item: Item, type: 'star' | 'heart') => {
-        const currentFavorites = user && db ? { ...favorites } : getLocalFavorites();
-        let updateData: any = {};
-        let newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-        
         const isLeague = 'leagueId' in item || !('national' in item);
         const itemId = item.id;
         
+        const currentFavorites = user && db ? favorites : getLocalFavorites();
+        const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+
+        let updateData: any = {};
+        
         if (type === 'heart') {
             if (isLeague) {
-                const comp = item as LeagueResult['league'];
                 if (newFavorites.ourLeagueId === itemId) {
                     delete newFavorites.ourLeagueId;
-                    updateData.ourLeagueId = deleteField();
+                    updateData['ourLeagueId'] = deleteField();
                 } else {
                     newFavorites.ourLeagueId = itemId;
-                    updateData.ourLeagueId = itemId;
+                    updateData['ourLeagueId'] = itemId;
                 }
-            } else {
-                const team = item as TeamResult['team'];
+            } else { // Team
+                const fieldPath = `ourBallTeams.${itemId}`;
                 if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
                 if (newFavorites.ourBallTeams[itemId]) {
                     delete newFavorites.ourBallTeams[itemId];
-                    updateData[`ourBallTeams.${itemId}`] = deleteField();
+                    updateData[fieldPath] = deleteField();
                 } else {
-                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: team.national ? 'National' : 'Club' };
+                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
                     newFavorites.ourBallTeams[itemId] = favData;
-                    updateData[`ourBallTeams.${itemId}`] = favData;
+                    updateData[fieldPath] = favData;
                 }
             }
         } else { // Star
-             const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-             if (!newFavorites[itemType]) newFavorites[itemType] = {};
+            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+            const fieldPath = `${itemType}.${itemId}`;
+            if (!newFavorites[itemType]) newFavorites[itemType] = {};
 
-             if (newFavorites[itemType]?.[itemId]) {
-                 delete newFavorites[itemType]![itemId];
-                 updateData[`${itemType}.${itemId}`] = deleteField();
-             } else {
+            if (newFavorites[itemType]?.[itemId]) {
+                delete newFavorites[itemType]![itemId];
+                updateData[fieldPath] = deleteField();
+            } else {
                 const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
                 newFavorites[itemType]![itemId] = favData;
-                updateData[`${itemType}.${itemId}`] = favData;
-             }
+                updateData[fieldPath] = favData;
+            }
         }
         
         setFavorites(newFavorites);
@@ -331,9 +332,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         if (user && db) {
             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
             updateDoc(favRef, updateData).catch(serverError => {
-                setFavorites(currentFavorites);
-                const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
-                errorEmitter.emit('permission-error', permissionError);
+                setFavorites(currentFavorites); // Revert on error
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData }));
             });
         } else {
             setLocalFavorites(newFavorites);
@@ -456,3 +456,4 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
+

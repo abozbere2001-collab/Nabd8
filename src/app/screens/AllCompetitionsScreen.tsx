@@ -346,59 +346,61 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [user, db]);
 
      const handleFavorite = useCallback((item: ManagedCompetitionType | Team, type: 'star' | 'heart') => {
-        const currentFavorites = user && db ? { ...favorites } : getLocalFavorites();
-        let updateData: any = {};
-        let newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-        
         const isLeague = 'leagueId' in item;
         const itemId = isLeague ? item.leagueId : item.id;
         
+        const currentFavorites = user && db ? favorites : getLocalFavorites();
+        const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+
+        let updateData: any = {};
+        let fieldToUpdate: string = '';
+
         if (type === 'heart') {
             if (isLeague) {
-                const comp = item as ManagedCompetitionType;
+                fieldToUpdate = 'ourLeagueId';
                 if (newFavorites.ourLeagueId === itemId) {
                     delete newFavorites.ourLeagueId;
-                    updateData.ourLeagueId = deleteField();
+                    updateData[fieldToUpdate] = deleteField();
                 } else {
                     newFavorites.ourLeagueId = itemId;
-                    updateData.ourLeagueId = itemId;
+                    updateData[fieldToUpdate] = itemId;
                 }
-            } else {
-                const team = item as Team;
+            } else { // Team
+                fieldToUpdate = `ourBallTeams.${itemId}`;
                 if (!newFavorites.ourBallTeams) newFavorites.ourBallTeams = {};
                 if (newFavorites.ourBallTeams[itemId]) {
                     delete newFavorites.ourBallTeams[itemId];
-                    updateData[`ourBallTeams.${itemId}`] = deleteField();
+                    updateData[fieldToUpdate] = deleteField();
                 } else {
-                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: team.national ? 'National' : 'Club' };
+                    const favData = { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
                     newFavorites.ourBallTeams[itemId] = favData;
-                    updateData[`ourBallTeams.${itemId}`] = favData;
+                    updateData[fieldToUpdate] = favData;
                 }
             }
         } else { // Star
-             const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-             if (!newFavorites[itemType]) newFavorites[itemType] = {};
+            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+            fieldToUpdate = `${itemType}.${itemId}`;
+            if (!newFavorites[itemType]) newFavorites[itemType] = {};
 
-             if (newFavorites[itemType]?.[itemId]) {
-                 delete newFavorites[itemType]![itemId];
-                 updateData[`${itemType}.${itemId}`] = deleteField();
-             } else {
+            if (newFavorites[itemType]?.[itemId]) {
+                delete newFavorites[itemType]![itemId];
+                updateData[fieldToUpdate] = deleteField();
+            } else {
                 const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
                 newFavorites[itemType]![itemId] = favData;
-                updateData[`${itemType}.${itemId}`] = favData;
-             }
+                updateData[fieldToUpdate] = favData;
+            }
         }
-        
+
         setFavorites(newFavorites);
 
         if (user && db) {
             const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
             updateDoc(favRef, updateData).catch(serverError => {
-                setFavorites(currentFavorites);
-                const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
-                errorEmitter.emit('permission-error', permissionError);
+                setFavorites(currentFavorites); // Revert on error
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData }));
             });
         } else {
             setLocalFavorites(newFavorites);
@@ -533,7 +535,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                        </div>
                                        <div className="flex items-center gap-1">
                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                               <Heart className={favorites.ourLeagueId === comp.leagueId ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                               <Heart className={(favorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                            </Button>
                                            {isAdmin && (
                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
@@ -570,7 +572,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                </div>
                                                <div className="flex items-center gap-1">
                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavorite(comp, 'heart'); }}>
-                                                       <Heart className={favorites.ourLeagueId === comp.leagueId ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
+                                                       <Heart className={(favorites.ourLeagueId === comp.leagueId) ? "h-5 w-5 text-red-500 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                    </Button>
                                                    {isAdmin && (
                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('league', comp.leagueId, comp.name, managedCompetitions?.find(c => c.leagueId === comp.leagueId)?.name) }}>
