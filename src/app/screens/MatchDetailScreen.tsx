@@ -307,11 +307,9 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
         return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     }
 
-    const home = lineups.find(l => l.team.id === lineups[0].team.id);
-    const away = lineups.find(l => l.team.id !== lineups[0].team.id);
+    const home = lineups[0];
+    const away = lineups[1];
     
-    if (!home || !away) return <p className="text-center text-muted-foreground p-8">التشكيلات غير كاملة.</p>;
-
     const activeLineup = activeTeamTab === 'home' ? home : away;
     
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
@@ -581,15 +579,21 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
 
     useEffect(() => {
         let isMounted = true;
-    
+
         const fetchAllData = async () => {
             if (!fixtureId) return;
-            setLoading(true);
-    
+
+            // Immediately show initial fixture if available
+            if (initialFixture) {
+                setFixture(initialFixture);
+            } else {
+                setLoading(true);
+            }
+            
             try {
-                // Step 1: Fetch custom names
+                // Fetch custom names first
                 if (db) {
-                    const [teamsSnapshot, leaguesSnapshot, playersSnapshot, coachSnapshot] = await Promise.all([
+                     const [teamsSnapshot, leaguesSnapshot, playersSnapshot, coachSnapshot] = await Promise.all([
                         getDocs(collection(db, 'teamCustomizations')),
                         getDocs(collection(db, 'leagueCustomizations')),
                         getDocs(collection(db, 'playerCustomizations')),
@@ -604,79 +608,66 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                     coachSnapshot.forEach(doc => names.coach.set(Number(doc.id), doc.data().customName));
                     setCustomNames(names);
                 }
-    
-                // Step 2: Fetch all initial data concurrently
-                const [fixtureRes, lineupsRes, eventsRes, statisticsRes] = await Promise.all([
-                    fetch(`/api/football/fixtures?id=${fixtureId}`),
-                    fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`),
-                    fetch(`/api/football/fixtures/events?fixture=${fixtureId}`),
-                    fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`)
-                ]);
-    
+
+                // Fetch fixture data (even if initialFixture is present, to get latest)
+                const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
                 if (!isMounted) return;
-    
                 const fixtureData = await fixtureRes.json();
-                const lineupsData = await lineupsRes.json();
-                const eventsData = await eventsRes.json();
-                const statisticsData = await statisticsRes.json();
-    
                 const currentFixture = fixtureData.response?.[0];
+
                 if (!currentFixture) {
                     toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على المباراة.' });
                     setLoading(false);
                     return;
                 }
                 
-                // Apply names immediately after fetching
                 setFixture(applyCustomNames(currentFixture, 'fixture'));
-                setLineups(applyCustomNames(lineupsData.response || [], 'lineups'));
-                setEvents(applyCustomNames(eventsData.response || [], 'events'));
-                setStatistics(applyCustomNames(statisticsData.response || [], 'statistics'));
-    
-                setLoading(false); // Stop main loading indicator
-    
-                // Step 3: Fetch non-critical data (standings, detailed players)
-                const leagueId = currentFixture.league?.id;
-                const season = currentFixture.league?.season || CURRENT_SEASON;
-    
-                if (leagueId) {
-                    fetch(`/api/football/standings?league=${leagueId}&season=${season}`)
-                        .then(res => res.json())
-                        .then(standingsData => {
-                            if (isMounted) {
-                                setStandings(applyCustomNames(standingsData?.response?.[0]?.league?.standings[0] || [], 'standings'));
-                            }
-                        }).catch(e => console.error("Could not fetch standings", e));
+                setLoading(false);
+
+                // Fetch other data concurrently after getting fixture
+                const { league, teams } = currentFixture;
+                const leagueId = league?.id;
+                const season = league?.season || CURRENT_SEASON;
+
+                const fetchPromises = [
+                    fetch(`/api/football/fixtures/lineups?fixture=${fixtureId}`).then(res => res.json()),
+                    fetch(`/api/football/fixtures/events?fixture=${fixtureId}`).then(res => res.json()),
+                    fetch(`/api/football/fixtures/statistics?fixture=${fixtureId}`).then(res => res.json()),
+                    leagueId ? fetch(`/api/football/standings?league=${leagueId}&season=${season}`).then(res => res.json()) : Promise.resolve(null),
+                    fetch(`/api/football/fixtures/players?fixture=${fixtureId}`).then(res => res.json())
+                ];
+
+                const [lineupsData, eventsData, statisticsData, standingsData, playersData] = await Promise.all(fetchPromises);
+
+                if (!isMounted) return;
+
+                // Set lineups and events first
+                let initialLineups = applyCustomNames(lineupsData?.response || [], 'lineups');
+                setLineups(initialLineups);
+                setEvents(applyCustomNames(eventsData?.response || [], 'events'));
+                setStatistics(applyCustomNames(statisticsData?.response || [], 'statistics'));
+                setStandings(applyCustomNames(standingsData?.response?.[0]?.league?.standings[0] || [], 'standings'));
+                
+                // Then, merge detailed player data (with ratings) into lineups
+                if (playersData?.response) {
+                    const detailedPlayers = playersData.response.flatMap((team: any) => team.players);
+                    setLineups(prevLineups => prevLineups ? mergePlayerData(prevLineups, detailedPlayers) : null);
                 }
-    
-                fetch(`/api/football/fixtures/players?fixture=${fixtureId}`)
-                    .then(res => res.json())
-                    .then(playersData => {
-                        if (isMounted && playersData.response) {
-                            const detailedPlayers = playersData.response.flatMap((team: any) => team.players);
-                            setLineups(prevLineups => {
-                                if (prevLineups) {
-                                    return mergePlayerData(prevLineups, detailedPlayers);
-                                }
-                                return prevLineups;
-                            });
-                        }
-                    }).catch(e => console.error("Could not fetch detailed players", e));
-    
+
             } catch (error) {
-                if(isMounted) {
+                 if (isMounted) {
                     console.error("Failed to fetch match details:", error);
                     toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحميل بيانات المباراة.' });
                     setLoading(false);
                 }
             }
         };
-    
+
         fetchAllData();
-    
+
         return () => { isMounted = false; };
-    
-    }, [fixtureId, db, toast, applyCustomNames]);
+
+    }, [fixtureId, db, toast, applyCustomNames, initialFixture]);
     
     useEffect(() => {
         if (!db || !fixtureId) return;
@@ -839,4 +830,5 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
 

@@ -62,14 +62,14 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
         }
         if (live) {
             return {
-                main: `${fixture.goals.away ?? '-'} - ${fixture.goals.home ?? '-'}`,
+                main: `${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`,
                 sub: status.short === 'HT' ? 'استراحة' : liveDisplayTime ? liveDisplayTime : 'مباشر',
                 isLive: true
             };
         }
         if (isFinished) {
             return {
-                main: `${fixture.goals.away ?? '-'} - ${fixture.goals.home ?? '-'}`,
+                main: `${fixture.goals.home ?? '-'} - ${fixture.goals.away ?? '-'}`,
                 sub: status.long,
                 isLive: false
             };
