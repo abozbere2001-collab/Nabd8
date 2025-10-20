@@ -6,7 +6,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { useFirestore, useAdmin, useAuth } from '@/firebase/provider';
-import { collection, onSnapshot, doc, query } from 'firebase/firestore';
+import { collection, onSnapshot, doc, query, getDoc } from 'firebase/firestore';
 import type { PinnedMatch, Favorites, Team } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -17,6 +17,7 @@ import { ProfileButton } from '../AppContentWrapper';
 import { OurLeagueTab } from '@/components/my-country/OurLeagueTab';
 import { OurBallTab } from '@/components/my-country/OurBallTab';
 import { getLocalFavorites } from '@/lib/local-favorites';
+import { hardcodedTranslations }from '@/lib/hardcoded-translations';
 
 function PinnedMatchCard({ match, onManage, isAdmin }: { match: PinnedMatch, onManage: () => void, isAdmin: boolean}) {
     if (!match.isEnabled) return null;
@@ -59,11 +60,14 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const [favorites, setFavorites] = useState<Partial<Favorites>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [pinnedMatches, setPinnedMatches] = useState<PinnedMatch[]>([]);
+    const [leagueDetails, setLeagueDetails] = useState<{ id: number; name: string; logo: string; } | null>(null);
+    const [loadingLeague, setLoadingLeague] = useState(false);
+
 
     useEffect(() => {
         setIsLoading(true);
-        const favs = getLocalFavorites();
-        setFavorites(favs);
+        const localFavs = getLocalFavorites();
+        setFavorites(localFavs); // Set local favorites initially
         
         if (user && db) {
             const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
@@ -77,23 +81,49 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             });
             return () => unsubscribe();
         } else {
-            setIsLoading(false);
+            setIsLoading(false); // No user, so no loading from firestore
         }
     }, [user, db]);
+
+     const ourLeagueId = useMemo(() => favorites?.ourLeagueId, [favorites]);
+     const ourBallTeams = useMemo(() => Object.values(favorites?.ourBallTeams || {}).sort((a, b) => a.name.localeCompare(b.name)), [favorites?.ourBallTeams]);
+
+    useEffect(() => {
+        if (ourLeagueId) {
+            setLoadingLeague(true);
+            const leagueName = hardcodedTranslations.leagues[ourLeagueId];
+            if(leagueName) {
+                 setLeagueDetails({ id: ourLeagueId, name: leagueName, logo: `https://media.api-sports.io/football/leagues/${ourLeagueId}.png` });
+                 setLoadingLeague(false);
+            } else {
+                getDoc(doc(db, 'managedCompetitions', String(ourLeagueId)))
+                    .then(docSnap => {
+                        if (docSnap.exists()) {
+                            const data = docSnap.data();
+                            setLeagueDetails({ id: ourLeagueId, name: data.name, logo: data.logo });
+                        }
+                    })
+                    .catch(console.error)
+                    .finally(() => setLoadingLeague(false));
+            }
+        } else {
+            setLeagueDetails(null);
+        }
+    }, [ourLeagueId, db]);
+
 
     useEffect(() => {
         if (!db) return;
         const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
-        const unsub = onSnapshot(query(pinnedMatchesRef), (snapshot) => {
-            setPinnedMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch)));
+        const q = query(pinnedMatchesRef);
+        const unsub = onSnapshot(q, (snapshot) => {
+            setPinnedMatches(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as PinnedMatch)));
         }, (serverError) => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
         });
         return () => unsub();
     }, [db]);
-    
-    const ourLeagueId = useMemo(() => favorites?.ourLeagueId, [favorites]);
-    const ourBallTeams = useMemo(() => Object.values(favorites.ourBallTeams || {}).sort((a, b) => a.name.localeCompare(b.name)), [favorites.ourBallTeams]);
+
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -148,7 +178,8 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                         <TabsContent value="our-league" className="flex-1 overflow-auto">
                              <OurLeagueTab
                                 navigate={navigate}
-                                ourLeagueId={ourLeagueId}
+                                leagueDetails={leagueDetails}
+                                isLoading={loadingLeague}
                             />
                         </TabsContent>
                         <TabsContent value="our-ball" className="pt-0 flex-1 overflow-auto">
