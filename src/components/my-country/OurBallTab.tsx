@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -110,4 +109,3 @@ export function OurBallTab({ navigate, ourBallTeams }: OurBallTabProps) {
         </div>
     );
 }
-

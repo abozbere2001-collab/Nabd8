@@ -65,51 +65,47 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     
     useEffect(() => {
         let isMounted = true;
+        setIsLoading(true);
 
-        const fetchAllData = () => {
-            setIsLoading(true);
-            let favoritesUnsubscribe: (() => void) | null = null;
-            let pinnedMatchesUnsubscribe: (() => void) | null = null;
-    
-            if (user && db) {
-                const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                favoritesUnsubscribe = onSnapshot(favsRef, (docSnap) => {
-                    if (isMounted) {
-                        setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
-                    }
-                }, (error) => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
-                    if (isMounted) setFavorites({});
-                });
-            } else {
-                setFavorites(getLocalFavorites());
-            }
-    
-            if (db) {
-                const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
-                pinnedMatchesUnsubscribe = onSnapshot(query(pinnedMatchesRef), (snapshot) => {
-                    if (isMounted) {
-                        setPinnedMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch)));
-                    }
-                }, (serverError) => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
-                });
-            }
-
-            // Combine loading state logic
-            const loadingTimer = setTimeout(() => {
-                if (isMounted) setIsLoading(false);
-            }, 500);
-    
-            return () => {
-                isMounted = false;
-                clearTimeout(loadingTimer);
-                if (favoritesUnsubscribe) favoritesUnsubscribe();
-                if (pinnedMatchesUnsubscribe) pinnedMatchesUnsubscribe();
-            };
+        let favoritesUnsubscribe: (() => void) | null = null;
+        if (user && db) {
+            const favsRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            favoritesUnsubscribe = onSnapshot(favsRef, (docSnap) => {
+                if (isMounted) {
+                    setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
+                }
+            }, (error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favsRef.path, operation: 'get' }));
+                if (isMounted) setFavorites({});
+            });
+        } else {
+            setFavorites(getLocalFavorites());
         }
 
-        fetchAllData();
+        let pinnedMatchesUnsubscribe: (() => void) | null = null;
+        if (db) {
+            const pinnedMatchesRef = collection(db, 'pinnedIraqiMatches');
+            pinnedMatchesUnsubscribe = onSnapshot(query(pinnedMatchesRef), (snapshot) => {
+                if (isMounted) {
+                    setPinnedMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PinnedMatch)));
+                }
+            }, (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'pinnedIraqiMatches', operation: 'list' }));
+            });
+        }
+        
+        // This timer ensures that even for guest users (no db calls), the loading state is managed.
+        const timer = setTimeout(() => {
+            if(isMounted) setIsLoading(false);
+        }, 500);
+
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timer);
+            if (favoritesUnsubscribe) favoritesUnsubscribe();
+            if (pinnedMatchesUnsubscribe) pinnedMatchesUnsubscribe();
+        };
     }, [user, db]);
 
     useEffect(() => {
@@ -126,7 +122,6 @@ export function MyCountryScreen({ navigate, goBack, canGoBack }: ScreenProps) {
                 return;
             }
 
-            // If we already have the correct data, don't refetch
             if (ourLeagueData?.id === leagueId) {
                  if(isMounted) setLoadingLeague(false);
                  return;
