@@ -24,7 +24,7 @@ export function LeagueHeaderItem({ league, isFavorited, onFavoriteToggle, onClic
                 <Avatar className="h-6 w-6 p-0.5">
                     <AvatarImage src={league.logo} alt={league.name} className="object-contain" />
                 </Avatar>
-                <span className="text-sm truncate font-semibold">{league.name}</span>
+                <span className="text-sm truncate font-bold">{league.name}</span>
             </div>
             <div className="flex items-center gap-1">
                 {isAdmin && (

@@ -11,7 +11,7 @@ export default {
     extend: {
       fontFamily: {
         body: ['var(--font-cairo)', 'sans-serif'],
-        headline: ['var(--font-tajawal)', 'sans-serif'],
+        headline: ['var(--font-cairo)', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
