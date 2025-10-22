@@ -11,6 +11,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 import type { Fixture, Prediction, PredictionMatch } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { PredictionOdds } from './PredictionOdds';
 
 const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictionMatch: PredictionMatch, userPrediction?: Prediction, onSave: (fixtureId: number, home: string, away: string) => void }) => {
     const { fixtureData: fixture } = predictionMatch;
@@ -115,6 +116,11 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
                  <div className="text-center text-xs text-muted-foreground mt-2">
                     <span>{fixture.league.name}</span> - <span>{format(new Date(fixture.fixture.date), "EEE, d MMM", { locale: ar })}</span>
                 </div>
+
+                <div className="mt-2">
+                    <PredictionOdds fixtureId={fixture.fixture.id} />
+                </div>
+
 
                 {isMatchFinished && userPrediction?.points !== undefined && (
                      <p className={cn("text-center font-bold text-sm mt-2", getPointsColor())}>
