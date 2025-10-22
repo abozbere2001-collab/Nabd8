@@ -4,13 +4,25 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
+import { GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
+import { auth } from '@/firebase';
 
 interface WelcomeScreenProps {
-  onChoice: (choice: 'login' | 'guest') => void;
+  onGuestChoice: () => void;
 }
 
-export function WelcomeScreen({ onChoice }: WelcomeScreenProps) {
+export function WelcomeScreen({ onGuestChoice }: WelcomeScreenProps) {
   
+  const handleGoogleLogin = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithRedirect(auth, provider);
+    } catch (e) {
+      console.error("Login Error:", e);
+      // Optionally show a toast or alert to the user here
+    }
+  };
+
   return (
     <div className="flex h-full flex-col bg-background">
       <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
@@ -20,7 +32,7 @@ export function WelcomeScreen({ onChoice }: WelcomeScreenProps) {
         
         <div className="w-full max-w-xs space-y-4">
             <Button 
-              onClick={() => onChoice('login')} 
+              onClick={handleGoogleLogin} 
               className="w-full" 
               size="lg"
             >
@@ -29,7 +41,7 @@ export function WelcomeScreen({ onChoice }: WelcomeScreenProps) {
             </Button>
             <Button
                 variant="ghost"
-                onClick={() => onChoice('guest')}
+                onClick={onGuestChoice}
                 className="w-full"
             >
                 تصفح كزائر

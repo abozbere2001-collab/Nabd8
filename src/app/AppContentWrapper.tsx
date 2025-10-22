@@ -18,7 +18,6 @@ import { SeasonPlayerSelectionScreen } from './screens/SeasonPlayerSelectionScre
 import { AddEditNewsScreen } from './screens/AddEditNewsScreen';
 import { ManagePinnedMatchScreen } from './screens/ManagePinnedMatchScreen';
 import { MatchDetailScreen } from './screens/MatchDetailScreen';
-import { LoginScreen } from './screens/LoginScreen';
 import { NotificationSettingsScreen } from './screens/NotificationSettingsScreen';
 import { GeneralSettingsScreen } from './screens/GeneralSettingsScreen';
 import PrivacyPolicyScreen from './privacy-policy/page';
@@ -61,8 +60,6 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   AddEditNews: { component: AddEditNewsScreen },
   ManagePinnedMatch: { component: ManagePinnedMatchScreen },
   MatchDetails: { component: MatchDetailScreen },
-  Login: { component: LoginScreen },
-  SignUp: { component: LoginScreen },
   NotificationSettings: { component: NotificationSettingsScreen },
   GeneralSettings: { component: GeneralSettingsScreen },
   PrivacyPolicy: { component: PrivacyPolicyScreen },
@@ -96,7 +93,7 @@ export const ProfileButton = () => {
     
     const navigateToLogin = () => {
          if ((window as any).appNavigate) {
-            (window as any).appNavigate('Login');
+            (window as any).appNavigate('Welcome');
         }
     }
 

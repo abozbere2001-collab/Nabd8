@@ -166,7 +166,8 @@ export const useAuth = () => {
     }
     return { 
         user: context.user, 
-        isProUser: context.isProUser, 
+        isProUser: context.isProUser,
+        auth: context.auth,
         setProUser: context.setProUser,
         isUserLoading: context.isLoading
     };
