@@ -72,11 +72,7 @@ const TeamHeader = ({ team, venue, onStar, isStarred, onCrown, isCrowned, isAdmi
         <Card className="mb-4 overflow-hidden">
             <div className="relative h-24 bg-gradient-to-r from-primary/20 to-accent/20" style={{backgroundImage: `url(${venue?.image})`, backgroundSize: 'cover', backgroundPosition: 'center'}}>
                 <div className="absolute inset-0 bg-black/50" />
-                <Avatar className="absolute bottom-0 left-1/2 -translate-x-1/2 -translate-y-1/2 h-24 w-24 border-4 border-background">
-                    <AvatarImage src={team.logo} alt={team.name} />
-                    <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div className="absolute top-2 left-2 flex items-center gap-1 z-10">
+                 <div className="absolute top-2 left-2 flex items-center gap-1 z-10">
                     <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/20 hover:bg-black/40" onClick={onStar}>
                         <Star className={cn("h-5 w-5", isStarred ? "text-yellow-400 fill-current" : "text-white/80")} />
                     </Button>
@@ -90,7 +86,13 @@ const TeamHeader = ({ team, venue, onStar, isStarred, onCrown, isCrowned, isAdmi
                     )}
                 </div>
             </div>
-            <CardContent className="pt-16 text-center">
+            <CardContent className="pt-2 pb-4 text-center relative flex flex-col items-center">
+                 <div className="relative -mt-12 mb-2">
+                    <Avatar className="h-20 w-20 border-4 border-background">
+                        <AvatarImage src={team.logo} alt={team.name} />
+                        <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                </div>
                 <h1 className="text-2xl font-bold">{team.name}</h1>
                 <p className="text-muted-foreground">{venue?.name}</p>
             </CardContent>
