@@ -8,10 +8,10 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileButton } from '../AppContentWrapper';
 import { Button } from '@/components/ui/button';
-import { Crown, Search, X, Loader2, Trophy, BarChart, Users as UsersIcon, RefreshCw } from 'lucide-react';
+import { Crown, Search, X, Loader2, Trophy, BarChart, Users as UsersIcon, RefreshCw, CalendarDays, ThumbsUp } from 'lucide-react';
 import { SearchSheet } from '@/components/SearchSheet';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import type { CrownedTeam, Favorites, Fixture, CrownedLeague, Standing, TopScorer, Prediction, Team, Player, UserScore } from '@/lib/types';
+import type { CrownedTeam, Favorites, Fixture, Standing, TopScorer, Prediction, Team, Player, UserScore, PredictionMatch } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { collection, onSnapshot, doc, updateDoc, deleteField, setDoc, query, where, getDocs, writeBatch, getDoc, orderBy, limit } from 'firebase/firestore';
@@ -23,12 +23,13 @@ import { isMatchLive } from '@/lib/matchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, addDays, subDays } from 'date-fns';
+import { format, addDays, subDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import PredictionCard from '@/components/PredictionCard';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { cn } from '@/lib/utils';
 import {Skeleton} from "@/components/ui/skeleton";
+
 
 const CrownedTeamScroller = ({
   crownedTeams,
@@ -232,114 +233,80 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard }: { le
 LeaderboardDisplay.displayName = 'LeaderboardDisplay';
 
 
-const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTab: string, league: CrownedLeague, navigate: ScreenProps['navigate'], user: any, db: any }) => {
-    const [data, setData] = useState<any>(null);
-    const [loading, setLoading] = useState(false);
-    const { toast } = useToast();
+const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
+    const [mainTab, setMainTab] = useState('voting');
     const [calculatingPoints, setCalculatingPoints] = useState(false);
-    const [predictions, setPredictions] = useState<{ [key: number]: Prediction }>({});
+    const { toast } = useToast();
     
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
     const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
-    
+
+    const [pinnedMatches, setPinnedMatches] = useState<PredictionMatch[]>([]);
+    const [loadingMatches, setLoadingMatches] = useState(true);
+
+    const [userPredictions, setUserPredictions] = useState<{ [key: number]: Prediction }>({});
+
+    // Fetch Leaderboard
     const fetchLeaderboard = useCallback(async () => {
-        if (!db || !league) return;
+        if (!db) return;
         setLoadingLeaderboard(true);
-        const leaderboardRef = collection(db, 'leagueLeaderboards', String(league.leagueId), 'users');
+        const leaderboardRef = collection(db, 'leaderboard');
         const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), limit(100));
 
         try {
             const snapshot = await getDocs(q);
             let rank = 1;
-            const newScores = snapshot.docs.map(doc => ({ ...(doc.data() as UserScore), rank: rank++ }));
+            const newScores = snapshot.docs.map(doc => ({ userId: doc.id, ...(doc.data() as Omit<UserScore, 'userId'>), rank: rank++ }));
             setLeaderboard(newScores);
         } catch (error) {
-            console.error("Error fetching league leaderboard:", error);
+            console.error("Error fetching leaderboard:", error);
         } finally {
             setLoadingLeaderboard(false);
         }
-    }, [db, league]);
+    }, [db]);
     
+    // Fetch Pinned Matches
     useEffect(() => {
-        if (activeTab === 'predictions') {
-            fetchLeaderboard();
-        }
-    }, [activeTab, fetchLeaderboard]);
+        if (!db) return;
+        setLoadingMatches(true);
+        const unsub = onSnapshot(collection(db, 'predictions'), snapshot => {
+            const matches = snapshot.docs.map(doc => doc.data() as PredictionMatch);
+            matches.sort((a, b) => a.fixtureData.fixture.timestamp - b.fixtureData.fixture.timestamp);
+            setPinnedMatches(matches);
+            setLoadingMatches(false);
+        }, error => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({path: 'predictions', operation: 'list'}));
+            setLoadingMatches(false);
+        });
+        return () => unsub();
+    }, [db]);
 
+
+    // Fetch user's predictions for the visible pinned matches
     useEffect(() => {
-        if (!activeTab || !league?.leagueId) return;
-
-        setData(null);
-        setLoading(true);
-
-        const fetchData = async () => {
-            let url = '';
-            try {
-                switch (activeTab) {
-                    case 'matches':
-                        const fromDate = format(new Date(), 'yyyy-MM-dd');
-                        const toDate = format(addDays(new Date(), 7), 'yyyy-MM-dd');
-                        url = `/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&from=${fromDate}&to=${toDate}`;
-                        break;
-                    case 'standings':
-                        url = `/api/football/standings?league=${league.leagueId}&season=${CURRENT_SEASON}`;
-                        break;
-                    case 'scorers':
-                        url = `/api/football/players/topscorers?league=${league.leagueId}&season=${CURRENT_SEASON}`;
-                        break;
-                    case 'predictions':
-                         const today = format(new Date(), 'yyyy-MM-dd');
-                         url = `/api/football/fixtures?league=${league.leagueId}&season=${CURRENT_SEASON}&date=${today}`;
-                         break;
-                }
-                
-                if (url) {
-                    const res = await fetch(url);
-                    if (!res.ok) throw new Error('Failed to fetch data');
-                    const result = await res.json();
-                    
-                    if (activeTab === 'standings') {
-                        setData(result.response[0]?.league?.standings[0] || []);
-                    } else if (activeTab === 'matches') {
-                        const sortedFixtures = (result.response || []).sort((a: Fixture, b: Fixture) => a.fixture.timestamp - b.fixture.timestamp);
-                        setData(sortedFixtures);
-                    }
-                    else {
-                        setData(result.response || []);
-                    }
-                }
-
-            } catch (error) {
-                console.error(`Error fetching ${activeTab}:`, error);
-                toast({ variant: 'destructive', title: 'خطأ', description: `فشل في جلب بيانات ${activeTab}` });
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-
-    }, [activeTab, league, toast]);
-    
-
-    useEffect(() => {
-        if (activeTab !== 'predictions' || !data || !user || !db) return;
+        if (!user || !db || pinnedMatches.length === 0) return;
         
-        const fixtureIds = (data as Fixture[]).map(f => f.fixture.id);
-        if (fixtureIds.length === 0) return;
-
-        const q = query(collection(db, 'leaguePredictions'), where('userId', '==', user.uid), where('fixtureId', 'in', fixtureIds));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const userPredictions: { [key: number]: Prediction } = {};
+        const fixtureIds = pinnedMatches.map(m => m.fixtureData.fixture.id);
+        const userPredsRef = collection(db, 'users', user.uid, 'predictions');
+        const q = query(userPredsRef, where('fixtureId', 'in', fixtureIds));
+        
+        const unsub = onSnapshot(q, snapshot => {
+            const predictions: { [key: number]: Prediction } = {};
             snapshot.forEach(doc => {
                 const pred = doc.data() as Prediction;
-                userPredictions[pred.fixtureId] = pred;
+                predictions[pred.fixtureId] = pred;
             });
-            setPredictions(userPredictions);
+            setUserPredictions(predictions);
         });
-        return () => unsubscribe();
-        
-    }, [activeTab, data, user, db]);
+        return () => unsub();
+    }, [user, db, pinnedMatches]);
+
+
+    useEffect(() => {
+        if (mainTab === 'leaderboard') {
+            fetchLeaderboard();
+        }
+    }, [mainTab, fetchLeaderboard]);
 
 
     const handleSavePrediction = useCallback(async (fixtureId: number, homeGoalsStr: string, awayGoalsStr: string) => {
@@ -348,8 +315,7 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
         const awayGoals = parseInt(awayGoalsStr, 10);
         if (isNaN(homeGoals) || isNaN(awayGoals)) return;
     
-        const predictionRef = doc(db, 'leaguePredictions', `${user.uid}_${fixtureId}`);
-        const isUpdating = (await getDoc(predictionRef).catch(() => null))?.exists() ?? false;
+        const predictionRef = doc(db, 'users', user.uid, 'predictions', String(fixtureId));
         
         const predictionData: Prediction = {
             userId: user.uid,
@@ -360,224 +326,153 @@ const DoreenaTabContent = ({ activeTab, league, navigate, user, db }: { activeTa
             timestamp: new Date().toISOString()
         };
         
-        const operation = isUpdating
-            ? updateDoc(predictionRef, { homeGoals, awayGoals, timestamp: predictionData.timestamp })
-            : setDoc(predictionRef, predictionData);
-            
-        operation.catch(serverError => {
+        setDoc(predictionRef, predictionData, { merge: true }).catch(serverError => {
              const permissionError = new FirestorePermissionError({
                 path: predictionRef.path,
-                operation: isUpdating ? 'update' : 'create',
-                requestResourceData: isUpdating ? { homeGoals, awayGoals } : predictionData
+                operation: 'write',
+                requestResourceData: predictionData
             });
             errorEmitter.emit('permission-error', permissionError);
         });
     }, [user, db]);
-    
 
-     const handleCalculateLeaguePoints = useCallback(async () => {
+     const handleCalculatePoints = useCallback(async () => {
         if (!db) return;
         setCalculatingPoints(true);
-        toast({ title: 'بدء احتساب النقاط', description: 'يتم الآن احتساب نقاط مباريات الأمس لهذا الدوري...' });
+        toast({ title: 'بدء احتساب النقاط', description: 'يتم الآن احتساب نقاط مباريات الأمس...' });
 
         try {
             const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-            const fixturesRes = await fetch(`/api/football/fixtures?date=${yesterday}&league=${league.leagueId}&season=${CURRENT_SEASON}`);
+            const fixturesRes = await fetch(`/api/football/fixtures?date=${yesterday}`);
             const fixturesData = await fixturesRes.json();
             const finishedFixtures: Fixture[] = (fixturesData.response || []).filter((f: Fixture) => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short));
 
             if (finishedFixtures.length === 0) {
-                toast({ title: 'لا توجد مباريات', description: 'لا توجد مباريات منتهية لاحتساب نقاطها.' });
+                toast({ title: 'لا توجد مباريات', description: 'لا توجد مباريات منتهية من الأمس لاحتساب نقاطها.' });
                 setCalculatingPoints(false);
                 return;
             }
 
-            const fixtureIds = finishedFixtures.map(f => f.fixture.id);
-            const predictionsRef = collection(db, 'leaguePredictions');
-            const q = query(predictionsRef, where('fixtureId', 'in', fixtureIds));
-            const predictionSnapshots = await getDocs(q);
-
-            const predictionsToUpdate: { ref: any, points: number }[] = [];
-            predictionSnapshots.forEach(doc => {
-                const prediction = { ...doc.data() } as Prediction;
-                const fixture = finishedFixtures.find(f => f.fixture.id === prediction.fixtureId);
-                if (fixture) {
-                    const points = calculatePoints(prediction, fixture);
-                    if (prediction.points !== points) {
-                        predictionsToUpdate.push({ ref: doc.ref, points });
-                    }
-                }
-            });
-
+            // Get all users who have made predictions for yesterday's matches
+            const usersRef = collection(db, 'users');
+            const usersSnap = await getDocs(usersRef);
+            
             const batch = writeBatch(db);
-            predictionsToUpdate.forEach(p => batch.update(p.ref, { points: p.points }));
-            await batch.commit();
-            
-            const allUsersInLeagueSnap = await getDocs(query(collection(db, 'leagueLeaderboards', String(league.leagueId), 'users')));
-            const userIds = allUsersInLeagueSnap.docs.map(d => d.id);
-            
-            const pointsBatch = writeBatch(db);
+            const userTotalPoints: {[key: string]: number} = {};
 
-            for (const userId of userIds) {
-                const userPredsRef = collection(db, 'leaguePredictions');
-                const userPredsQuery = query(userPredsRef, where('userId', '==', userId));
-                const userPredsSnap = await getDocs(userPredsQuery);
-
-                let totalPoints = 0;
-                userPredsSnap.forEach(predDoc => {
-                    const pred = predDoc.data();
-                    if(pred.fixtureId && finishedFixtures.some(f => f.fixture.id === pred.fixtureId) && pred.points) {
-                         totalPoints += pred.points;
+            for (const userDoc of usersSnap.docs) {
+                const userId = userDoc.id;
+                userTotalPoints[userId] = 0;
+                
+                const userPredictionsRef = collection(db, 'users', userId, 'predictions');
+                const userPredictionsSnap = await getDocs(userPredictionsRef);
+                
+                userPredictionsSnap.forEach(predDoc => {
+                    const prediction = predDoc.data() as Prediction;
+                    const fixture = finishedFixtures.find(f => f.fixture.id === prediction.fixtureId);
+                    
+                    if (fixture) {
+                        const points = calculatePoints(prediction, fixture);
+                        if (prediction.points !== points) {
+                           batch.update(predDoc.ref, { points });
+                        }
+                        userTotalPoints[userId] += points;
+                    } else if (prediction.points) {
+                         userTotalPoints[userId] += prediction.points;
                     }
                 });
-
-                const leaderboardRef = doc(db, 'leagueLeaderboards', String(league.leagueId), 'users', userId);
-                pointsBatch.update(leaderboardRef, { totalPoints: totalPoints });
             }
 
-            await pointsBatch.commit();
+            // Update leaderboard
+            for (const userId in userTotalPoints) {
+                const userDoc = usersSnap.docs.find(d => d.id === userId);
+                if (userDoc) {
+                    const leaderboardRef = doc(db, 'leaderboard', userId);
+                    batch.set(leaderboardRef, {
+                        totalPoints: userTotalPoints[userId],
+                        userName: userDoc.data().displayName,
+                        userPhoto: userDoc.data().photoURL,
+                    }, { merge: true });
+                }
+            }
+
+            await batch.commit();
             
-            toast({ title: 'اكتمل الاحتساب', description: 'تم تحديث جميع النقاط في لوحة صدارة الدوري.' });
+            toast({ title: 'اكتمل الاحتساب', description: 'تم تحديث جميع النقاط في لوحة الصدارة.' });
             fetchLeaderboard(); // Refetch after calculation
         } catch (error: any) {
-            console.error("Error calculating league points:", error);
+            console.error("Error calculating points:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل احتساب النقاط.' });
         } finally {
             setCalculatingPoints(false);
         }
-    }, [db, league.leagueId, toast, fetchLeaderboard]);
+    }, [db, toast, fetchLeaderboard]);
 
+    const groupedMatches = useMemo(() => {
+        return pinnedMatches.reduce((acc, match) => {
+            const date = format(new Date(match.fixtureData.fixture.timestamp * 1000), 'yyyy-MM-dd');
+            if (!acc[date]) {
+                acc[date] = [];
+            }
+            acc[date].push(match);
+            return acc;
+        }, {} as Record<string, PredictionMatch[]>);
+    }, [pinnedMatches]);
 
-    if (loading) {
-        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    }
-    
-    if (activeTab === 'predictions') {
-         return (
-             <Tabs defaultValue="voting" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="prizes">الجوائز</TabsTrigger>
-                    <TabsTrigger value="leaderboard">الترتيب</TabsTrigger>
-                    <TabsTrigger value="voting">تصويت</TabsTrigger>
-                </TabsList>
-                <TabsContent value="voting" className="mt-4 space-y-4">
-                     {(data as Fixture[]) && (data as Fixture[]).length > 0 ? (
-                        (data as Fixture[]).map(fixture => (
-                            <PredictionCard 
-                                key={fixture.fixture.id}
-                                fixture={fixture}
-                                userPrediction={predictions[fixture.fixture.id]}
-                                onSave={(home, away) => handleSavePrediction(fixture.fixture.id, home, away)}
-                            />
-                        ))
-                    ) : (
-                        <div className="text-center text-muted-foreground pt-10">
-                            <p>لا توجد مباريات متاحة للتوقع لهذا اليوم.</p>
+    const getDayLabel = (dateKey: string) => {
+        const date = new Date(dateKey);
+        if (isToday(date)) return 'اليوم';
+        if (isYesterday(date)) return 'الأمس';
+        if (isTomorrow(date)) return 'غداً';
+        return format(date, 'EEEE, d MMM', { locale: ar });
+    };
+
+    return (
+        <Tabs value={mainTab} onValueChange={setMainTab} className="w-full flex-1 flex flex-col">
+           <TabsList className="grid w-full grid-cols-2">
+               <TabsTrigger value="leaderboard"><BarChart className="ml-2 h-4 w-4" />الترتيب</TabsTrigger>
+               <TabsTrigger value="voting"><ThumbsUp className="ml-2 h-4 w-4" />تصويت</TabsTrigger>
+           </TabsList>
+           <TabsContent value="voting" className="flex-1 overflow-y-auto mt-4 space-y-4">
+                {loadingMatches ? (
+                     <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                ) : Object.keys(groupedMatches).length > 0 ? (
+                    Object.keys(groupedMatches).sort().map(dateKey => (
+                        <div key={dateKey}>
+                             <h3 className="font-bold mb-2 text-center text-muted-foreground">{getDayLabel(dateKey)}</h3>
+                            {groupedMatches[dateKey].map(match => (
+                                <PredictionCard 
+                                    key={match.fixtureData.fixture.id}
+                                    predictionMatch={match}
+                                    userPrediction={userPredictions[match.fixtureData.fixture.id]}
+                                    onSave={handleSavePrediction}
+                                />
+                            ))}
                         </div>
-                    )}
-                </TabsContent>
-                <TabsContent value="leaderboard" className="mt-4">
-                    <Card>
-                       <CardHeader className="flex-row items-center justify-between">
-                            <CardTitle>لوحة الصدارة</CardTitle>
-                            <Button onClick={handleCalculateLeaguePoints} disabled={calculatingPoints} size="sm">
-                                {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : "احتساب النقاط"}
-                            </Button>
-                       </CardHeader>
-                       <CardContent className="p-0">
-                            <LeaderboardDisplay leaderboard={leaderboard} loadingLeaderboard={loadingLeaderboard} />
-                       </CardContent>
-                    </Card>
-                </TabsContent>
-                <TabsContent value="prizes" className="mt-4">
-                    <Card>
-                       <CardContent className="p-10 text-center text-muted-foreground">
-                            <p className="text-lg font-bold">قريبًا...</p>
-                            <p>سيتم الإعلان عن جوائز دورينا هنا.</p>
-                       </CardContent>
-                    </Card>
-                </TabsContent>
-             </Tabs>
-         );
-    }
-    
-    if (!data || data.length === 0) {
-        return <div className="text-center text-muted-foreground py-10">لا توجد بيانات متاحة حاليًا.</div>;
-    }
-
-    if (activeTab === 'matches') {
-        return (
-            <div className="space-y-2">
-                {(data as Fixture[]).map((fixture) => <FixtureItem key={fixture.fixture.id} fixture={fixture} navigate={navigate} />)}
-            </div>
-        );
-    }
-
-    if (activeTab === 'standings') {
-        const validStandings = (data as Standing[]).filter(s => s && s.team);
-        return (
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="text-center">نقاط</TableHead>
-                        <TableHead className="text-center">لعب</TableHead>
-                        <TableHead className="w-1/2 text-right">الفريق</TableHead>
-                        <TableHead>#</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {validStandings.map((s) => (
-                        <TableRow key={s.team.id} onClick={() => navigate('TeamDetails', { teamId: s.team.id })} className="cursor-pointer">
-                            <TableCell className="text-center font-bold">{s.points}</TableCell>
-                            <TableCell className="text-center">{s.all?.played || 0}</TableCell>
-                            <TableCell>
-                                <div className="flex items-center gap-2 justify-end">
-                                    <span>{s.team?.name}</span>
-                                    <Avatar className="h-6 w-6"><AvatarImage src={s.team?.logo} /></Avatar>
-                                </div>
-                            </TableCell>
-                            <TableCell className="font-bold">{s.rank}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        );
-    }
-    
-    if (activeTab === 'scorers') {
-        return (
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="text-left w-12">الأهداف</TableHead>
-                        <TableHead className="text-right">اللاعب</TableHead>
-                        <TableHead>#</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {(data as TopScorer[]).map(({ player, statistics }, index) => (
-                        <TableRow key={player.id} onClick={() => navigate('PlayerDetails', { playerId: player.id })} className="cursor-pointer">
-                            <TableCell className="font-bold text-lg text-left">{statistics[0]?.goals.total}</TableCell>
-                            <TableCell>
-                                <div className="flex items-center gap-3 justify-end">
-                                    <div className="text-right">
-                                        <p className="font-semibold">{player.name}</p>
-                                        <p className="text-xs text-muted-foreground">{statistics[0]?.team.name}</p>
-                                    </div>
-                                    <Avatar className="h-10 w-10"><AvatarImage src={player.photo} /></Avatar>
-                                </div>
-                            </TableCell>
-                            <TableCell className="font-bold">{index + 1}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        );
-    }
-
-    return null;
+                    ))
+                ) : (
+                    <div className="text-center text-muted-foreground pt-10">
+                        <p>لا توجد مباريات متاحة للتوقع حاليًا.</p>
+                        <p className="text-xs">سيقوم المدير بإضافتها قريبًا.</p>
+                    </div>
+                )}
+           </TabsContent>
+           <TabsContent value="leaderboard" className="mt-4">
+               <Card>
+                  <CardHeader className="flex-row items-center justify-between">
+                       <CardTitle>لوحة الصدارة</CardTitle>
+                       <Button onClick={handleCalculatePoints} disabled={calculatingPoints} size="sm">
+                           {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : "احتساب النقاط"}
+                       </Button>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                       <LeaderboardDisplay leaderboard={leaderboard} loadingLeaderboard={loadingLeaderboard} />
+                  </CardContent>
+               </Card>
+           </TabsContent>
+        </Tabs>
+    );
 };
-
 
 
 export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
@@ -585,10 +480,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { isAdmin, db } = useAdmin();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-  const [mainTab, setMainTab] = useState<'doreena' | 'kurratna'>('doreena');
-  const [doreenaSubTab, setDoreenaSubTab] = useState('predictions');
-  const [calculatingAllPoints, setCalculatingAllPoints] = useState(false);
-  const { toast } = useToast();
+  const [mainTab, setMainTab] = useState<'predictions' | 'kurratna'>('kurratna');
 
   useEffect(() => {
     if (!user || !db) return;
@@ -608,12 +500,6 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     if (!favorites.crownedTeams) return [];
     return Object.values(favorites.crownedTeams);
   }, [favorites.crownedTeams]);
-
-  const crownedLeague = useMemo(() => {
-    if (!favorites.crownedLeagues || Object.keys(favorites.crownedLeagues).length === 0) return null;
-    const leagueId = Object.keys(favorites.crownedLeagues)[0];
-    return favorites.crownedLeagues[Number(leagueId)] || null;
-  }, [favorites.crownedLeagues]);
   
   useEffect(() => {
     if(crownedTeams.length > 0 && !selectedTeamId) {
@@ -625,13 +511,12 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   }, [crownedTeams, selectedTeamId]);
 
 
-  const handleRemoveCrowned = (type: 'team' | 'league', id: number) => {
+  const handleRemoveCrowned = (teamId: number) => {
     if (!user || !db) return;
     const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    const fieldPath = type === 'team' ? `crownedTeams.${id}` : `crownedLeagues`;
-    const updateData = type === 'team' ? { [fieldPath]: deleteField() } : { crownedLeagues: {} };
+    const fieldPath = `crownedTeams.${teamId}`;
     
-    updateDoc(favRef, updateData)
+    updateDoc(favRef, { [fieldPath]: deleteField() })
       .catch(err => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: { [fieldPath]: 'DELETED' } }));
       });
@@ -641,107 +526,6 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setSelectedTeamId(teamId);
   }
   
-  const handleDoreenaSubTabChange = (newTab: string) => {
-    setDoreenaSubTab(newTab);
-  };
-  
-    const handleCalculateAllPoints = useCallback(async () => {
-    if (!db) return;
-    setCalculatingAllPoints(true);
-    toast({ title: 'بدء الاحتساب الشامل', description: 'جاري تحديث نقاط جميع الدوريات...' });
-
-    try {
-        const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-        const crownedLeaguesSnap = await getDocs(query(collection(db, 'users'), where('crownedLeagues', '!=', null)));
-        const allLeagueIds = new Set<number>();
-        crownedLeaguesSnap.forEach(userDoc => {
-            const favs = userDoc.data() as Favorites;
-            if (favs.crownedLeagues) {
-                Object.keys(favs.crownedLeagues).forEach(leagueId => allLeagueIds.add(Number(leagueId)));
-            }
-        });
-
-        if (allLeagueIds.size === 0) {
-            toast({ title: 'لا توجد دوريات', description: 'لم يقم أي مستخدم بتتويج أي دوري بعد.' });
-            setCalculatingAllPoints(false);
-            return;
-        }
-
-        const leagueFixturePromises = Array.from(allLeagueIds).map(leagueId =>
-            fetch(`/api/football/fixtures?date=${yesterday}&league=${leagueId}&season=${CURRENT_SEASON}`).then(res => res.json())
-        );
-
-        const allFixturesResponses = await Promise.all(leagueFixturePromises);
-        const allFinishedFixtures = allFixturesResponses.flatMap(data => (data.response || []).filter((f: Fixture) => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short)));
-
-        if (allFinishedFixtures.length === 0) {
-            toast({ title: 'لا توجد مباريات', description: 'لا توجد مباريات منتهية لاحتساب نقاطها.' });
-            setCalculatingAllPoints(false);
-            return;
-        }
-        
-        const allFixtureIds = allFinishedFixtures.map(f => f.fixture.id);
-        const predictionsRef = collection(db, 'leaguePredictions');
-        const predictionsQuery = query(predictionsRef, where('fixtureId', 'in', allFixtureIds));
-        const predictionsSnapshot = await getDocs(predictionsQuery);
-
-        const predictionsToUpdate: { ref: any, points: number }[] = [];
-        predictionsSnapshot.forEach(doc => {
-            const prediction = doc.data() as Prediction;
-            const fixture = allFinishedFixtures.find(f => f.fixture.id === prediction.fixtureId);
-            if (fixture) {
-                const points = calculatePoints(prediction, fixture);
-                if (prediction.points !== points) {
-                    predictionsToUpdate.push({ ref: doc.ref, points });
-                }
-            }
-        });
-        
-        // Update predictions points in batches
-        let pointsBatch = writeBatch(db);
-        for(let i = 0; i < predictionsToUpdate.length; i++) {
-            pointsBatch.update(predictionsToUpdate[i].ref, { points: predictionsToUpdate[i].points });
-            if ((i + 1) % 500 === 0) {
-                await pointsBatch.commit();
-                pointsBatch = writeBatch(db);
-            }
-        }
-        await pointsBatch.commit();
-
-        // Recalculate total scores for all users in all leagues
-        let leaderboardBatch = writeBatch(db);
-        for (const leagueId of allLeagueIds) {
-            const usersInLeagueSnap = await getDocs(query(collection(db, 'leagueLeaderboards', String(leagueId), 'users')));
-            const userIdsInLeague = usersInLeagueSnap.docs.map(d => d.id);
-            
-            for (const userId of userIdsInLeague) {
-                 const userPredsRef = collection(db, 'leaguePredictions');
-                 const userPredsQuery = query(userPredsRef, where('userId', '==', userId));
-                 const userPredsSnap = await getDocs(userPredsQuery);
-                 
-                 let totalPoints = 0;
-                 userPredsSnap.forEach(predDoc => {
-                     const pred = predDoc.data() as Prediction;
-                     if(pred.leagueId === leagueId && pred.points) {
-                         totalPoints += pred.points;
-                     }
-                 });
-
-                 const leaderboardRef = doc(db, 'leagueLeaderboards', String(leagueId), 'users', userId);
-                 leaderboardBatch.update(leaderboardRef, { totalPoints: totalPoints });
-            }
-        }
-        await leaderboardBatch.commit();
-        
-        toast({ title: 'اكتمل التحديث الشامل', description: 'تم تحديث جميع النقاط بنجاح.' });
-    } catch (error) {
-        console.error("Error calculating all points:", error);
-        toast({ variant: 'destructive', title: 'خطأ شامل', description: 'فشل تحديث النقاط لجميع الدوريات.' });
-    } finally {
-        setCalculatingAllPoints(false);
-    }
-}, [db, toast]);
-
   if (!user) {
     return (
        <div className="flex h-full flex-col bg-background">
@@ -752,7 +536,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
               <p className="text-muted-foreground mb-6">
                 قم بتسجيل الدخول لتتويج فرقك وبطولاتك المفضلة.
               </p>
-              <Button onClick={() => navigate('Login')}>تسجيل الدخول</Button>
+              <Button onClick={() => navigate('Welcome')}>تسجيل الدخول</Button>
            </div>
        </div>
     )
@@ -766,12 +550,6 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
         canGoBack={canGoBack}
         actions={
           <div className="flex items-center gap-1">
-              {isAdmin && mainTab === 'doreena' && (
-                  <Button onClick={handleCalculateAllPoints} disabled={calculatingAllPoints} size="sm" variant="outline">
-                      {calculatingAllPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
-                      <span className="mr-2 hidden sm:inline">تحديث كل النقاط</span>
-                  </Button>
-              )}
               <SearchSheet navigate={navigate}>
                   <Button variant="ghost" size="icon">
                       <Search className="h-5 w-5" />
@@ -783,8 +561,8 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       />
       <Tabs value={mainTab} onValueChange={(value) => setMainTab(value as any)} className="flex flex-1 flex-col min-h-0">
         <TabsList className="grid w-full grid-cols-2">
-           <TabsTrigger value="kurratna">كرتنا</TabsTrigger>
-           <TabsTrigger value="doreena">دورينا</TabsTrigger>
+           <TabsTrigger value="predictions"><Trophy className="ml-2 h-4 w-4" />التوقعات</TabsTrigger>
+           <TabsTrigger value="kurratna"><FootballIcon className="ml-2 h-4 w-4" />كرتنا</TabsTrigger>
         </TabsList>
         
         <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
@@ -792,7 +570,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
             <CrownedTeamScroller 
               crownedTeams={crownedTeams} 
               onSelectTeam={handleSelectTeam}
-              onRemove={(id) => handleRemoveCrowned('team', id)} 
+              onRemove={handleRemoveCrowned} 
               selectedTeamId={selectedTeamId}
             />
           </div>
@@ -807,36 +585,10 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
           </div>
         </TabsContent>
 
-        <TabsContent value="doreena" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
-          {crownedLeague ? (
-             <Tabs value={doreenaSubTab} onValueChange={handleDoreenaSubTabChange} className="flex flex-1 flex-col min-h-0 p-1">
-                 <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="scorers">الهدافين</TabsTrigger>
-                    <TabsTrigger value="standings">الترتيب</TabsTrigger>
-                    <TabsTrigger value="matches">المباريات</TabsTrigger>
-                    <TabsTrigger value="predictions">التوقعات</TabsTrigger>
-                 </TabsList>
-                 <div className="flex-1 overflow-y-auto mt-2">
-                    <DoreenaTabContent 
-                        activeTab={doreenaSubTab} 
-                        league={crownedLeague} 
-                        navigate={navigate} 
-                        user={user}
-                        db={db}
-                    />
-                 </div>
-             </Tabs>
-          ) : (
-            <div className="text-center text-muted-foreground pt-10 flex flex-col items-center gap-4">
-              <p className="font-bold text-lg">لم تقم بتتويج أي بطولة بعد</p>
-              <p>اذهب إلى البطولات واضغط على أيقونة التاج 👑</p>
-              <Button onClick={() => navigate('AllCompetitions')}>استكشف البطولات</Button>
-            </div>
-          )}
+        <TabsContent value="predictions" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden p-1">
+          <PredictionsTabContent user={user} db={db} />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
-
-

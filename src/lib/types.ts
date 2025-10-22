@@ -1,5 +1,6 @@
 
 
+
 // This file contains all the type definitions for the data used in the app.
 
 // --- API Football Types ---
@@ -189,7 +190,6 @@ export interface Favorites {
   teams?: { [key: number]: FavoriteTeam };
   players?: { [key: number]: any };
   crownedTeams?: { [key: number]: CrownedTeam };
-  crownedLeagues?: { [key: string]: CrownedLeague };
   notificationsEnabled?: {
     news?: boolean;
     comments?: boolean;
@@ -287,6 +287,6 @@ export interface MatchCustomization {
   customStatus: string;
 }
 
-export interface PredictionMatch extends Fixture {
-    isPinned: boolean;
+export interface PredictionMatch {
+    fixtureData: Fixture;
 }

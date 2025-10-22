@@ -4,11 +4,11 @@
 import React from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
-import type { Fixture as FixtureType } from '@/lib/types';
+import type { Fixture as FixtureType, PredictionMatch } from '@/lib/types';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { LiveMatchStatus } from './LiveMatchStatus';
 import { Button } from './ui/button';
-import { Crown, Star } from 'lucide-react';
+import { Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';

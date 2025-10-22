@@ -8,11 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/use-debounce';
-import type { Fixture, Prediction } from '@/lib/types';
+import type { Fixture, Prediction, PredictionMatch } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
-const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture, userPrediction?: Prediction, onSave: (home: string, away: string) => void }) => {
+const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictionMatch: PredictionMatch, userPrediction?: Prediction, onSave: (fixtureId: number, home: string, away: string) => void }) => {
+    const { fixtureData: fixture } = predictionMatch;
     const isPredictionDisabled = new Date(fixture.fixture.timestamp * 1000) < new Date(Date.now() + 10 * 60 * 1000);
     const [homeValue, setHomeValue] = useState(userPrediction?.homeGoals?.toString() ?? '');
     const [awayValue, setAwayValue] = useState(userPrediction?.awayGoals?.toString() ?? '');
@@ -58,9 +59,9 @@ const PredictionCard = ({ fixture, userPrediction, onSave }: { fixture: Fixture,
 
     useEffect(() => {
         if (debouncedHome !== '' && debouncedAway !== '' && (debouncedHome !== userPrediction?.homeGoals?.toString() || debouncedAway !== userPrediction?.awayGoals?.toString())) {
-            onSave(debouncedHome, debouncedAway);
+            onSave(fixture.fixture.id, debouncedHome, debouncedAway);
         }
-    }, [debouncedHome, debouncedAway, onSave, userPrediction]);
+    }, [debouncedHome, debouncedAway, onSave, userPrediction, fixture.fixture.id]);
 
     const handleHomeChange = (e: React.ChangeEvent<HTMLInputElement>) => setHomeValue(e.target.value);
     const handleAwayChange = (e: React.ChangeEvent<HTMLInputElement>) => setAwayValue(e.target.value);

@@ -7,9 +7,9 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { ScreenProps } from '@/app/page';
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { useAuth, useFirestore } from '@/firebase/provider';
-import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
-import { Loader2, Search, Star, CalendarClock } from 'lucide-react';
+import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
+import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
+import { Loader2, Search, Star, CalendarClock, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -17,11 +17,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
-import type { Fixture as FixtureType, Favorites } from '@/lib/types';
+import type { Fixture as FixtureType, Favorites, PredictionMatch } from '@/lib/types';
 import { FixtureItem } from '@/components/FixtureItem';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { getLocalFavorites } from '@/lib/local-favorites';
 import { POPULAR_LEAGUES } from '@/lib/popular-data';
+import { useToast } from '@/hooks/use-toast';
 
 interface GroupedFixtures {
     [leagueName: string]: {
@@ -42,6 +43,8 @@ const FixturesList = React.memo(({
     favoritedLeagueIds,
     favoritedTeamIds,
     navigate,
+    pinnedPredictionMatches,
+    onPinToggle
 }: { 
     fixtures: FixtureType[], 
     loading: boolean,
@@ -50,6 +53,8 @@ const FixturesList = React.memo(({
     favoritedLeagueIds: number[],
     favoritedTeamIds: number[],
     navigate: ScreenProps['navigate'],
+    pinnedPredictionMatches: Set<number>,
+    onPinToggle: (fixture: FixtureType) => void,
 }) => {
     
     const { favoriteTeamMatches, otherFixtures } = useMemo(() => {
@@ -133,6 +138,8 @@ const FixturesList = React.memo(({
                                 key={f.fixture.id} 
                                 fixture={f} 
                                 navigate={navigate}
+                                isPinnedForPrediction={pinnedPredictionMatches.has(f.fixture.id)}
+                                onPinToggle={onPinToggle}
                             />
                         ))}
                     </div>
@@ -158,6 +165,8 @@ const FixturesList = React.memo(({
                                     key={f.fixture.id} 
                                     fixture={f} 
                                     navigate={navigate}
+                                    isPinnedForPrediction={pinnedPredictionMatches.has(f.fixture.id)}
+                                    onPinToggle={onPinToggle}
                                 />
                             ))}
                         </div>
@@ -246,7 +255,8 @@ const tabs: {id: TabName, label: string}[] = [
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: ScreenProps & { isVisible: boolean }) {
   const { user } = useAuth();
-  const { db } = useFirestore();
+  const { db } = useAdmin();
+  const { toast } = useToast();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [activeTab, setActiveTab] = useState<TabName>('my-results');
   
@@ -262,6 +272,42 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [loading, setLoading] = useState(true);
     
   const [customNamesCache, setCustomNamesCache] = useState<{leagues: Map<number, string>, teams: Map<number, string>} | null>(null);
+  const [pinnedPredictionMatches, setPinnedPredictionMatches] = useState(new Set<number>());
+
+
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(collection(db, 'predictions'), (snapshot) => {
+        const newPinnedSet = new Set<number>();
+        snapshot.forEach(doc => newPinnedSet.add(Number(doc.id)));
+        setPinnedPredictionMatches(newPinnedSet);
+    });
+    return () => unsub();
+  }, [db]);
+
+
+  const handlePinToggle = useCallback((fixture: FixtureType) => {
+    if (!db) return;
+    const fixtureId = fixture.fixture.id;
+    const isPinned = pinnedPredictionMatches.has(fixtureId);
+    const docRef = doc(db, 'predictions', String(fixtureId));
+
+    if (isPinned) {
+        deleteDoc(docRef).then(() => {
+            toast({ title: "تم إلغاء التثبيت", description: "تمت إزالة المباراة من التوقعات." });
+        }).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+        });
+    } else {
+        const data: PredictionMatch = { fixtureData: fixture };
+        setDoc(docRef, data).then(() => {
+            toast({ title: "تم التثبيت", description: "أصبحت المباراة متاحة الآن للتوقع." });
+        }).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data }));
+        });
+    }
+  }, [db, pinnedPredictionMatches, toast]);
+
 
   const fetchAndProcessData = useCallback(async (dateKey: string, abortSignal: AbortSignal) => {
     setLoading(true);
@@ -461,6 +507,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
                     navigate={navigate}
+                    pinnedPredictionMatches={pinnedPredictionMatches}
+                    onPinToggle={handlePinToggle}
                 />
             </TabsContent>
             
@@ -473,6 +521,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
                     navigate={navigate}
+                    pinnedPredictionMatches={pinnedPredictionMatches}
+                    onPinToggle={handlePinToggle}
                 />
             </TabsContent>
 

@@ -8,25 +8,11 @@
       "type": "object",
       "description": "Represents a user of the application.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user."
-        },
-        "email": {
-          "type": "string",
-          "description": "The user's email address.",
-          "format": "email"
-        },
-        "username": {
-          "type": "string",
-          "description": "The username of the user."
-        }
+        "id": { "type": "string", "description": "Unique identifier for the user." },
+        "email": { "type": "string", "description": "The user's email address.", "format": "email" },
+        "username": { "type": "string", "description": "The username of the user." }
       },
-      "required": [
-        "id",
-        "email",
-        "username"
-      ]
+      "required": ["id", "email", "username"]
     },
     "Competition": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -34,29 +20,12 @@
       "type": "object",
       "description": "Represents a football competition (e.g., league, cup).",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the competition."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the competition."
-        },
-        "continent": {
-          "type": "string",
-          "description": "The continent the competition belongs to."
-        },
-        "apiFootballId": {
-          "type": "number",
-          "description": "The ID of the competition in the API Football API."
-        }
+        "id": { "type": "string", "description": "Unique identifier for the competition." },
+        "name": { "type": "string", "description": "The name of the competition." },
+        "continent": { "type": "string", "description": "The continent the competition belongs to." },
+        "apiFootballId": { "type": "number", "description": "The ID of the competition in the API Football API." }
       },
-      "required": [
-        "id",
-        "name",
-        "continent",
-        "apiFootballId"
-      ]
+      "required": ["id", "name", "continent", "apiFootballId"]
     },
     "Team": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -64,28 +33,11 @@
       "type": "object",
       "description": "Represents a football team.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the team."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the team."
-        },
-        "originalId": {
-          "type": "number",
-          "description": "The original ID of the team in the API Football API."
-        },
-        "customNameByAdmin": {
-          "type": "string",
-          "description": "Custom name for the team set by an admin (optional)."
-        }
+        "id": { "type": "string", "description": "Unique identifier for the team." },
+        "name": { "type": "string", "description": "The name of the team." },
+        "originalId": { "type": "number", "description": "The original ID of the team in the API Football API." }
       },
-      "required": [
-        "id",
-        "name",
-        "originalId"
-      ]
+      "required": ["id", "name", "originalId"]
     },
     "Match": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -93,45 +45,15 @@
       "type": "object",
       "description": "Represents a football match between two teams.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the match."
-        },
-        "competitionId": {
-          "type": "string",
-          "description": "Reference to Competition. (Relationship: Competition 1:N Match)"
-        },
-        "homeTeamId": {
-          "type": "string",
-          "description": "Reference to Team (Home Team). (Relationship: Team 1:N Match (Home))"
-        },
-        "awayTeamId": {
-          "type": "string",
-          "description": "Reference to Team (Away Team). (Relationship: Team 1:N Match (Away))"
-        },
-        "date": {
-          "type": "string",
-          "description": "The date and time of the match.",
-          "format": "date-time"
-        },
-        "status": {
-          "type": "string",
-          "description": "The status of the match (e.g., 'FT' for full-time, 'NS' for not started)."
-        },
-        "score": {
-          "type": "string",
-          "description": "The score of the match (e.g., '2-1')."
-        }
+        "id": { "type": "string", "description": "Unique identifier for the match." },
+        "competitionId": { "type": "string", "description": "Reference to Competition." },
+        "homeTeamId": { "type": "string", "description": "Reference to Team (Home Team)." },
+        "awayTeamId": { "type": "string", "description": "Reference to Team (Away Team)." },
+        "date": { "type": "string", "description": "The date and time of the match.", "format": "date-time" },
+        "status": { "type": "string", "description": "The status of the match." },
+        "score": { "type": "string", "description": "The score of the match." }
       },
-      "required": [
-        "id",
-        "competitionId",
-        "homeTeamId",
-        "awayTeamId",
-        "date",
-        "status",
-        "score"
-      ]
+      "required": ["id", "competitionId", "homeTeamId", "awayTeamId", "date", "status", "score"]
     },
     "News": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -139,41 +61,14 @@
       "type": "object",
       "description": "Represents a news article.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the news article."
-        },
-        "title": {
-          "type": "string",
-          "description": "The title of the news article."
-        },
-        "body": {
-          "type": "string",
-          "description": "The body of the news article."
-        },
-        "imageUrl": {
-          "type": "string",
-          "description": "The URL of the image associated with the news article.",
-          "format": "uri"
-        },
-        "authorId": {
-          "type": "string",
-          "description": "Reference to Admin user who wrote the news. (Relationship: Admin 1:N News)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "The date and time the news article was created.",
-          "format": "date-time"
-        }
+        "id": { "type": "string", "description": "Unique identifier for the news article." },
+        "title": { "type": "string", "description": "The title of the news article." },
+        "body": { "type": "string", "description": "The body of the news article." },
+        "imageUrl": { "type": "string", "description": "The URL of the image associated with the news article.", "format": "uri" },
+        "authorId": { "type": "string", "description": "Reference to Admin user who wrote the news." },
+        "createdAt": { "type": "string", "description": "The date and time the news article was created.", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "title",
-        "body",
-        "imageUrl",
-        "authorId",
-        "createdAt"
-      ]
+      "required": ["id", "title", "body", "imageUrl", "authorId", "createdAt"]
     },
     "Admin": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -181,19 +76,9 @@
       "type": "object",
       "description": "Represents an administrator user with special privileges.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the admin user."
-        },
-        "permissions": {
-          "type": "string",
-          "description": "Object containing boolean flags for different permissions (e.g., manageCompetitions, manageNews)."
-        }
+        "id": { "type": "string", "description": "Unique identifier for the admin user." }
       },
-      "required": [
-        "id",
-        "permissions"
-      ]
+      "required": ["id"]
     },
     "UserFavorites": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -201,35 +86,21 @@
       "type": "object",
       "description": "Stores user's favorite teams and competitions.",
       "properties": {
-        "userId": {
-          "type": "string",
-          "description": "Reference to User. (Relationship: User 1:1 UserFavorites)"
-        },
-        "teamIds": {
-          "type": "array",
-          "description": "References to Teams favorited by the user. (Relationship: UserFavorites 1:N Team)",
-          "items": {
-            "type": "string"
-          }
-        },
-        "competitionIds": {
-          "type": "array",
-          "description": "References to Competitions favorited by the user. (Relationship: UserFavorites 1:N Competition)",
-          "items": {
-            "type": "string"
-          }
-        },
-        "matchIds": {
-          "type": "array",
-          "description": "References to Matches favorited by the user. (Relationship: UserFavorites 1:N Match)",
-          "items": {
-            "type": "string"
-          }
-        }
+        "userId": { "type": "string", "description": "Reference to User." },
+        "teamIds": { "type": "array", "items": { "type": "string" } },
+        "competitionIds": { "type": "array", "items": { "type": "string" } }
       },
-      "required": [
-        "userId"
-      ]
+      "required": ["userId"]
+    },
+    "PredictionMatch": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PredictionMatch",
+      "type": "object",
+      "description": "Represents a match that is pinned by an admin for predictions.",
+      "properties": {
+        "fixtureData": { "$ref": "#/entities/Match" }
+      },
+      "required": ["fixtureData"]
     }
   },
   "auth": {
@@ -245,224 +116,83 @@
         "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profile information.  Authorization: Only the user can read/write their own profile.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique ID of the user, obtained from Firebase Authentication."
-            }
-          ]
+          "schema": { "$ref": "#/entities/User" },
+          "description": "Stores user profile information."
         }
       },
       {
         "path": "/competitions/{competitionId}",
         "definition": {
           "entityName": "Competition",
-          "schema": {
-            "$ref": "#/backend/entities/Competition"
-          },
-          "description": "Stores competition data (e.g., league, cup). Publicly readable, but only admins can create/update/delete.",
-          "params": [
-            {
-              "name": "competitionId",
-              "description": "The unique ID of the competition."
-            }
-          ]
+          "schema": { "$ref": "#/entities/Competition" },
+          "description": "Stores competition data."
         }
       },
       {
         "path": "/teams/{teamId}",
         "definition": {
           "entityName": "Team",
-          "schema": {
-            "$ref": "#/backend/entities/Team"
-          },
-          "description": "Stores team data. Publicly readable, but only admins can create/update/delete.",
-          "params": [
-            {
-              "name": "teamId",
-              "description": "The unique ID of the team."
-            }
-          ]
+          "schema": { "$ref": "#/entities/Team" },
+          "description": "Stores team data."
         }
       },
       {
         "path": "/matches/{matchId}",
         "definition": {
           "entityName": "Match",
-          "schema": {
-            "$ref": "#/backend/entities/Match"
-          },
-          "description": "Stores match data. Publicly readable.",
-          "params": [
-            {
-              "name": "matchId",
-              "description": "The unique ID of the match."
-            }
-          ]
+          "schema": { "$ref": "#/entities/Match" },
+          "description": "Stores match data."
         }
       },
       {
         "path": "/news/{newsId}",
         "definition": {
           "entityName": "News",
-          "schema": {
-            "$ref": "#/backend/entities/News"
-          },
-          "description": "Stores news articles. Publicly readable, but only admins can create/update/delete.",
-          "params": [
-            {
-              "name": "newsId",
-              "description": "The unique ID of the news article."
-            }
-          ]
+          "schema": { "$ref": "#/entities/News" },
+          "description": "Stores news articles."
         }
       },
       {
         "path": "/admins/{adminId}",
         "definition": {
           "entityName": "Admin",
-          "schema": {
-            "$ref": "#/backend/entities/Admin"
-          },
-          "description": "Stores admin user data. The existence of a document indicates admin status. Only admins can create/update/delete other admins. Normal users can't read.",
-          "params": [
-            {
-              "name": "adminId",
-              "description": "The unique ID of the admin user, obtained from Firebase Authentication."
-            }
-          ]
+          "schema": { "$ref": "#/entities/Admin" },
+          "description": "Stores admin user data."
         }
       },
       {
         "path": "/users/{userId}/favorites/data",
         "definition": {
           "entityName": "UserFavorites",
-          "schema": {
-            "$ref": "#/backend/entities/UserFavorites"
-          },
-          "description": "Stores user's favorite teams and competitions. Only the user can read/write their own favorites.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique ID of the user, obtained from Firebase Authentication."
-            }
-          ]
-        }
-      },
-	  {
-        "path": "/topCompetitions/{competitionId}",
-        "definition": {
-          "entityName": "Competition",
-          "schema": {
-            "$ref": "#/backend/entities/Competition"
-          },
-          "description": "Stores top competitions marked by admins. Publicly readable, but only admins can create/update/delete.",
-          "params": [
-            {
-              "name": "competitionId",
-              "description": "The unique ID of the competition."
-            }
-          ]
+          "schema": { "$ref": "#/entities/UserFavorites" },
+          "description": "Stores user's favorite teams and competitions."
         }
       },
       {
-        "path": "/topTeams/{teamId}",
+        "path": "/predictions/{fixtureId}",
         "definition": {
-          "entityName": "Team",
-          "schema": {
-            "$ref": "#/backend/entities/Team"
-          },
-          "description": "Stores top teams marked by admins. Publicly readable, but only admins can create/update/delete.",
-          "params": [
-            {
-              "name": "teamId",
-              "description": "The unique ID of the team."
-            }
-          ]
-        }
-      },
-       {
-        "path": "/leagueCustomizations/{leagueId}",
-        "definition": {
-          "entityName": "CustomName",
-          "schema": { "type": "object", "properties": { "customName": { "type": "string" } } },
-          "description": "Stores custom names for leagues set by admins."
+          "entityName": "PredictionMatch",
+          "schema": { "$ref": "#/entities/PredictionMatch" },
+          "description": "Admin-pinned matches available for user predictions. Publicly readable."
         }
       },
       {
-        "path": "/teamCustomizations/{teamId}",
-        "definition": {
-          "entityName": "CustomName",
-          "schema": { "type": "object", "properties": { "customName": { "type": "string" } } },
-          "description": "Stores custom names for teams set by admins."
-        }
-      },
-      {
-        "path": "/playerCustomizations/{playerId}",
-        "definition": {
-          "entityName": "CustomName",
-          "schema": { "type": "object", "properties": { "customName": { "type": "string" } } },
-          "description": "Stores custom names for players set by admins."
-        }
-      },
-       {
-        "path": "/matchCustomizations/{fixtureId}",
-        "definition": {
-          "entityName": "CustomStatus",
-          "schema": { "type": "object", "properties": { "customStatus": { "type": "string" } } },
-          "description": "Stores custom status for matches set by admins."
-        }
-      },
-      {
-        "path": "/continentCustomizations/{continentId}",
-        "definition": {
-          "entityName": "CustomName",
-          "schema": { "type": "object", "properties": { "customName": { "type": "string" } } },
-          "description": "Stores custom names for continents set by admins."
-        }
-      },
-      {
-        "path": "/countryCustomizations/{countryId}",
-        "definition": {
-          "entityName": "CustomName",
-          "schema": { "type": "object", "properties": { "customName": { "type": "string" } } },
-          "description": "Stores custom names for countries set by admins."
-        }
-      },
-      {
-        "path": "/pinnedIraqiMatches/{matchId}",
-        "definition": {
-          "entityName": "PinnedMatch",
-          "schema": { "type": "object", "properties": { "isEnabled": { "type": "boolean" }, "homeTeamName": { "type": "string" }, "homeTeamLogo": { "type": "string" }, "awayTeamName": { "type": "string" }, "awayTeamLogo": { "type": "string" }, "competitionName": { "type": "string" }, "matchDate": { "type": "string" }, "matchTime": { "type": "string" } } },
-          "description": "Stores the details of a pinned Iraqi match, managed by an admin."
-        }
-      },
-      {
-        "path": "/leaguePredictions/{predictionId}",
+        "path": "/predictions/{fixtureId}/userPredictions/{userId}",
         "definition": {
           "entityName": "Prediction",
-          "schema": {
-            "$ref": "#/backend/entities/Prediction"
-          },
-          "description": "Stores user predictions for specific league matches."
+          "schema": { "type": "object", "properties": { "homeGoals": { "type": "number" }, "awayGoals": { "type": "number" } } },
+          "description": "Stores an individual user's prediction for a specific match."
         }
       },
       {
-        "path": "/leagueLeaderboards/{leagueId}/users/{userId}",
+        "path": "/leaderboard/{userId}",
         "definition": {
           "entityName": "UserScore",
-          "schema": {
-            "$ref": "#/backend/entities/UserScore"
-          },
-          "description": "Stores user scores for a specific league leaderboard."
+          "schema": { "type": "object", "properties": { "score": { "type": "number" }, "displayName": {"type": "string"} } },
+          "description": "Stores the aggregated prediction scores for each user."
         }
       }
-    ],
-    "reasoning": "The Firestore data structure is designed to support the Goal Stack application, focusing on user-specific data, shared entities like competitions and teams, and admin-managed content such as news.  The key principle is Authorization Independence, achieved through denormalization.  For instance, user favorites (teams, competitions, matches) are stored under the `/users/{userId}/favorites` collection, and if a team or competition's details are needed, they are queried directly without requiring a `get()` call to the user document during security rule evaluation. Admin roles are determined by the existence of a document in the `/admins/{adminId}` collection. This structure supports the QAPs (Rules are not Filters) requirement by allowing direct queries on collections like `/competitions` and `/teams` with appropriate security rules based on user roles or ownership, without needing complex filtering in the rules themselves.\n\nFor data that needs collaborative authorization (if any), a membership map in the relevant document would be used.\n\nThis approach maximizes security and minimizes rule complexity."
+    ]
   }
 }
 

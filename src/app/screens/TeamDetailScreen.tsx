@@ -6,7 +6,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteField, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteField, writeBatch, deleteDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Loader2, Pencil, Shirt, Star, Crown } from 'lucide-react';
@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { Team, Player, Fixture, Standing, TeamStatistics, Favorites, AdminFavorite, CrownedTeam } from '@/lib/types';
+import type { Team, Player, Fixture, Standing, TeamStatistics, Favorites, AdminFavorite, CrownedTeam, PredictionMatch } from '@/lib/types';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { FixtureItem } from '@/components/FixtureItem';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -72,7 +72,7 @@ const TeamHeader = ({ team, venue, onStar, isStarred, onCrown, isCrowned, isAdmi
         <Card className="mb-4 overflow-hidden">
             <div className="relative h-24 bg-gradient-to-r from-primary/20 to-accent/20" style={{backgroundImage: `url(${venue?.image})`, backgroundSize: 'cover', backgroundPosition: 'center'}}>
                 <div className="absolute inset-0 bg-black/50" />
-                <Avatar className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 h-24 w-24 border-4 border-background">
+                <Avatar className="absolute bottom-0 left-1/2 -translate-x-1/2 -translate-y-1/2 h-24 w-24 border-4 border-background">
                     <AvatarImage src={team.logo} alt={team.name} />
                     <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
                 </Avatar>
@@ -186,7 +186,7 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
     
     return (
         <div className="space-y-2">
-            {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={(isOpen) => !isOpen && setRenameItem(null)} item={{...renameItem, type: 'player'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name, renameItem.originalName)} />}
+            {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={(isOpen) => !isOpen && setRenameItem(null)} item={{...renameItem, type: 'player', purpose: 'rename'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name, renameItem.originalName)} />}
             {players.map(player => (
                 <Card key={player.id} className="p-2">
                     <div className="flex items-center gap-3">
@@ -218,7 +218,7 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
     );
 };
 
-const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: ScreenProps['navigate']}) => {
+const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatches }: { teamId: number, navigate: ScreenProps['navigate'], onPinToggle: (fixture: Fixture) => void, pinnedPredictionMatches: Set<number> }) => {
     const [fixtures, setFixtures] = useState<Fixture[]>([]);
     const [standings, setStandings] = useState<Standing[]>([]);
     const [stats, setStats] = useState<TeamStatistics | null>(null);
@@ -357,7 +357,12 @@ const TeamDetailsTabs = ({ teamId, navigate }: { teamId: number, navigate: Scree
                         const isFirstUpcoming = isUpcomingOrLive && !processedFixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(f.fixture.status.short));
                         return (
                             <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
-                                <FixtureItem fixture={fixture} navigate={navigate} />
+                                <FixtureItem 
+                                    fixture={fixture} 
+                                    navigate={navigate} 
+                                    isPinnedForPrediction={pinnedPredictionMatches.has(fixture.fixture.id)}
+                                    onPinToggle={onPinToggle}
+                                />
                             </div>
                         )
                     }) : <p className="text-center text-muted-foreground p-8">لا توجد مباريات متاحة.</p>}
@@ -439,8 +444,42 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   const [displayTitle, setDisplayTitle] = useState<string | undefined>(undefined);
   const [teamData, setTeamData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [renameItem, setRenameItem] = useState<{ id: number; name: string; note?: string; type: 'team' | 'crown'; originalData: any; } | null>(null);
+  const [renameItem, setRenameItem] = useState<{ id: number; name: string; note?: string; type: 'team' | 'crown'; purpose: 'rename' | 'crown' | 'note'; originalData: any; } | null>(null);
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
+  const [pinnedPredictionMatches, setPinnedPredictionMatches] = useState(new Set<number>());
+
+
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(collection(db, 'predictions'), (snapshot) => {
+        const newPinnedSet = new Set<number>();
+        snapshot.forEach(doc => newPinnedSet.add(Number(doc.id)));
+        setPinnedPredictionMatches(newPinnedSet);
+    });
+    return () => unsub();
+  }, [db]);
+
+  const handlePinToggle = useCallback((fixture: Fixture) => {
+    if (!db) return;
+    const fixtureId = fixture.fixture.id;
+    const isPinned = pinnedPredictionMatches.has(fixtureId);
+    const docRef = doc(db, 'predictions', String(fixtureId));
+
+    if (isPinned) {
+        deleteDoc(docRef).then(() => {
+            toast({ title: "تم إلغاء التثبيت", description: "تمت إزالة المباراة من التوقعات." });
+        }).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+        });
+    } else {
+        const data: PredictionMatch = { fixtureData: fixture };
+        setDoc(docRef, data).then(() => {
+            toast({ title: "تم التثبيت", description: "أصبحت المباراة متاحة الآن للتوقع." });
+        }).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: data }));
+        });
+    }
+  }, [db, pinnedPredictionMatches, toast]);
 
 
   useEffect(() => {
@@ -545,6 +584,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
         id: team.id,
         name: displayTitle || team.name,
         type: 'crown',
+        purpose: 'crown',
         originalData: team,
         note: currentNote,
     });
@@ -557,6 +597,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
         id: team.id,
         name: displayTitle || team.name,
         type: 'team',
+        purpose: 'rename',
         originalData: team,
     });
   };
@@ -631,7 +672,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
           <RenameDialog
               isOpen={!!renameItem}
               onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-              item={{...renameItem, purpose: renameItem.type === 'crown' ? 'crown' : 'rename'}}
+              item={renameItem}
               onSave={(type, id, name, note) => handleSaveRenameOrNote(type as 'team' | 'crown', Number(id), name, note)}
           />
       )}
@@ -652,7 +693,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
             <TabsTrigger value="players">اللاعبون</TabsTrigger>
           </TabsList>
           <TabsContent value="details" className="mt-4">
-            <TeamDetailsTabs teamId={teamId} navigate={navigate} />
+            <TeamDetailsTabs teamId={teamId} navigate={navigate} onPinToggle={handlePinToggle} pinnedPredictionMatches={pinnedPredictionMatches} />
           </TabsContent>
           <TabsContent value="players" className="mt-4">
             <TeamPlayersTab teamId={teamId} navigate={navigate} />
