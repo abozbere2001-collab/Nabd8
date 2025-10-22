@@ -59,6 +59,8 @@ const OnboardingFlow = ({ user }: { user: User }) => {
                 setOnboardingComplete(userDoc.exists() && userDoc.data().onboardingComplete);
             } catch (error) {
                 console.error("Error checking onboarding status:", error);
+                // Assume onboarding is not complete if there's an error,
+                // which is safer than getting stuck.
                 setOnboardingComplete(false);
             } finally {
                 setIsLoading(false);
@@ -75,6 +77,7 @@ const OnboardingFlow = ({ user }: { user: User }) => {
         } else {
             const userDocRef = doc(db, 'users', user.uid);
             try {
+                // Set onboarding as complete in the user's document
                 await setDoc(userDocRef, { onboardingComplete: true }, { merge: true });
             } catch (error) {
                 const permissionError = new FirestorePermissionError({ path: userDocRef.path, operation: 'update', requestResourceData: { onboardingComplete: true } });
