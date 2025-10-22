@@ -448,7 +448,6 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [pinnedPredictionMatches, setPinnedPredictionMatches] = useState(new Set<number>());
 
-  // States to manage tab data loading
   const [activeTab, setActiveTab] = useState('details');
 
   useEffect(() => {
@@ -548,8 +547,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   const handleFavoriteToggle = () => {
     if (!teamData) return;
     const { team } = teamData;
-    const teamNameForFavorite = displayTitle || team.name;
     const isFavorited = !!favorites.teams?.[team.id];
+    const teamNameForFavorite = teamData.team.name;
 
     if (!user || user.isAnonymous) {
         const currentFavorites = getLocalFavorites();
@@ -567,9 +566,13 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
 
     const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const fieldPath = `teams.${team.id}`;
-    const updateData = isFavorited ? { [fieldPath]: deleteField() } : { [fieldPath]: { teamId: team.id, name: teamNameForFavorite, logo: team.logo, type: team.national ? 'National' : 'Club' } };
+    
+    const updateData = isFavorited 
+        ? { [fieldPath]: deleteField() } 
+        : { [fieldPath]: { teamId: team.id, name: teamNameForFavorite, logo: team.logo, type: team.national ? 'National' : 'Club' } };
 
-    updateDoc(favDocRef, updateData).catch(err => {
+    // Use setDoc with merge to ensure the document is created if it doesn't exist
+    setDoc(favDocRef, updateData, { merge: true }).catch(err => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
     });
   };
