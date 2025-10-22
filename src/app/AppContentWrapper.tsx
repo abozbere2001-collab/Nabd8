@@ -17,7 +17,7 @@ import { SeasonTeamSelectionScreen } from './screens/SeasonTeamSelectionScreen';
 import { SeasonPlayerSelectionScreen } from './screens/SeasonPlayerSelectionScreen';
 import { AddEditNewsScreen } from './screens/AddEditNewsScreen';
 import { ManagePinnedMatchScreen } from './screens/ManagePinnedMatchScreen';
-import { MatchDetailScreen } from './screens/MatchDetailScreen';
+import MatchDetailScreen from './screens/MatchDetailScreen';
 import { NotificationSettingsScreen } from './screens/NotificationSettingsScreen';
 import { GeneralSettingsScreen } from './screens/GeneralSettingsScreen';
 import PrivacyPolicyScreen from './privacy-policy/page';
