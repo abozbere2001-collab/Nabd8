@@ -257,6 +257,76 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
 LeaderboardDisplay.displayName = 'LeaderboardDisplay';
 
 
+const formatDateKey = (date: Date): string => format(date, 'yyyy-MM-dd');
+
+const getDayLabel = (dateKey: string) => {
+    const date = new Date(dateKey);
+    if (isToday(date)) return 'اليوم';
+    if (isYesterday(date)) return 'الأمس';
+    if (isTomorrow(date)) return 'غداً';
+    return format(date, 'EEEE, d MMM', { locale: ar });
+};
+
+const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: string, onDateSelect: (dateKey: string) => void}) => {
+    const dates = useMemo(() => {
+        const today = new Date();
+        return Array.from({ length: 30 }, (_, i) => addDays(today, i - 15));
+    }, []);
+    
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const selectedButtonRef = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        const scroller = scrollerRef.current;
+        const selectedButton = selectedButtonRef.current;
+
+        if (scroller && selectedButton) {
+            const scrollerRect = scroller.getBoundingClientRect();
+            const selectedRect = selectedButton.getBoundingClientRect();
+            const scrollOffset = selectedRect.left - scrollerRect.left - (scrollerRect.width / 2) + (selectedRect.width / 2);
+            scroller.scrollTo({ left: scroller.scrollLeft + scrollOffset, behavior: 'smooth' });
+        }
+    }, [selectedDateKey]);
+
+    return (
+        <div className="relative bg-card py-2 border-x border-b rounded-b-lg shadow-md -mt-1">
+             <div ref={scrollerRef} className="flex flex-row-reverse overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                {dates.map(date => {
+                    const dateKey = formatDateKey(date);
+                    const isSelected = dateKey === selectedDateKey;
+                    return (
+                         <button
+                            key={dateKey}
+                            ref={isSelected ? selectedButtonRef : null}
+                            className={cn(
+                                "relative flex flex-col items-center justify-center h-auto py-1 px-2 min-w-[40px] rounded-lg transition-colors ml-2",
+                                "text-foreground/80 hover:text-primary",
+                                isSelected && "text-primary"
+                            )}
+                            onClick={() => onDateSelect(dateKey)}
+                        >
+                            <span className="text-[10px] font-normal">{format(date, "EEE", { locale: ar })}</span>
+                            <span className="font-semibold text-sm">{format(date, 'd')}</span>
+                            {isSelected && <span className="absolute bottom-0 h-0.5 w-3 rounded-full bg-primary" />}
+                        </button>
+                    )
+                })}
+            </div>
+             <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={() => onDateSelect(formatDateKey(new Date()))}
+                disabled={isToday(new Date(selectedDateKey))}
+             >
+                <CalendarDays className="h-4 w-4"/>
+             </Button>
+        </div>
+    );
+}
+
+
+
 const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     const [mainTab, setMainTab] = useState('voting');
     const [calculatingPoints, setCalculatingPoints] = useState(false);
@@ -270,27 +340,24 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     const [loadingMatches, setLoadingMatches] = useState(true);
 
     const [userPredictions, setUserPredictions] = useState<{ [key: number]: Prediction }>({});
+    const [selectedDateKey, setSelectedDateKey] = useState<string>(formatDateKey(new Date()));
 
-    // Fetch Leaderboard and current user's score
     const fetchLeaderboard = useCallback(async () => {
         if (!db) return;
         setLoadingLeaderboard(true);
         const leaderboardRef = collection(db, 'leaderboard');
         
         try {
-            // Fetch top 100
             const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), limit(100));
             const top100Snapshot = await getDocs(q);
             let rank = 1;
             const top100Scores = top100Snapshot.docs.map(doc => ({ userId: doc.id, ...(doc.data() as Omit<UserScore, 'userId'>), rank: rank++ }));
             setLeaderboard(top100Scores);
             
-            // Fetch current user's score if they exist
             if (user) {
                 const userScoreRef = doc(db, 'leaderboard', user.uid);
                 const userScoreSnap = await getDoc(userScoreRef);
                 if (userScoreSnap.exists()) {
-                    // To get the rank, we need to count how many users have more points
                     const higherRankQuery = query(leaderboardRef, where('totalPoints', '>', userScoreSnap.data().totalPoints || 0));
                     const higherRankSnap = await getDocs(higherRankQuery);
                     const userRank = higherRankSnap.size + 1;
@@ -306,15 +373,12 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         }
     }, [db, user]);
     
-    // Fetch Pinned Matches
     useEffect(() => {
         if (!db) return;
         setLoadingMatches(true);
         const unsub = onSnapshot(collection(db, 'predictions'), snapshot => {
             const matches = snapshot.docs.map(doc => doc.data() as PredictionMatch);
-            // Defensive sort: filter out items that don't have the required data
             const validMatches = matches.filter(m => m && m.fixtureData && m.fixtureData.fixture);
-            validMatches.sort((a, b) => a.fixtureData.fixture.timestamp - b.fixtureData.fixture.timestamp);
             setPinnedMatches(validMatches);
             setLoadingMatches(false);
         }, error => {
@@ -325,7 +389,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     }, [db]);
 
 
-    // Fetch user's predictions for the visible pinned matches
     useEffect(() => {
         if (!user || !db || pinnedMatches.length === 0) return;
         
@@ -396,7 +459,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 return;
             }
 
-            // Get all users who have made predictions for yesterday's matches
             const usersRef = collection(db, 'users');
             const usersSnap = await getDocs(usersRef);
             
@@ -426,7 +488,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 });
             }
 
-            // Update leaderboard
             for (const userId in userTotalPoints) {
                 const userDoc = usersSnap.docs.find(d => d.id === userId);
                 if (userDoc) {
@@ -442,7 +503,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             await batch.commit();
             
             toast({ title: 'اكتمل الاحتساب', description: 'تم تحديث جميع النقاط في لوحة الصدارة.' });
-            fetchLeaderboard(); // Refetch after calculation
+            fetchLeaderboard();
         } catch (error: any) {
             console.error("Error calculating points:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل احتساب النقاط.' });
@@ -451,24 +512,12 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         }
     }, [db, toast, fetchLeaderboard]);
 
-    const groupedMatches = useMemo(() => {
-        return pinnedMatches.reduce((acc, match) => {
-            const date = format(new Date(match.fixtureData.fixture.timestamp * 1000), 'yyyy-MM-dd');
-            if (!acc[date]) {
-                acc[date] = [];
-            }
-            acc[date].push(match);
-            return acc;
-        }, {} as Record<string, PredictionMatch[]>);
-    }, [pinnedMatches]);
-
-    const getDayLabel = (dateKey: string) => {
-        const date = new Date(dateKey);
-        if (isToday(date)) return 'اليوم';
-        if (isYesterday(date)) return 'الأمس';
-        if (isTomorrow(date)) return 'غداً';
-        return format(date, 'EEEE, d MMM', { locale: ar });
-    };
+    const filteredMatches = useMemo(() => {
+        return pinnedMatches.filter(match => {
+            const matchDateKey = format(new Date(match.fixtureData.fixture.timestamp * 1000), 'yyyy-MM-dd');
+            return matchDateKey === selectedDateKey;
+        }).sort((a,b) => a.fixtureData.fixture.timestamp - b.fixtureData.fixture.timestamp);
+    }, [pinnedMatches, selectedDateKey]);
 
     return (
         <Tabs value={mainTab} onValueChange={setMainTab} className="w-full flex-1 flex flex-col">
@@ -476,30 +525,30 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                <TabsTrigger value="leaderboard"><BarChart className="ml-2 h-4 w-4" />الترتيب</TabsTrigger>
                <TabsTrigger value="voting"><ThumbsUp className="ml-2 h-4 w-4" />تصويت</TabsTrigger>
            </TabsList>
-           <TabsContent value="voting" className="flex-1 overflow-y-auto mt-4 space-y-4">
-                {loadingMatches ? (
-                     <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-                ) : Object.keys(groupedMatches).length > 0 ? (
-                    Object.keys(groupedMatches).sort().map(dateKey => (
-                        <div key={dateKey}>
-                             <h3 className="font-bold mb-2 text-center text-muted-foreground">{getDayLabel(dateKey)}</h3>
-                            {groupedMatches[dateKey].map(match => (
-                                <PredictionCard 
-                                    key={match.fixtureData.fixture.id}
-                                    predictionMatch={match}
-                                    userPrediction={userPredictions[match.fixtureData.fixture.id]}
-                                    onSave={handleSavePrediction}
-                                />
-                            ))}
+           
+           <TabsContent value="voting" className="flex-1 overflow-y-auto mt-0 data-[state=inactive]:hidden flex flex-col">
+                <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
+                <div className="flex-1 overflow-y-auto p-1 space-y-4 pt-4">
+                    {loadingMatches ? (
+                         <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                    ) : filteredMatches.length > 0 ? (
+                        filteredMatches.map(match => (
+                            <PredictionCard 
+                                key={match.fixtureData.fixture.id}
+                                predictionMatch={match}
+                                userPrediction={userPredictions[match.fixtureData.fixture.id]}
+                                onSave={handleSavePrediction}
+                            />
+                        ))
+                    ) : (
+                        <div className="text-center text-muted-foreground pt-10">
+                            <p>لا توجد مباريات للتوقع في هذا اليوم.</p>
+                            <p className="text-xs">سيقوم المدير بإضافتها قريبًا.</p>
                         </div>
-                    ))
-                ) : (
-                    <div className="text-center text-muted-foreground pt-10">
-                        <p>لا توجد مباريات متاحة للتوقع حاليًا.</p>
-                        <p className="text-xs">سيقوم المدير بإضافتها قريبًا.</p>
-                    </div>
-                )}
+                    )}
+                </div>
            </TabsContent>
+
            <TabsContent value="leaderboard" className="mt-4">
                <Card>
                   <CardHeader className="flex-row items-center justify-between">
