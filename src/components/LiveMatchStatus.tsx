@@ -60,6 +60,8 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
             };
         }
         
+        // This is the core logic change.
+        // It now correctly uses goals.home and goals.away
         if (goals.home === null || goals.away === null) {
             if (status.short === "PST") return { main: "مؤجلة", sub: "", isLive: false };
             if (status.short === "TBD") return { main: "لم تحدد", sub: "", isLive: false };
@@ -71,7 +73,9 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
             };
         }
 
-        const score = `${goals.home} - ${goals.away}`;
+        const score = large 
+          ? `${goals.home} - ${goals.away}` 
+          : `${goals.away} - ${goals.home}`;
 
         if (live) {
             return {
@@ -98,13 +102,10 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
     
     const { main, sub, isLive } = renderStatus();
 
-    const largeScore = goals.home !== null && goals.away !== null ? `${goals.home} - ${goals.away}` : main;
-
-
     if (large) {
          return (
             <div className="flex flex-col items-center justify-center text-center">
-                <div className="font-bold text-3xl tracking-wider">{largeScore}</div>
+                <div className="font-bold text-3xl tracking-wider">{main}</div>
                 {sub && (
                     <div className={cn("text-xs mt-1", isLive ? "text-red-500 font-bold animate-pulse" : "text-muted-foreground")}>
                         {sub}
