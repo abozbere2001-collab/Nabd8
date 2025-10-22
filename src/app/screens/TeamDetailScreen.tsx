@@ -571,7 +571,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   const handleOpenCrownDialog = () => {
     if (!teamData) return;
     if (!user || user.isAnonymous) {
-        toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+        toast({ title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
         return;
     }
     const { team } = teamData;

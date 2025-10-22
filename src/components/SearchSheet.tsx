@@ -306,8 +306,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
 
     const handleFavorite = useCallback((item: Item, itemType: ItemType) => {
-        const isLeague = itemType === 'leagues';
         const itemId = item.id;
+        const isLeague = itemType === 'leagues';
 
         if (user && db && !user.isAnonymous) {
             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
@@ -348,7 +348,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   const handleCrownToggle = (item: Item) => {
     const team = item as Team;
     if (!user || user.isAnonymous) {
-        toast({variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.'});
+        toast({title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.'});
         return;
     }
     if (!db) return;
