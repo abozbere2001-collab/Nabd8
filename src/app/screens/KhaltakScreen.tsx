@@ -36,16 +36,19 @@ const CrownedTeamScroller = ({
   onSelectTeam,
   onRemove,
   selectedTeamId,
+  navigate,
 }: {
   crownedTeams: CrownedTeam[];
   onSelectTeam: (teamId: number) => void;
   onRemove: (teamId: number) => void;
   selectedTeamId: number | null;
+  navigate: ScreenProps['navigate'];
 }) => {
   if (crownedTeams.length === 0) {
     return (
       <div className="text-center text-muted-foreground py-4 px-4">
-        <p>لم تتوج أي فريق بعد. اضغط على التاج 👑 بجانب أي فريق لتبدأ!</p>
+        <p className="mb-4">لم تتوج أي فريق بعد. اضغط على التاج 👑 بجانب أي فريق لتبدأ!</p>
+        <Button onClick={() => navigate('AllCompetitions')}>استكشف</Button>
       </div>
     );
   }
@@ -554,7 +557,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                        <CardTitle>لوحة الصدارة</CardTitle>
                        {isAdmin && (
                            <Button onClick={handleCalculatePoints} disabled={calculatingPoints} size="sm">
-                               {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : "تحديث النقاط"}
+                               {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : "تحديث نقاطي"}
                            </Button>
                        )}
                   </CardHeader>
@@ -665,15 +668,18 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
               onSelectTeam={handleSelectTeam}
               onRemove={handleRemoveCrowned} 
               selectedTeamId={selectedTeamId}
+              navigate={navigate}
             />
           </div>
           <div className="flex-1 overflow-y-auto p-4">
             {selectedTeamId ? (
               <TeamFixturesDisplay teamId={selectedTeamId} navigate={navigate} />
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-center p-4">
-                <p>اختر فريقًا من الأعلى لعرض مبارياته.</p>
-              </div>
+              crownedTeams.length > 0 && (
+                 <div className="flex items-center justify-center h-full text-muted-foreground text-center p-4">
+                  <p>اختر فريقًا من الأعلى لعرض مبارياته.</p>
+                </div>
+              )
             )}
           </div>
         </TabsContent>
@@ -685,5 +691,6 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
 
 
