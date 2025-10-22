@@ -8,8 +8,9 @@ import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { auth } from '@/firebase';
-import { GoogleAuthProvider, getRedirectResult, signInWithRedirect } from 'firebase/auth';
+import { getRedirectResult } from 'firebase/auth';
 import { ScreenProps } from '@/app/page';
+import { signInWithGoogle } from '@/lib/firebase-client';
 
 interface LoginScreenProps {
   onLoginSuccess?: () => void;
@@ -26,8 +27,10 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
       try {
         const result = await getRedirectResult(auth);
         if (result && onLoginSuccess) {
+          // A user has successfully signed in.
           onLoginSuccess();
         } else {
+          // No user signed in via redirect.
           setLoading(false);
         }
       } catch (e: any) {
@@ -58,8 +61,10 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
     if (loading) return;
     setLoading(true);
     setError(null);
-    const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
+    // This function will now handle the full-page redirect.
+    await signInWithGoogle();
+    // The page will redirect, so we don't need to setLoading(false) here
+    // unless the redirect fails, which is handled in handleAuthError.
   };
 
   return (

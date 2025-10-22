@@ -2,9 +2,15 @@
 "use client";
 
 import { 
+  GoogleAuthProvider,
   signOut as firebaseSignOut, 
+  onAuthStateChanged as firebaseOnAuthStateChanged,
+  signInWithRedirect,
+  getRedirectResult,
   updateProfile,
   type User, 
+  linkWithCredential,
+  signInAnonymously as firebaseSignInAnonymously
 } from "firebase/auth";
 import { doc, setDoc, getDoc, Firestore, writeBatch } from 'firebase/firestore';
 import type { UserProfile, UserScore, Favorites } from './types';
@@ -13,6 +19,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { auth, firestore as db } from "@/firebase";
 import { getLocalFavorites, clearLocalFavorites } from './local-favorites';
 import { getDatabase, ref, set } from 'firebase/database';
+
 
 export const handleNewUser = async (user: User, firestore: Firestore) => {
     const userRef = doc(firestore, 'users', user.uid);
@@ -127,3 +134,10 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
 
     set(rtdbUserRef, { displayName: newDisplayName, photoURL: user.photoURL }).catch(console.error);
 };
+
+export async function signInWithGoogle() {
+  const provider = new GoogleAuthProvider();
+  // This is the most robust way to handle this in an iframe environment.
+  // It ensures the redirect happens at the top level.
+  await signInWithRedirect(auth, provider);
+}
