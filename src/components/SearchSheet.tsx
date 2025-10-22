@@ -190,7 +190,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         buildLocalIndex();
         
         let unsubscribe: (() => void) | null = null;
-        if (user && db) {
+        if (user && !user.isAnonymous) {
+            if (!db) return;
             const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
             unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
@@ -299,26 +300,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         const isLeague = !('national' in item);
         const itemId = item.id;
         const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-        
-        if (!user || user.isAnonymous) {
-            const currentFavorites = getLocalFavorites();
-            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-            if (!newFavorites[itemType]) newFavorites[itemType] = {};
-            
-            if (newFavorites[itemType]?.[itemId]) {
-                delete newFavorites[itemType]![itemId];
-            } else {
-                const favData = isLeague 
-                    ? { name: item.name, leagueId: itemId, logo: item.logo }
-                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                newFavorites[itemType]![itemId] = favData;
-            }
-            setLocalFavorites(newFavorites);
-            setFavorites(newFavorites);
-            return;
-        }
 
-        if (user && db) {
+        if (user && !user.isAnonymous && db) {
             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
             const isCurrentlyFavorited = !!favorites[itemType]?.[itemId];
             const fieldPath = `${itemType}.${itemId}`;
@@ -335,6 +318,23 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             updateDoc(favDocRef, updateData).catch(err => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
             });
+
+        } else { // Guest user
+            const currentFavorites = getLocalFavorites();
+            if (!currentFavorites[itemType]) {
+                currentFavorites[itemType] = {};
+            }
+            
+            if (currentFavorites[itemType]?.[itemId]) {
+                delete currentFavorites[itemType]![itemId];
+            } else {
+                const favData = isLeague 
+                    ? { name: item.name, leagueId: itemId, logo: item.logo }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                currentFavorites[itemType]![itemId] = favData;
+            }
+            setLocalFavorites(currentFavorites);
+            setFavorites(currentFavorites); // Update local state to re-render
         }
     }, [user, db, favorites]);
 

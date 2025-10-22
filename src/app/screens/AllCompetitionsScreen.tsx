@@ -216,7 +216,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         fetchAllData();
     
         let unsubscribe: (() => void) | null = null;
-        if (user && db) {
+        if (user && !user.isAnonymous && db) {
             const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
             unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
@@ -362,49 +362,45 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const handleFavoriteToggle = useCallback((item: ManagedCompetitionType | Team) => {
         const isLeague = 'leagueId' in item;
         const itemId = isLeague ? item.leagueId : item.id;
-        const itemType = isLeague ? 'leagues' : 'teams';
+        const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
 
-        if (!user || user.isAnonymous) {
-            const currentFavorites = getLocalFavorites();
-            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+        if (user && !user.isAnonymous && db) {
+            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+            const isCurrentlyFavorited = !!favorites[itemType]?.[itemId];
+            const fieldPath = `${itemType}.${itemId}`;
             
-            if (!newFavorites[itemType]) newFavorites[itemType] = {};
+            let updateData: { [key: string]: any };
 
-            if (newFavorites[itemType]?.[itemId]) {
-                delete newFavorites[itemType]![itemId];
+            if (isCurrentlyFavorited) {
+                updateData = { [fieldPath]: deleteField() };
+            } else {
+                const favData = isLeague
+                    ? { name: item.name, leagueId: itemId, logo: item.logo }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                updateData = { [fieldPath]: favData };
+            }
+            
+            updateDoc(favDocRef, updateData).catch(err => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }))
+            });
+        } else {
+            const currentFavorites = getLocalFavorites();
+            if (!currentFavorites[itemType]) {
+                currentFavorites[itemType] = {};
+            }
+
+            if (currentFavorites[itemType]?.[itemId]) {
+                delete currentFavorites[itemType]![itemId];
             } else {
                  const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                newFavorites[itemType]![itemId] = favData;
+                currentFavorites[itemType]![itemId] = favData;
             }
-            setLocalFavorites(newFavorites);
-            setFavorites(newFavorites);
-            return;
+            setLocalFavorites(currentFavorites);
+            setFavorites(currentFavorites);
         }
-
-        if (!db) return;
-
-        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const isCurrentlyFavorited = !!favorites[itemType]?.[itemId];
-        
-        const fieldPath = `${itemType}.${itemId}`;
-        let updateData: { [key: string]: any };
-
-        if (isCurrentlyFavorited) {
-            updateData = { [fieldPath]: deleteField() };
-        } else {
-            const favData = isLeague
-                ? { name: item.name, leagueId: itemId, logo: item.logo }
-                : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-            updateData = { [fieldPath]: favData };
-        }
-        
-        updateDoc(favDocRef, updateData).catch(err => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }))
-        });
-
-    }, [user, db, favorites, toast]);
+    }, [user, db, favorites]);
     
 
     const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote: string = '') => {
