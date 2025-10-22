@@ -11,7 +11,7 @@ import { Star, Pencil, Trash2, Loader2, Crown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { doc, setDoc, onSnapshot, updateDoc, deleteField, getDocs, collection, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, updateDoc, deleteField, getDocs, collection, deleteDoc, getDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
 import type { Fixture, Standing, TopScorer, Team, Favorites, CrownedTeam } from '@/lib/types';
@@ -200,22 +200,26 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     }
   }, [user, db]);
 
- useEffect(() => {
+  useEffect(() => {
     if (leagueId && db) {
-        const leagueDocRef = doc(db, "leagueCustomizations", String(leagueId));
-        const unsub = onSnapshot(leagueDocRef, (doc) => {
-            if (doc.exists()) {
-                setDisplayTitle(doc.data().customName);
-            } else {
-                 const hardcodedName = hardcodedTranslations.leagues[leagueId];
-                 setDisplayTitle(hardcodedName || initialTitle);
-            }
-        }, (error) => {
-            console.warn("Could not listen to league customizations, this is expected for non-admins:", error);
+      const leagueDocRef = doc(db, 'leagueCustomizations', String(leagueId));
+      getDoc(leagueDocRef)
+        .then(doc => {
+          if (doc.exists()) {
+            setDisplayTitle(doc.data().customName);
+          } else {
             const hardcodedName = hardcodedTranslations.leagues[leagueId];
             setDisplayTitle(hardcodedName || initialTitle);
+          }
+        })
+        .catch(error => {
+          console.warn(
+            'Could not fetch league customization, this is expected for non-admins:',
+            error
+          );
+          const hardcodedName = hardcodedTranslations.leagues[leagueId];
+          setDisplayTitle(hardcodedName || initialTitle);
         });
-        return () => unsub();
     }
   }, [leagueId, initialTitle, db]);
 
