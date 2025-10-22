@@ -98,7 +98,6 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
     
     const { main, sub, isLive } = renderStatus();
 
-    // The large display was showing away-home, now it's home-away
     const largeScore = goals.home !== null && goals.away !== null ? `${goals.home} - ${goals.away}` : main;
 
 
