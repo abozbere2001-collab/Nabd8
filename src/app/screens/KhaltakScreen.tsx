@@ -377,9 +377,8 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         if (!db) return;
         setLoadingMatches(true);
         const unsub = onSnapshot(collection(db, 'predictions'), snapshot => {
-            const matches = snapshot.docs.map(doc => doc.data() as PredictionMatch);
-            const validMatches = matches.filter(m => m && m.fixtureData && m.fixtureData.fixture);
-            setPinnedMatches(validMatches);
+            const matches = snapshot.docs.map(doc => doc.data() as PredictionMatch).filter(m => m && m.fixtureData && m.fixtureData.fixture);
+            setPinnedMatches(matches);
             setLoadingMatches(false);
         }, error => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({path: 'predictions', operation: 'list'}));
@@ -393,6 +392,8 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         if (!user || !db || pinnedMatches.length === 0) return;
         
         const fixtureIds = pinnedMatches.map(m => m.fixtureData.fixture.id);
+        if (fixtureIds.length === 0) return;
+        
         const userPredsRef = collection(db, 'users', user.uid, 'predictions');
         const q = query(userPredsRef, where('fixtureId', 'in', fixtureIds));
         
@@ -403,6 +404,8 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 predictions[pred.fixtureId] = pred;
             });
             setUserPredictions(predictions);
+        }, err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({path: `users/${user.uid}/predictions`, operation: 'list'}));
         });
         return () => unsub();
     }, [user, db, pinnedMatches]);
@@ -443,74 +446,70 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     }, [user, db]);
 
      const handleCalculatePoints = useCallback(async () => {
-        if (!db) return;
+        if (!db || !user) return;
         setCalculatingPoints(true);
-        toast({ title: 'بدء احتساب النقاط', description: 'يتم الآن احتساب نقاط مباريات الأمس...' });
-
+        toast({ title: 'بدء احتساب نقاطك', description: 'يتم الآن تحديث نقاط توقعاتك...' });
+    
         try {
-            const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-            const fixturesRes = await fetch(`/api/football/fixtures?date=${yesterday}`);
-            const fixturesData = await fixturesRes.json();
-            const finishedFixtures: Fixture[] = (fixturesData.response || []).filter((f: Fixture) => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short));
-
-            if (finishedFixtures.length === 0) {
-                toast({ title: 'لا توجد مباريات', description: 'لا توجد مباريات منتهية من الأمس لاحتساب نقاطها.' });
+            // Fetch all predictions for the current user
+            const userPredictionsRef = collection(db, 'users', user.uid, 'predictions');
+            const userPredictionsSnap = await getDocs(userPredictionsRef);
+    
+            if (userPredictionsSnap.empty) {
+                toast({ title: 'لا توجد توقعات', description: 'لم تقم بأي توقعات بعد.' });
                 setCalculatingPoints(false);
                 return;
             }
-
-            const usersRef = collection(db, 'users');
-            const usersSnap = await getDocs(usersRef);
-            
+    
             const batch = writeBatch(db);
-            const userTotalPoints: {[key: string]: number} = {};
-
-            for (const userDoc of usersSnap.docs) {
-                const userId = userDoc.id;
-                userTotalPoints[userId] = 0;
+            let totalPoints = 0;
+    
+            // Process each prediction
+            for (const predDoc of userPredictionsSnap.docs) {
+                const prediction = predDoc.data() as Prediction;
                 
-                const userPredictionsRef = collection(db, 'users', userId, 'predictions');
-                const userPredictionsSnap = await getDocs(userPredictionsRef);
-                
-                userPredictionsSnap.forEach(predDoc => {
-                    const prediction = predDoc.data() as Prediction;
-                    const fixture = finishedFixtures.find(f => f.fixture.id === prediction.fixtureId);
-                    
-                    if (fixture) {
-                        const points = calculatePoints(prediction, fixture);
-                        if (prediction.points !== points) {
-                           batch.update(predDoc.ref, { points });
-                        }
-                        userTotalPoints[userId] += points;
-                    } else if (prediction.points) {
-                         userTotalPoints[userId] += prediction.points;
+                // Fetch the fixture result for this specific prediction
+                const fixturesRes = await fetch(`/api/football/fixtures?id=${prediction.fixtureId}`);
+                const fixturesData = await fixturesRes.json();
+                const fixture: Fixture | undefined = (fixturesData.response || []).find((f: Fixture) => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short));
+    
+                if (fixture) {
+                    const points = calculatePoints(prediction, fixture);
+                    if (prediction.points !== points) {
+                        batch.update(predDoc.ref, { points });
                     }
-                });
-            }
-
-            for (const userId in userTotalPoints) {
-                const userDoc = usersSnap.docs.find(d => d.id === userId);
-                if (userDoc) {
-                    const leaderboardRef = doc(db, 'leaderboard', userId);
-                    batch.set(leaderboardRef, {
-                        totalPoints: userTotalPoints[userId],
-                        userName: userDoc.data().displayName,
-                        userPhoto: userDoc.data().photoURL,
-                    }, { merge: true });
+                    totalPoints += points;
+                } else if (prediction.points) {
+                    // If fixture is not finished, keep existing points
+                    totalPoints += prediction.points;
                 }
             }
-
+    
+            // Update the user's total score in the leaderboard
+            const leaderboardRef = doc(db, 'leaderboard', user.uid);
+            batch.set(leaderboardRef, {
+                totalPoints: totalPoints,
+                userName: user.displayName || 'مستخدم غير معروف',
+                userPhoto: user.photoURL || '',
+            }, { merge: true });
+    
             await batch.commit();
             
-            toast({ title: 'اكتمل الاحتساب', description: 'تم تحديث جميع النقاط في لوحة الصدارة.' });
-            fetchLeaderboard();
+            toast({ title: 'اكتمل التحديث', description: 'تم تحديث نقاطك بنجاح.' });
+            fetchLeaderboard(); // Refresh the leaderboard view
         } catch (error: any) {
             console.error("Error calculating points:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل احتساب النقاط.' });
+            // This is a generic error, but it's better to show something.
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: `users/${user.uid}/predictions`,
+                operation: 'list' // Or 'write' on the leaderboard
+            }));
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث نقاطك.' });
         } finally {
             setCalculatingPoints(false);
         }
-    }, [db, toast, fetchLeaderboard]);
+    }, [db, user, toast, fetchLeaderboard]);
+
 
     const filteredMatches = useMemo(() => {
         return pinnedMatches.filter(match => {
@@ -554,7 +553,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                   <CardHeader className="flex-row items-center justify-between">
                        <CardTitle>لوحة الصدارة</CardTitle>
                        <Button onClick={handleCalculatePoints} disabled={calculatingPoints} size="sm">
-                           {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : "احتساب النقاط"}
+                           {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : "تحديث نقاطي"}
                        </Button>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -684,3 +683,4 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
