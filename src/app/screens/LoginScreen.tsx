@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
@@ -18,6 +18,30 @@ interface LoginScreenProps {
 export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & ScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Attempt to process redirect result as soon as the login screen is mounted.
+    setLoading(true);
+    signInWithGoogle()
+        .then(user => {
+            // If user is returned, the redirect flow is complete.
+            if (user && onLoginSuccess) {
+                onLoginSuccess();
+            }
+            // If user is null, it means a redirect was initiated, so we don't need to do anything.
+            // The loading state will persist until the page reloads.
+            if (!user) {
+              // This path is taken when signInWithRedirect is called.
+              // We keep loading true because the page will redirect.
+            } else {
+              setLoading(false);
+            }
+        })
+        .catch(err => {
+            handleAuthError(err);
+            setLoading(false);
+        });
+  }, [onLoginSuccess]);
 
   const handleAuthError = (e: any) => {
     console.error("Login Error:", e);
@@ -37,11 +61,9 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
     setLoading(true);
     setError(null);
     try {
+      // This will now initiate the redirect flow.
       await signInWithGoogle();
-      // The onAuthStateChanged listener will handle the redirection automatically.
-      if (onLoginSuccess) {
-        onLoginSuccess();
-      }
+      // The onLoginSuccess will be handled by the useEffect on page reload.
     } catch (e: any) {
       handleAuthError(e);
     }

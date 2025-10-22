@@ -5,7 +5,8 @@ import {
   GoogleAuthProvider, 
   signOut as firebaseSignOut, 
   onAuthStateChanged as firebaseOnAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   updateProfile,
   type User, 
   linkWithCredential,
@@ -82,46 +83,59 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
 }
 
 
-export const signInWithGoogle = async (): Promise<User> => {
+export const signInWithGoogle = async (): Promise<User | null> => {
     const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
-
-    const localFavorites = getLocalFavorites();
-    if (db && (Object.keys(localFavorites.teams || {}).length > 0 || Object.keys(localFavorites.leagues || {}).length > 0)) {
-        await handleNewUser(user, db); 
-        
-        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        
-        try {
-            const remoteFavsDoc = await getDoc(favRef);
-            const remoteFavs = remoteFavsDoc.exists() ? (remoteFavsDoc.data() as Favorites) : {};
-
-            const mergedTeams = { ...(remoteFavs.teams || {}), ...(localFavorites.teams || {}) };
-            const mergedLeagues = { ...(remoteFavs.leagues || {}), ...(localFavorites.leagues || {}) };
-
-            const dataToSet = {
-                userId: user.uid,
-                teams: mergedTeams,
-                leagues: mergedLeagues
-            };
-
-            await setDoc(favRef, dataToSet, { merge: true });
-
-            clearLocalFavorites();
-        } catch (error) {
-            const permissionError = new FirestorePermissionError({
-              path: favRef.path,
-              operation: 'write',
-              requestResourceData: localFavorites,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        }
-    } else if (db) {
-         await handleNewUser(user, db);
-    }
     
-    return user;
+    // Check for redirect result first when the page loads
+    try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+            // This is the return trip from the redirect.
+            const user = result.user;
+            const localFavorites = getLocalFavorites();
+            if (db && (Object.keys(localFavorites.teams || {}).length > 0 || Object.keys(localFavorites.leagues || {}).length > 0)) {
+                await handleNewUser(user, db); 
+                
+                const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+                
+                try {
+                    const remoteFavsDoc = await getDoc(favRef);
+                    const remoteFavs = remoteFavsDoc.exists() ? (remoteFavsDoc.data() as Favorites) : {};
+
+                    const mergedTeams = { ...(remoteFavs.teams || {}), ...(localFavorites.teams || {}) };
+                    const mergedLeagues = { ...(remoteFavs.leagues || {}), ...(localFavorites.leagues || {}) };
+
+                    const dataToSet = {
+                        userId: user.uid,
+                        teams: mergedTeams,
+                        leagues: mergedLeagues
+                    };
+
+                    await setDoc(favRef, dataToSet, { merge: true });
+                    clearLocalFavorites();
+                } catch (error) {
+                    const permissionError = new FirestorePermissionError({
+                      path: favRef.path,
+                      operation: 'write',
+                      requestResourceData: localFavorites,
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
+                }
+            } else if (db) {
+                 await handleNewUser(user, db);
+            }
+            return user;
+        } else {
+            // This is the initial call, so trigger the redirect.
+            await signInWithRedirect(auth, provider);
+            // This promise does not resolve in a redirect flow. The page will be reloaded.
+            return null;
+        }
+    } catch (error) {
+        // Handle errors from getRedirectResult or signInWithRedirect
+        console.error("Google Sign-In Error:", error);
+        throw error;
+    }
 };
 
 
