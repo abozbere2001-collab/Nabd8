@@ -19,6 +19,32 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    // This effect will run when the page loads. If it's the return trip
+    // from a Google sign-in redirect, signInWithGoogle() will handle it.
+    const checkRedirect = async () => {
+        setLoading(true);
+        try {
+            const user = await signInWithGoogle();
+            if (user && onLoginSuccess) {
+                // If user is returned, it means redirect was successful.
+                onLoginSuccess();
+            }
+            // If user is null, it means we are in the process of redirecting, or no redirect happened.
+            // If we are about to redirect, let loading stay true.
+            // If no redirect is happening, we might be on a fresh page load.
+            const urlParams = new URLSearchParams(window.location.search);
+            if (!urlParams.has('state')) { // A crude way to check if we are NOT on a redirect return
+                 setLoading(false);
+            }
+        } catch (e: any) {
+            handleAuthError(e);
+        }
+    };
+    checkRedirect();
+  }, [onLoginSuccess]);
+
+
   const handleAuthError = (e: any) => {
     console.error("Login Error:", e);
     
@@ -26,6 +52,8 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
 
     if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
         errorMessage = 'تم إلغاء عملية تسجيل الدخول.';
+    } else if (e.code === 'auth/unauthorized-domain') {
+        errorMessage = "النطاق غير مصرح به. يرجى الاتصال بالدعم الفني.";
     }
     
     setError(errorMessage);
@@ -38,18 +66,9 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
     setError(null);
     try {
       // This will now initiate the redirect flow.
-      const user = await signInWithGoogle();
-      if (user && onLoginSuccess) {
-          onLoginSuccess();
-      }
-      // If user is null, it means a redirect was initiated, so we don't need to do anything.
-      // The loading state will persist until the page reloads.
-      if (!user) {
-        // This path is taken when signInWithRedirect is called.
-        // We keep loading true because the page will redirect.
-      } else {
-        setLoading(false);
-      }
+      await signInWithGoogle();
+      // The page will redirect, so no further action is needed here.
+      // The useEffect hook will handle the result on the redirect return.
     } catch (e: any) {
       handleAuthError(e);
     }

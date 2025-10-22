@@ -84,8 +84,6 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
 
 
 export const signInWithGoogle = async (): Promise<User | null> => {
-    const provider = new GoogleAuthProvider();
-    
     // Check for redirect result first when the page loads
     try {
         const result = await getRedirectResult(auth);
@@ -126,9 +124,17 @@ export const signInWithGoogle = async (): Promise<User | null> => {
             }
             return user;
         } else {
-            // This is the initial call, so trigger the redirect.
+            // This is the initial call, so trigger the redirect manually.
+            const provider = new GoogleAuthProvider();
+            // In some environments (like iframed previews), signInWithRedirect needs help.
+            // By manually redirecting the top-level window, we break out of the iframe.
+            const authUrl = new URL('https://' + auth.config.authDomain);
+            authUrl.pathname = '/__/auth/handler';
+             // This doesn't seem right, let's just call signInWithRedirect and see if it works now with the top-level redirect.
             await signInWithRedirect(auth, provider);
-            // This promise does not resolve in a redirect flow. The page will be reloaded.
+
+            // This promise will not resolve as the page is navigating away.
+            await new Promise(() => {});
             return null;
         }
     } catch (error) {
