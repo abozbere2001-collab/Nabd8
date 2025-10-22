@@ -3,7 +3,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from '@/components/theme-provider';
-import { Tajawal, Cairo } from 'next/font/google';
+import { Cairo } from 'next/font/google';
 import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
@@ -11,12 +11,6 @@ export const metadata: Metadata = {
   description: 'عالم كرة القدم بين يديك',
   manifest: '/manifest.json',
 };
-
-const tajawal = Tajawal({
-  subsets: ['arabic'],
-  weight: ['400', '500', '700'],
-  variable: '--font-tajawal',
-});
 
 const cairo = Cairo({
   subsets: ['arabic'],
@@ -31,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
-        <body className={`${tajawal.variable} ${cairo.variable} font-body antialiased`}>
+        <body className={`${cairo.variable} font-body antialiased`}>
             <ThemeProvider
                 attribute="class"
                 defaultTheme="dark"
