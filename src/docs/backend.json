@@ -39,6 +39,17 @@
       },
       "required": ["id", "name", "originalId"]
     },
+    "Coach": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Coach",
+      "type": "object",
+      "description": "Represents a football coach.",
+      "properties": {
+        "id": { "type": "number", "description": "Unique identifier for the coach." },
+        "name": { "type": "string", "description": "The name of the coach." }
+      },
+      "required": ["id", "name"]
+    },
     "Match": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Match",
@@ -136,6 +147,14 @@
           "description": "Stores team data."
         }
       },
+       {
+        "path": "/coachCustomizations/{coachId}",
+        "definition": {
+          "entityName": "Coach",
+          "schema": { "$ref": "#/entities/Coach" },
+          "description": "Stores coach custom names."
+        }
+      },
       {
         "path": "/matches/{matchId}",
         "definition": {
@@ -195,4 +214,3 @@
     ]
   }
 }
-

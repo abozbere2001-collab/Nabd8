@@ -78,9 +78,12 @@ export function RenameDialog({
   
   const getDescription = () => {
       if (!item) return '';
-      if(item.purpose === 'crown') return 'أضف ملاحظة خاصة لهذا الفريق المتوج لعرضها في قسم "خالتك".'
+      if(item.purpose === 'crown') return 'أضف ملاحظة خاصة لهذا الفريق المتوج لعرضها في قسم "ملعبي".'
       if(item.purpose === 'note') return 'سيتم حفظ هذا العنصر مع ملاحظتك في قسم "بلدي".';
-      if(isAdmin && item.purpose === 'rename') return `أدخل الاسم الجديد (الترجمة). اتركه فارغًا للعودة للاسم الأصلي.`;
+      if(isAdmin && item.purpose === 'rename') {
+        const originalName = item?.originalData?.name || item?.originalName || item?.name;
+        return `الاسم الأصلي: ${originalName}. اتركه فارغًا للعودة للاسم الأصلي.`;
+      }
       return '';
   }
 
@@ -107,7 +110,7 @@ export function RenameDialog({
                 id="name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder={`الاسم الأصلي: ${item?.originalName || item?.name}`}
+                placeholder={'الاسم الجديد'}
                 />
             </div>
           )}

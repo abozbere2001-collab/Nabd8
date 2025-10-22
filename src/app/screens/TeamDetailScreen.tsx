@@ -6,7 +6,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { ScreenProps } from '@/app/page';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteField, writeBatch, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteField, writeBatch, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Loader2, Pencil, Shirt, Star, Crown } from 'lucide-react';
@@ -449,8 +449,6 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   const [pinnedPredictionMatches, setPinnedPredictionMatches] = useState(new Set<number>());
 
   // States to manage tab data loading
-  const [detailsDataLoaded, setDetailsDataLoaded] = useState(false);
-  const [playersDataLoaded, setPlayersDataLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
 
   useEffect(() => {
@@ -548,8 +546,9 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   }, [user, db]);
 
   const handleFavoriteToggle = () => {
-    if (!teamData || !displayTitle) return;
+    if (!teamData) return;
     const { team } = teamData;
+    const teamNameForFavorite = displayTitle || team.name;
     const isFavorited = !!favorites.teams?.[team.id];
 
     if (!user || user.isAnonymous) {
@@ -558,7 +557,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
             delete currentFavorites.teams?.[team.id];
         } else {
             if (!currentFavorites.teams) currentFavorites.teams = {};
-            currentFavorites.teams[team.id] = { teamId: team.id, name: displayTitle, logo: team.logo, type: team.national ? 'National' : 'Club' };
+            currentFavorites.teams[team.id] = { teamId: team.id, name: teamNameForFavorite, logo: team.logo, type: team.national ? 'National' : 'Club' };
         }
         setLocalFavorites(currentFavorites);
         return;
@@ -568,7 +567,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
 
     const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const fieldPath = `teams.${team.id}`;
-    const updateData = isFavorited ? { [fieldPath]: deleteField() } : { [fieldPath]: { teamId: team.id, name: displayTitle, logo: team.logo, type: team.national ? 'National' : 'Club' } };
+    const updateData = isFavorited ? { [fieldPath]: deleteField() } : { [fieldPath]: { teamId: team.id, name: teamNameForFavorite, logo: team.logo, type: team.national ? 'National' : 'Club' } };
 
     updateDoc(favDocRef, updateData).catch(err => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
@@ -643,10 +642,12 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     return (
         <div className="flex h-full flex-col bg-background">
             <ScreenHeader title="جاري التحميل..." onBack={goBack} canGoBack={canGoBack} />
-            <div className="p-4 space-y-4">
-                <Skeleton className="h-48 w-full" />
+            <div className="flex-1 overflow-y-auto p-1">
+                <Skeleton className="h-48 w-full mb-4" />
                 <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-64 w-full" />
+                <div className="mt-4 p-4">
+                    <Skeleton className="h-64 w-full" />
+                </div>
             </div>
         </div>
     );
@@ -695,10 +696,10 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
             <TabsTrigger value="details">التفاصيل</TabsTrigger>
             <TabsTrigger value="players">اللاعبون</TabsTrigger>
           </TabsList>
-          <TabsContent value="details" className="mt-4" forceMount hidden={activeTab !== 'details'}>
+          <TabsContent value="details" className="mt-4" forceMount={activeTab === 'details'}>
             <TeamDetailsTabs teamId={teamId} navigate={navigate} onPinToggle={handlePinToggle} pinnedPredictionMatches={pinnedPredictionMatches} />
           </TabsContent>
-          <TabsContent value="players" className="mt-4" forceMount hidden={activeTab !== 'players'}>
+          <TabsContent value="players" className="mt-4" forceMount={activeTab === 'players'}>
             <TeamPlayersTab teamId={teamId} navigate={navigate} />
           </TabsContent>
         </Tabs>
