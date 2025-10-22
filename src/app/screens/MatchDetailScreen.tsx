@@ -73,7 +73,7 @@ const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerTyp
                     </div>
                 )}
             </div>
-            <span className="mt-1 text-[10px] font-semibold text-center truncate w-16">{player?.name || "غير معروف"}</span>
+            <span className="mt-1 text-[10px] font-semibold text-center truncate w-16 text-white">{player?.name || "غير معروف"}</span>
         </div>
     );
 };
@@ -615,7 +615,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         if (fixture) {
              fetchTabData(activeTab);
         }
-    }, [fixture, fetchTabData]);
+    }, [fixture, fetchTabData, activeTab]);
 
     const handleTabChange = (newTab: string) => {
         setActiveTab(newTab);
