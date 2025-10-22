@@ -20,7 +20,17 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
 
     try {
         const userDoc = await getDoc(userRef);
+        // If user document already exists, no need to do anything.
         if (userDoc.exists()) {
+            // But if they were anonymous and had local favorites, merge them.
+            if (!user.isAnonymous) {
+                const localFavorites = getLocalFavorites();
+                 if (Object.keys(localFavorites.teams || {}).length > 0 || Object.keys(localFavorites.leagues || {}).length > 0) {
+                     const favoritesRef = doc(firestore, 'users', user.uid, 'favorites', 'data');
+                     await setDoc(favoritesRef, localFavorites, { merge: true });
+                     clearLocalFavorites();
+                 }
+            }
             return;
         }
 
@@ -37,15 +47,15 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
         };
         
         const favoritesRef = doc(firestore, 'users', user.uid, 'favorites', 'data');
+        // Start with a clean slate for favorites, but check local storage for guest data.
         const initialFavorites: Partial<Favorites> = { userId: user.uid, teams: {}, leagues: {} };
-
         const localFavorites = getLocalFavorites();
         if (Object.keys(localFavorites.teams || {}).length > 0 || Object.keys(localFavorites.leagues || {}).length > 0) {
              const mergedTeams = { ...(initialFavorites.teams || {}), ...(localFavorites.teams || {}) };
              const mergedLeagues = { ...(initialFavorites.leagues || {}), ...(localFavorites.leagues || {}) };
              initialFavorites.teams = mergedTeams;
              initialFavorites.leagues = mergedLeagues;
-             clearLocalFavorites();
+             clearLocalFavorites(); // Clear local data after merging.
         }
 
         const batch = writeBatch(firestore);
@@ -67,7 +77,7 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
 
 
 export const signOut = (): Promise<void> => {
-    localStorage.removeItem('goalstack_guest_onboarding_complete');
+    clearLocalFavorites();
     return firebaseSignOut(auth);
 };
 

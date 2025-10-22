@@ -358,12 +358,16 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         const unsubscribe = onSnapshot(docRef, (doc) => {
             setFavorites(doc.data() as Favorites || { userId: user.uid });
         }, (error) => {
-            const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
-            errorEmitter.emit('permission-error', permissionError);
+            if (user && !user.isAnonymous) {
+                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
+                errorEmitter.emit('permission-error', permissionError);
+            }
         });
         return () => unsubscribe();
     } else {
-        setFavorites({});
+        // For guest users, we don't listen to Firestore.
+        // We'll get their favorites from local storage on demand.
+        setFavorites({}); 
     }
   }, [user, db]);
   
@@ -476,4 +480,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-

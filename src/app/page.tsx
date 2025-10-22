@@ -70,7 +70,7 @@ const OnboardingFlow = ({ user }: { user: User }) => {
     }, [user, db]);
 
     const handleOnboardingComplete = async () => {
-        if (!user || !db) return;
+        if (!db) return;
         
         if (user.isAnonymous) {
             localStorage.setItem(GUEST_ONBOARDING_COMPLETE_KEY, 'true');
