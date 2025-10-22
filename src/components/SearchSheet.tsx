@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
@@ -189,8 +190,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         buildLocalIndex();
         
         let unsubscribe: (() => void) | null = null;
-        if (user) {
-            if (!db) return;
+        if (user && db) {
             const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
             unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
@@ -298,10 +298,28 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     const handleFavorite = useCallback((item: Item) => {
         const isLeague = !('national' in item);
         const itemId = item.id;
+        const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+        
+        if (!user || user.isAnonymous) {
+            const currentFavorites = getLocalFavorites();
+            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+            if (!newFavorites[itemType]) newFavorites[itemType] = {};
+            
+            if (newFavorites[itemType]?.[itemId]) {
+                delete newFavorites[itemType]![itemId];
+            } else {
+                const favData = isLeague 
+                    ? { name: item.name, leagueId: itemId, logo: item.logo }
+                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
+                newFavorites[itemType]![itemId] = favData;
+            }
+            setLocalFavorites(newFavorites);
+            setFavorites(newFavorites);
+            return;
+        }
 
         if (user && db) {
             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const itemType = isLeague ? 'leagues' : 'teams';
             const isCurrentlyFavorited = !!favorites[itemType]?.[itemId];
             const fieldPath = `${itemType}.${itemId}`;
             
@@ -317,23 +335,6 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             updateDoc(favDocRef, updateData).catch(err => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({path: favDocRef.path, operation: 'update', requestResourceData: updateData}))
             });
-
-        } else { // Guest user
-            const currentFavorites = getLocalFavorites();
-            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-            if (!newFavorites[itemType]) newFavorites[itemType] = {};
-            
-            if (newFavorites[itemType]?.[itemId]) {
-                delete newFavorites[itemType]![itemId];
-            } else {
-                const favData = isLeague 
-                    ? { name: item.name, leagueId: itemId, logo: item.logo }
-                    : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                newFavorites[itemType]![itemId] = favData;
-            }
-            setLocalFavorites(newFavorites);
-            setFavorites(newFavorites);
         }
     }, [user, db, favorites]);
 

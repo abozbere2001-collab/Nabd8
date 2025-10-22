@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -352,23 +353,36 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   }, [loading, fixtures, firstUpcomingMatchIndex]);
   
     const handleFavoriteToggle = (team: Team) => {
-        if (!user) {
-            toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+        const itemType = 'teams';
+        const itemId = team.id;
+        
+        if (!user || user.isAnonymous) {
+            const currentFavorites = getLocalFavorites();
+            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+            
+            if (!newFavorites[itemType]) newFavorites[itemType] = {};
+
+            if (newFavorites[itemType]?.[itemId]) {
+                delete newFavorites[itemType]![itemId];
+            } else {
+                newFavorites[itemType]![itemId] = { name: team.name, teamId: itemId, logo: team.logo, type: team.national ? 'National' : 'Club' };
+            }
+            setLocalFavorites(newFavorites);
+            setFavorites(newFavorites);
             return;
         }
+
         if (!db) return;
 
         const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        
-        const fieldPath = `teams.${team.id}`;
-        const isCurrentlyFavorited = !!favorites?.teams?.[team.id];
-
+        const fieldPath = `teams.${itemId}`;
+        const isCurrentlyFavorited = !!favorites?.teams?.[itemId];
         let updateData: { [key: string]: any };
 
         if (isCurrentlyFavorited) {
             updateData = { [fieldPath]: deleteField() };
         } else {
-            updateData = { [fieldPath]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
+            updateData = { [fieldPath]: { teamId: itemId, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
         }
         
         updateDoc(favRef, updateData).catch(serverError => {

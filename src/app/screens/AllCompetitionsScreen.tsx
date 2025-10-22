@@ -362,21 +362,21 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const handleFavoriteToggle = useCallback((item: ManagedCompetitionType | Team) => {
         const isLeague = 'leagueId' in item;
         const itemId = isLeague ? item.leagueId : item.id;
+        const itemType = isLeague ? 'leagues' : 'teams';
 
-        if (!user) {
+        if (!user || user.isAnonymous) {
             const currentFavorites = getLocalFavorites();
             const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-            const itemType = isLeague ? 'leagues' : 'teams';
-
+            
             if (!newFavorites[itemType]) newFavorites[itemType] = {};
 
-            if (newFavorites[itemType][itemId]) {
-                delete newFavorites[itemType][itemId];
+            if (newFavorites[itemType]?.[itemId]) {
+                delete newFavorites[itemType]![itemId];
             } else {
                  const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                newFavorites[itemType][itemId] = favData;
+                newFavorites[itemType]![itemId] = favData;
             }
             setLocalFavorites(newFavorites);
             setFavorites(newFavorites);
@@ -386,11 +386,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         if (!db) return;
 
         const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const itemType = isLeague ? 'leagues' : 'teams';
         const isCurrentlyFavorited = !!favorites[itemType]?.[itemId];
         
         const fieldPath = `${itemType}.${itemId}`;
         let updateData: { [key: string]: any };
+
         if (isCurrentlyFavorited) {
             updateData = { [fieldPath]: deleteField() };
         } else {

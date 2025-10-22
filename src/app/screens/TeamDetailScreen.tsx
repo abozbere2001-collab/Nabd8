@@ -546,30 +546,31 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   const handleFavoriteToggle = () => {
     if (!teamData) return;
     const { team } = teamData;
+    const isFavorited = !!favorites.teams?.[team.id];
 
-    const currentFavorites = user && db ? favorites : getLocalFavorites();
-    const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-    const isFavorited = !!newFavorites.teams?.[team.id];
-
-    if (isFavorited) {
-        delete newFavorites.teams[team.id];
-    } else {
-        if (!newFavorites.teams) newFavorites.teams = {};
-        newFavorites.teams[team.id] = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
-    }
-    
-    if (user && db) {
-        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const fieldPath = `teams.${team.id}`;
-        const updateData = isFavorited ? { [fieldPath]: deleteField() } : { [fieldPath]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
-
-        updateDoc(favDocRef, updateData).catch(err => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
-        });
-    } else {
+    if (!user || user.isAnonymous) {
+        const currentFavorites = getLocalFavorites();
+        const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
+        if (isFavorited) {
+            delete newFavorites.teams?.[team.id];
+        } else {
+            if (!newFavorites.teams) newFavorites.teams = {};
+            newFavorites.teams[team.id] = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
+        }
         setLocalFavorites(newFavorites);
         setFavorites(newFavorites);
+        return;
     }
+    
+    if (!db) return;
+
+    const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
+    const fieldPath = `teams.${team.id}`;
+    const updateData = isFavorited ? { [fieldPath]: deleteField() } : { [fieldPath]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
+
+    updateDoc(favDocRef, updateData).catch(err => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
+    });
   };
 
   const handleOpenCrownDialog = () => {
