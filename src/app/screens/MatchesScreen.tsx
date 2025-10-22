@@ -404,16 +404,18 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         const unsubscribe = onSnapshot(docRef, (doc) => {
             setFavorites(doc.data() as Favorites || { userId: user.uid });
         }, (error) => {
+            // Only emit error for non-anonymous users if permission is denied
             if (user && !user.isAnonymous) {
                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
                 errorEmitter.emit('permission-error', permissionError);
             }
+            // For anonymous users or other errors, we can just proceed without favorites
+            setFavorites({});
         });
         return () => unsubscribe();
     } else {
-        // For guest users, we don't listen to Firestore.
-        // We'll get their favorites from local storage on demand.
-        setFavorites({}); 
+        // For guest users, read from local storage once.
+        setFavorites(getLocalFavorites());
     }
   }, [user, db]);
   
@@ -530,3 +532,4 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
