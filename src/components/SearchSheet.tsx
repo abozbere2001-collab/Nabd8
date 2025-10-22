@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from '@/components/ui/button';
-import { Search, Star, Pencil, Loader2 } from 'lucide-react';
+import { Search, Star, Pencil, Loader2, Crown } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenProps } from '@/app/page';
@@ -20,7 +20,7 @@ import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, writeBatch, deleteField, onSnapshot, updateDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
-import type { Favorites, AdminFavorite, ManagedCompetition, Team } from '@/lib/types';
+import type { Favorites, AdminFavorite, ManagedCompetition, Team, CrownedTeam } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
@@ -39,7 +39,7 @@ interface LeagueResult {
 type Item = TeamResult['team'] | LeagueResult['league'];
 type ItemType = 'teams' | 'leagues';
 type SearchResult = (TeamResult & { type: 'team' }) | (LeagueResult & { type: 'league' });
-type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
+type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status' | 'crown';
 
 interface SearchableItem {
     id: number;
@@ -83,7 +83,7 @@ const normalizeArabic = (text: string) => {
 };
 
 
-const ItemRow = ({ item, itemType, isFavorited, onFavoriteToggle, onResultClick, onRename, isAdmin }: { item: Item, itemType: ItemType, isFavorited: boolean, onFavoriteToggle: (item: Item) => void, onResultClick: () => void, onRename: () => void, isAdmin: boolean }) => {
+const ItemRow = ({ item, itemType, isFavorited, isCrowned, onFavoriteToggle, onCrownToggle, onResultClick, onRename, isAdmin }: { item: Item, itemType: ItemType, isFavorited: boolean, isCrowned: boolean, onFavoriteToggle: (item: Item) => void, onCrownToggle: (item: Item) => void, onResultClick: () => void, onRename: () => void, isAdmin: boolean }) => {
   return (
     <div className="flex items-center gap-2 p-1.5 border-b last:border-b-0 hover:bg-accent/50 rounded-md">
        <div className="flex-1 flex items-center gap-2 cursor-pointer" onClick={onResultClick}>
@@ -93,14 +93,21 @@ const ItemRow = ({ item, itemType, isFavorited, onFavoriteToggle, onResultClick,
             </Avatar>
             <div className="flex-1 font-semibold truncate text-sm">{item.name}</div>
         </div>
-      {isAdmin && (
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onRename}>
-            <Pencil className="h-4 w-4 text-muted-foreground" />
-        </Button>
-      )}
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onFavoriteToggle(item)}>
-        <Star className={cn("h-5 w-5 text-muted-foreground/60", isFavorited && "fill-current text-yellow-400")} />
-      </Button>
+        <div className="flex items-center">
+            {isAdmin && (
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onRename(); }}>
+                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                </Button>
+            )}
+            {itemType === 'teams' && (
+                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onCrownToggle(item); }}>
+                    <Crown className={cn("h-5 w-5 text-muted-foreground/60", isCrowned && "fill-current text-yellow-400")} />
+                </Button>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onFavoriteToggle(item); }}>
+                <Star className={cn("h-5 w-5 text-muted-foreground/60", isFavorited && "fill-current text-yellow-400")} />
+            </Button>
+        </div>
     </div>
   );
 }
@@ -121,7 +128,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   const { toast } = useToast();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   
-  const [renameItem, setRenameItem] = useState<{ id: string | number; name: string; note?: string; type: RenameType; purpose: 'rename' | 'note'; originalData?: any; } | null>(null);
+  const [renameItem, setRenameItem] = useState<{ id: string | number; name: string; note?: string; type: RenameType; purpose: 'rename' | 'note' | 'crown'; originalData?: any; } | null>(null);
 
   const [localSearchIndex, setLocalSearchIndex] = useState<SearchableItem[]>([]);
   
@@ -186,7 +193,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         buildLocalIndex();
         
         let unsubscribe: (() => void) | null = null;
-        if (user && !user.isAnonymous && db) {
+        if (user && !user.isAnonymous) {
             const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
             unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
@@ -333,6 +340,35 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         }
     }, [user, db, favorites]);
 
+  const handleCrownToggle = (item: Item) => {
+    const team = item as Team;
+    if (!user) {
+        toast({variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.'});
+        return;
+    }
+    if (!db) return;
+    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+    const fieldPath = `crownedTeams.${team.id}`;
+    const isCrowned = !!favorites.crownedTeams?.[team.id];
+
+    let updateData;
+    if (isCrowned) {
+        updateData = { [fieldPath]: deleteField() };
+    } else {
+        const crownedTeamData: CrownedTeam = {
+            teamId: team.id,
+            name: team.name,
+            logo: team.logo,
+            note: '',
+        };
+        updateData = { [fieldPath]: crownedTeamData };
+    }
+    
+    updateDoc(favRef, updateData).catch(err => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({path: favRef.path, operation: 'update', requestResourceData: updateData}));
+    });
+  }
+
 
   const handleResultClick = (result: SearchableItem) => {
     if (result.type === 'teams') {
@@ -394,9 +430,21 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             {!debouncedSearchTerm && <h3 className="font-bold text-md text-center text-muted-foreground">{itemType === 'teams' ? 'الفرق الأكثر شعبية' : 'البطولات الأكثر شعبية'}</h3>}
             {itemsToRender.map(result => {
                 const isFavorited = !!favorites[result.type]?.[result.id];
+                const isCrowned = result.type === 'teams' && !!favorites.crownedTeams?.[result.id];
                 const displayName = getDisplayName(result.type.slice(0, -1) as 'team'|'league', result.id, result.name);
 
-                return <ItemRow key={`${result.type}-${result.id}`} item={{...result.originalItem, name: displayName}} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={handleFavorite} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(result.type as RenameType, result.id, result.originalItem)} />;
+                return <ItemRow 
+                            key={`${result.type}-${result.id}`} 
+                            item={{...result.originalItem, name: displayName}} 
+                            itemType={result.type} 
+                            isFavorited={isFavorited} 
+                            isCrowned={isCrowned}
+                            onFavoriteToggle={handleFavorite} 
+                            onCrownToggle={handleCrownToggle}
+                            onResultClick={() => handleResultClick(result)} 
+                            isAdmin={isAdmin} 
+                            onRename={() => handleOpenRename(result.type as RenameType, result.id, result.originalItem)} 
+                        />;
             })}
         </div>
     )

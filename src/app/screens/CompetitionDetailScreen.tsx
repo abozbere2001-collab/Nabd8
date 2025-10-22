@@ -374,8 +374,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             }
             
             updateDoc(favRef, updateData).catch(serverError => {
-                const permissionError = new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData });
-                errorEmitter.emit('permission-error', permissionError);
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData }));
             });
         } else {
             const currentFavorites = getLocalFavorites();
@@ -391,6 +390,22 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             setFavorites(currentFavorites);
         }
     }
+
+  const handleOpenCrownDialog = (team: Team) => {
+    if (!user) {
+        toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+        return;
+    }
+    const currentNote = favorites?.crownedTeams?.[team.id]?.note || '';
+    setRenameItem({
+        id: team.id,
+        name: getDisplayName('team', team.id, team.name),
+        type: 'crown',
+        purpose: 'crown',
+        originalData: team,
+        note: currentNote,
+    });
+  };
   
   const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
     if (type === 'team') {
@@ -430,6 +445,22 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                  errorEmitter.emit('permission-error', permissionError);
              });
         }
+    } else if (purpose === 'crown') {
+        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const fieldPath = `crownedTeams.${id}`;
+        const crownedTeamData: CrownedTeam = {
+            teamId: Number(id),
+            name: originalData.name,
+            logo: originalData.logo,
+            note: newNote,
+        };
+        const updateData = { [fieldPath]: crownedTeamData };
+
+        updateDoc(favRef, updateData).then(() => {
+            toast({ title: 'نجاح', description: `تم تتويج فريق ${originalData.name}.` });
+        }).catch(serverError => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData }));
+        });
     }
     
     setRenameItem(null);
@@ -646,6 +677,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     {teams.map(({ team }) => {
                         const displayName = getDisplayName('team', team.id, team.name);
                         const isFavoritedTeam = !!favorites?.teams?.[team.id];
+                        const isCrowned = !!favorites.crownedTeams?.[team.id];
                         
                         return (
                         <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
@@ -654,17 +686,17 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                     <AvatarImage src={team.logo} alt={team.name} />
                                     <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
                                 </Avatar>
-                                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team) }}><Pencil className="h-3 w-3 text-muted-foreground"/></Button>}
+                                {isAdmin && <Button variant="ghost" size="icon" className="absolute -bottom-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team) }}><Pencil className="h-3 w-3 text-muted-foreground"/></Button>}
                             </div>
                             <span className="font-semibold text-sm">
                                 {displayName}
                             </span>
-                            <div className="absolute top-1 left-1 flex">
-                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleFavoriteToggle(team);
-                                }}>
+                            <div className="absolute top-1 left-1 flex flex-col gap-0.5">
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(team); }}>
                                     <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenCrownDialog(team); }}>
+                                    <Crown className={cn("h-5 w-5", isCrowned ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
                             </div>
                         </div>
