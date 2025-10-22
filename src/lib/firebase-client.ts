@@ -2,15 +2,9 @@
 "use client";
 
 import { 
-  GoogleAuthProvider, 
   signOut as firebaseSignOut, 
-  onAuthStateChanged as firebaseOnAuthStateChanged,
-  signInWithRedirect,
-  getRedirectResult,
   updateProfile,
   type User, 
-  linkWithCredential,
-  signInAnonymously as firebaseSignInAnonymously
 } from "firebase/auth";
 import { doc, setDoc, getDoc, Firestore, writeBatch } from 'firebase/firestore';
 import type { UserProfile, UserScore, Favorites } from './types';
@@ -54,6 +48,17 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
                 teams: {},
                 leagues: {},
             };
+            
+            // This is a special handling for merging local favorites for a new user
+            const localFavorites = getLocalFavorites();
+            if (Object.keys(localFavorites.teams || {}).length > 0 || Object.keys(localFavorites.leagues || {}).length > 0) {
+                 const mergedTeams = { ...(initialFavorites.teams || {}), ...(localFavorites.teams || {}) };
+                 const mergedLeagues = { ...(initialFavorites.leagues || {}), ...(localFavorites.leagues || {}) };
+                 initialFavorites.teams = mergedTeams;
+                 initialFavorites.leagues = mergedLeagues;
+                 clearLocalFavorites();
+            }
+
 
             const batch = writeBatch(firestore);
             batch.set(userRef, userProfileData);
@@ -81,68 +86,6 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
         throw error;
     }
 }
-
-
-export const signInWithGoogle = async (): Promise<User | null> => {
-    // Check for redirect result first when the page loads
-    try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-            // This is the return trip from the redirect.
-            const user = result.user;
-            const localFavorites = getLocalFavorites();
-            if (db && (Object.keys(localFavorites.teams || {}).length > 0 || Object.keys(localFavorites.leagues || {}).length > 0)) {
-                await handleNewUser(user, db); 
-                
-                const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                
-                try {
-                    const remoteFavsDoc = await getDoc(favRef);
-                    const remoteFavs = remoteFavsDoc.exists() ? (remoteFavsDoc.data() as Favorites) : {};
-
-                    const mergedTeams = { ...(remoteFavs.teams || {}), ...(localFavorites.teams || {}) };
-                    const mergedLeagues = { ...(remoteFavs.leagues || {}), ...(localFavorites.leagues || {}) };
-
-                    const dataToSet = {
-                        userId: user.uid,
-                        teams: mergedTeams,
-                        leagues: mergedLeagues
-                    };
-
-                    await setDoc(favRef, dataToSet, { merge: true });
-                    clearLocalFavorites();
-                } catch (error) {
-                    const permissionError = new FirestorePermissionError({
-                      path: favRef.path,
-                      operation: 'write',
-                      requestResourceData: localFavorites,
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
-                }
-            } else if (db) {
-                 await handleNewUser(user, db);
-            }
-            return user;
-        } else {
-            // This is the initial call, so trigger the redirect manually.
-            const provider = new GoogleAuthProvider();
-            // In some environments (like iframed previews), signInWithRedirect needs help.
-            // By manually redirecting the top-level window, we break out of the iframe.
-            const authUrl = new URL('https://' + auth.config.authDomain);
-            authUrl.pathname = '/__/auth/handler';
-             // This doesn't seem right, let's just call signInWithRedirect and see if it works now with the top-level redirect.
-            await signInWithRedirect(auth, provider);
-
-            // This promise will not resolve as the page is navigating away.
-            await new Promise(() => {});
-            return null;
-        }
-    } catch (error) {
-        // Handle errors from getRedirectResult or signInWithRedirect
-        console.error("Google Sign-In Error:", error);
-        throw error;
-    }
-};
 
 
 export const signOut = (): Promise<void> => {

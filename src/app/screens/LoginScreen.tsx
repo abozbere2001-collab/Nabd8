@@ -7,7 +7,8 @@ import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { signInWithGoogle } from '@/lib/firebase-client';
+import { auth } from '@/firebase';
+import { GoogleAuthProvider, getRedirectResult, signInWithRedirect } from 'firebase/auth';
 import { ScreenProps } from '@/app/page';
 
 interface LoginScreenProps {
@@ -19,29 +20,26 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // This effect hook checks for the result of a redirect authentication
+  // when the component mounts.
   useEffect(() => {
-    // This effect will run when the page loads. If it's the return trip
-    // from a Google sign-in redirect, signInWithGoogle() will handle it.
-    const checkRedirect = async () => {
-        setLoading(true);
-        try {
-            const user = await signInWithGoogle();
-            if (user && onLoginSuccess) {
-                // If user is returned, it means redirect was successful.
-                onLoginSuccess();
-            }
-            // If user is null, it means we are in the process of redirecting, or no redirect happened.
-            // If we are about to redirect, let loading stay true.
-            // If no redirect is happening, we might be on a fresh page load.
-            const urlParams = new URLSearchParams(window.location.search);
-            if (!urlParams.has('state')) { // A crude way to check if we are NOT on a redirect return
-                 setLoading(false);
-            }
-        } catch (e: any) {
-            handleAuthError(e);
+    const checkRedirectResult = async () => {
+      setLoading(true);
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && onLoginSuccess) {
+          // User successfully signed in.
+          onLoginSuccess();
+        } else {
+          // No user, which is normal on the initial page load before redirecting.
+          setLoading(false);
         }
+      } catch (e: any) {
+        handleAuthError(e);
+      }
     };
-    checkRedirect();
+    
+    checkRedirectResult();
   }, [onLoginSuccess]);
 
 
@@ -65,10 +63,10 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
     setLoading(true);
     setError(null);
     try {
-      // This will now initiate the redirect flow.
-      await signInWithGoogle();
-      // The page will redirect, so no further action is needed here.
-      // The useEffect hook will handle the result on the redirect return.
+      const provider = new GoogleAuthProvider();
+      // This will redirect the user to the Google sign-in page.
+      // The result will be handled by the useEffect hook when they are redirected back.
+      await signInWithRedirect(auth, provider);
     } catch (e: any) {
       handleAuthError(e);
     }
