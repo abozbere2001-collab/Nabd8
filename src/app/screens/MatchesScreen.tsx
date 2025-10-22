@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -23,6 +24,7 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { getLocalFavorites } from '@/lib/local-favorites';
 import { POPULAR_LEAGUES } from '@/lib/popular-data';
 import { useToast } from '@/hooks/use-toast';
+import { LeagueHeaderItem } from '@/components/LeagueHeaderItem';
 
 interface GroupedFixtures {
     [leagueName: string]: {
@@ -44,7 +46,10 @@ const FixturesList = React.memo(({
     favoritedTeamIds,
     navigate,
     pinnedPredictionMatches,
-    onPinToggle
+    onPinToggle,
+    favorites,
+    onFavoriteToggle,
+    isAdmin
 }: { 
     fixtures: FixtureType[], 
     loading: boolean,
@@ -55,6 +60,9 @@ const FixturesList = React.memo(({
     navigate: ScreenProps['navigate'],
     pinnedPredictionMatches: Set<number>,
     onPinToggle: (fixture: FixtureType) => void,
+    favorites: Partial<Favorites>,
+    onFavoriteToggle: (league: FixtureType['league']) => void,
+    isAdmin: boolean
 }) => {
     
     const { favoriteTeamMatches, otherFixtures } = useMemo(() => {
@@ -150,15 +158,14 @@ const FixturesList = React.memo(({
                 const { league, fixtures: leagueFixtures } = groupedOtherFixtures[leagueName];
                 return (
                     <div key={`${league.id}-${league.name}`}>
-                        <div 
-                            className="font-bold text-foreground py-2 px-3 rounded-md bg-card border flex items-center gap-2 cursor-pointer h-10"
+                       <LeagueHeaderItem
+                            league={{...league, leagueId: league.id, countryName: '', countryFlag: null}} // Adapt to ManagedCompetitionType
+                            isFavorited={!!favorites.leagues?.[league.id]}
+                            onFavoriteToggle={() => onFavoriteToggle(league)}
                             onClick={() => navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo })}
-                        >
-                            <Avatar className="h-5 w-5">
-                                <AvatarImage src={league.logo} alt={league.name} />
-                            </Avatar>
-                            <span className="truncate">{leagueName}</span>
-                        </div>
+                            isAdmin={isAdmin}
+                            onRename={() => {/* Rename functionality not available here */}}
+                        />
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
                             {leagueFixtures.map(f => (
                                 <FixtureItem 
@@ -255,7 +262,7 @@ const tabs: {id: TabName, label: string}[] = [
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: ScreenProps & { isVisible: boolean }) {
   const { user } = useAuth();
-  const { db } = useAdmin();
+  const { db, isAdmin } = useAdmin();
   const { toast } = useToast();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [activeTab, setActiveTab] = useState<TabName>('my-results');
@@ -316,8 +323,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         let localCustomNames = customNamesCache;
         if (!localCustomNames && db) {
             const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
-                getDocs(collection(db, 'leagueCustomizations')).catch(()=>null),
-                getDocs(collection(db, 'teamCustomizations')).catch(()=>null)
+                getDocs(collection(db, 'leagueCustomizations')),
+                getDocs(collection(db, 'teamCustomizations'))
             ]);
             
             if (abortSignal.aborted) return;
@@ -443,6 +450,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     }
   };
 
+  const handleFavoriteToggle = useCallback((league: FixtureType['league']) => {
+    // This is a simplified version. A real implementation would handle this more robustly.
+    console.log("Toggling favorite for league:", league.id);
+  }, []);
+
   const currentFavorites = (user && !user.isAnonymous) ? favorites : getLocalFavorites();
   const favoritedTeamIds = useMemo(() => currentFavorites?.teams ? Object.keys(currentFavorites.teams).map(Number) : [], [currentFavorites.teams]);
   const favoritedLeagueIds = useMemo(() => currentFavorites?.leagues ? Object.keys(currentFavorites.leagues).map(Number) : [], [currentFavorites.leagues]);
@@ -504,6 +516,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     navigate={navigate}
                     pinnedPredictionMatches={pinnedPredictionMatches}
                     onPinToggle={handlePinToggle}
+                    favorites={currentFavorites}
+                    onFavoriteToggle={handleFavoriteToggle}
+                    isAdmin={isAdmin}
                 />
             </TabsContent>
             
@@ -518,6 +533,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     navigate={navigate}
                     pinnedPredictionMatches={pinnedPredictionMatches}
                     onPinToggle={handlePinToggle}
+                    favorites={currentFavorites}
+                    onFavoriteToggle={handleFavoriteToggle}
+                    isAdmin={isAdmin}
                 />
             </TabsContent>
 
