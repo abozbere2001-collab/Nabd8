@@ -13,14 +13,14 @@ export default function PrivacyPolicyScreen({ navigate, goBack, canGoBack }: Scr
       <div className="flex-1 overflow-y-auto p-4">
         <Card>
           <CardHeader>
-            <CardTitle>سياسة الخصوصية لتطبيق Goal Stack</CardTitle>
+            <CardTitle>سياسة الخصوصية لتطبيق نبض الملاعب</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-muted-foreground leading-relaxed">
             <p className="font-bold">
               تاريخ آخر تحديث: أكتوبر {currentYear}
             </p>
             <p>
-              نحن في Goal Stack ("نحن"، "التطبيق") نأخذ خصوصيتك على محمل الجد. توضح سياسة الخصوصية هذه كيفية جمعنا واستخدامنا وحماية معلوماتك الشخصية عند استخدامك لتطبيقنا وخدماتنا.
+              نحن في نبض الملاعب ("نحن"، "التطبيق") نأخذ خصوصيتك على محمل الجد. توضح سياسة الخصوصية هذه كيفية جمعنا واستخدامنا وحماية معلوماتك الشخصية عند استخدامك لتطبيقنا وخدماتنا.
             </p>
             
             <h3 className="font-bold text-lg text-foreground pt-4">1. المعلومات التي نجمعها</h3>

@@ -298,7 +298,7 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
                         const itemTop = firstUpcomingMatchRef.current.offsetTop;
                         fixturesListRef.current.scrollTop = itemTop - listTop;
                     }
-                }, 300);
+                }, 100);
             }
         }
     }, [loading, fixtures]);
@@ -353,8 +353,8 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
             <TabsContent value="matches" className="mt-4">
                 <div ref={fixturesListRef} className="h-full overflow-y-auto space-y-3">
                     {processedFixtures.length > 0 ? processedFixtures.map((fixture, index) => {
-                        const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(fixture.fixture.status.short);
-                        const isFirstUpcoming = isUpcomingOrLive && !processedFixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || !['FT', 'AET', 'PEN', 'PST'].includes(f.fixture.status.short));
+                        const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || new Date(fixture.fixture.timestamp * 1000) > new Date();
+                        const isFirstUpcoming = isUpcomingOrLive && !processedFixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
                         return (
                             <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
                                 <FixtureItem 

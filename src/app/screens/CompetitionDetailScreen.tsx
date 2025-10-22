@@ -144,6 +144,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   const [season, setSeason] = useState<number>(CURRENT_SEASON);
   
   const fixturesListRef = useRef<HTMLDivElement>(null);
+  const firstUpcomingMatchRef = useRef<HTMLDivElement>(null);
 
   
   const fetchAllCustomNames = useCallback(async () => {
@@ -340,22 +341,20 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   }, [leagueId, season, fetchAllCustomNames, initialTitle]);
   
 
-  const firstUpcomingMatchIndex = useMemo(() => {
-    return fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
-  }, [fixtures]);
-
   useEffect(() => {
-    if (!loading && fixtures.length > 0 && fixturesListRef.current && firstUpcomingMatchIndex !== -1) {
+    if (!loading && fixtures.length > 0 && fixturesListRef.current) {
+      const firstUpcomingIndex = fixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
+      if (firstUpcomingIndex !== -1 && firstUpcomingMatchRef.current) {
         setTimeout(() => {
-            const itemElement = fixturesListRef.current?.children[firstUpcomingMatchIndex] as HTMLDivElement;
-            if (itemElement && fixturesListRef.current) {
-                const listTop = fixturesListRef.current.offsetTop;
-                const itemTop = itemElement.offsetTop;
-                fixturesListRef.current.scrollTop = itemTop - listTop;
-            }
-        }, 300);
+          if (firstUpcomingMatchRef.current && fixturesListRef.current) {
+            const listTop = fixturesListRef.current.offsetTop;
+            const itemTop = firstUpcomingMatchRef.current.offsetTop;
+            fixturesListRef.current.scrollTop = itemTop - listTop;
+          }
+        }, 100);
+      }
     }
-  }, [loading, fixtures, firstUpcomingMatchIndex]);
+  }, [loading, fixtures]);
   
     const handleFavoriteToggle = (team: Team) => {
         const itemType = 'teams';
@@ -392,8 +391,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     }
 
   const handleOpenCrownDialog = (team: Team) => {
-    if (!user) {
-        toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
+    if (!user || user.isAnonymous) {
+        toast({ title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
         return;
     }
     const currentNote = favorites?.crownedTeams?.[team.id]?.note || '';
@@ -566,11 +565,16 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     </div>
                 ) : fixtures.length > 0 ? (
                     <div className="space-y-3 p-1">
-                        {fixtures.map((fixture, index) => (
-                           <div key={fixture.fixture.id}>
-                                <FixtureItem fixture={fixture} navigate={navigate} />
-                           </div>
-                        ))}
+                        {fixtures.map((fixture, index) => {
+                            const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || new Date(fixture.fixture.timestamp * 1000) > new Date();
+                            const isFirstUpcoming = isUpcomingOrLive && !fixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
+                            
+                            return (
+                               <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
+                                    <FixtureItem fixture={fixture} navigate={navigate} />
+                               </div>
+                            );
+                        })}
                     </div>
                 ) : <p className="pt-4 text-center text-muted-foreground">لا توجد مباريات لهذا الموسم.</p>}
              </div>
@@ -681,13 +685,11 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                         
                         return (
                         <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
-                            <div className='relative'>
-                                <Avatar className="h-16 w-16">
-                                    <AvatarImage src={team.logo} alt={team.name} />
-                                    <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
-                                </Avatar>
-                                {isAdmin && <Button variant="ghost" size="icon" className="absolute -bottom-2 -right-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team) }}><Pencil className="h-3 w-3 text-muted-foreground"/></Button>}
-                            </div>
+                             <Avatar className="h-16 w-16">
+                                <AvatarImage src={team.logo} alt={team.name} />
+                                <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
+                            </Avatar>
+                             {isAdmin && <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team) }}><Pencil className="h-4 w-4"/></Button>}
                             <span className="font-semibold text-sm">
                                 {displayName}
                             </span>

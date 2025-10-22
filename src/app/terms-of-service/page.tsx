@@ -13,11 +13,11 @@ export default function TermsOfServiceScreen({ navigate, goBack, canGoBack }: Sc
       <div className="flex-1 overflow-y-auto p-4">
         <Card>
           <CardHeader>
-            <CardTitle>شروط الخدمة لتطبيق Goal Stack</CardTitle>
+            <CardTitle>شروط الخدمة لتطبيق نبض الملاعب</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-muted-foreground leading-relaxed">
             <p className="font-bold">
-              مرحبًا بك في Goal Stack. باستخدامك لتطبيقنا ("الخدمة")، فإنك توافق على الالتزام بشروط وأحكام الخدمة هذه ("الشروط"). آخر تحديث: أكتوبر {currentYear}.
+              مرحبًا بك في نبض الملاعب. باستخدامك لتطبيقنا ("الخدمة")، فإنك توافق على الالتزام بشروط وأحكام الخدمة هذه ("الشروط"). آخر تحديث: أكتوبر {currentYear}.
             </p>
 
             <h3 className="font-bold text-lg text-foreground pt-4">1. قبول الشروط</h3>
@@ -44,7 +44,7 @@ export default function TermsOfServiceScreen({ navigate, goBack, canGoBack }: Sc
 
             <h3 className="font-bold text-lg text-foreground pt-4">4. الملكية الفكرية</h3>
             <p>
-              الخدمة وجميع محتوياتها الأصلية (باستثناء المحتوى الذي يقدمه المستخدمون)، والميزات، والوظائف هي وستبقى ملكية حصرية لـ Goal Stack ومرخصيها. خدمتنا محمية بموجب حقوق النشر والعلامات التجارية والقوانين الأخرى.
+              الخدمة وجميع محتوياتها الأصلية (باستثناء المحتوى الذي يقدمه المستخدمون)، والميزات، والوظائف هي وستبقى ملكية حصرية لـ نبض الملاعب ومرخصيها. خدمتنا محمية بموجب حقوق النشر والعلامات التجارية والقوانين الأخرى.
             </p>
 
             <h3 className="font-bold text-lg text-foreground pt-4">5. دقة البيانات</h3>
@@ -59,7 +59,7 @@ export default function TermsOfServiceScreen({ navigate, goBack, canGoBack }: Sc
 
             <h3 className="font-bold text-lg text-foreground pt-4">7. تحديد المسؤولية</h3>
             <p>
-              لن يكون Goal Stack أو مديروه أو موظفوه مسؤولين بأي حال من الأحوال عن أي أضرار غير مباشرة أو عرضية أو خاصة أو تبعية تنشأ عن استخدامك أو عدم قدرتك على استخدام الخدمة.
+              لن يكون نبض الملاعب أو مديروه أو موظفوه مسؤولين بأي حال من الأحوال عن أي أضرار غير مباشرة أو عرضية أو خاصة أو تبعية تنشأ عن استخدامك أو عدم قدرتك على استخدام الخدمة.
             </p>
 
              <h3 className="font-bold text-lg text-foreground pt-4">8. التغييرات على الشروط</h3>
