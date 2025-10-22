@@ -60,12 +60,10 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
             };
         }
         
-        // This check is crucial. If goals are null, it means the match hasn't started or data is missing.
         if (goals.home === null || goals.away === null) {
             if (status.short === "PST") return { main: "مؤجلة", sub: "", isLive: false };
             if (status.short === "TBD") return { main: "لم تحدد", sub: "", isLive: false };
             
-            // Default to showing the time if not started
             return {
                 main: format(fixtureDate, "HH:mm"),
                 sub: getRelativeDay(fixtureDate),
@@ -73,7 +71,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
             };
         }
 
-        const score = `${goals.away} - ${goals.home}`;
+        const score = `${goals.home} - ${goals.away}`;
 
         if (live) {
             return {
@@ -91,20 +89,23 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
             };
         }
         
-        // Fallback for any other state - should be rare but safe.
         return {
             main: format(fixtureDate, "HH:mm"),
             sub: getRelativeDay(fixtureDate),
             isLive: false
         };
     };
-
+    
     const { main, sub, isLive } = renderStatus();
+
+    // The large display was showing away-home, now it's home-away
+    const largeScore = goals.home !== null && goals.away !== null ? `${goals.home} - ${goals.away}` : main;
+
 
     if (large) {
          return (
             <div className="flex flex-col items-center justify-center text-center">
-                <div className="font-bold text-3xl tracking-wider">{main}</div>
+                <div className="font-bold text-3xl tracking-wider">{largeScore}</div>
                 {sub && (
                     <div className={cn("text-xs mt-1", isLive ? "text-red-500 font-bold animate-pulse" : "text-muted-foreground")}>
                         {sub}
