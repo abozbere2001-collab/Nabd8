@@ -471,7 +471,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                   groupedNationalTeams[continent].map(team => {
                      const isStarred = !!favorites.teams?.[team.id];
                      return (
-                         <li key={team.id} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
+                         <li key={team.id} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md">
                            <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
                              <Avatar className="h-6 w-6"><AvatarImage src={team.logo} alt={team.name} /></Avatar>
                              <span className="text-sm truncate">{team.name}</span>
@@ -516,7 +516,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                (content.leagues as ManagedCompetitionType[]).map(comp => {
                                   const isStarred = !!favorites.leagues?.[comp.leagueId];
                                    return (
-                                       <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
+                                       <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md">
                                            <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
                                                <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
                                                <span className="text-sm truncate">{comp.name}</span>
@@ -553,7 +553,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                        <ul className="flex flex-col">{leagues.map(comp => {
                                              const isStarred = !!favorites.leagues?.[comp.leagueId];
                                            return (
-                                               <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
+                                               <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md">
                                                    <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
                                                        <img src={comp.logo} alt={comp.name} className="h-6 w-6 object-contain" />
                                                        <span className="text-sm truncate">{comp.name}</span>

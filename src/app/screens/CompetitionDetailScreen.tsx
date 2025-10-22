@@ -393,9 +393,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     }
   
   const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
-    if (purpose === 'rename' && !isAdmin) {
-        return;
-    } else if (type === 'team') {
+    if (type === 'team') {
         const currentName = getDisplayName('team', id, originalData.name);
         setRenameItem({ id, name: currentName, type, purpose: 'rename', originalData });
     } else if (type === 'player') {
@@ -650,13 +648,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                         const isFavoritedTeam = !!favorites?.teams?.[team.id];
                         
                         return (
-                        <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer group/team" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
+                        <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
                             <div className='relative'>
                                 <Avatar className="h-16 w-16">
                                     <AvatarImage src={team.logo} alt={team.name} />
                                     <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
                                 </Avatar>
-                                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6 opacity-0 group-hover/team:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team) }}><Pencil className="h-3 w-3 text-muted-foreground"/></Button>}
+                                {isAdmin && <Button variant="ghost" size="icon" className="absolute -top-2 -left-2 h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team) }}><Pencil className="h-3 w-3 text-muted-foreground"/></Button>}
                             </div>
                             <span className="font-semibold text-sm">
                                 {displayName}
