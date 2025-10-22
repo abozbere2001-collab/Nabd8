@@ -91,16 +91,16 @@ const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture
                     <span className="text-[10px]">{format(new Date(fixture.fixture.date), 'd MMMM yyyy', { locale: ar })}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
-                        <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
+                    <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
+                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                      <div className="relative flex flex-col items-center justify-center min-w-[120px] text-center">
                         <LiveMatchStatus fixture={fixture} large customStatus={customStatus} />
                     </div>
-                    <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
-                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
+                    <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
+                        <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                 </div>
             </CardContent>
@@ -162,22 +162,22 @@ const DetailsTab = ({ fixture, statistics, loading }: { fixture: Fixture; statis
                                 return (
                                     <div key={stat.type} className="space-y-2">
                                         <div className="flex justify-between items-center text-xs font-bold">
-                                            <span>{homeValueRaw}</span>
-                                            <span className="text-muted-foreground">{stat.labelKey}</span>
                                             <span>{awayValueRaw}</span>
+                                            <span className="text-muted-foreground">{stat.labelKey}</span>
+                                            <span>{homeValueRaw}</span>
                                         </div>
                                         <div className="flex items-center gap-1" dir="ltr">
-                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-l-full" className="rounded-l-full"/>
                                             <Progress value={awayVal} indicatorClassName="bg-accent rounded-r-full" className="rounded-r-full" style={{transform: 'rotate(180deg)'}}/>
+                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-l-full" className="rounded-l-full"/>
                                         </div>
                                     </div>
                                 )
                             }
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
-                                    <span>{homeValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{stat.labelKey}</span>
                                     <span>{awayValueRaw}</span>
+                                    <span className="text-muted-foreground font-normal">{stat.labelKey}</span>
+                                    <span>{homeValueRaw}</span>
                                 </div>
                             )
                         })
@@ -219,12 +219,12 @@ const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { ev
         <div className="space-y-6 pt-4">
              <div className="flex justify-between items-center px-4">
                 <div className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8"><AvatarImage src={awayTeam.logo} /></Avatar>
-                    <span className="font-bold">{awayTeam.name}</span>
-                </div>
-                 <div className="flex items-center gap-2">
                     <span className="font-bold">{homeTeam.name}</span>
                     <Avatar className="h-8 w-8"><AvatarImage src={homeTeam.logo} /></Avatar>
+                </div>
+                 <div className="flex items-center gap-2">
+                    <Avatar className="h-8 w-8"><AvatarImage src={awayTeam.logo} /></Avatar>
+                    <span className="font-bold">{awayTeam.name}</span>
                 </div>
             </div>
             
@@ -236,9 +236,9 @@ const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { ev
                     const playerIn = event.assist;
 
                     return (
-                        <div key={`${event.time.elapsed}-${event.player.name}-${index}`} className={cn("relative flex my-4 items-center", !isHomeEvent ? "flex-row" : "flex-row-reverse")}>
+                        <div key={`${event.time.elapsed}-${event.player.name}-${index}`} className={cn("relative flex my-4 items-center", isHomeEvent ? "flex-row" : "flex-row-reverse")}>
                            <div className="flex-1 px-4">
-                                <div className={cn("flex items-center gap-3 w-full", !isHomeEvent ? "flex-row text-left" : "flex-row-reverse text-right")}>
+                                <div className={cn("flex items-center gap-3 w-full", isHomeEvent ? "flex-row text-left" : "flex-row-reverse text-right")}>
                                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background flex-shrink-0">
                                         {getEventIcon(event)}
                                     </div>
@@ -315,7 +315,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
         const ungriddedPlayers: PlayerWithStats[] = [];
 
         lineup.startXI.forEach(p => {
-            if (p.player.grid) {
+            if (p.player.grid && typeof p.player.grid === 'string') {
                 const [row] = p.player.grid.split(':').map(Number);
                 if (!formationGrid[row]) formationGrid[row] = [];
                 formationGrid[row].push(p);
@@ -440,11 +440,11 @@ const StandingsTab = ({ standings, fixture, navigate, loading }: { standings: St
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead className="text-center">نقاط</TableHead>
-                    <TableHead className="text-center">ف/ت/خ</TableHead>
-                    <TableHead className="text-center">لعب</TableHead>
-                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
                     <TableHead className="w-[40px]">#</TableHead>
+                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                    <TableHead className="text-center">لعب</TableHead>
+                    <TableHead className="text-center">ف/ت/خ</TableHead>
+                    <TableHead className="text-center">نقاط</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -452,16 +452,16 @@ const StandingsTab = ({ standings, fixture, navigate, loading }: { standings: St
                     const isRelevantTeam = s.team.id === fixture.teams.home.id || s.team.id === fixture.teams.away.id;
                     return (
                         <TableRow key={s.team.id} className={cn(isRelevantTeam && "bg-primary/10", "cursor-pointer")} onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                            <TableCell className="text-center font-bold">{s.points}</TableCell>
-                            <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
-                            <TableCell className="text-center">{s.all.played}</TableCell>
-                            <TableCell className="font-medium">
+                            <TableCell className="font-bold">{s.rank}</TableCell>
+                            <TableCell>
                                 <div className="flex items-center gap-2 justify-end">
-                                    <span className="truncate">{s.team.name}</span>
+                                    <span className="font-semibold truncate">{s.team.name}</span>
                                     <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
                                 </div>
                             </TableCell>
-                            <TableCell className="font-bold">{s.rank}</TableCell>
+                            <TableCell className="text-center">{s.all.played}</TableCell>
+                            <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
+                            <TableCell className="text-center font-bold">{s.points}</TableCell>
                         </TableRow>
                     );
                 })}
@@ -848,5 +848,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
         </div>
     );
 }
+
+    
 
     
