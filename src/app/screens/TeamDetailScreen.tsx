@@ -448,6 +448,10 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [pinnedPredictionMatches, setPinnedPredictionMatches] = useState(new Set<number>());
 
+  // States to manage tab data loading
+  const [detailsDataLoaded, setDetailsDataLoaded] = useState(false);
+  const [playersDataLoaded, setPlayersDataLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState('details');
 
   useEffect(() => {
     if (!db) return;
@@ -534,26 +538,29 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
         });
         return () => unsub();
     } else {
+        const handleLocalFavoritesChange = () => {
+            setFavorites(getLocalFavorites());
+        };
         setFavorites(getLocalFavorites());
+        window.addEventListener('localFavoritesChanged', handleLocalFavoritesChange);
+        return () => window.removeEventListener('localFavoritesChanged', handleLocalFavoritesChange);
     }
   }, [user, db]);
 
   const handleFavoriteToggle = () => {
-    if (!teamData) return;
+    if (!teamData || !displayTitle) return;
     const { team } = teamData;
     const isFavorited = !!favorites.teams?.[team.id];
 
     if (!user || user.isAnonymous) {
         const currentFavorites = getLocalFavorites();
-        const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
         if (isFavorited) {
-            delete newFavorites.teams?.[team.id];
+            delete currentFavorites.teams?.[team.id];
         } else {
-            if (!newFavorites.teams) newFavorites.teams = {};
-            newFavorites.teams[team.id] = { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' };
+            if (!currentFavorites.teams) currentFavorites.teams = {};
+            currentFavorites.teams[team.id] = { teamId: team.id, name: displayTitle, logo: team.logo, type: team.national ? 'National' : 'Club' };
         }
-        setLocalFavorites(newFavorites);
-        setFavorites(newFavorites);
+        setLocalFavorites(currentFavorites);
         return;
     }
     
@@ -561,7 +568,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
 
     const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const fieldPath = `teams.${team.id}`;
-    const updateData = isFavorited ? { [fieldPath]: deleteField() } : { [fieldPath]: { teamId: team.id, name: team.name, logo: team.logo, type: team.national ? 'National' : 'Club' } };
+    const updateData = isFavorited ? { [fieldPath]: deleteField() } : { [fieldPath]: { teamId: team.id, name: displayTitle, logo: team.logo, type: team.national ? 'National' : 'Club' } };
 
     updateDoc(favDocRef, updateData).catch(err => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
@@ -683,15 +690,15 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
             isAdmin={isAdmin}
             onRename={handleRename}
         />
-         <Tabs defaultValue="details" className="w-full">
+         <Tabs defaultValue="details" onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="details">التفاصيل</TabsTrigger>
             <TabsTrigger value="players">اللاعبون</TabsTrigger>
           </TabsList>
-          <TabsContent value="details" className="mt-4">
+          <TabsContent value="details" className="mt-4" forceMount hidden={activeTab !== 'details'}>
             <TeamDetailsTabs teamId={teamId} navigate={navigate} onPinToggle={handlePinToggle} pinnedPredictionMatches={pinnedPredictionMatches} />
           </TabsContent>
-          <TabsContent value="players" className="mt-4">
+          <TabsContent value="players" className="mt-4" forceMount hidden={activeTab !== 'players'}>
             <TeamPlayersTab teamId={teamId} navigate={navigate} />
           </TabsContent>
         </Tabs>
