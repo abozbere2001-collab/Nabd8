@@ -10,7 +10,6 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 import { auth } from '@/firebase';
 import { getRedirectResult, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
 import { ScreenProps } from '@/app/page';
-import { signInWithGoogle as startSignInWithGoogle } from '@/lib/firebase-client';
 
 interface LoginScreenProps {
   onLoginSuccess?: () => void;
@@ -22,23 +21,21 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkRedirectResult = async () => {
+    const checkRedirect = async () => {
       setLoading(true);
       try {
         const result = await getRedirectResult(auth);
-        if (result && onLoginSuccess) {
-          // A user has successfully signed in.
-          onLoginSuccess();
-        } else {
-          // No user signed in via redirect.
-          setLoading(false);
+        if (result) {
+          // User successfully signed in.
+          onLoginSuccess?.();
         }
       } catch (e: any) {
         handleAuthError(e);
+      } finally {
+        setLoading(false);
       }
     };
-    
-    checkRedirectResult();
+    checkRedirect();
   }, [onLoginSuccess]);
 
 
@@ -62,8 +59,8 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
     setLoading(true);
     setError(null);
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithRedirect(auth, provider);
+        const provider = new GoogleAuthProvider();
+        await signInWithRedirect(auth, provider);
     } catch(e) {
       handleAuthError(e);
     }

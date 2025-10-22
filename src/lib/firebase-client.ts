@@ -137,7 +137,5 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
 
 export async function signInWithGoogle() {
     const provider = new GoogleAuthProvider();
-    // This is the most robust way to handle this in an iframe environment.
-    // It ensures the redirect happens at the top level.
     await signInWithRedirect(auth, provider);
 }
