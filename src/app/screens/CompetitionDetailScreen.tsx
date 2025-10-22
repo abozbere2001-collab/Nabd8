@@ -166,10 +166,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
 
         setCustomNames({ teams: teamNames, players: playerNames, adminNotes: new Map() });
     } catch (error) {
-        console.warn("Could not fetch custom names, this is expected for non-admins:", error);
+        console.warn("Could not fetch custom names:", error);
         setCustomNames({ teams: new Map(), players: new Map(), adminNotes: new Map() });
     }
-  }, [db, isAdmin]);
+  }, [db]);
   
 
   const getDisplayName = useCallback((type: 'team' | 'player', id: number, defaultName: string) => {
@@ -202,25 +202,30 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
   }, [user, db]);
 
   useEffect(() => {
-    if (leagueId && db) {
-      const leagueDocRef = doc(db, 'leagueCustomizations', String(leagueId));
-      getDoc(leagueDocRef)
-        .then(doc => {
-          if (doc.exists()) {
-            setDisplayTitle(doc.data().customName);
-          } else {
+    if (leagueId) {
+        if (db) {
+            const leagueDocRef = doc(db, 'leagueCustomizations', String(leagueId));
+            getDoc(leagueDocRef)
+                .then(doc => {
+                    if (doc.exists()) {
+                        setDisplayTitle(doc.data().customName);
+                    } else {
+                        const hardcodedName = hardcodedTranslations.leagues[leagueId];
+                        setDisplayTitle(hardcodedName || initialTitle);
+                    }
+                })
+                .catch(error => {
+                    console.warn(
+                        'Could not fetch league customization, falling back to hardcoded/initial.',
+                        error
+                    );
+                    const hardcodedName = hardcodedTranslations.leagues[leagueId];
+                    setDisplayTitle(hardcodedName || initialTitle);
+                });
+        } else {
             const hardcodedName = hardcodedTranslations.leagues[leagueId];
             setDisplayTitle(hardcodedName || initialTitle);
-          }
-        })
-        .catch(error => {
-          console.warn(
-            'Could not fetch league customization, this is expected for non-admins:',
-            error
-          );
-          const hardcodedName = hardcodedTranslations.leagues[leagueId];
-          setDisplayTitle(hardcodedName || initialTitle);
-        });
+        }
     }
   }, [leagueId, initialTitle, db]);
 

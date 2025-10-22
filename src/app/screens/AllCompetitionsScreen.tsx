@@ -143,32 +143,27 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 setCustomNames({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
                 return;
             };
-            try {
-                 const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, teamsSnapshot] = await Promise.all([
-                    getDocs(collection(db, 'leagueCustomizations')),
-                    getDocs(collection(db, 'countryCustomizations')),
-                    getDocs(collection(db, 'continentCustomizations')),
-                    getDocs(collection(db, 'teamCustomizations')),
-                ]);
+            
+            const [leaguesSnapshot, countriesSnapshot, continentsSnapshot, teamsSnapshot] = await Promise.all([
+                getDocs(collection(db, 'leagueCustomizations')).catch(() => null),
+                getDocs(collection(db, 'countryCustomizations')).catch(() => null),
+                getDocs(collection(db, 'continentCustomizations')).catch(() => null),
+                getDocs(collection(db, 'teamCustomizations')).catch(() => null),
+            ]);
 
-                const fetchedCustomNames = {
-                    leagues: new Map<number, string>(),
-                    countries: new Map<string, string>(),
-                    continents: new Map<string, string>(),
-                    teams: new Map<number, string>()
-                };
+            const fetchedCustomNames = {
+                leagues: new Map<number, string>(),
+                countries: new Map<string, string>(),
+                continents: new Map<string, string>(),
+                teams: new Map<number, string>()
+            };
 
-                leaguesSnapshot?.forEach(d => fetchedCustomNames.leagues.set(Number(d.id), d.data().customName));
-                countriesSnapshot?.forEach(d => fetchedCustomNames.countries.set(d.id, d.data().customName));
-                continentsSnapshot?.forEach(d => fetchedCustomNames.continents.set(d.id, d.data().customName));
-                teamsSnapshot?.forEach(d => fetchedCustomNames.teams.set(Number(d.id), d.data().customName));
-                
-                setCustomNames(fetchedCustomNames);
-
-            } catch(e) {
-                 console.warn("Could not fetch custom names, this is expected for guests/non-admins");
-                 setCustomNames({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
-            }
+            leaguesSnapshot?.forEach(d => fetchedCustomNames.leagues.set(Number(d.id), d.data().customName));
+            countriesSnapshot?.forEach(d => fetchedCustomNames.countries.set(d.id, d.data().customName));
+            continentsSnapshot?.forEach(d => fetchedCustomNames.continents.set(d.id, d.data().customName));
+            teamsSnapshot?.forEach(d => fetchedCustomNames.teams.set(Number(d.id), d.data().customName));
+            
+            setCustomNames(fetchedCustomNames);
         };
 
         const fetchClubData = async () => {

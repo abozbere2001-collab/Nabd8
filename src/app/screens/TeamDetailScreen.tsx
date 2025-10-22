@@ -108,7 +108,9 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
     const [renameItem, setRenameItem] = useState<{ id: number, name: string, originalName: string } | null>(null);
 
     const getDisplayName = useCallback((id: number, defaultName: string) => {
-        return customNames.get(id) || defaultName;
+        const customName = customNames.get(id);
+        if (customName) return customName;
+        return hardcodedTranslations.players[id] || defaultName;
     }, [customNames]);
 
      const fetchCustomNames = useCallback(async () => {
@@ -119,23 +121,20 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
             snapshot.forEach(doc => names.set(Number(doc.id), doc.data().customName));
             setCustomNames(names);
         } catch (error) {
-            const permissionError = new FirestorePermissionError({
-                path: 'playerCustomizations',
-                operation: 'list',
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            // Non-admins might not have access, which is fine.
+            console.warn("Could not fetch player customizations.");
         }
     }, [db]);
 
     useEffect(() => {
         const fetchPlayers = async () => {
             setLoading(true);
+            await fetchCustomNames();
             const cacheKey = `team_players_${teamId}_${CURRENT_SEASON}`;
             const cachedPlayers = getCachedData(cacheKey);
 
             if (cachedPlayers) {
                 setPlayers(cachedPlayers);
-                await fetchCustomNames();
                 setLoading(false);
                 return;
             }
@@ -148,7 +147,6 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
                     setPlayers(fetchedPlayers);
                     setCachedData(cacheKey, fetchedPlayers);
                 }
-                await fetchCustomNames();
             } catch (error) {
                 toast({ variant: 'destructive', title: "خطأ", description: "فشل في جلب قائمة اللاعبين." });
             } finally {
@@ -496,24 +494,21 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
                 const teamInfo = data.response[0];
                 setTeamData(teamInfo);
                 const name = teamInfo.team.name;
-
-                if (!db) {
-                    setDisplayTitle(hardcodedTranslations.teams[teamId] || name);
-                    setLoading(false);
-                    return;
-                }
                 
-                const customNameDocRef = doc(db, "teamCustomizations", String(teamId));
-                try {
-                    const customNameDocSnap = await getDoc(customNameDocRef);
-                    if (customNameDocSnap.exists()) {
-                        setDisplayTitle(customNameDocSnap.data().customName);
-                    } else {
-                        setDisplayTitle(hardcodedTranslations.teams[teamId] || name);
+                let finalName = hardcodedTranslations.teams[teamId] || name;
+
+                if (db) {
+                    const customNameDocRef = doc(db, "teamCustomizations", String(teamId));
+                    try {
+                        const customNameDocSnap = await getDoc(customNameDocRef);
+                        if (customNameDocSnap.exists()) {
+                            finalName = customNameDocSnap.data().customName;
+                        }
+                    } catch (error) {
+                        // Non-admin may not have access, that's fine.
                     }
-                } catch (error) {
-                    setDisplayTitle(hardcodedTranslations.teams[teamId] || name);
                 }
+                setDisplayTitle(finalName);
             } else {
                  throw new Error("Team not found in API response");
             }
@@ -530,17 +525,15 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
   }, [db, teamId, toast]);
   
   useEffect(() => {
-    if (!db || !user) {
+    if (user && !user.isAnonymous && db) {
+        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const unsub = onSnapshot(favRef, (docSnap) => {
+            setFavorites(docSnap.exists() ? docSnap.data() as Favorites : {});
+        });
+        return () => unsub();
+    } else {
         setFavorites(getLocalFavorites());
-        return;
-    };
-    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    
-    const unsub = onSnapshot(favRef, (docSnap) => {
-        setFavorites(docSnap.exists() ? docSnap.data() as Favorites : {});
-    });
-
-    return () => unsub();
+    }
   }, [user, db]);
 
   const handleFavoriteToggle = () => {

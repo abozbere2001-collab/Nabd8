@@ -315,25 +315,19 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     try {
         let localCustomNames = customNamesCache;
         if (!localCustomNames && db) {
-            try {
-                const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
-                    getDocs(collection(db, 'leagueCustomizations')),
-                    getDocs(collection(db, 'teamCustomizations'))
-                ]);
-                
-                if (abortSignal.aborted) return;
-                
-                const leagueNames = new Map<number, string>();
-                leaguesSnapshot.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
-                const teamNames = new Map<number, string>();
-                teamsSnapshot.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-                localCustomNames = { leagues: leagueNames, teams: teamNames };
-                setCustomNamesCache(localCustomNames);
-            } catch (e) {
-                console.warn("Could not fetch custom names, proceeding without them.");
-                localCustomNames = { leagues: new Map(), teams: new Map() };
-                setCustomNamesCache(localCustomNames);
-            }
+            const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+                getDocs(collection(db, 'leagueCustomizations')).catch(()=>null),
+                getDocs(collection(db, 'teamCustomizations')).catch(()=>null)
+            ]);
+            
+            if (abortSignal.aborted) return;
+            
+            const leagueNames = new Map<number, string>();
+            leaguesSnapshot?.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+            const teamNames = new Map<number, string>();
+            teamsSnapshot?.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+            localCustomNames = { leagues: leagueNames, teams: teamNames };
+            setCustomNamesCache(localCustomNames);
         }
 
 
@@ -358,7 +352,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
         let rawFixtures: FixtureType[] = data.response || [];
 
-        const currentFavorites = user ? favorites : getLocalFavorites();
+        const currentFavorites = user && !user.isAnonymous ? favorites : getLocalFavorites();
         const hasFavs = (currentFavorites?.teams && Object.keys(currentFavorites.teams).length > 0) || (currentFavorites?.leagues && Object.keys(currentFavorites.leagues).length > 0);
         
         if (activeTab === 'my-results' && !hasFavs) {
@@ -399,22 +393,21 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
 
   useEffect(() => {
-    if (user && db) {
+    if (user && db && !user.isAnonymous) {
         const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const unsubscribe = onSnapshot(docRef, (doc) => {
             setFavorites(doc.data() as Favorites || { userId: user.uid });
         }, (error) => {
-            // Only emit error for non-anonymous users if permission is denied
-            if (user && !user.isAnonymous) {
+            if (error.code === 'permission-denied') {
+                console.warn("Permission denied for favorites, user might be new or rules are restrictive.");
+                setFavorites(getLocalFavorites());
+            } else {
                 const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
                 errorEmitter.emit('permission-error', permissionError);
             }
-            // For anonymous users or other errors, we can just proceed without favorites
-            setFavorites({});
         });
         return () => unsubscribe();
     } else {
-        // For guest users, read from local storage once.
         setFavorites(getLocalFavorites());
     }
   }, [user, db]);
@@ -450,7 +443,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     }
   };
 
-  const currentFavorites = user ? favorites : getLocalFavorites();
+  const currentFavorites = (user && !user.isAnonymous) ? favorites : getLocalFavorites();
   const favoritedTeamIds = useMemo(() => currentFavorites?.teams ? Object.keys(currentFavorites.teams).map(Number) : [], [currentFavorites.teams]);
   const favoritedLeagueIds = useMemo(() => currentFavorites?.leagues ? Object.keys(currentFavorites.leagues).map(Number) : [], [currentFavorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
@@ -532,4 +525,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-

@@ -135,16 +135,12 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     let customLeagueNames = new Map<number, string>();
 
     if(db) {
-        try {
-            const [teamsSnap, leaguesSnap] = await Promise.all([
-                getDocs(collection(db, 'teamCustomizations')),
-                getDocs(collection(db, 'leagueCustomizations'))
-            ]);
-            teamsSnap.forEach(doc => customTeamNames.set(Number(doc.id), doc.data().customName));
-            leaguesSnap.forEach(doc => customLeagueNames.set(Number(doc.id), doc.data().customName));
-        } catch (e) {
-            console.warn("Could not fetch custom names for index.");
-        }
+        const [teamsSnap, leaguesSnap] = await Promise.all([
+            getDocs(collection(db, 'teamCustomizations')).catch(()=>null),
+            getDocs(collection(db, 'leagueCustomizations')).catch(()=>null)
+        ]);
+        teamsSnap?.forEach(doc => customTeamNames.set(Number(doc.id), doc.data().customName));
+        leaguesSnap?.forEach(doc => customLeagueNames.set(Number(doc.id), doc.data().customName));
     }
 
     const getName = (type: 'team' | 'league', id: number, defaultName: string) => {
@@ -190,8 +186,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         buildLocalIndex();
         
         let unsubscribe: (() => void) | null = null;
-        if (user && !user.isAnonymous) {
-            if (!db) return;
+        if (user && !user.isAnonymous && db) {
             const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
             unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
