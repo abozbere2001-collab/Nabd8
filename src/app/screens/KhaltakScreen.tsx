@@ -184,7 +184,7 @@ const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
     return 0;
 };
 
-const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard }: { leaderboard: UserScore[], loadingLeaderboard: boolean }) => {
+const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userScore, userId }: { leaderboard: UserScore[], loadingLeaderboard: boolean, userScore: UserScore | null, userId: string | undefined }) => {
     if (loadingLeaderboard) {
         return (
             <div className="space-y-2 p-4">
@@ -203,31 +203,55 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard }: { le
     if (leaderboard.length === 0) {
         return <p className="text-center text-muted-foreground p-8">لا يوجد مشاركون في لوحة الصدارة بعد.</p>;
     }
+    
+    const isUserInTop100 = leaderboard.some(s => s.userId === userId);
 
     return (
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead>الترتيب</TableHead>
-                    <TableHead className="text-right">المستخدم</TableHead>
-                    <TableHead className="text-center">النقاط</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {leaderboard.map(score => (
-                    <TableRow key={score.userId}>
-                        <TableCell>{score.rank}</TableCell>
-                        <TableCell className="text-right">
-                            <div className="flex items-center gap-2 justify-end">
-                                {score.userName}
-                                <Avatar className="h-6 w-6"><AvatarImage src={score.userPhoto}/></Avatar>
-                            </div>
-                        </TableCell>
-                        <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
+        <div className="space-y-2">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>الترتيب</TableHead>
+                        <TableHead className="text-right">المستخدم</TableHead>
+                        <TableHead className="text-center">النقاط</TableHead>
                     </TableRow>
-                ))}
-            </TableBody>
-        </Table>
+                </TableHeader>
+                <TableBody>
+                    {leaderboard.map(score => (
+                        <TableRow key={score.userId} className={cn(score.userId === userId && "bg-primary/10")}>
+                            <TableCell>{score.rank}</TableCell>
+                            <TableCell className="text-right">
+                                <div className="flex items-center gap-2 justify-end">
+                                    {score.userName}
+                                    <Avatar className="h-6 w-6"><AvatarImage src={score.userPhoto}/></Avatar>
+                                </div>
+                            </TableCell>
+                            <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+            {userScore && !isUserInTop100 && (
+                 <Card className="bg-primary/10 mt-4">
+                    <CardContent className="p-0">
+                         <Table>
+                             <TableBody>
+                                <TableRow className="border-t-2 border-primary/50">
+                                    <TableCell>{userScore.rank || '-'}</TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex items-center gap-2 justify-end">
+                                            {userScore.userName}
+                                            <Avatar className="h-6 w-6"><AvatarImage src={userScore.userPhoto}/></Avatar>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center font-bold">{userScore.totalPoints}</TableCell>
+                                </TableRow>
+                             </TableBody>
+                         </Table>
+                    </CardContent>
+                 </Card>
+            )}
+        </div>
     );
 });
 LeaderboardDisplay.displayName = 'LeaderboardDisplay';
@@ -240,30 +264,47 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
     const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+    const [currentUserScore, setCurrentUserScore] = useState<UserScore | null>(null);
 
     const [pinnedMatches, setPinnedMatches] = useState<PredictionMatch[]>([]);
     const [loadingMatches, setLoadingMatches] = useState(true);
 
     const [userPredictions, setUserPredictions] = useState<{ [key: number]: Prediction }>({});
 
-    // Fetch Leaderboard
+    // Fetch Leaderboard and current user's score
     const fetchLeaderboard = useCallback(async () => {
         if (!db) return;
         setLoadingLeaderboard(true);
         const leaderboardRef = collection(db, 'leaderboard');
-        const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), limit(100));
-
+        
         try {
-            const snapshot = await getDocs(q);
+            // Fetch top 100
+            const q = query(leaderboardRef, orderBy('totalPoints', 'desc'), limit(100));
+            const top100Snapshot = await getDocs(q);
             let rank = 1;
-            const newScores = snapshot.docs.map(doc => ({ userId: doc.id, ...(doc.data() as Omit<UserScore, 'userId'>), rank: rank++ }));
-            setLeaderboard(newScores);
+            const top100Scores = top100Snapshot.docs.map(doc => ({ userId: doc.id, ...(doc.data() as Omit<UserScore, 'userId'>), rank: rank++ }));
+            setLeaderboard(top100Scores);
+            
+            // Fetch current user's score if they exist
+            if (user) {
+                const userScoreRef = doc(db, 'leaderboard', user.uid);
+                const userScoreSnap = await getDoc(userScoreRef);
+                if (userScoreSnap.exists()) {
+                    // To get the rank, we need to count how many users have more points
+                    const higherRankQuery = query(leaderboardRef, where('totalPoints', '>', userScoreSnap.data().totalPoints || 0));
+                    const higherRankSnap = await getDocs(higherRankQuery);
+                    const userRank = higherRankSnap.size + 1;
+                    setCurrentUserScore({ userId: user.uid, ...userScoreSnap.data(), rank: userRank } as UserScore);
+                } else {
+                    setCurrentUserScore(null);
+                }
+            }
         } catch (error) {
             console.error("Error fetching leaderboard:", error);
         } finally {
             setLoadingLeaderboard(false);
         }
-    }, [db]);
+    }, [db, user]);
     
     // Fetch Pinned Matches
     useEffect(() => {
@@ -468,7 +509,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                        </Button>
                   </CardHeader>
                   <CardContent className="p-0">
-                       <LeaderboardDisplay leaderboard={leaderboard} loadingLeaderboard={loadingLeaderboard} />
+                       <LeaderboardDisplay leaderboard={leaderboard} loadingLeaderboard={loadingLeaderboard} userScore={currentUserScore} userId={user?.uid}/>
                   </CardContent>
                </Card>
            </TabsContent>
