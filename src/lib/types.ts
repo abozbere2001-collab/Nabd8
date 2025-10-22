@@ -286,3 +286,7 @@ export interface ManualTopScorer {
 export interface MatchCustomization {
   customStatus: string;
 }
+
+export interface PredictionMatch extends Fixture {
+    isPinned: boolean;
+}

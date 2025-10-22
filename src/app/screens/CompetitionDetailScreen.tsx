@@ -7,14 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
-import { Star, Pencil, Copy, Trash2, Loader2, Crown } from 'lucide-react';
+import { Star, Pencil, Trash2, Loader2, Crown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { doc, setDoc, onSnapshot, updateDoc, deleteField, getDocs, collection, deleteDoc, getDoc, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, updateDoc, deleteField, getDocs, collection, deleteDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
-import type { Fixture, Standing, TopScorer, Team, Favorites, AdminFavorite, CrownedTeam } from '@/lib/types';
+import type { Fixture, Standing, TopScorer, Team, Favorites, CrownedTeam } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -151,10 +151,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         return;
     };
     try {
-        const [teamsSnapshot, playersSnapshot, adminFavsSnapshot] = await Promise.all([
+        const [teamsSnapshot, playersSnapshot] = await Promise.all([
             getDocs(collection(db, 'teamCustomizations')),
             getDocs(collection(db, 'playerCustomizations')),
-            isAdmin ? getDocs(collection(db, 'adminFavorites')) : Promise.resolve({ docs: [] }),
         ]);
         
         const teamNames = new Map<number, string>();
@@ -163,10 +162,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         const playerNames = new Map<number, string>();
         playersSnapshot.forEach(doc => playerNames.set(Number(doc.id), doc.data().customName));
         
-        const adminNotes = new Map<number, string>();
-        adminFavsSnapshot.forEach(doc => adminNotes.set(Number(doc.id), doc.data().note));
 
-        setCustomNames({ teams: teamNames, players: playerNames, adminNotes: adminNotes });
+        setCustomNames({ teams: teamNames, players: playerNames, adminNotes: new Map() });
     } catch (error) {
         console.warn("Could not fetch custom names, this is expected for non-admins:", error);
         setCustomNames({ teams: new Map(), players: new Map(), adminNotes: new Map() });
@@ -377,14 +374,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     }
   
   const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
-    if (type === 'crown') {
-        if (!user) {
-            toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
-            return;
-        }
-        const currentNote = favorites?.crownedTeams?.[id]?.note || '';
-        setRenameItem({ id, name: originalData.name, type, purpose: 'crown', originalData, note: currentNote });
-    } else if (purpose === 'rename' && !isAdmin) {
+    if (purpose === 'rename' && !isAdmin) {
         return;
     } else if (type === 'team') {
         const currentName = getDisplayName('team', id, originalData.name);
@@ -402,23 +392,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     
     const { originalData, purpose } = renameItem;
 
-    if (purpose === 'crown') {
-        const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const fieldPath = `crownedTeams.${id}`;
-        const crownedTeamData: CrownedTeam = {
-            teamId: Number(id),
-            name: originalData.name,
-            logo: originalData.logo,
-            note: newNote,
-        };
-        const updateData = { [fieldPath]: crownedTeamData };
-
-        updateDoc(favRef, updateData).then(() => {
-            toast({ title: 'نجاح', description: `تم تتويج فريق ${originalData.name}.` });
-        }).catch(serverError => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: updateData }));
-        });
-    } else if (purpose === 'rename' && isAdmin) {
+    if (purpose === 'rename' && isAdmin) {
         const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
         if (newName && newName !== originalData.name) {
@@ -655,7 +629,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     {teams.map(({ team }) => {
                         const displayName = getDisplayName('team', team.id, team.name);
                         const isFavoritedTeam = !!favorites?.teams?.[team.id];
-                        const isCrowned = !!favorites?.crownedTeams?.[team.id];
                         
                         return (
                         <div key={team.id} className="relative flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-center cursor-pointer group/team" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
@@ -675,9 +648,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                     handleFavoriteToggle(team);
                                 }}>
                                     <Star className={cn("h-5 w-5", isFavoritedTeam ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('crown', team.id, team) }}>
-                                    <Crown className={cn("h-5 w-5", isCrowned ? "text-yellow-400 fill-current" : "text-muted-foreground/50")} />
                                 </Button>
                             </div>
                         </div>

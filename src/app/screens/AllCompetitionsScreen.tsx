@@ -4,11 +4,11 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Star, Pencil, Plus, Search, Heart, RefreshCcw, Users, Trophy, Loader2, Crown } from 'lucide-react';
+import { Star, Pencil, Plus, Search, Users, Trophy, Loader2, RefreshCw } from 'lucide-react';
 import type { ScreenProps } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import { doc, setDoc, collection, onSnapshot, getDocs, writeBatch, getDoc, deleteDoc, deleteField, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, collection, onSnapshot, getDocs, writeBatch, getDoc, deleteDoc, deleteField, updateDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { AddCompetitionDialog } from '@/components/AddCompetitionDialog';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -21,16 +21,6 @@ import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileButton } from '../AppContentWrapper';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 // --- Persistent Cache Logic ---
 const COMPETITIONS_CACHE_KEY = 'goalstack_competitions_cache';
@@ -116,7 +106,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const [favorites, setFavorites] = useState<Partial<Favorites>>({});
     const [renameItem, setRenameItem] = useState<RenameState | null>(null);
     const [isAddOpen, setAddOpen] = useState(false);
-    const [crownConfirmationState, setCrownConfirmationState] = useState<{ isOpen: boolean; item: ManagedCompetitionType | null }>({ isOpen: false, item: null });
     
     const [customNames, setCustomNames] = useState<{ leagues: Map<number, string>, teams: Map<number, string>, countries: Map<string, string>, continents: Map<string, string> }>({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
 
@@ -417,110 +406,13 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     }, [user, db, favorites, toast]);
     
-    const handleCrownToggle = (item: ManagedCompetitionType | Team) => {
-        if (!user) {
-            toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
-            return;
-        }
-    
-        const isLeague = 'leagueId' in item;
-    
-        if (isLeague) {
-            const leagueItem = item as ManagedCompetitionType;
-            if (favorites.crownedLeagues) {
-                const crownedLeagueId = Object.keys(favorites.crownedLeagues)[0];
-                if (crownedLeagueId) {
-                    if (Number(crownedLeagueId) === leagueItem.leagueId) {
-                        setCrownConfirmationState({ isOpen: true, item: leagueItem });
-                        return;
-                    }
-                    
-                    const crownedData = favorites.crownedLeagues[Number(crownedLeagueId)];
-                    if (crownedData?.crownedAt?.toDate) {
-                        const thirtyDaysInMillis = 30 * 24 * 60 * 60 * 1000;
-                        const canChange = new Date().getTime() - crownedData.crownedAt.toDate().getTime() > thirtyDaysInMillis;
-                        if (!canChange && !isAdmin) { // Admin can bypass
-                            toast({
-                                title: 'لا يمكن التغيير الآن',
-                                description: 'لا يمكنك تغيير دوريك المتوج إلا بعد مرور 30 يومًا على اختيارك الحالي.',
-                            });
-                            return;
-                        }
-                    }
-                }
-            }
-            setCrownConfirmationState({ isOpen: true, item: leagueItem });
-        } else {
-            const teamItem = item as Team;
-            const isCrowned = !!favorites.crownedTeams?.[teamItem.id];
-            if (isCrowned) {
-                const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-                const fieldPath = `crownedTeams.${teamItem.id}`;
-                updateDoc(favDocRef, { [fieldPath]: deleteField() }).catch(err => {
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: { [fieldPath]: 'DELETED' } }));
-                });
-            } else {
-                setRenameItem({
-                    type: 'team',
-                    id: teamItem.id,
-                    name: teamItem.name,
-                    originalData: item,
-                    purpose: 'crown'
-                });
-            }
-        }
-    };
-
-    const handleConfirmCrown = () => {
-        const item = crownConfirmationState.item;
-        if (!item || !user || !db) return;
-    
-        const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-        const isCurrentlyCrowned = favorites.crownedLeagues && Object.keys(favorites.crownedLeagues).includes(String(item.leagueId));
-    
-        let updateData: { crownedLeagues: { [key: string]: CrownedLeague } | {} };
-    
-        if (isCurrentlyCrowned) {
-            updateData = { crownedLeagues: {} }; 
-            toast({ title: 'نجاح', description: `تم إزالة تتويج ${item.name}.` });
-        } else {
-            const crownData: CrownedLeague = { 
-                leagueId: item.leagueId, 
-                name: item.name, 
-                logo: item.logo, 
-                note: '',
-                crownedAt: serverTimestamp(),
-            };
-            updateData = { crownedLeagues: { [item.leagueId]: crownData } };
-            toast({ title: 'نجاح', description: `تم تتويج ${item.name}.` });
-        }
-    
-        updateDoc(favDocRef, updateData).catch(serverError => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
-        });
-        
-        setCrownConfirmationState({ isOpen: false, item: null });
-    };
-
 
     const handleSaveRenameOrNote = (type: RenameType, id: string | number, newName: string, newNote: string = '') => {
         if (!renameItem) return;
         
         const { originalData, purpose } = renameItem;
 
-        if (purpose === 'crown' && user && db && type === 'team') {
-            const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const fieldPath = `crownedTeams.${id}`;
-            const crownData = { teamId: Number(id), name: originalData.name, logo: originalData.logo, note: newNote } as CrownedTeam;
-            const updateData = { [fieldPath]: crownData };
-            
-            updateDoc(favDocRef, updateData).then(() => {
-                toast({ title: 'نجاح', description: `تم تتويج ${originalData.name}.` });
-            }).catch(serverError => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }));
-            });
-        }
-        else if (purpose === 'rename' && isAdmin && db) {
+        if (purpose === 'rename' && isAdmin && db) {
             const collectionName = `${type}Customizations`;
             const docRef = doc(db, collectionName, String(id));
             const data = { customName: newName };
@@ -632,7 +524,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                            <ul className="flex flex-col">{
                                (content.leagues as ManagedCompetitionType[]).map(comp => {
                                   const isStarred = !!favorites.leagues?.[comp.leagueId];
-                                  const isCrowned = favorites.crownedLeagues ? Object.keys(favorites.crownedLeagues).includes(String(comp.leagueId)) : false;
                                    return (
                                        <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
                                            <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
@@ -645,9 +536,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                        <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                    </Button>
                                                )}
-                                               {user && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleCrownToggle(comp); }}>
-                                                   <Crown className={isCrowned ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                               </Button>}
                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(comp); }}>
                                                    <Star className={isStarred ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                </Button>
@@ -673,7 +561,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                    <AccordionContent className="p-1">
                                        <ul className="flex flex-col">{leagues.map(comp => {
                                              const isStarred = !!favorites.leagues?.[comp.leagueId];
-                                             const isCrowned = favorites.crownedLeagues ? Object.keys(favorites.crownedLeagues).includes(String(comp.leagueId)) : false;
                                            return (
                                                <li key={comp.leagueId} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md group">
                                                    <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('CompetitionDetails', { title: comp.name, leagueId: comp.leagueId, logo: comp.logo })}>
@@ -686,9 +573,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                                                                <Pencil className="h-4 w-4 text-muted-foreground/80" />
                                                            </Button>
                                                        )}
-                                                       {user && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleCrownToggle(comp); }}>
-                                                            <Crown className={isCrowned ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
-                                                       </Button>}
                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(comp); }}>
                                                            <Star className={isStarred ? "h-5 w-5 text-yellow-400 fill-current" : "h-5 w-5 text-muted-foreground/50"} />
                                                        </Button>
@@ -734,7 +618,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                       {isAdmin && (
                         <>
                             <Button size="icon" variant="ghost" onClick={handleAdminRefresh}>
-                                <RefreshCcw className="h-5 w-5" />
+                                <RefreshCw className="h-5 w-5" />
                             </Button>
                             <Button size="icon" variant="ghost" onClick={() => setAddOpen(true)}>
                                 <Plus className="h-5 w-5" />
@@ -788,25 +672,6 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     fetchAllData(true);
                 }
             }} />
-             <AlertDialog open={crownConfirmationState.isOpen} onOpenChange={(isOpen) => setCrownConfirmationState({ isOpen, item: isOpen ? crownConfirmationState.item : null })}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>هل أنت متأكد من تتويج هذا الدوري؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            سيصبح هذا هو دوريك الأساسي في قسم "دورينا". يمكنك تغيير هذا الاختيار مرة واحدة فقط كل شهر، لذا اختر بعناية.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleConfirmCrown}>تأكيد</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 }
-
-
-
-
-
