@@ -72,29 +72,36 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
         
         let unsubscribe: (() => void) | null = null;
         
-        if (user && db) {
+        const handleLocalFavoritesChange = () => {
+            setFavorites(getLocalFavorites());
+        };
+
+        if (user && db && !user.isAnonymous) {
             const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
             unsubscribe = onSnapshot(docRef, (doc) => {
                 const favs = (doc.data() as Favorites) || { userId: user.uid };
                 setFavorites(favs);
                 setLoading(false);
             }, (error) => {
-                 if (user && error.code === 'permission-denied') {
+                 if (error.code === 'permission-denied') {
                     setFavorites(getLocalFavorites());
-                } else if(user) {
+                } else {
                   const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
                   errorEmitter.emit('permission-error', permissionError);
                 }
                 setLoading(false);
             });
+             window.removeEventListener('localFavoritesChanged', handleLocalFavoritesChange);
         } else {
-            // Guest user, read from local storage
+            // Guest user: read from local storage and listen for changes
             setFavorites(getLocalFavorites());
+            window.addEventListener('localFavoritesChanged', handleLocalFavoritesChange);
             setLoading(false);
         }
 
         return () => {
             if (unsubscribe) unsubscribe();
+             window.removeEventListener('localFavoritesChanged', handleLocalFavoritesChange);
         };
     }, [user, db, fetchAllCustomNames]);
 
@@ -118,7 +125,9 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
     const favoritePlayers = useMemo(() => favorites?.players ? Object.values(favorites.players) : [], [favorites.players]);
     
     const handleLoginClick = () => {
-        navigate('Login');
+        if ((window as any).appNavigate) {
+            (window as any).appNavigate('Welcome');
+        }
     }
 
     return (
@@ -237,10 +246,10 @@ export function CompetitionsScreen({ navigate, goBack, canGoBack }: ScreenProps)
                                 </div>
                             </TabsContent>
                         </Tabs>
-                         {!user && (
+                         {user?.isAnonymous && (
                             <div className="px-4 pt-4 text-center">
-                                 <p className="text-sm text-muted-foreground mb-4">للحفاظ على مفضلاتك ومزامنتها عبر الأجهزة، قم بتسجيل الدخول.</p>
-                                <Button onClick={handleLoginClick} className="w-full max-w-sm mx-auto">تسجيل الدخول</Button>
+                                 <p className="text-sm text-muted-foreground mb-4">للحفاظ على مفضلاتك ومزامنتها عبر الأجهزة، قم بإنشاء حساب دائم.</p>
+                                <Button onClick={handleLoginClick} className="w-full max-w-sm mx-auto">تسجيل الدخول أو إنشاء حساب</Button>
                             </div>
                         )}
                     </div>

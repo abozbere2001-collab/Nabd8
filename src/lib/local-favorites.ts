@@ -10,12 +10,13 @@ export const getLocalFavorites = (): Partial<Favorites> => {
     }
     try {
         const localData = window.localStorage.getItem(LOCAL_FAVORITES_KEY);
-        // Ensure we always return a valid structure
         const parsed = localData ? JSON.parse(localData) : {};
         return {
             teams: parsed.teams || {},
             leagues: parsed.leagues || {},
-            ...parsed
+            players: parsed.players || {},
+            crownedTeams: parsed.crownedTeams || {},
+            notificationsEnabled: parsed.notificationsEnabled || { news: true },
         };
     } catch (error) {
         console.error("Error reading local favorites:", error);
@@ -30,6 +31,8 @@ export const setLocalFavorites = (favorites: Partial<Favorites>) => {
     }
     try {
         window.localStorage.setItem(LOCAL_FAVORITES_KEY, JSON.stringify(favorites));
+        // Dispatch a custom event to notify other components of the change
+        window.dispatchEvent(new CustomEvent('localFavoritesChanged'));
     } catch (error) {
         console.error("Error saving local favorites:", error);
     }
@@ -40,4 +43,5 @@ export const clearLocalFavorites = () => {
         return;
     }
     window.localStorage.removeItem(LOCAL_FAVORITES_KEY);
+     window.dispatchEvent(new CustomEvent('localFavoritesChanged'));
 };

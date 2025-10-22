@@ -193,8 +193,12 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         buildLocalIndex();
         
         let unsubscribe: (() => void) | null = null;
-        if (user && !user.isAnonymous) {
-            const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const handleLocalFavoritesChange = () => {
+            setFavorites(getLocalFavorites());
+        };
+
+        if (user && db && !user.isAnonymous) {
+             const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
             unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
             }, (error) => {
@@ -204,12 +208,15 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
                 });
                 errorEmitter.emit('permission-error', permissionError);
             });
+            window.removeEventListener('localFavoritesChanged', handleLocalFavoritesChange);
         } else {
-            setFavorites(getLocalFavorites());
+             setFavorites(getLocalFavorites());
+             window.addEventListener('localFavoritesChanged', handleLocalFavoritesChange);
         }
 
         return () => {
             if (unsubscribe) unsubscribe();
+            window.removeEventListener('localFavoritesChanged', handleLocalFavoritesChange);
         }
     }
   }, [isOpen, user, db, buildLocalIndex]);
@@ -303,7 +310,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         const itemId = item.id;
         const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
 
-        if (user && !user.isAnonymous && db) {
+        if (user && db && !user.isAnonymous) {
             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
             const isCurrentlyFavorited = !!favorites[itemType]?.[itemId];
             const fieldPath = `${itemType}.${itemId}`;
@@ -323,20 +330,19 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
         } else { // Guest user
             const currentFavorites = getLocalFavorites();
-            const newFavorites = JSON.parse(JSON.stringify(currentFavorites)); // Deep copy
-            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-            if (!newFavorites[itemType]) newFavorites[itemType] = {};
+            if (!currentFavorites[itemType]) {
+                currentFavorites[itemType] = {};
+            }
             
-            if (newFavorites[itemType]?.[itemId]) {
-                delete newFavorites[itemType]![itemId];
+            if (currentFavorites[itemType]?.[itemId]) {
+                delete currentFavorites[itemType]![itemId];
             } else {
                 const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                newFavorites[itemType]![itemId] = favData;
+                currentFavorites[itemType]![itemId] = favData as any;
             }
-            setLocalFavorites(newFavorites);
-            setFavorites(newFavorites); // Update local state to re-render
+            setLocalFavorites(currentFavorites);
         }
     }, [user, db, favorites]);
 
