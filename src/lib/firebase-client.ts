@@ -2,15 +2,9 @@
 "use client";
 
 import { 
-  GoogleAuthProvider,
   signOut as firebaseSignOut, 
-  onAuthStateChanged as firebaseOnAuthStateChanged,
-  signInWithRedirect,
-  getRedirectResult,
   updateProfile,
   type User, 
-  linkWithCredential,
-  signInAnonymously as firebaseSignInAnonymously
 } from "firebase/auth";
 import { doc, setDoc, getDoc, Firestore, writeBatch } from 'firebase/firestore';
 import type { UserProfile, UserScore, Favorites } from './types';
@@ -134,8 +128,3 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
 
     set(rtdbUserRef, { displayName: newDisplayName, photoURL: user.photoURL }).catch(console.error);
 };
-
-export async function signInWithGoogle() {
-    const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
-}

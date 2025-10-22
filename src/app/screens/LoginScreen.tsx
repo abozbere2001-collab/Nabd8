@@ -8,9 +8,8 @@ import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { auth } from '@/firebase';
-import { getRedirectResult, GoogleAuthProvider } from 'firebase/auth';
+import { getRedirectResult, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
 import { ScreenProps } from '@/app/page';
-import { signInWithGoogle } from '@/lib/firebase-client';
 
 interface LoginScreenProps {
   onLoginSuccess?: () => void;
@@ -22,21 +21,18 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkRedirect = async () => {
-      setLoading(true);
-      try {
-        const result = await getRedirectResult(auth);
+    setLoading(true);
+    getRedirectResult(auth)
+      .then((result) => {
         if (result) {
-          // User successfully signed in.
           onLoginSuccess?.();
         }
-      } catch (e: any) {
-        handleAuthError(e);
-      } finally {
         setLoading(false);
-      }
-    };
-    checkRedirect();
+      })
+      .catch((e) => {
+        handleAuthError(e);
+        setLoading(false);
+      });
   }, [onLoginSuccess]);
 
 
@@ -49,6 +45,8 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
         errorMessage = 'تم إلغاء عملية تسجيل الدخول.';
     } else if (e.code === 'auth/unauthorized-domain') {
         errorMessage = "النطاق غير مصرح به. يرجى الاتصال بالدعم الفني.";
+    } else if (e.code === 'auth/popup-blocked') {
+        errorMessage = "تم حظر النافذة المنبثقة بواسطة المتصفح. يرجى السماح بالنوافذ المنبثقة والمحاولة مرة أخرى."
     }
     
     setError(errorMessage);
@@ -60,7 +58,8 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
     setLoading(true);
     setError(null);
     try {
-        await signInWithGoogle();
+        const provider = new GoogleAuthProvider();
+        await signInWithRedirect(auth, provider);
     } catch(e) {
       handleAuthError(e);
     }
