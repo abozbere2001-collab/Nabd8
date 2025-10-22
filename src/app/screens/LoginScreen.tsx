@@ -8,8 +8,9 @@ import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { auth } from '@/firebase';
-import { getRedirectResult, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
+import { getRedirectResult, GoogleAuthProvider } from 'firebase/auth';
 import { ScreenProps } from '@/app/page';
+import { signInWithGoogle } from '@/lib/firebase-client';
 
 interface LoginScreenProps {
   onLoginSuccess?: () => void;
@@ -59,8 +60,7 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
     setLoading(true);
     setError(null);
     try {
-        const provider = new GoogleAuthProvider();
-        await signInWithRedirect(auth, provider);
+        await signInWithGoogle();
     } catch(e) {
       handleAuthError(e);
     }
