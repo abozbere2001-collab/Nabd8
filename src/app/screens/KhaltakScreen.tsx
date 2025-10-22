@@ -520,13 +520,13 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     }, [pinnedMatches, selectedDateKey]);
 
     return (
-        <Tabs value={mainTab} onValueChange={setMainTab} className="w-full flex-1 flex flex-col">
+        <Tabs value={mainTab} onValueChange={setMainTab} className="w-full flex-1 flex flex-col min-h-0">
            <TabsList className="grid w-full grid-cols-2">
                <TabsTrigger value="leaderboard"><BarChart className="ml-2 h-4 w-4" />الترتيب</TabsTrigger>
                <TabsTrigger value="voting"><ThumbsUp className="ml-2 h-4 w-4" />تصويت</TabsTrigger>
            </TabsList>
            
-           <TabsContent value="voting" className="flex-1 overflow-y-auto mt-0 data-[state=inactive]:hidden flex flex-col">
+           <TabsContent value="voting" className="flex-1 flex flex-col mt-0 data-[state=inactive]:hidden min-h-0">
                 <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
                 <div className="flex-1 overflow-y-auto p-1 space-y-4 pt-4">
                     {loadingMatches ? (
