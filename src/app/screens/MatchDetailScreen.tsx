@@ -657,13 +657,15 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
 
     // Listen for custom match status
     useEffect(() => {
-        if (!db || !fixtureId) return;
+        if (!db || !fixtureId || !isAdmin) return;
         const customStatusRef = doc(db, 'matchCustomizations', String(fixtureId));
         const unsub = onSnapshot(customStatusRef, (docSnap) => {
             setCustomStatus(docSnap.exists() ? docSnap.data().customStatus : null);
+        }, (error) => {
+            console.error("Error listening to custom status:", error);
         });
         return () => unsub();
-    }, [db, fixtureId]);
+    }, [db, fixtureId, isAdmin]);
 
     // Memoized function to apply custom names
     const getDisplayName = useCallback((type: 'team' | 'player' | 'league' | 'coach', id: number | undefined, defaultName: string) => {
