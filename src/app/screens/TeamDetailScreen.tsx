@@ -309,7 +309,7 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
         if (customName) return customName;
 
         const hardcodedMap = hardcodedTranslations[key];
-        const hardcodedName = hardcodedMap[id];
+        const hardcodedName = hardcodedMap[id as any];
         if (hardcodedName) return hardcodedName;
 
         return defaultName;
@@ -495,7 +495,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
                 setTeamData(teamInfo);
                 const name = teamInfo.team.name;
                 
-                let finalName = hardcodedTranslations.teams[teamId] || name;
+                let finalName = hardcodedTranslations.teams[teamId as any] || name;
 
                 if (db) {
                     const customNameDocRef = doc(db, "teamCustomizations", String(teamId));
@@ -568,7 +568,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
 
   const handleOpenCrownDialog = () => {
     if (!teamData) return;
-    if (!user) {
+    if (!user || user.isAnonymous) {
         toast({ variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.' });
         return;
     }
@@ -670,7 +670,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
               onSave={(type, id, name, note) => handleSaveRenameOrNote(type as 'team' | 'crown', Number(id), name, note)}
           />
       )}
-      <div className="flex-1 overflow-y-auto p-1">
+      <div className="flex-1 overflow-y-auto p-1 min-h-0">
         <TeamHeader 
             team={{...teamData.team, name: displayTitle || teamData.team.name}}
             venue={teamData.venue} 
