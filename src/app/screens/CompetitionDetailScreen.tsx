@@ -689,7 +689,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 <AvatarImage src={team.logo} alt={team.name} />
                                 <AvatarFallback>{team.name.substring(0, 2)}</AvatarFallback>
                             </Avatar>
-                             {isAdmin && <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team) }}><Pencil className="h-4 w-4"/></Button>}
+                            <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenRename('team', team.id, team) }}>
+                                <Pencil className="h-4 w-4"/>
+                            </Button>
                             <span className="font-semibold text-sm">
                                 {displayName}
                             </span>
