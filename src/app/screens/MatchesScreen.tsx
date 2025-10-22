@@ -10,7 +10,7 @@ import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, onSnapshot, collection, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
-import { Loader2, Search, Star, CalendarClock, Crown } from 'lucide-react';
+import { Loader2, Search, Star, CalendarClock, Crown, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -25,6 +25,7 @@ import { getLocalFavorites } from '@/lib/local-favorites';
 import { POPULAR_LEAGUES } from '@/lib/popular-data';
 import { useToast } from '@/hooks/use-toast';
 import { LeagueHeaderItem } from '@/components/LeagueHeaderItem';
+import { RenameDialog } from '@/components/RenameDialog';
 
 interface GroupedFixtures {
     [leagueName: string]: {
@@ -49,7 +50,8 @@ const FixturesList = React.memo(({
     onPinToggle,
     favorites,
     onFavoriteToggle,
-    isAdmin
+    isAdmin,
+    onRename
 }: { 
     fixtures: FixtureType[], 
     loading: boolean,
@@ -62,7 +64,8 @@ const FixturesList = React.memo(({
     onPinToggle: (fixture: FixtureType) => void,
     favorites: Partial<Favorites>,
     onFavoriteToggle: (league: FixtureType['league']) => void,
-    isAdmin: boolean
+    isAdmin: boolean,
+    onRename: (league: FixtureType['league']) => void
 }) => {
     
     const { favoriteTeamMatches, otherFixtures } = useMemo(() => {
@@ -164,7 +167,7 @@ const FixturesList = React.memo(({
                             onFavoriteToggle={() => onFavoriteToggle(league)}
                             onClick={() => navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo })}
                             isAdmin={isAdmin}
-                            onRename={() => {/* Rename functionality not available here */}}
+                            onRename={() => onRename(league)}
                         />
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
                             {leagueFixtures.map(f => (
@@ -259,6 +262,8 @@ const tabs: {id: TabName, label: string}[] = [
     { id: 'my-results', label: 'نتائجي' },
 ];
 
+type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
+
 // Main Screen Component
 export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: ScreenProps & { isVisible: boolean }) {
   const { user } = useAuth();
@@ -266,6 +271,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const { toast } = useToast();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [activeTab, setActiveTab] = useState<TabName>('my-results');
+  const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
+
   
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   
@@ -316,30 +323,37 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   }, [db, pinnedPredictionMatches, toast]);
 
 
+  const fetchAllCustomNames = useCallback(async (abortSignal: AbortSignal) => {
+    if (customNamesCache || !db) return;
+     try {
+        const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+            getDocs(collection(db, 'leagueCustomizations')),
+            getDocs(collection(db, 'teamCustomizations'))
+        ]);
+        
+        if (abortSignal.aborted) return;
+        
+        const leagueNames = new Map<number, string>();
+        leaguesSnapshot?.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+        const teamNames = new Map<number, string>();
+        teamsSnapshot?.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+        
+        setCustomNamesCache({ leagues: leagueNames, teams: teamNames });
+    } catch(e) {
+        console.warn("Could not fetch custom names", e);
+        setCustomNamesCache({ leagues: new Map(), teams: new Map() });
+    }
+  }, [customNamesCache, db]);
+
+
   const fetchAndProcessData = useCallback(async (dateKey: string, abortSignal: AbortSignal) => {
     setLoading(true);
       
     try {
-        let localCustomNames = customNamesCache;
-        if (!localCustomNames && db) {
-            const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
-                getDocs(collection(db, 'leagueCustomizations')),
-                getDocs(collection(db, 'teamCustomizations'))
-            ]);
-            
-            if (abortSignal.aborted) return;
-            
-            const leagueNames = new Map<number, string>();
-            leaguesSnapshot?.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
-            const teamNames = new Map<number, string>();
-            teamsSnapshot?.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-            localCustomNames = { leagues: leagueNames, teams: teamNames };
-            setCustomNamesCache(localCustomNames);
-        }
-
+        await fetchAllCustomNames(abortSignal);
 
         const getDisplayName = (type: 'team' | 'league', id: number, defaultName: string) => {
-            const firestoreMap = type === 'team' ? localCustomNames?.teams : localCustomNames?.leagues;
+            const firestoreMap = type === 'team' ? customNamesCache?.teams : customNamesCache?.leagues;
             const customName = firestoreMap?.get(id);
             if (customName) return customName;
 
@@ -396,7 +410,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             setLoading(false);
           }
       }
-  }, [db, activeTab, user, favorites, customNamesCache]);
+  }, [db, activeTab, user, favorites, customNamesCache, fetchAllCustomNames]);
 
 
   useEffect(() => {
@@ -455,6 +469,50 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     console.log("Toggling favorite for league:", league.id);
   }, []);
 
+  const handleOpenRename = (league: FixtureType['league']) => {
+    if (!isAdmin) return;
+    const currentName = customNamesCache?.leagues.get(league.id) || hardcodedTranslations.leagues[league.id] || league.name;
+    setRenameItem({
+        type: 'league',
+        id: league.id,
+        name: currentName,
+        originalName: league.name
+    });
+  };
+
+  const handleSaveRename = (type: RenameType, id: number, newName: string) => {
+    if (!db || !renameItem) return;
+    const docRef = doc(db, 'leagueCustomizations', String(id));
+
+    const originalName = renameItem.originalName;
+
+    if (newName && newName.trim() !== originalName) {
+        setDoc(docRef, { customName: newName }).then(() => {
+            toast({ title: "نجاح", description: `تم تحديث اسم البطولة.` });
+            setCustomNamesCache(prev => {
+                const newLeagues = new Map(prev?.leagues);
+                newLeagues.set(id, newName);
+                return { ...prev!, leagues: newLeagues };
+            });
+        }).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: { customName: newName } }));
+        });
+    } else {
+        deleteDoc(docRef).then(() => {
+            toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` });
+             setCustomNamesCache(prev => {
+                const newLeagues = new Map(prev?.leagues);
+                newLeagues.delete(id);
+                return { ...prev!, leagues: newLeagues };
+            });
+        }).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
+        });
+    }
+    setRenameItem(null);
+  };
+
+
   const currentFavorites = (user && !user.isAnonymous) ? favorites : getLocalFavorites();
   const favoritedTeamIds = useMemo(() => currentFavorites?.teams ? Object.keys(currentFavorites.teams).map(Number) : [], [currentFavorites.teams]);
   const favoritedLeagueIds = useMemo(() => currentFavorites?.leagues ? Object.keys(currentFavorites.leagues).map(Number) : [], [currentFavorites.leagues]);
@@ -480,6 +538,14 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
               </div>
             }
         />
+        {renameItem && (
+            <RenameDialog
+                isOpen={!!renameItem}
+                onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
+                item={{...renameItem, purpose: 'rename' }}
+                onSave={(type, id, name) => handleSaveRename(type as RenameType, Number(id), name)}
+            />
+        )}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col min-h-0">
             <div className="sticky top-0 z-10 px-1 pt-1 bg-background">
                 <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
@@ -519,6 +585,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favorites={currentFavorites}
                     onFavoriteToggle={handleFavoriteToggle}
                     isAdmin={isAdmin}
+                    onRename={handleOpenRename}
                 />
             </TabsContent>
             
@@ -536,6 +603,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     favorites={currentFavorites}
                     onFavoriteToggle={handleFavoriteToggle}
                     isAdmin={isAdmin}
+                    onRename={handleOpenRename}
                 />
             </TabsContent>
 

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -288,7 +289,7 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
     );
 }
 
-const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string, originalName: string) => void, homeTeamId: number, awayTeamId: number }) => {
+const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, originalData: any) => void, homeTeamId: number, awayTeamId: number }) => {
     if (lineups === null) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
@@ -339,12 +340,12 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
                 {sortedRows.map(row => (
                     <div key={row} className="flex justify-around items-center">
-                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />)}
+                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player)} />)}
                     </div>
                 ))}
                  {ungriddedPlayers.length > 0 && (
                     <div className="flex justify-around items-center">
-                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />)}
+                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player)} />)}
                     </div>
                 )}
             </div>
@@ -374,7 +375,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                         </Avatar>
                         <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
                         {isAdmin && (
-                            <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name, activeLineup.coach.name);}}>
+                            <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach);}}>
                                 <Pencil className="h-3 w-3" />
                             </Button>
                         )}
@@ -421,7 +422,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                                     <p className="font-semibold text-sm">{p.player.name}</p>
                                     <p className="text-xs text-muted-foreground">{p.player.position}</p>
                                 </div>
-                                {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {e.stopPropagation(); onRename('player', p.player.id, p.player.name, p.player.name)}}><Pencil className="h-4 w-4" /></Button>}
+                                {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {e.stopPropagation(); onRename('player', p.player.id, p.player)}}><Pencil className="h-4 w-4" /></Button>}
                             </div>
                         </div>
                     ))}
@@ -535,7 +536,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     // State for custom data
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> } | null>(null);
     const [customStatus, setCustomStatus] = useState<string | null>(null);
-    const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
+    const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalData: any } | null>(null);
 
     // Initial fixture data fetch
     useEffect(() => {
@@ -612,10 +613,10 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     
     // Fetch data for the default tab
     useEffect(() => {
-        if (fixture) {
+        if (fixture && customNames) {
              fetchTabData(activeTab);
         }
-    }, [fixture, fetchTabData, activeTab]);
+    }, [fixture, fetchTabData, activeTab, customNames]);
 
     const handleTabChange = (newTab: string) => {
         setActiveTab(newTab);
@@ -725,14 +726,16 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     }, [standings, getDisplayName]);
 
 
-    const handleOpenRename = (type: RenameType, id: number, name: string, originalName?: string) => {
-        setRenameItem({ type, id, name, originalName: originalName || name });
+    const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
+        const currentName = getDisplayName(type, id, originalData.name);
+        setRenameItem({ type, id, name: currentName, originalData });
     };
 
     const handleSaveRename = (type: RenameType, id: string | number, newName: string) => {
         if (!renameItem || !db) return;
 
-        const { originalName } = renameItem;
+        const { originalData } = renameItem;
+        const originalName = originalData.name;
         const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
         
@@ -773,7 +776,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     };
 
 
-    if (!processedFixture) {
+    if (!processedFixture || customNames === null) {
         return (
             <div className="flex h-full flex-col bg-background">
                 <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} />
@@ -788,7 +791,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setRenameItem({ type: 'status', id: fixtureId, name: customStatus || '', originalName: '' })}
+              onClick={() => setRenameItem({ type: 'status', id: fixtureId, name: customStatus || '', originalData: {} })}
             >
               <Pencil className="h-5 w-5" />
             </Button>
@@ -809,7 +812,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                 <RenameDialog
                     isOpen={!!renameItem}
                     onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-                    item={renameItem}
+                    item={{ ...renameItem, purpose: renameItem.type === 'status' ? 'rename' : 'rename', originalName: renameItem.originalData.name }}
                     onSave={(type, id, name) => type === 'status' ? handleSaveStatus(name) : handleSaveRename(type, id, name)}
                 />
             )}
@@ -840,7 +843,7 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
                             events={processedEvents} 
                             navigate={navigate} 
                             isAdmin={isAdmin} 
-                            onRename={(type, id, name, originalName) => handleOpenRename(type, id, name, originalName)}
+                            onRename={(type, id, originalData) => handleOpenRename(type, id, originalData)}
                             homeTeamId={processedFixture.teams.home.id}
                             awayTeamId={processedFixture.teams.away.id}
                         />
@@ -854,3 +857,4 @@ export function MatchDetailScreen({ navigate, goBack, canGoBack, fixtureId, fixt
     
 
     
+
