@@ -271,8 +271,10 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         setLoadingMatches(true);
         const unsub = onSnapshot(collection(db, 'predictions'), snapshot => {
             const matches = snapshot.docs.map(doc => doc.data() as PredictionMatch);
-            matches.sort((a, b) => a.fixtureData.fixture.timestamp - b.fixtureData.fixture.timestamp);
-            setPinnedMatches(matches);
+            // Defensive sort: filter out items that don't have the required data
+            const validMatches = matches.filter(m => m && m.fixtureData && m.fixtureData.fixture);
+            validMatches.sort((a, b) => a.fixtureData.fixture.timestamp - b.fixtureData.fixture.timestamp);
+            setPinnedMatches(validMatches);
             setLoadingMatches(false);
         }, error => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({path: 'predictions', operation: 'list'}));
