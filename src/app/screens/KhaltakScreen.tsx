@@ -328,6 +328,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
 
 
 const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
+    const { isAdmin } = useAdmin();
     const [mainTab, setMainTab] = useState('voting');
     const [calculatingPoints, setCalculatingPoints] = useState(false);
     const { toast } = useToast();
@@ -499,10 +500,9 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             fetchLeaderboard(); // Refresh the leaderboard view
         } catch (error: any) {
             console.error("Error calculating points:", error);
-            // This is a generic error, but it's better to show something.
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: `users/${user.uid}/predictions`,
-                operation: 'list' // Or 'write' on the leaderboard
+                operation: 'list'
             }));
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث نقاطك.' });
         } finally {
@@ -548,13 +548,15 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 </div>
            </TabsContent>
 
-           <TabsContent value="leaderboard" className="mt-4">
+           <TabsContent value="leaderboard" className="mt-4 flex-1 overflow-y-auto">
                <Card>
                   <CardHeader className="flex-row items-center justify-between">
                        <CardTitle>لوحة الصدارة</CardTitle>
-                       <Button onClick={handleCalculatePoints} disabled={calculatingPoints} size="sm">
-                           {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : "تحديث نقاطي"}
-                       </Button>
+                       {isAdmin && (
+                           <Button onClick={handleCalculatePoints} disabled={calculatingPoints} size="sm">
+                               {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : "تحديث النقاط"}
+                           </Button>
+                       )}
                   </CardHeader>
                   <CardContent className="p-0">
                        <LeaderboardDisplay leaderboard={leaderboard} loadingLeaderboard={loadingLeaderboard} userScore={currentUserScore} userId={user?.uid}/>
@@ -683,4 +685,5 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
 
