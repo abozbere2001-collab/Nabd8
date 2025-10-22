@@ -47,7 +47,9 @@ const CrownedTeamScroller = ({
   if (crownedTeams.length === 0) {
     return (
       <div className="text-center text-muted-foreground py-4 px-4">
-        <p className="mb-4">لم تتوج أي فريق بعد. اضغط على التاج 👑 بجانب أي فريق لتبدأ!</p>
+        <p className="mb-4">
+          قم بتتويج فريقك المفضل بالضغط على أيقونة التاج 👑 في صفحة تفاصيل الفريق لتبقى على اطلاع دائم بآخر أخباره ومبارياته هنا.
+        </p>
         <Button onClick={() => navigate('AllCompetitions')}>استكشف</Button>
       </div>
     );
@@ -452,7 +454,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
      const handleCalculatePoints = useCallback(async () => {
         if (!db || !user) return;
         setCalculatingPoints(true);
-        toast({ title: 'بدء احتساب نقاطك', description: 'يتم الآن تحديث نقاط توقعاتك...' });
+        toast({ title: 'بدء احتساب نقاطك', description: 'سيتم تحديث نقاط توقعاتك الشخصية...' });
     
         try {
             // Fetch all predictions for the current user
@@ -576,7 +578,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { isAdmin, db } = useAdmin();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-  const [mainTab, setMainTab] = useState<'predictions' | 'kurratna'>('kurratna');
+  const [mainTab, setMainTab] = useState<'predictions' | 'myTeams'>('myTeams');
 
   useEffect(() => {
     if (!user || !db) return;
@@ -625,7 +627,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   if (!user) {
     return (
        <div className="flex h-full flex-col bg-background">
-          <ScreenHeader title="بلدي" onBack={goBack} canGoBack={canGoBack} />
+          <ScreenHeader title="ملعبي" onBack={goBack} canGoBack={canGoBack} />
            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
               <Crown className="h-16 w-16 text-muted-foreground mb-4"/>
               <h2 className="text-xl font-bold">ميزة حصرية للمستخدمين المسجلين</h2>
@@ -641,7 +643,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   return (
     <div className="flex h-full flex-col bg-background">
       <ScreenHeader
-        title="بلدي"
+        title="ملعبي"
         onBack={goBack}
         canGoBack={canGoBack}
         actions={
@@ -658,10 +660,10 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
       <Tabs value={mainTab} onValueChange={(value) => setMainTab(value as any)} className="flex flex-1 flex-col min-h-0">
         <TabsList className="grid w-full grid-cols-2">
            <TabsTrigger value="predictions"><Trophy className="ml-2 h-4 w-4" />التوقعات</TabsTrigger>
-           <TabsTrigger value="kurratna"><FootballIcon className="ml-2 h-4 w-4" />كرتنا</TabsTrigger>
+           <TabsTrigger value="myTeams"><FootballIcon className="ml-2 h-4 w-4" />فرقي</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="kurratna" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
+        <TabsContent value="myTeams" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
           <div className="py-4 border-b">
             <CrownedTeamScroller 
               crownedTeams={crownedTeams} 
@@ -691,6 +693,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
 
 
 
