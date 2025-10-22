@@ -17,74 +17,54 @@ import { getDatabase, ref, set } from 'firebase/database';
 
 export const handleNewUser = async (user: User, firestore: Firestore) => {
     const userRef = doc(firestore, 'users', user.uid);
-    const leaderboardRef = doc(firestore, 'leaderboard', user.uid);
-    const favoritesRef = doc(firestore, 'users', user.uid, 'favorites', 'data');
-    const rtdb = getDatabase();
-    const rtdbUserRef = ref(rtdb, `users/${user.uid}`);
 
     try {
         const userDoc = await getDoc(userRef);
-        if (!userDoc.exists()) {
-            const displayName = user.displayName || `مستخدم_${user.uid.substring(0, 5)}`;
-            const photoURL = user.photoURL || '';
-
-            const userProfileData: UserProfile = {
-                displayName: displayName,
-                email: user.email!,
-                photoURL: photoURL,
-                isProUser: false,
-                isAnonymous: user.isAnonymous,
-                onboardingComplete: false,
-            };
-
-            const leaderboardEntry: UserScore = {
-                userId: user.uid,
-                userName: displayName,
-                userPhoto: photoURL,
-                totalPoints: 0,
-            };
-
-            const initialFavorites: Partial<Favorites> = {
-                userId: user.uid,
-                teams: {},
-                leagues: {},
-            };
-            
-            // This is a special handling for merging local favorites for a new user
-            const localFavorites = getLocalFavorites();
-            if (Object.keys(localFavorites.teams || {}).length > 0 || Object.keys(localFavorites.leagues || {}).length > 0) {
-                 const mergedTeams = { ...(initialFavorites.teams || {}), ...(localFavorites.teams || {}) };
-                 const mergedLeagues = { ...(initialFavorites.leagues || {}), ...(localFavorites.leagues || {}) };
-                 initialFavorites.teams = mergedTeams;
-                 initialFavorites.leagues = mergedLeagues;
-                 clearLocalFavorites();
-            }
-
-
-            const batch = writeBatch(firestore);
-            batch.set(userRef, userProfileData);
-            batch.set(leaderboardRef, leaderboardEntry);
-            batch.set(favoritesRef, initialFavorites);
-
-            await Promise.all([
-                batch.commit(),
-                set(rtdbUserRef, {
-                    displayName,
-                    photoURL,
-                }),
-            ]);
+        // Only create documents if they don't already exist.
+        if (userDoc.exists()) {
+            return;
         }
+
+        const displayName = user.displayName || `مستخدم_${user.uid.substring(0, 5)}`;
+        const photoURL = user.photoURL || '';
+
+        const userProfileData: UserProfile = {
+            displayName: displayName,
+            email: user.email!,
+            photoURL: photoURL,
+            isProUser: false,
+            isAnonymous: user.isAnonymous,
+            onboardingComplete: false,
+        };
+
+        const favoritesRef = doc(firestore, 'users', user.uid, 'favorites', 'data');
+        let initialFavorites: Partial<Favorites> = { userId: user.uid, teams: {}, leagues: {} };
+        
+        // Merge local favorites if they exist (from guest session)
+        const localFavorites = getLocalFavorites();
+        if (Object.keys(localFavorites.teams || {}).length > 0 || Object.keys(localFavorites.leagues || {}).length > 0) {
+             const mergedTeams = { ...(initialFavorites.teams || {}), ...(localFavorites.teams || {}) };
+             const mergedLeagues = { ...(initialFavorites.leagues || {}), ...(localFavorites.leagues || {}) };
+             initialFavorites.teams = mergedTeams;
+             initialFavorites.leagues = mergedLeagues;
+             clearLocalFavorites();
+        }
+
+        const batch = writeBatch(firestore);
+        batch.set(userRef, userProfileData);
+        batch.set(favoritesRef, initialFavorites);
+
+        await batch.commit();
+
     } catch (error: any) {
+        // This is a critical error, so we emit it.
         const permissionError = new FirestorePermissionError({
-            path: `users/${user.uid} and related docs`,
+            path: `users/${user.uid}`,
             operation: 'write',
-            requestResourceData: { 
-                userProfile: { displayName: user.displayName, email: user.email },
-                leaderboard: { userId: user.uid, userName: user.displayName }
-            }
+            requestResourceData: { displayName: user.displayName, email: user.email }
         });
         errorEmitter.emit('permission-error', permissionError);
-        throw error;
+        console.error("Failed to create new user documents:", error);
     }
 }
 
@@ -101,7 +81,6 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
     await updateProfile(user, { displayName: newDisplayName });
 
     const userRef = doc(db, 'users', user.uid);
-    const leaderboardRef = doc(db, 'leaderboard', user.uid);
     const rtdbUserRef = ref(getDatabase(), `users/${user.uid}`);
     
     const userProfileUpdateData = { displayName: newDisplayName };
@@ -111,17 +90,6 @@ export const updateUserDisplayName = async (user: User, newDisplayName: string):
                 path: userRef.path,
                 operation: 'update',
                 requestResourceData: userProfileUpdateData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        });
-
-    const leaderboardUpdateData = { userName: newDisplayName };
-    setDoc(leaderboardRef, leaderboardUpdateData, { merge: true })
-        .catch((serverError) => {
-            const permissionError = new FirestorePermissionError({
-                path: leaderboardRef.path,
-                operation: 'update',
-                requestResourceData: leaderboardUpdateData,
             });
             errorEmitter.emit('permission-error', permissionError);
         });

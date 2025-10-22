@@ -30,7 +30,7 @@ const ItemGrid = ({ items, onSelect, selectedIds, itemType }: { items: any[], on
           className="relative flex flex-col items-center justify-start gap-1 text-center cursor-pointer h-[88px]"
           onClick={() => onSelect(item)}
         >
-          <Avatar className="h-14 w-14 border-2 border-transparent data-[state=selected]:border-primary transition-all">
+          <Avatar className={cn("h-14 w-14 border-2 border-transparent transition-all", selectedIds.has(item.id) && 'border-primary')}>
             <AvatarImage src={item.logo} alt={item.name} className={cn(itemType === 'league' && 'object-contain p-1')} />
             <AvatarFallback>{item.name.charAt(0)}</AvatarFallback>
           </Avatar>
@@ -53,12 +53,12 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
   const [selectedTeams, setSelectedTeams] = useState<Set<number>>(new Set());
   const [selectedLeagues, setSelectedLeagues] = useState<Set<number>>(new Set());
 
-  // Al Nassr's ID is 605
+  // Al Nassr's ID is 605, preset it as a default selection
   const AL_NASSR_ID = 605;
 
   useEffect(() => {
-    // This component is now used for both guests and new registered users.
-    // For registered users, local favorites might exist if they used the app as a guest first.
+    // This component is used for both guests and new registered users.
+    // We check local storage for any favorites selected during a guest session.
     const localFavs = getLocalFavorites();
     const initialTeams = new Set<number>([AL_NASSR_ID]);
     
@@ -67,9 +67,12 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
     }
     setSelectedTeams(initialTeams);
 
+    const initialLeagues = new Set<number>();
     if (localFavs.leagues) {
-      setSelectedLeagues(new Set(Object.keys(localFavs.leagues).map(Number)));
+      Object.keys(localFavs.leagues).map(Number).forEach(id => initialLeagues.add(id));
     }
+    setSelectedLeagues(initialLeagues);
+
   }, []);
 
   const handleSelect = useCallback((item: any, type: 'team' | 'league') => {
@@ -112,22 +115,23 @@ export function FavoriteSelectionScreen({ onOnboardingComplete }: FavoriteSelect
         }
     });
     
-    if (user && db) {
-        // Registered user: save to Firestore. Use merge to update existing empty doc.
+    if (user && db && !user.isAnonymous) {
+        // Registered user: save to Firestore, merging with any existing data.
         const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
         try {
-            await setDoc(favRef, { ...favoritesToSave, userId: user.uid }, { merge: true });
+            await setDoc(favRef, { ...favoritesToSave }, { merge: true });
+            // Now that favorites are saved to the cloud, clear the local ones.
             clearLocalFavorites();
         } catch (error) {
              const permissionError = new FirestorePermissionError({
                 path: favRef.path,
-                operation: 'write', // 'write' covers create/update
+                operation: 'write',
                 requestResourceData: favoritesToSave
             });
             errorEmitter.emit('permission-error', permissionError);
         }
     } else {
-        // Guest user: save to localStorage
+        // Guest user or user not yet available: save to localStorage
         setLocalFavorites(favoritesToSave);
     }
     
