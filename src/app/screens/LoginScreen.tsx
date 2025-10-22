@@ -20,18 +20,14 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // This effect hook checks for the result of a redirect authentication
-  // when the component mounts.
   useEffect(() => {
     const checkRedirectResult = async () => {
       setLoading(true);
       try {
         const result = await getRedirectResult(auth);
         if (result && onLoginSuccess) {
-          // User successfully signed in.
           onLoginSuccess();
         } else {
-          // No user, which is normal on the initial page load before redirecting.
           setLoading(false);
         }
       } catch (e: any) {
@@ -62,14 +58,8 @@ export function LoginScreen({ onLoginSuccess, goBack }: LoginScreenProps & Scree
     if (loading) return;
     setLoading(true);
     setError(null);
-    try {
-      const provider = new GoogleAuthProvider();
-      // This will redirect the user to the Google sign-in page.
-      // The result will be handled by the useEffect hook when they are redirected back.
-      await signInWithRedirect(auth, provider);
-    } catch (e: any) {
-      handleAuthError(e);
-    }
+    const provider = new GoogleAuthProvider();
+    await signInWithRedirect(auth, provider);
   };
 
   return (
