@@ -323,26 +323,26 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
         } else { // Guest user
             const currentFavorites = getLocalFavorites();
-            if (!currentFavorites[itemType]) {
-                currentFavorites[itemType] = {};
-            }
+            const newFavorites = JSON.parse(JSON.stringify(currentFavorites)); // Deep copy
+            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
+            if (!newFavorites[itemType]) newFavorites[itemType] = {};
             
-            if (currentFavorites[itemType]?.[itemId]) {
-                delete currentFavorites[itemType]![itemId];
+            if (newFavorites[itemType]?.[itemId]) {
+                delete newFavorites[itemType]![itemId];
             } else {
                 const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                currentFavorites[itemType]![itemId] = favData;
+                newFavorites[itemType]![itemId] = favData;
             }
-            setLocalFavorites(currentFavorites);
-            setFavorites(currentFavorites); // Update local state to re-render
+            setLocalFavorites(newFavorites);
+            setFavorites(newFavorites); // Update local state to re-render
         }
     }, [user, db, favorites]);
 
   const handleCrownToggle = (item: Item) => {
     const team = item as Team;
-    if (!user) {
+    if (!user || user.isAnonymous) {
         toast({variant: 'destructive', title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.'});
         return;
     }
