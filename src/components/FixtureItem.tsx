@@ -14,8 +14,9 @@ import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { PredictionOdds } from './PredictionOdds';
 
-export const FixtureItem = React.memo(({ fixture, navigate, customStatus, isPinnedForPrediction, onPinToggle }: { fixture: FixtureType, navigate: ScreenProps['navigate'], customStatus?: string | null, isPinnedForPrediction?: boolean, onPinToggle?: (fixture: FixtureType) => void }) => {
+export const FixtureItem = React.memo(({ fixture, navigate, customStatus, isPinnedForPrediction, onPinToggle, showOdds }: { fixture: FixtureType, navigate: ScreenProps['navigate'], customStatus?: string | null, isPinnedForPrediction?: boolean, onPinToggle?: (fixture: FixtureType) => void, showOdds?: boolean }) => {
     const { isAdmin } = useAdmin();
 
     const HomeTeamDisplay = () => (
@@ -65,7 +66,14 @@ export const FixtureItem = React.memo(({ fixture, navigate, customStatus, isPinn
             <HomeTeamDisplay />
          </main>
         </div>
+        {showOdds && (
+            <div className="px-2 pb-2">
+                <PredictionOdds fixtureId={fixture.fixture.id} />
+            </div>
+        )}
       </div>
     );
 });
 FixtureItem.displayName = 'FixtureItem';
+
+    
