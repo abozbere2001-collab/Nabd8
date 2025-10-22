@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
-import { GoogleAuthProvider, signInWithRedirect, signInAnonymously, getRedirectResult } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInAnonymously } from "firebase/auth";
 import { auth, useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -15,46 +15,27 @@ export function WelcomeScreen() {
   const { db } = useFirestore();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGuestLoading, setIsGuestLoading] = useState(false);
-  const [isRedirectLoading, setIsRedirectLoading] = useState(true);
-
-  useEffect(() => {
-    if (!db) return;
-
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (result?.user) {
-          // User signed in via redirect. Handle new user creation.
-          await handleNewUser(result.user, db);
-          // The onAuthStateChanged listener will now handle navigating to the main app.
-        }
-      })
-      .catch((error) => {
-        console.error("Auth redirect error:", error);
-        toast({
-            variant: 'destructive',
-            title: 'خطأ في المصادقة',
-            description: 'حدث خطأ أثناء معالجة تسجيل الدخول. يرجى المحاولة مرة أخرى.',
-        });
-      })
-      .finally(() => {
-        setIsRedirectLoading(false);
-      });
-  }, [db, toast]);
-
-
+  
   const handleGoogleLogin = async () => {
+    if (!db) return;
     setIsGoogleLoading(true);
+    const provider = new GoogleAuthProvider();
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithRedirect(auth, provider);
-      // The redirect will navigate the user away. The result is handled by the useEffect.
-    } catch (e) {
-      console.error("Login Error:", e);
+      const result = await signInWithPopup(auth, provider);
+      if (result.user) {
+        await handleNewUser(result.user, db);
+      }
+      // onAuthStateChanged will handle navigation to the main app
+    } catch (error: any) {
+      console.error("Google login error:", error);
       toast({
         variant: 'destructive',
         title: 'خطأ في تسجيل الدخول',
-        description: 'لم نتمكن من بدء عملية تسجيل الدخول. يرجى المحاولة مرة أخرى.',
+        description: error.code === 'auth/popup-closed-by-user' 
+          ? 'تم إغلاق نافذة تسجيل الدخول.'
+          : 'حدث خطأ أثناء محاولة تسجيل الدخول باستخدام جوجل.',
       });
+    } finally {
       setIsGoogleLoading(false);
     }
   };
@@ -75,16 +56,7 @@ export function WelcomeScreen() {
     }
   }
 
-  const isLoading = isGoogleLoading || isGuestLoading || isRedirectLoading;
-
-  if (isRedirectLoading) {
-      return (
-        <div className="flex flex-col items-center justify-center h-screen bg-background text-center">
-            <NabdAlMalaebLogo className="h-24 w-24 mb-4" />
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      );
-  }
+  const isLoading = isGoogleLoading || isGuestLoading;
 
   return (
     <div className="flex h-full flex-col bg-background">
