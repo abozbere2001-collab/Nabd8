@@ -20,7 +20,6 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
 
     try {
         const userDoc = await getDoc(userRef);
-        // Only create documents if they don't already exist.
         if (userDoc.exists()) {
             return;
         }
@@ -36,11 +35,10 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
             isAnonymous: user.isAnonymous,
             onboardingComplete: false,
         };
-
-        const favoritesRef = doc(firestore, 'users', user.uid, 'favorites', 'data');
-        let initialFavorites: Partial<Favorites> = { userId: user.uid, teams: {}, leagues: {} };
         
-        // Merge local favorites if they exist (from guest session)
+        const favoritesRef = doc(firestore, 'users', user.uid, 'favorites', 'data');
+        const initialFavorites: Partial<Favorites> = { userId: user.uid, teams: {}, leagues: {} };
+
         const localFavorites = getLocalFavorites();
         if (Object.keys(localFavorites.teams || {}).length > 0 || Object.keys(localFavorites.leagues || {}).length > 0) {
              const mergedTeams = { ...(initialFavorites.teams || {}), ...(localFavorites.teams || {}) };
@@ -57,7 +55,6 @@ export const handleNewUser = async (user: User, firestore: Firestore) => {
         await batch.commit();
 
     } catch (error: any) {
-        // This is a critical error, so we emit it.
         const permissionError = new FirestorePermissionError({
             path: `users/${user.uid}`,
             operation: 'write',
