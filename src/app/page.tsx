@@ -13,7 +13,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { WelcomeScreen } from './screens/WelcomeScreen';
 import { handleNewUser } from '@/lib/firebase-client';
-import { getRedirectResult, type User } from 'firebase/auth';
+import { type User } from 'firebase/auth';
 
 export type ScreenKey = 'Welcome' | 'SignUp' | 'Matches' | 'Competitions' | 'AllCompetitions' | 'News' | 'Settings' | 'CompetitionDetails' | 'TeamDetails' | 'PlayerDetails' | 'AdminFavoriteTeamDetails' | 'Profile' | 'SeasonPredictions' | 'SeasonTeamSelection' | 'SeasonPlayerSelection' | 'AddEditNews' | 'ManageTopScorers' | 'MatchDetails' | 'NotificationSettings' | 'GeneralSettings' | 'ManagePinnedMatch' | 'PrivacyPolicy' | 'TermsOfService' | 'FavoriteSelection' | 'GoPro' | 'MyCountry';
 
@@ -101,24 +101,8 @@ const OnboardingFlow = ({ user }: { user: User }) => {
 
 
 export default function Home() {
-    const { user, auth, db, isUserLoading } = useAuth();
+    const { user, isUserLoading } = useAuth();
     
-    // This effect runs only once on mount to handle the redirect result from Google auth.
-    useEffect(() => {
-        if (!auth || !db) return;
-
-        getRedirectResult(auth)
-            .then(async (result) => {
-                if (result?.user) {
-                    await handleNewUser(result.user, db);
-                }
-            })
-            .catch((error) => {
-                console.error("Auth redirect error:", error);
-            });
-
-    }, [auth, db]);
-
     if (isUserLoading) {
         return <LoadingSplashScreen />;
     }
