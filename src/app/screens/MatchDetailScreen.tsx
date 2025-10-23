@@ -286,7 +286,7 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
     );
 }
 
-const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId, detailedPlayersMap }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string, originalName: string) => void, homeTeamId: number, awayTeamId: number, detailedPlayersMap: Map<number, { player: Player, statistics: any[] }> }) => {
+const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId, detailedPlayersMap }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string, originalName: string) => void, homeTeamId: number, awayTeamId: number, detailedPlayersMap: Map<number, { player: PlayerType; statistics: any[] }> }) => {
     if (lineups === null) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
@@ -308,8 +308,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
 
-    const getPlayerWithDetails = (playerId: number, basePlayer: PlayerType): PlayerType => {
-        const detailedPlayer = detailedPlayersMap.get(playerId);
+    const getPlayerWithDetails = (basePlayer: PlayerType): PlayerType => {
+        const detailedPlayer = detailedPlayersMap.get(basePlayer.id);
         if (detailedPlayer) {
             return {
                 ...basePlayer,
@@ -350,7 +350,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                 {[...sortedRows].reverse().map(row => (
                     <div key={row} className="flex justify-around items-center w-full">
                         {formationGrid[row]?.map(p => {
-                            const fullPlayer = getPlayerWithDetails(p.player.id, p.player);
+                            const fullPlayer = getPlayerWithDetails(p.player);
                             return <PlayerCard key={p.player.id || p.player.name} player={fullPlayer} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />
                         })}
                     </div>
@@ -358,7 +358,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                  {ungriddedPlayers.length > 0 && (
                     <div className="flex justify-around items-center">
                         {ungriddedPlayers.map(p => {
-                            const fullPlayer = getPlayerWithDetails(p.player.id, p.player);
+                            const fullPlayer = getPlayerWithDetails(p.player);
                             return <PlayerCard key={p.player.id || p.player.name} player={fullPlayer} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />
                         })}
                     </div>
@@ -423,7 +423,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                 <h3 className="text-center text-base font-bold mb-2">الاحتياط</h3>
                 <div className="space-y-2">
                     {activeLineup.substitutes.map(p => {
-                        const fullPlayer = getPlayerWithDetails(p.player.id, p.player);
+                        const fullPlayer = getPlayerWithDetails(p.player);
                         return (
                          <Card key={p.player.id || p.player.name} className="p-2 cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                             <div className="flex items-center gap-3">
@@ -495,7 +495,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const [lineups, setLineups] = useState<LineupData[] | null>(null);
     const [events, setEvents] = useState<MatchEvent[] | null>(null);
     const [statistics, setStatistics] = useState<MatchStatistics[] | null>(null);
-    const [detailedPlayersMap, setDetailedPlayersMap] = useState<Map<number, { player: Player, statistics: any[] }>>(new Map());
+    const [detailedPlayersMap, setDetailedPlayersMap] = useState<Map<number, { player: PlayerType, statistics: any[] }>>(new Map());
     const [customStatus, setCustomStatus] = useState<string | null>(null);
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> } | null>(null);
 
@@ -614,9 +614,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
                 if (signal.aborted) return;
                 
-                const playersMap = new Map<number, { player: Player, statistics: any[] }>();
+                const playersMap = new Map<number, { player: PlayerType, statistics: any[] }>();
                 if (playersData.response) {
-                    playersData.response.forEach((p: { player: Player, statistics: any[] }) => {
+                    playersData.response.forEach((p: { player: PlayerType, statistics: any[] }) => {
                         if (p.player.id) {
                             playersMap.set(p.player.id, p);
                         }
@@ -729,7 +729,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={() => setRenameItem(null)} item={{...renameItem, purpose: 'rename'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name)} />}
             <div className="flex-1 overflow-y-auto p-4">
                 <MatchHeaderCard fixture={processedFixture} navigate={navigate} customStatus={customStatus} />
-                <Tabs defaultValue="details" className="w-full">
+                <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="details">{'التفاصيل'}</TabsTrigger>
                         <TabsTrigger value="lineups">{'التشكيلات'}</TabsTrigger>
@@ -756,3 +756,5 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
 // Ensure you have a valid fallback for useTranslation if LanguageProvider is not setup
 const useTranslation = () => ({ t: (key: string) => key });
+
+    
