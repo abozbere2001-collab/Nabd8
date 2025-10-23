@@ -640,6 +640,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         const signal = controller.signal;
 
         const fetchInitialFixture = async () => {
+            if (!fixtureId) return;
             setLoadingFixture(true);
             try {
                 const response = await fetch(`/api/football/fixtures?id=${fixtureId}`, { signal });
@@ -667,16 +668,38 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         let unsubStatus: (() => void) | undefined;
         
         const fetchAllDetails = async () => {
-             setLoadingDetails(true);
-             try {
+            setLoadingDetails(true);
+            try {
                 await fetchAllCustomNames();
+
+                const fetchTeamPlayers = async (teamId: number, season: number) => {
+                    const allPlayersForTeam: { player: PlayerType, statistics: any[] }[] = [];
+                    let currentPage = 1;
+                    let totalPages = 1;
+
+                    while (currentPage <= totalPages) {
+                        const res = await fetch(`/api/football/players?team=${teamId}&season=${season}&page=${currentPage}`, { signal });
+                        if (signal.aborted) return [];
+                        const data = await res.json();
+                        if (data.response) {
+                            allPlayersForTeam.push(...data.response);
+                        }
+                        if (data.paging && data.paging.total > currentPage) {
+                            totalPages = data.paging.total;
+                            currentPage++;
+                        } else {
+                            break;
+                        }
+                    }
+                    return allPlayersForTeam;
+                };
                 
-                const [lineupsRes, eventsRes, statsRes, homePlayersRes, awayPlayersRes] = await Promise.all([
+                const [lineupsRes, eventsRes, statsRes, homePlayersData, awayPlayersData] = await Promise.all([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixture.fixture.id}`, { signal }),
                     fetch(`/api/football/fixtures/events?fixture=${fixture.fixture.id}`, { signal }),
                     fetch(`/api/football/fixtures/statistics?fixture=${fixture.fixture.id}`, { signal }),
-                    fetch(`/api/football/players?team=${fixture.teams.home.id}&season=${fixture.league.season}`, { signal }),
-                    fetch(`/api/football/players?team=${fixture.teams.away.id}&season=${fixture.league.season}`, { signal }),
+                    fetchTeamPlayers(fixture.teams.home.id, fixture.league.season),
+                    fetchTeamPlayers(fixture.teams.away.id, fixture.league.season),
                 ]);
 
                 if (signal.aborted) return;
@@ -684,14 +707,11 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 const lineupsData = await lineupsRes.json();
                 const eventsData = await eventsRes.json();
                 const statsData = await statsRes.json();
-                const homePlayersData = await homePlayersRes.json();
-                const awayPlayersData = await awayPlayersRes.json();
-
 
                 if (signal.aborted) return;
                 
                 const playersMap = new Map<number, { player: PlayerType, statistics: any[] }>();
-                const allPlayers = [...(homePlayersData.response || []), ...(awayPlayersData.response || [])];
+                const allPlayers = [...homePlayersData, ...awayPlayersData];
 
                 allPlayers.forEach((p: { player: PlayerType, statistics: any[] }) => {
                     if (p.player.id) {
@@ -704,11 +724,11 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 setEvents(eventsData.response);
                 setStatistics(statsData.response);
 
-             } catch (error) {
+            } catch (error) {
                 if (!signal.aborted) console.error("Could not fetch match details:", error);
-             } finally {
+            } finally {
                 if (!signal.aborted) setLoadingDetails(false);
-             }
+            }
         };
 
         const fetchStandings = async () => {
