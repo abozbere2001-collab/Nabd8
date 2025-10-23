@@ -306,12 +306,13 @@ const LineupsTab = ({ fixture, lineups, events, navigate, isAdmin, onRename, hom
     
     const renderPitch = (lineup: LineupData) => {
         try {
-            if (!lineup || typeof lineup !== 'object' || !Array.isArray(lineup.startXI)) {
-                return (
-                    <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
-                        ⚠️ بيانات اللاعبين الأساسيين غير متوفرة.
-                    </div>
-                );
+            const isUpcoming = fixture?.fixture?.status?.short === 'NS' || fixture?.fixture?.status?.short === 'TBD';
+
+            if (!lineup || typeof lineup !== 'object' || !Array.isArray(lineup.startXI) || lineup.startXI.length === 0) {
+                 if (isUpcoming) {
+                    return <p className="text-center text-muted-foreground p-8">📅 لم يتم إعلان التشكيلة بعد.</p>;
+                 }
+                return <p className="text-center text-muted-foreground p-8">⚠️ التشكيلة غير متوفرة لهذه المباراة.</p>;
             }
             
             const players = lineup.startXI;
@@ -342,7 +343,6 @@ const LineupsTab = ({ fixture, lineups, events, navigate, isAdmin, onRename, hom
             }
 
             const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
-
             const stadiumImage = fixture.fixture.venue.image || fixture.league.logo;
 
             return (
@@ -690,66 +690,33 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     useEffect(() => {
         if (!fixture) return;
 
-        const fetchLineups = async () => {
-            try {
-                const response = await fetch(`/api/football/fixtures/lineups?fixture=${fixture.fixture.id}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                setLineups(data.response);
+        const fetchAllMatchData = async () => {
+             try {
+                const [lineupsRes, eventsRes, statsRes, playersRes] = await Promise.all([
+                    fetch(`/api/football/fixtures/lineups?fixture=${fixture.fixture.id}`),
+                    fetch(`/api/football/fixtures/events?fixture=${fixture.fixture.id}`),
+                    fetch(`/api/football/fixtures/statistics?fixture=${fixture.fixture.id}`),
+                    fetch(`/api/football/players?fixture=${fixture.fixture.id}`)
+                ]);
+                
+                const lineupsData = await lineupsRes.json();
+                setLineups(lineupsData.response);
+
+                const eventsData = await eventsRes.json();
+                setEvents(eventsData.response);
+                
+                const statsData = await statsRes.json();
+                setStatistics(statsData.response);
+                
+                const playersData = await playersRes.json();
+                setPlayersDetails(playersData.response);
+
             } catch (error) {
-                console.error("Could not fetch lineups:", error);
-                setLineups([]); // Set to empty array on error
+                console.error("Could not fetch match details:", error);
             }
         };
         
-        const fetchEvents = async () => {
-            try {
-                const response = await fetch(`/api/football/fixtures/events?fixture=${fixture.fixture.id}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                setEvents(data.response);
-            } catch (error) {
-                console.error("Could not fetch match events:", error);
-                setEvents([]); // Set to empty array on error
-            }
-        };
-        
-        const fetchStatistics = async () => {
-            try {
-                const response = await fetch(`/api/football/fixtures/statistics?fixture=${fixture.fixture.id}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                setStatistics(data.response);
-            } catch (error) {
-                console.error("Could not fetch match statistics:", error);
-                setStatistics([]); // Set to empty array on error
-            }
-        };
-        
-        const fetchPlayers = async () => {
-            try {
-                const response = await fetch(`/api/football/players?fixture=${fixture.fixture.id}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                setPlayersDetails(data.response);
-            } catch (error) {
-                console.error("Could not fetch players details:", error);
-                setPlayersDetails([]); // Set to empty array on error
-            }
-        };
-        
-        fetchLineups();
-        fetchEvents();
-        fetchStatistics();
-        fetchPlayers();
+        fetchAllMatchData();
     }, [fixture]);
     
 
@@ -771,11 +738,11 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
     const availableTabs = useMemo(() => {
         const tabs = [{ id: 'details', label: 'تفاصيل' }];
-        if (lineups && lineups.length > 0) tabs.push({ id: 'lineups', label: 'التشكيلات' });
+        if (mergedLineups && mergedLineups.length > 0) tabs.push({ id: 'lineups', label: 'التشكيلات' });
         if (events && events.length > 0) tabs.push({ id: 'timeline', label: 'الاحداث' });
         if (standings && standings.length > 0) tabs.push({ id: 'standings', label: 'الترتيب' });
         return tabs;
-    }, [lineups, events, standings]);
+    }, [mergedLineups, events, standings]);
 
 
     if (!fixture) {
@@ -853,4 +820,3 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         </div>
     );
 }
-
