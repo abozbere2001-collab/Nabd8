@@ -470,9 +470,9 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             // Fetch all finished fixtures that have been predicted on, to avoid repeated API calls.
             const allPredictionsSnapshot = await getDocs(query(collection(db, 'predictions')));
             const finishedFixtureIds = allPredictionsSnapshot.docs
-                .map(doc => doc.data().fixtureData as Fixture)
-                .filter(f => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short))
-                .map(f => f.fixture.id);
+                .map(doc => doc.data() as PredictionMatch)
+                .filter(m => m && m.fixtureData && ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short))
+                .map(m => m.fixtureData.fixture.id);
             
             const fixtureResults = new Map<number, Fixture>();
             for (const id of finishedFixtureIds) {
@@ -703,6 +703,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
 
 
 
