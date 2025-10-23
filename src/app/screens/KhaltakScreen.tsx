@@ -371,32 +371,41 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         return () => unsubPredictions();
     }, [db]);
 
-    useEffect(() => {
-        if (!db || !user || pinnedMatches.length === 0) {
+     useEffect(() => {
+        if (!db || !user ) {
             setLoadingUserPredictions(false);
             return;
         };
 
         setLoadingUserPredictions(true);
-        const newPredictions: { [key: number]: Prediction } = {};
-        const promises = pinnedMatches.map(match => {
-            const fixtureId = match.fixtureData.fixture.id;
-            const userPredictionRef = doc(db, 'predictions', String(fixtureId), 'userPredictions', user.uid);
-            return getDoc(userPredictionRef).then(predDoc => {
-                if (predDoc.exists()) {
-                    newPredictions[fixtureId] = predDoc.data() as Prediction;
-                }
-            }).catch(error => {
-                // Non-critical, just means user hasn't predicted this match.
-            });
-        });
+        const predictions: { [key: number]: Prediction } = {};
 
-        Promise.all(promises).then(() => {
-            setAllUserPredictions(prev => ({...prev, ...newPredictions}));
-            setLoadingUserPredictions(false);
-        });
+        // Fetch all user predictions across all matches
+        const fetchAllUserPredictions = async () => {
+             try {
+                const predictionsSnapshot = await getDocs(collection(db, 'predictions'));
+                const predictionPromises = predictionsSnapshot.docs.map(async (matchDoc) => {
+                    const userPredictionRef = doc(db, 'predictions', matchDoc.id, 'userPredictions', user.uid);
+                    const predDoc = await getDoc(userPredictionRef);
+                    if (predDoc.exists()) {
+                        const fixtureId = parseInt(matchDoc.id, 10);
+                        if (!isNaN(fixtureId)) {
+                             predictions[fixtureId] = predDoc.data() as Prediction;
+                        }
+                    }
+                });
+                await Promise.all(predictionPromises);
+                setAllUserPredictions(predictions);
+            } catch (e) {
+                console.error("Failed to fetch all user predictions", e);
+            } finally {
+                setLoadingUserPredictions(false);
+            }
+        }
+        
+        fetchAllUserPredictions();
 
-    }, [db, user, pinnedMatches]);
+    }, [db, user]);
     
     
     const fetchLeaderboard = useCallback(async () => {
@@ -485,6 +494,14 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             
             const userPointsMap = new Map<string, number>();
 
+            // Step 1: Initialize all users' points to 0.
+            const allUsersSnapshot = await getDocs(collection(db, 'users'));
+            allUsersSnapshot.forEach(userDoc => {
+                userPointsMap.set(userDoc.id, 0);
+            });
+
+
+            // Step 2: Accumulate points from all finished prediction matches.
             for (const match of finishedFixtures) {
                 const fixtureId = match.fixtureData.fixture.id;
                 const userPredictionsColRef = collection(db, 'predictions', String(fixtureId), 'userPredictions');
@@ -512,15 +529,13 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 }
             }
             
-            // Fetch all user profiles once
-            const allUsersSnapshot = await getDocs(collection(db, 'users'));
+            // Step 3: Batch update the leaderboard.
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
             allUsersSnapshot.forEach(userDoc => {
                 const data = userDoc.data() as UserProfile;
                 userDetailsMap.set(userDoc.id, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
             });
 
-            // Prepare leaderboard batch update
             const leaderboardBatch = writeBatch(db);
             
             for (const [userId, totalPoints] of userPointsMap.entries()) {
