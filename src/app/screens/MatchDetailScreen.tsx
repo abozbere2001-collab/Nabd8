@@ -301,24 +301,15 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
     );
 }
 
-const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId, fixture }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, originalData: any) => void, homeTeamId: number, awayTeamId: number, fixture: Fixture | null }) => {
+const LineupsTab = ({ fixture, lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId }: { fixture: Fixture, lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, originalData: any) => void, homeTeamId: number, awayTeamId: number }) => {
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
     
-    const renderPitch = (lineup: LineupData | undefined) => {
+    const renderPitch = (lineup: LineupData) => {
         try {
-            const isUpcoming = fixture?.fixture?.status?.short === 'NS' || fixture?.fixture?.status?.short === 'TBD';
-
-            if (!lineup || typeof lineup !== 'object' || !Array.isArray(lineup.startXI) || lineup.startXI.length === 0) {
-                 if (isUpcoming) {
-                    return (
-                        <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
-                            📅 سيتم عرض التشكيلة فور إعلانها.
-                        </div>
-                    );
-                }
+            if (!lineup || typeof lineup !== 'object' || !Array.isArray(lineup.startXI)) {
                 return (
                     <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
-                        ⚠️ التشكيلة غير متوفرة لهذه المباراة.
+                        ⚠️ بيانات اللاعبين الأساسيين غير متوفرة.
                     </div>
                 );
             }
@@ -350,19 +341,19 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                 }
             }
 
-            if (Object.keys(formationGrid).length === 0) {
-                return (
-                    <div className="text-center text-muted-foreground p-4">
-                        ⚠️ لا توجد بيانات لاعبين في هذه التشكيلة.
-                    </div>
-                );
-            }
+            const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
+
+            const stadiumImage = fixture.fixture.venue.image || fixture.league.logo;
 
             return (
-                <div className="flex flex-col justify-between items-center h-full py-4 gap-3">
-                    {Object.entries(formationGrid).map(([row, playersInRow]) => (
-                        <div key={row} className="flex justify-center gap-3">
-                            {playersInRow.map((p, i) => {
+                <div 
+                    className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-800 rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col justify-around p-2 bg-cover bg-center"
+                    style={{backgroundImage: `url('${stadiumImage}')`}}
+                >
+                    <div className="absolute inset-0 bg-black/30"></div>
+                     {sortedRows.reverse().map(row => (
+                        <div key={row} className="relative z-10 flex justify-around items-center">
+                            {formationGrid[row]?.map((p, i) => {
                                 const player = p.player;
                                 return (
                                     <PlayerCard
@@ -376,6 +367,22 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                             })}
                         </div>
                     ))}
+                     {ungridded.length > 0 && (
+                        <div className="relative z-10 flex justify-around items-center">
+                            {ungridded.map((p, i) => {
+                                 const player = p.player;
+                                 return (
+                                    <PlayerCard
+                                        key={player.id ?? i}
+                                        player={player}
+                                        navigate={navigate}
+                                        onRename={() => onRename('player', player.id, p)}
+                                        isAdmin={isAdmin}
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             );
         } catch (err) {
@@ -390,6 +397,16 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     
     if (lineups === null) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    }
+    
+    const isUpcoming = fixture?.fixture?.status?.short === 'NS' || fixture?.fixture?.status?.short === 'TBD';
+    
+    if (lineups.length === 0 && isUpcoming) {
+        return <p className="text-center text-muted-foreground p-8">📅 لم يتم إعلان التشكيلة بعد.</p>;
+    }
+    
+    if (lineups.length === 0) {
+        return <p className="text-center text-muted-foreground p-8">⚠️ التشكيلة غير متوفرة لهذه المباراة.</p>;
     }
     
     const home = lineups.find(l => l.team.id === homeTeamId);
@@ -676,7 +693,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         const fetchLineups = async () => {
             try {
                 const response = await fetch(`/api/football/fixtures/lineups?fixture=${fixture.fixture.id}`);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const data = await response.json();
                 setLineups(data.response);
             } catch (error) {
@@ -688,7 +707,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         const fetchEvents = async () => {
             try {
                 const response = await fetch(`/api/football/fixtures/events?fixture=${fixture.fixture.id}`);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const data = await response.json();
                 setEvents(data.response);
             } catch (error) {
@@ -700,7 +721,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         const fetchStatistics = async () => {
             try {
                 const response = await fetch(`/api/football/fixtures/statistics?fixture=${fixture.fixture.id}`);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const data = await response.json();
                 setStatistics(data.response);
             } catch (error) {
@@ -712,7 +735,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         const fetchPlayers = async () => {
             try {
                 const response = await fetch(`/api/football/players?fixture=${fixture.fixture.id}`);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const data = await response.json();
                 setPlayersDetails(data.response);
             } catch (error) {
@@ -798,6 +823,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                      {availableTabs.some(t => t.id === 'lineups') && (
                         <TabsContent value="lineups" className="mt-4">
                            <LineupsTab 
+                             fixture={fixture}
                              lineups={mergedLineups} 
                              events={events} 
                              navigate={navigate} 
@@ -805,7 +831,6 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                              onRename={handleOpenRename} 
                              homeTeamId={homeTeamId} 
                              awayTeamId={awayTeamId}
-                             fixture={fixture}
                            />
                        </TabsContent>
                      )}
@@ -828,3 +853,4 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         </div>
     );
 }
+
