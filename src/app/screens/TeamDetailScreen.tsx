@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
@@ -373,8 +372,8 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[40px] text-right">#</TableHead>
-                                <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                                <TableHead className="w-[40px] text-left">#</TableHead>
+                                <TableHead className="text-left">الفريق</TableHead>
                                 <TableHead className="text-center">لعب</TableHead>
                                 <TableHead className="text-center">ف/ت/خ</TableHead>
                                 <TableHead className="text-center">نقاط</TableHead>

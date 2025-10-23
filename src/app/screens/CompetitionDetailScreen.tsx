@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -588,8 +587,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[40px] text-right">#</TableHead>
-                            <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                            <TableHead className="w-[40px] text-left">#</TableHead>
+                            <TableHead className="text-left">الفريق</TableHead>
                             <TableHead className="text-center">لعب</TableHead>
                             <TableHead className="text-center">ف</TableHead>
                             <TableHead className="text-center">ت</TableHead>
@@ -636,9 +635,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-8 text-right">#</TableHead>
-                            <TableHead className="text-right">اللاعب</TableHead>
-                            <TableHead className="text-left w-12">الأهداف</TableHead>
+                            <TableHead className="w-8 text-left">#</TableHead>
+                            <TableHead className="text-left">اللاعب</TableHead>
+                            <TableHead className="text-center w-12">الأهداف</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -647,7 +646,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const teamName = getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name);
                             return (
                                 <TableRow key={player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
-                                    <TableCell className="font-bold text-right">{index + 1}</TableCell>
+                                    <TableCell className="font-bold text-left">{index + 1}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-10 w-10">
@@ -660,7 +659,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="font-bold text-lg text-left">{statistics[0]?.goals.total}</TableCell>
+                                    <TableCell className="font-bold text-lg text-center">{statistics[0]?.goals.total}</TableCell>
                                 </TableRow>
                             )})}
                     </TableBody>
