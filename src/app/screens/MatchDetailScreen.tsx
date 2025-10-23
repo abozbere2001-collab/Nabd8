@@ -12,12 +12,11 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
+import { Shirt, ArrowLeft, ArrowRight, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
-import { OddsTab } from '@/components/OddsTab';
 import { useAdmin, useFirestore, useFirebase } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
 import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection, onSnapshot } from 'firebase/firestore';
@@ -737,7 +736,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         if (mergedLineups && mergedLineups.length > 0) tabs.push({ id: 'lineups', label: 'التشكيلات' });
         if (events && events.length > 0) tabs.push({ id: 'timeline', label: 'الاحداث' });
         if (standings && standings.length > 0) tabs.push({ id: 'standings', label: 'الترتيب' });
-        tabs.push({ id: 'odds', label: 'الاحتمالات' });
+        
         return tabs;
     }, [mergedLineups, events, standings]);
 
@@ -772,7 +771,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} />
                 <Tabs defaultValue="details" className="w-full">
-                    <TabsList className="grid w-full grid-cols-5">
+                    <TabsList className="grid w-full grid-cols-4">
                         {availableTabs.map(tab => (
                              <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
                         ))}
@@ -781,16 +780,13 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                         <DetailsTab fixture={fixture} statistics={statistics} />
                     </TabsContent>
                     <TabsContent value="lineups" className="pt-4">
-                        <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={(type, id, data) => handleOpenRename(type, id, data)} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
+                        <LineupsTab fixture={fixture} lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={(type, id, data) => handleOpenRename(type, id, data)} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
                     </TabsContent>
                     <TabsContent value="timeline" className="pt-4">
                         <TimelineTab events={events} homeTeamId={homeTeamId} />
                     </TabsContent>
                     <TabsContent value="standings" className="pt-4">
                         <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
-                    </TabsContent>
-                     <TabsContent value="odds" className="pt-4">
-                        <OddsTab fixtureId={fixture.fixture.id} />
                     </TabsContent>
                 </Tabs>
             </div>
@@ -800,3 +796,5 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
 // Ensure you have a valid fallback for useTranslation if LanguageProvider is not setup
 const useTranslation = () => ({ t: (key: string) => key });
+
+    
