@@ -42,6 +42,7 @@ import { signOut } from '@/lib/firebase-client';
 import { cn } from '@/lib/utils';
 import { ManageTopScorersScreen } from './screens/ManageTopScorersScreen';
 import { KhaltakScreen } from './screens/KhaltakScreen';
+import { PredictionsScreen } from './screens/PredictionsScreen';
 
 const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   Matches: { component: MatchesScreen },
@@ -67,10 +68,11 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   GoPro: { component: GoProScreen },
   ManageTopScorers: { component: ManageTopScorersScreen },
   MyCountry: { component: KhaltakScreen },
+  Predictions: { component: PredictionsScreen },
 };
 
 
-const mainTabs: ScreenKey[] = ['Matches', 'MyCountry', 'Competitions', 'News', 'Settings'];
+const mainTabs: ScreenKey[] = ['Matches', 'MyCountry', 'Predictions', 'Competitions', 'News', 'Settings'];
 
 type StackItem = {
   key: string;
@@ -149,6 +151,7 @@ export function AppContentWrapper() {
         'Competitions': [{ key: 'Competitions-0', screen: 'Competitions' }],
         'News': [{ key: 'News-0', screen: 'News' }],
         'MyCountry': [{ key: 'MyCountry-0', screen: 'MyCountry' }],
+        'Predictions': [{ key: 'Predictions-0', screen: 'Predictions' }],
         'Settings': [{ key: 'Settings-0', screen: 'Settings' }],
     },
   });
