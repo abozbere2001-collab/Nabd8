@@ -679,7 +679,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     
 
     const mergedLineups = useMemo(() => {
-        return mergePlayerData(lineups, playersDetails || []);
+        return mergePlayerData(lineups || [], playersDetails || []);
     }, [lineups, playersDetails]);
     
     const processedFixture = useMemo(() => {
@@ -734,38 +734,38 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const awayTeamId = processedFixture.teams.away.id;
     
     return (
-        <div className="flex flex-col h-full bg-background">
-            <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} actions={
-                isAdmin && (
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenRename('status', processedFixture.fixture.id, customStatus || '')}><Pencil className="h-4 w-4" /></Button>
-                )
-            } />
-             {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={() => setRenameItem(null)} item={{...renameItem, purpose: 'rename'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name)} />}
-            <div className="flex-1 overflow-y-auto p-4">
-                <MatchHeaderCard fixture={processedFixture} navigate={navigate} customStatus={customStatus} />
-                <Tabs defaultValue="details" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4">
-                        <TabsTrigger value="details">{'التفاصيل'}</TabsTrigger>
-                        <TabsTrigger value="lineups">{'التشكيلات'}</TabsTrigger>
-                        <TabsTrigger value="timeline">{'الأحداث'}</TabsTrigger>
-                        <TabsTrigger value="standings">{'الترتيب'}</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="details" className="pt-4">
-                        <DetailsTab fixture={processedFixture} statistics={statistics} loading={loadingDetails} />
-                    </TabsContent>
-                    <TabsContent value="lineups" className="pt-4">
-                        <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
-                    </TabsContent>
-                    <TabsContent value="timeline" className="pt-4">
-                        <TimelineTab events={events} homeTeam={processedFixture.teams.home} awayTeam={processedFixture.teams.away} />
-                    </TabsContent>
-                    <TabsContent value="standings" className="pt-4">
-                        <StandingsTab standings={processedStandings} homeTeamId={homeTeamId} awayTeamId={awayTeamId} navigate={navigate} loading={loadingStandings} />
-                    </TabsContent>
-                </Tabs>
-            </div>
-        </div>
-    );
+    <div className="flex h-full flex-col bg-background">
+      <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} actions={
+          isAdmin && (
+              <Button variant="ghost" size="icon" onClick={() => handleOpenRename('status', processedFixture.fixture.id, customStatus || '')}><Pencil className="h-4 w-4" /></Button>
+          )
+      } />
+      {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={() => setRenameItem(null)} item={{...renameItem, purpose: 'rename'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name)} />}
+      <div className="flex-1 overflow-y-auto p-4">
+        <MatchHeaderCard fixture={processedFixture} navigate={navigate} customStatus={customStatus} />
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="details">{'التفاصيل'}</TabsTrigger>
+            <TabsTrigger value="lineups">{'التشكيلات'}</TabsTrigger>
+            <TabsTrigger value="timeline">{'الأحداث'}</TabsTrigger>
+            <TabsTrigger value="standings">{'الترتيب'}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="details" className="pt-4">
+            <DetailsTab fixture={processedFixture} statistics={statistics} loading={loadingDetails} />
+          </TabsContent>
+          <TabsContent value="lineups" className="pt-4">
+            <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
+          </TabsContent>
+          <TabsContent value="timeline" className="pt-4">
+            <TimelineTab events={events} homeTeam={processedFixture.teams.home} awayTeam={processedFixture.teams.away} />
+          </TabsContent>
+          <TabsContent value="standings" className="pt-4">
+            <StandingsTab standings={processedStandings} homeTeamId={homeTeamId} awayTeamId={awayTeamId} navigate={navigate} loading={loadingStandings} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
 }
 
 // Ensure you have a valid fallback for useTranslation if LanguageProvider is not setup
