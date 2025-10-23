@@ -522,13 +522,11 @@ const mergePlayerData = (baseLineups: LineupData[], detailedPlayers: { player: P
         });
     };
 
-    return (
-      baseLineups.map(lineup => ({
+    return baseLineups.map(lineup => ({
         ...lineup,
         startXI: updatePlayerInList(lineup.startXI),
         substitutes: updatePlayerInList(lineup.substitutes),
-      }))
-    );
+    }));
 };
 
 
@@ -758,14 +756,16 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', Number(fixtureId), {name: customStatus})}/>
                  <Tabs defaultValue="lineups" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4">
+                     <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="standings">الترتيب</TabsTrigger>
                         <TabsTrigger value="timeline">الاحداث</TabsTrigger>
                         <TabsTrigger value="details">تفاصيل</TabsTrigger>
                         <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
                     </TabsList>
                     <TabsContent value="details" className="mt-4">
-                        <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
+                       <ScrollArea className="h-[calc(100vh-250px)]">
+                           <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
+                        </ScrollArea>
                     </TabsContent>
                      <TabsContent value="lineups" className="mt-4">
                         <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
@@ -774,7 +774,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                         <TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} />
                     </TabsContent>
                     <TabsContent value="standings" className="mt-4">
-                        <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
+                        <ScrollArea className="h-[calc(100vh-250px)]">
+                            <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
+                        </ScrollArea>
                     </TabsContent>
                 </Tabs>
             </div>
