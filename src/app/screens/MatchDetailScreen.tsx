@@ -677,13 +677,6 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             }
         };
         
-        fetchLineups();
-        fetchEvents();
-        fetchStatistics();
-    }, [fixture]);
-    
-    useEffect(() => {
-         if (!fixture) return;
         const fetchPlayers = async () => {
             try {
                 const response = await fetch(`/api/football/players?fixture=${fixture.fixture.id}`);
@@ -697,8 +690,12 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             }
         };
         
+        fetchLineups();
+        fetchEvents();
+        fetchStatistics();
         fetchPlayers();
     }, [fixture]);
+    
 
     useEffect(() => {
         if (!firestore || !fixtureId) return;
@@ -783,3 +780,4 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         </div>
     );
 }
+
