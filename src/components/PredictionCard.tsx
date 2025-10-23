@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -123,7 +124,7 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                         <Avatar className="h-8 w-8"><AvatarImage src={liveFixture.teams.home.logo} /></Avatar>
                         <span className={cn("font-semibold text-xs text-center truncate w-full", isColoredCard && "text-white")}>{liveFixture.teams.home.name}</span>
                     </div>
-                    <div className="flex items-center gap-1" dir="ltr">
+                    <div className="flex items-center gap-1" dir="rtl">
                         <Input 
                             type="number" 
                             className={cn("w-10 h-9 text-center text-md font-bold", isColoredCard && 'bg-black/20 border-white/30 text-white placeholder:text-white/70')}
@@ -153,7 +154,7 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                     </div>
                 </div>
                  <div className={cn("text-center text-xs mt-2", isMatchLiveOrFinished ? (isColoredCard ? 'text-white/80' : 'text-muted-foreground') : 'text-muted-foreground')}>
-                    <span>{liveFixture.league.name}</span>
+                    <span className={cn(isColoredCard && "text-white")}>{liveFixture.league.name}</span>
                 </div>
 
                 <div className="mt-2">
@@ -177,3 +178,4 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
 };
 
 export default PredictionCard;
+
