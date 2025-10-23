@@ -25,7 +25,9 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
     useEffect(() => {
         let interval: NodeJS.Timeout | null = null;
         if (live && status.elapsed !== null && !isNaN(status.elapsed)) {
-            const initialSeconds = status.elapsed * 60;
+            // Ensure elapsed is treated as a number
+            const elapsedMinutes = Number(status.elapsed);
+            const initialSeconds = elapsedMinutes * 60;
             const timerStart = Date.now() - (initialSeconds * 1000);
 
             interval = setInterval(() => {

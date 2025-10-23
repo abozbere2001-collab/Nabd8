@@ -346,6 +346,8 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
 
     const [userPredictions, setUserPredictions] = useState<{ [key: number]: Prediction }>({});
     const [selectedDateKey, setSelectedDateKey] = useState<string>(formatDateKey(new Date()));
+    const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
+
 
     const fetchLeaderboard = useCallback(async () => {
         if (!db) return;
@@ -381,28 +383,29 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     useEffect(() => {
         if (!db) return;
         setLoadingMatches(true);
-        const unsub = onSnapshot(collection(db, 'predictions'), snapshot => {
+        const unsub = onSnapshot(collection(db, 'predictions'), async (snapshot) => {
             const matches = snapshot.docs
                 .map(doc => doc.data() as PredictionMatch)
                 .filter(m => m && m.fixtureData && m.fixtureData.fixture); // Ensure data is valid
 
-            matches.forEach(match => {
+            const updatedMatches = await Promise.all(matches.map(async (match) => {
                 if (['FT', 'AET', 'PEN'].includes(match.fixtureData.fixture.status.short)) {
-                    fetch(`/api/football/fixtures?id=${match.fixtureData.fixture.id}`)
-                        .then(res => res.json())
-                        .then(fixtureUpdate => {
+                     try {
+                        const res = await fetch(`/api/football/fixtures?id=${match.fixtureData.fixture.id}`);
+                        if (res.ok) {
+                            const fixtureUpdate = await res.json();
                             if (fixtureUpdate.response && fixtureUpdate.response.length > 0) {
-                                setPinnedMatches(prev => prev.map(m => 
-                                    m.fixtureData.fixture.id === fixtureUpdate.response[0].fixture.id 
-                                        ? { ...m, fixtureData: fixtureUpdate.response[0] } 
-                                        : m
-                                ));
+                                return { ...match, fixtureData: fixtureUpdate.response[0] };
                             }
-                        });
+                        }
+                    } catch (error) {
+                        console.error(`Failed to update fixture ${match.fixtureData.fixture.id}`, error);
+                    }
                 }
-            });
+                return match;
+            }));
 
-            setPinnedMatches(matches);
+            setPinnedMatches(updatedMatches);
             setLoadingMatches(false);
         }, error => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({path: 'predictions', operation: 'list'}));
@@ -468,59 +471,97 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         });
     }, [user, db]);
 
-     // Auto-calculate points for the current user when they visit the tab
-    useEffect(() => {
-        if (!db || !user || !pinnedMatches.length || !Object.keys(userPredictions).length) return;
+     const handleCalculateAllPoints = useCallback(async () => {
+        if (!db || !isAdmin) return;
+        setIsUpdatingPoints(true);
+        toast({ title: "بدء تحديث النقاط...", description: "جاري حساب النقاط لجميع المستخدمين. قد تستغرق هذه العملية بعض الوقت." });
 
-        const calculateMyPoints = async () => {
-            let totalPointsGained = 0;
-            const pointsBatch = writeBatch(db);
+        try {
+            const allPredictionsSnapshot = await getDocs(collection(db, "predictions"));
+            
+            // 1. Get all finished fixtures from the pinned predictions
+            const finishedFixtures = allPredictionsSnapshot.docs
+                .map(doc => doc.data() as PredictionMatch)
+                .filter(f => f && f.fixtureData && ['FT', 'AET', 'PEN'].includes(f.fixtureData.fixture.status.short))
+                .map(f => f.fixtureData);
 
-            for (const fixtureMatch of pinnedMatches) {
-                const fixture = fixtureMatch.fixtureData;
-                const userPred = userPredictions[fixture.fixture.id];
-                
-                // Check if match is finished AND the user has a prediction for it AND points haven't been calculated yet (points === 0)
-                if (fixture.goals.home !== null && fixture.goals.away !== null && userPred && (userPred.points === 0 || userPred.points === undefined)) {
-                    if (['FT', 'AET', 'PEN'].includes(fixture.fixture.status.short)) {
-                        const newPoints = calculatePoints(userPred, fixture);
-                        if (newPoints > 0) {
-                            const predRef = doc(db, 'predictions', String(fixture.fixture.id), 'userPredictions', user.uid);
-                            pointsBatch.update(predRef, { points: newPoints });
-                            totalPointsGained += newPoints;
-                        }
+            if (finishedFixtures.length === 0) {
+                toast({ title: "لا توجد مباريات منتهية", description: "لا يوجد ما يمكن تحديثه." });
+                setIsUpdatingPoints(false);
+                return;
+            }
+
+            const pointsUpdateBatch = writeBatch(db);
+            const userPointsMap = new Map<string, number>();
+
+            // 2. For each finished fixture, get all user predictions for it
+            for (const fixture of finishedFixtures) {
+                const userPredictionsColRef = collection(db, 'predictions', String(fixture.fixture.id), 'userPredictions');
+                const userPredictionsSnapshot = await getDocs(userPredictionsColRef);
+
+                for (const userPredDoc of userPredictionsSnapshot.docs) {
+                    const userPrediction = userPredDoc.data() as Prediction;
+                    
+                    // 3. Calculate points and update the user's prediction document
+                    const newPoints = calculatePoints(userPrediction, fixture);
+                    pointsUpdateBatch.update(userPredDoc.ref, { points: newPoints });
+
+                    // 4. Aggregate points per user
+                    const currentPoints = userPointsMap.get(userPrediction.userId) || 0;
+                    userPointsMap.set(userPrediction.userId, currentPoints + newPoints);
+                }
+            }
+
+            // 5. Commit all prediction point updates
+            await pointsUpdateBatch.commit();
+            
+            // 6. Now, update the leaderboard
+            const leaderboardBatch = writeBatch(db);
+            const userDetailsMap = new Map<string, { userName: string, userPhoto: string }>();
+
+            // Fetch user details for all users who have points
+            for (const userId of userPointsMap.keys()) {
+                if (!userDetailsMap.has(userId)) {
+                    const userDoc = await getDoc(doc(db, 'users', userId));
+                    if (userDoc.exists()) {
+                        userDetailsMap.set(userId, {
+                            userName: userDoc.data().displayName || 'مستخدم غير معروف',
+                            userPhoto: userDoc.data().photoURL || ''
+                        });
                     }
                 }
             }
 
-            if (totalPointsGained > 0) {
-                const leaderboardRef = doc(db, 'leaderboard', user.uid);
-                const userLeaderboardDoc = await getDoc(leaderboardRef);
-                const currentTotal = userLeaderboardDoc.exists() ? userLeaderboardDoc.data().totalPoints : 0;
-                
-                pointsBatch.set(leaderboardRef, {
-                    totalPoints: currentTotal + totalPointsGained,
-                    userName: user.displayName || 'مستخدم غير معروف',
-                    userPhoto: user.photoURL || '',
-                }, { merge: true });
-                
-                try {
-                    await pointsBatch.commit();
-                    toast({ title: "تم تحديث نقاطك!", description: `لقد حصلت على ${totalPointsGained} نقطة جديدة.`});
-                    fetchLeaderboard(); // Refresh leaderboard view
-                } catch(e) {
-                     console.error("Failed to auto-update points:", e);
+            for (const [userId, totalPoints] of userPointsMap.entries()) {
+                const userDetails = userDetailsMap.get(userId);
+                if (userDetails) {
+                    const leaderboardRef = doc(db, 'leaderboard', userId);
+                    leaderboardBatch.set(leaderboardRef, {
+                        totalPoints,
+                        userName: userDetails.userName,
+                        userPhoto: userDetails.userPhoto,
+                    }, { merge: true });
                 }
             }
-        };
-        
-        calculateMyPoints();
 
-    }, [db, user, pinnedMatches, userPredictions, toast, fetchLeaderboard]);
+            await leaderboardBatch.commit();
+
+            toast({ title: "نجاح!", description: `تم تحديث لوحة الصدارة بنجاح.` });
+            fetchLeaderboard(); // Refresh view
+        } catch (error) {
+            console.error("Error calculating all points:", error);
+            const permissionError = new FirestorePermissionError({ path: 'leaderboard', operation: 'write' });
+            errorEmitter.emit('permission-error', permissionError);
+            toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ أثناء تحديث لوحة الصدارة." });
+        } finally {
+            setIsUpdatingPoints(false);
+        }
+    }, [db, isAdmin, toast, fetchLeaderboard]);
 
 
     const filteredMatches = useMemo(() => {
         return pinnedMatches.filter(match => {
+            if (!match.fixtureData || !match.fixtureData.fixture) return false;
             const matchDateKey = format(new Date(match.fixtureData.fixture.timestamp * 1000), 'yyyy-MM-dd');
             return matchDateKey === selectedDateKey;
         }).sort((a,b) => a.fixtureData.fixture.timestamp - b.fixtureData.fixture.timestamp);
@@ -558,8 +599,14 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
 
            <TabsContent value="leaderboard" className="mt-4 flex-1 overflow-y-auto">
                <Card>
-                  <CardHeader>
+                  <CardHeader className="flex-row items-center justify-between">
                        <CardTitle>لوحة الصدارة</CardTitle>
+                       {isAdmin && (
+                           <Button onClick={handleCalculateAllPoints} disabled={isUpdatingPoints} size="sm">
+                               {isUpdatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
+                               <span className="mr-2">تحديث لوحة الصدارة</span>
+                           </Button>
+                       )}
                   </CardHeader>
                   <CardContent className="p-0">
                        <LeaderboardDisplay leaderboard={leaderboard} loadingLeaderboard={loadingLeaderboard} userScore={currentUserScore} userId={user?.uid}/>
