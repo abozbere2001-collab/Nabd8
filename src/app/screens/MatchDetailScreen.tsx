@@ -343,7 +343,7 @@ const LineupsTab = ({ fixture, lineups, events, navigate, isAdmin, onRename, hom
             }
 
             const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
-            const stadiumImage = fixture.fixture.venue.image || fixture.league.logo;
+            const stadiumImage = fixture.fixture.venue.image || "/pitch-vertical.svg";
 
             return (
                 <div 
