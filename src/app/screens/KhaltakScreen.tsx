@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -375,19 +374,25 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         setLoadingUserPredictions(true);
         const newPredictions: { [key: string]: Prediction } = {};
 
-        const fetchPromises = pinnedMatches.map(match => {
+        // This is now more complex because predictions are scattered.
+        // We listen to all relevant subcollections.
+        const unsubscribers = pinnedMatches.map(match => {
             const predRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
-            return getDoc(predRef).then(docSnap => {
+            return onSnapshot(predRef, docSnap => {
                 if (docSnap.exists()) {
-                    newPredictions[match.id] = docSnap.data() as Prediction;
+                    setAllUserPredictions(prev => ({
+                        ...prev,
+                        [match.id]: docSnap.data() as Prediction
+                    }));
                 }
-            }).catch(e => console.warn(`Could not fetch prediction for match ${match.id}`, e));
+            });
         });
 
-        Promise.all(fetchPromises).then(() => {
-            setAllUserPredictions(newPredictions);
-            setLoadingUserPredictions(false);
-        });
+        setLoadingUserPredictions(false);
+
+        return () => {
+            unsubscribers.forEach(unsub => unsub());
+        };
     }, [db, user, pinnedMatches]);
     
     const fetchLeaderboard = useCallback(async () => {
@@ -445,8 +450,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             points: 0,
             timestamp: new Date().toISOString()
         };
-        
-        setAllUserPredictions(prev => ({...prev, [String(fixtureId)]: predictionData}));
 
         setDoc(predictionRef, predictionData, { merge: true }).catch(serverError => {
              const permissionError = new FirestorePermissionError({
@@ -459,91 +462,81 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     }, [user, db]);
 
     const handleCalculateAllPoints = useCallback(async () => {
-        if (!db || !isAdmin) return;
-        setIsUpdatingPoints(true);
-        toast({ title: "بدء تحديث النقاط...", description: "قد تستغرق هذه العملية بعض الوقت." });
+    if (!db || !isAdmin) return;
+    setIsUpdatingPoints(true);
+    toast({ title: "بدء تحديث النقاط...", description: "قد تستغرق هذه العملية بعض الوقت." });
 
-        try {
-            const currentPinnedMatchesSnapshot = await getDocs(collection(db, 'predictions'));
-            const currentPinnedMatches = currentPinnedMatchesSnapshot.docs.map(doc => ({
-                ...(doc.data() as PredictionMatch),
-                id: doc.id,
-            })).filter(m => m && m.fixtureData && m.fixtureData.fixture);
+    try {
+        // --- 1. Reset and Prepare ---
+        const userPointsMap = new Map<string, number>();
+        const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
 
-            const finishedFixtures = currentPinnedMatches.filter(m => 
-                ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short) && m.fixtureData.goals.home !== null
-            );
+        // Fetch all users to initialize maps
+        const allUsersSnapshot = await getDocs(collection(db, 'users'));
+        allUsersSnapshot.forEach(userDoc => {
+            const data = userDoc.data() as UserProfile;
+            userPointsMap.set(userDoc.id, 0); // CRITICAL: Reset points to 0 for every user
+            userDetailsMap.set(userDoc.id, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
+        });
 
-            if (finishedFixtures.length === 0) {
-                toast({ title: "لا توجد مباريات منتهية", description: "لا يوجد ما يمكن تحديثه." });
-                setIsUpdatingPoints(false);
-                return;
-            }
+        // --- 2. Calculate Points ---
+        const currentPinnedMatchesSnapshot = await getDocs(collection(db, 'predictions'));
+        const finishedFixtures = currentPinnedMatchesSnapshot.docs
+            .map(doc => ({ id: doc.id, ...(doc.data() as PredictionMatch) }))
+            .filter(m => m.fixtureData && ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short) && m.fixtureData.goals.home !== null);
 
-            const allUsersSnapshot = await getDocs(collection(db, 'users'));
-            const userPointsMap = new Map<string, number>();
-            const userDetailsMap = new Map<string, { displayName: string, photoURL: string }>();
-
-            allUsersSnapshot.forEach(userDoc => {
-                const userData = userDoc.data() as UserProfile;
-                userPointsMap.set(userDoc.id, 0); // Initialize/reset points to 0
-                userDetailsMap.set(userDoc.id, {
-                    displayName: userData.displayName || 'مستخدم',
-                    photoURL: userData.photoURL || ''
-                });
-            });
-
-            for (const match of finishedFixtures) {
-                const userPredictionsColRef = collection(db, 'predictions', match.id, 'userPredictions');
-                try {
-                    const userPredictionsSnapshot = await getDocs(userPredictionsColRef);
-                    if (userPredictionsSnapshot.empty) continue;
-
-                    const pointsUpdateBatch = writeBatch(db);
-                    userPredictionsSnapshot.forEach(userPredDoc => {
-                        const userPrediction = userPredDoc.data() as Prediction;
-                        const newPoints = calculatePoints(userPrediction, match.fixtureData);
-                        
-                        if (userPrediction.points !== newPoints) {
-                            pointsUpdateBatch.update(userPredDoc.ref, { points: newPoints });
-                        }
-                        
-                        const currentTotal = userPointsMap.get(userPrediction.userId) || 0;
-                        userPointsMap.set(userPrediction.userId, currentTotal + newPoints);
-                    });
-                    await pointsUpdateBatch.commit();
-                } catch (e) {
-                     errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `predictions/${match.id}/userPredictions`, operation: 'list' }));
-                     continue; 
-                }
-            }
-            
-            const leaderboardWriteBatch = writeBatch(db);
-            const existingLeaderboardSnapshot = await getDocs(collection(db, "leaderboard"));
-            existingLeaderboardSnapshot.forEach((doc) => leaderboardWriteBatch.delete(doc.ref));
-
-            for (const [userId, totalPoints] of userPointsMap.entries()) {
-                 const userDetails = userDetailsMap.get(userId);
-                 if (userDetails) {
-                    const leaderboardRef = doc(db, 'leaderboard', userId);
-                    leaderboardWriteBatch.set(leaderboardRef, {
-                        totalPoints,
-                        userName: userDetails.displayName,
-                        userPhoto: userDetails.photoURL,
-                    });
-                 }
-            }
-            await leaderboardWriteBatch.commit();
-            
-            toast({ title: "نجاح!", description: `تم تحديث لوحة الصدارة بنجاح.` });
-            fetchLeaderboard();
-        } catch (error) {
-            console.error("Error calculating all points:", error);
-            toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ أثناء تحديث لوحة الصدارة." });
-        } finally {
+        if (finishedFixtures.length === 0) {
+            toast({ title: "لا توجد مباريات منتهية", description: "لا يوجد ما يمكن تحديثه." });
             setIsUpdatingPoints(false);
+            return;
         }
-    }, [db, isAdmin, toast, fetchLeaderboard]);
+
+        for (const match of finishedFixtures) {
+            const userPredictionsColRef = collection(db, 'predictions', match.id, 'userPredictions');
+            const userPredictionsSnapshot = await getDocs(userPredictionsColRef);
+            
+            userPredictionsSnapshot.forEach(userPredDoc => {
+                const userPrediction = userPredDoc.data() as Prediction;
+                const newPoints = calculatePoints(userPrediction, match.fixtureData);
+                
+                // CRITICAL FIX: Accumulate points correctly
+                const currentTotal = userPointsMap.get(userPrediction.userId) || 0;
+                userPointsMap.set(userPrediction.userId, currentTotal + newPoints);
+            });
+        }
+        
+        // --- 3. Wipe and Rebuild Leaderboard ---
+        const leaderboardBatch = writeBatch(db);
+        const existingLeaderboardSnapshot = await getDocs(collection(db, "leaderboard"));
+        existingLeaderboardSnapshot.forEach(doc => leaderboardBatch.delete(doc.ref));
+
+        for (const [userId, totalPoints] of userPointsMap.entries()) {
+             const userDetails = userDetailsMap.get(userId);
+             if (userDetails) {
+                const leaderboardRef = doc(db, 'leaderboard', userId);
+                leaderboardBatch.set(leaderboardRef, {
+                    totalPoints,
+                    userName: userDetails.displayName,
+                    userPhoto: userDetails.photoURL,
+                });
+             }
+        }
+        
+        await leaderboardBatch.commit();
+        
+        toast({ title: "نجاح!", description: `تم إعادة بناء لوحة الصدارة بنجاح.` });
+        fetchLeaderboard(); // Refresh the UI
+
+    } catch (error: any) {
+        console.error("Error calculating all points:", error);
+        toast({ variant: 'destructive', title: "خطأ فادح", description: error.message || "حدث خطأ أثناء تحديث لوحة الصدارة." });
+        if (error.message.includes('permission-denied')) {
+             errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'multiple collections', operation: 'list' }));
+        }
+    } finally {
+        setIsUpdatingPoints(false);
+    }
+}, [db, isAdmin, toast, fetchLeaderboard]);
 
 
     const filteredMatches = useMemo(() => {
@@ -725,5 +718,3 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
