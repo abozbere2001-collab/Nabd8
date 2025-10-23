@@ -88,7 +88,7 @@ const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerTyp
 };
 
 
-const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture, navigate: ScreenProps['navigate'], customStatus: string | null }) => {
+const MatchHeaderCard = ({ fixture, navigate, customStatus, isAdmin, onRenameStatus }: { fixture: Fixture, navigate: ScreenProps['navigate'], customStatus: string | null, isAdmin: boolean, onRenameStatus: () => void }) => {
     return (
         <Card className="mb-4 bg-card/80 backdrop-blur-sm">
             <CardContent className="p-4">
@@ -106,6 +106,11 @@ const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture
                     </div>
                      <div className="relative flex flex-col items-center justify-center min-w-[120px] text-center">
                         <LiveMatchStatus fixture={fixture} large customStatus={customStatus} />
+                        {isAdmin && (
+                            <Button variant="ghost" size="icon" className="absolute -top-3 -right-3 h-7 w-7" onClick={onRenameStatus}>
+                                <Pencil className="h-3 w-3" />
+                            </Button>
+                        )}
                     </div>
                     <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
@@ -363,82 +368,84 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     }
 
     return (
-        <div className="space-y-4">
-            <Tabs value={activeTeamTab} onValueChange={(val) => setActiveTeamTab(val as 'home' | 'away')} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="home">{home.team.name}</TabsTrigger>
-                    <TabsTrigger value="away">{away.team.name}</TabsTrigger>
-                </TabsList>
-            </Tabs>
-            
-            <div className="font-bold text-center text-muted-foreground text-sm">التشكيلة: {activeLineup.formation}</div>
-            
-            {renderPitch(activeLineup)}
-            
-            <Card>
-                <CardContent className="p-3 text-center">
-                    <h3 className="font-bold text-sm mb-2">المدرب</h3>
-                    <div className="relative inline-flex flex-col items-center gap-1">
-                        <Avatar className="h-12 w-12">
-                            <AvatarImage src={activeLineup.coach.photo} />
-                            <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
-                        {isAdmin && (
-                            <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach);}}>
-                                <Pencil className="h-3 w-3" />
-                            </Button>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-
-            {substitutionEvents.length > 0 && (
-                <div className='bg-card p-2 rounded-lg'>
-                    <h3 className="text-base font-bold text-center p-2">التبديلات</h3>
-                    <div className="space-y-1">
-                        {substitutionEvents.map((event, index) => {
-                            const playerIn = event.assist;
-                            const playerOut = event.player;
-                            return (
-                                <div key={index} className="flex items-center justify-between text-xs p-1">
-                                    <div className='font-bold w-10 text-center'>{event.time.elapsed}'</div>
-                                    <div className='flex-1 flex items-center justify-end gap-1 font-semibold text-red-500'>
-                                        <span>{playerOut.name}</span>
-                                        <ArrowDown className="h-3 w-3"/>
-                                    </div>
-                                    <div className='flex-1 flex items-center justify-start gap-1 font-semibold text-green-500 ml-4'>
-                                        <ArrowUp className="h-3 w-3"/>
-                                        <span>{playerIn.name}</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-            
-            <div className="pt-4">
-                <h3 className="text-center text-base font-bold mb-2">الاحتياط</h3>
-                <div className="space-y-1">
-                    {activeLineup.substitutes.map(p => (
-                         <div key={p.player.id || p.player.name} className="p-2 rounded-lg bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
-                            <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8">
-                                    <AvatarImage src={p.player.photo} />
-                                    <AvatarFallback>{p.player.name?.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 text-right">
-                                    <p className="font-semibold text-sm">{p.player.name}</p>
-                                    <p className="text-xs text-muted-foreground">{p.player.position}</p>
-                                </div>
-                                {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {e.stopPropagation(); onRename('player', p.player.id, p.player)}}><Pencil className="h-4 w-4" /></Button>}
-                            </div>
+        <ScrollArea className="h-[calc(100vh-250px)]">
+            <div className="space-y-4">
+                <Tabs value={activeTeamTab} onValueChange={(val) => setActiveTeamTab(val as 'home' | 'away')} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="home">{home.team.name}</TabsTrigger>
+                        <TabsTrigger value="away">{away.team.name}</TabsTrigger>
+                    </TabsList>
+                </Tabs>
+                
+                <div className="font-bold text-center text-muted-foreground text-sm">التشكيلة: {activeLineup.formation}</div>
+                
+                {renderPitch(activeLineup)}
+                
+                <Card>
+                    <CardContent className="p-3 text-center">
+                        <h3 className="font-bold text-sm mb-2">المدرب</h3>
+                        <div className="relative inline-flex flex-col items-center gap-1">
+                            <Avatar className="h-12 w-12">
+                                <AvatarImage src={activeLineup.coach.photo} />
+                                <AvatarFallback>{activeLineup.coach.name?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
+                            {isAdmin && (
+                                <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach);}}>
+                                    <Pencil className="h-3 w-3" />
+                                </Button>
+                            )}
                         </div>
-                    ))}
+                    </CardContent>
+                </Card>
+
+                {substitutionEvents.length > 0 && (
+                    <div className='bg-card p-2 rounded-lg'>
+                        <h3 className="text-base font-bold text-center p-2">التبديلات</h3>
+                        <div className="space-y-1">
+                            {substitutionEvents.map((event, index) => {
+                                const playerIn = event.assist;
+                                const playerOut = event.player;
+                                return (
+                                    <div key={index} className="flex items-center justify-between text-xs p-1">
+                                        <div className='font-bold w-10 text-center'>{event.time.elapsed}'</div>
+                                        <div className='flex-1 flex items-center justify-end gap-1 font-semibold text-red-500'>
+                                            <span>{playerOut.name}</span>
+                                            <ArrowDown className="h-3 w-3"/>
+                                        </div>
+                                        <div className='flex-1 flex items-center justify-start gap-1 font-semibold text-green-500 ml-4'>
+                                            <ArrowUp className="h-3 w-3"/>
+                                            <span>{playerIn.name}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+                
+                <div className="pt-4">
+                    <h3 className="text-center text-base font-bold mb-2">الاحتياط</h3>
+                    <div className="space-y-1">
+                        {activeLineup.substitutes.map(p => (
+                             <div key={p.player.id || p.player.name} className="p-2 rounded-lg bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
+                                <div className="flex items-center gap-3">
+                                    <Avatar className="h-8 w-8">
+                                        <AvatarImage src={p.player.photo} />
+                                        <AvatarFallback>{p.player.name?.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 text-right">
+                                        <p className="font-semibold text-sm">{p.player.name}</p>
+                                        <p className="text-xs text-muted-foreground">{p.player.position}</p>
+                                    </div>
+                                    {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {e.stopPropagation(); onRename('player', p.player.id, p.player)}}><Pencil className="h-4 w-4" /></Button>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
-        </div>
+        </ScrollArea>
     );
 };
 
@@ -545,23 +552,29 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const [renameItem, setRenameItem] = useState<RenameState | null>(null);
 
     const handleSaveRename = async (type: RenameType, id: number | string, newName: string) => {
-        if (!isAdmin || !firestore || !renameItem?.originalData) return;
-
-        const originalName = renameItem.originalData.name || '';
-        const collectionName = `${type}Customizations`;
+        if (!isAdmin || !firestore) return;
+    
+        const collectionName = (type === 'status') ? 'matchCustomizations' : `${type}Customizations`;
         const docRef = doc(firestore, collectionName, String(id));
-
+    
         try {
-            if (newName.trim() && newName.trim() !== originalName) {
-                await setDoc(docRef, { customName: newName.trim() }, { merge: true });
-                toast({ title: `تم تغيير الاسم`, description: `تم تغيير اسم ${type} بنجاح.` });
+            if (newName.trim()) {
+                const data = { customName: newName.trim() };
+                if (type === 'status') {
+                    await setDoc(docRef, { status: newName.trim() }, { merge: true });
+                    setCustomStatus(newName.trim());
+                } else {
+                     await setDoc(docRef, data, { merge: true });
+                }
+                toast({ title: `تم تغيير ${type}`, description: `تم حفظ التغييرات بنجاح.` });
             } else {
                 await deleteDoc(docRef);
-                toast({ title: `تمت إزالة الاسم`, description: `تمت إزالة الاسم المخصص بنجاح.` });
+                if (type === 'status') {
+                    setCustomStatus(null);
+                }
+                toast({ title: `تمت الإزالة`, description: `تمت إزالة الاسم المخصص بنجاح.` });
             }
-            // You might want to trigger a data re-fetch here if needed
         } catch (error: any) {
-            console.error(`Error renaming ${type}:`, error);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: docRef.path,
                 operation: newName.trim() ? 'write' : 'delete',
@@ -571,14 +584,14 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         setRenameItem(null);
     };
     
-    const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
+    const handleOpenRename = (type: RenameType, id: number | string, originalData: any) => {
         setRenameItem({
             id: id,
-            name: originalData.name || '',
+            name: type === 'status' ? (customStatus || '') : (originalData.name || ''),
             type: type,
             purpose: 'rename',
             originalData: originalData,
-            originalName: originalData.name,
+            originalName: type === 'status' ? '' : originalData.name,
         });
     };
 
@@ -692,7 +705,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     useEffect(() => {
         if (!firestore || !fixtureId) return;
 
-        const matchStatusRef = doc(firestore, 'matches', String(fixtureId));
+        const matchStatusRef = doc(firestore, 'matchCustomizations', String(fixtureId));
 
         const unsubscribe = onSnapshot(matchStatusRef, (doc) => {
             const data = doc.data();
@@ -743,9 +756,8 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 onSave={(type, id, name) => handleSaveRename(type, Number(id), name)}
              />}
             <div className="container mx-auto p-4">
-                <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} />
-
-                <Tabs defaultValue="lineups">
+                <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', Number(fixtureId), {name: customStatus})}/>
+                 <Tabs defaultValue="lineups" className="w-full">
                     <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="standings">الترتيب</TabsTrigger>
                         <TabsTrigger value="timeline">الاحداث</TabsTrigger>
@@ -765,11 +777,6 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                         <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
                     </TabsContent>
                 </Tabs>
-                {isAdmin && (
-                    <div className="fixed bottom-4 left-4 bg-primary text-primary-foreground rounded-md p-2 z-50">
-                        <Button onClick={() => handleOpenRename('status', Number(fixtureId), {name: customStatus})} variant="outline">تغيير حالة المباراة</Button>
-                    </div>
-                )}
             </div>
         </div>
     );
