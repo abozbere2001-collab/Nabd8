@@ -717,16 +717,18 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
     if (loadingFixture) {
         return (
-            <div>
+            <div className="flex flex-col h-full bg-background">
                 <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} />
-                <div className="p-4"><Skeleton className="h-48 w-full" /></div>
+                <div className="flex-1 overflow-y-auto p-4">
+                    <Skeleton className="h-48 w-full" />
+                </div>
             </div>
         );
     }
 
     if (!processedFixture) {
         return (
-            <div>
+            <div className="flex flex-col h-full bg-background">
                 <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} />
                 <p className="text-center text-muted-foreground p-8">لم يتم العثور على المباراة.</p>
             </div>
@@ -737,14 +739,14 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const awayTeamId = processedFixture.teams.away.id;
     
     return (
-        <div>
+        <div className="flex flex-col h-full bg-background">
             <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} actions={
                 isAdmin && (
                     <Button variant="ghost" size="icon" onClick={() => handleOpenRename('status', processedFixture.fixture.id, customStatus || '')}><Pencil className="h-4 w-4" /></Button>
                 )
             } />
              {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={() => setRenameItem(null)} item={{...renameItem, purpose: 'rename'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name)} />}
-            <div className="container mx-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4">
                 <MatchHeaderCard fixture={processedFixture} navigate={navigate} customStatus={customStatus} />
                 <Tabs defaultValue="details" className="w-full">
                     <TabsList className="grid w-full grid-cols-4">
