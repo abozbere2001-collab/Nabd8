@@ -517,7 +517,7 @@ interface MatchDetailScreenProps extends ScreenProps {
     fixtureId: string;
 }
 
-export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailScreenProps) {
+export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, navigate }: MatchDetailScreenProps) {
     const [fixture, setFixture] = useState<Fixture | null>(null);
     const [standings, setStandings] = useState<Standing[] | null>(null);
     const [lineups, setLineups] = useState<LineupData[] | null>(null);
@@ -530,36 +530,43 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
     const { isAdmin } = useAdmin();
     const { toast } = useToast();
 
-    const { db: firestore } = useFirestore();
+    const { db } = useFirestore();
     
     const rename = async (type: RenameType, id: number, originalData: any) => {
-        if (!isAdmin || !firestore) return;
+        if (!isAdmin || !db) return;
         
         const originalName = originalData?.name || '';
         
-        RenameDialog({
-            initialValue: originalName,
-            type,
-            onConfirm: async (newName) => {
-                if (!newName || newName.trim() === '') return;
-                try {
-                    const ref = doc(firestore, 'names', String(id));
-                    await setDoc(ref, { type, name: newName.trim() }, { merge: true });
-                    toast({
-                        title: `تم تغيير الاسم`,
-                        description: `تم تغيير اسم ${type} بنجاح إلى ${newName.trim()}.`,
-                    });
-                } catch (error: any) {
-                    console.error("Error renaming document:", error);
-                    errorEmitter.emit(FirestorePermissionError.code);
-                    toast({
-                        variant: 'destructive',
-                        title: `فشل تغيير الاسم`,
-                        description: `فشل تغيير اسم ${type}.`,
-                    });
-                }
-            },
-        });
+        const docRef = doc(db, `${type}Customizations`, String(id));
+        
+        // This is a simplified rename dialog trigger for the example.
+        // A real implementation would use a component like <RenameDialog>.
+        const newName = prompt(`Enter new name for ${originalName}:`);
+
+        if (newName === null) return; // User cancelled
+
+        try {
+            if (newName.trim()) {
+                await setDoc(docRef, { customName: newName.trim() }, { merge: true });
+                toast({
+                    title: `تم تغيير الاسم`,
+                    description: `تم تغيير اسم ${type} بنجاح إلى ${newName.trim()}.`,
+                });
+            } else {
+                await deleteDoc(docRef);
+                 toast({
+                    title: `تمت إزالة الاسم`,
+                    description: `تمت إزالة الاسم المخصص بنجاح.`,
+                });
+            }
+        } catch (error: any) {
+            console.error("Error renaming document:", error);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: docRef.path,
+                operation: newName.trim() ? 'write' : 'delete',
+                requestResourceData: { customName: newName.trim() }
+            }));
+        }
     };
 
     useEffect(() => {
@@ -670,9 +677,9 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
     }, [fixture]);
 
     useEffect(() => {
-        if (!firestore) return;
+        if (!db || !fixtureId) return;
 
-        const matchStatusRef = doc(firestore, 'matches', fixtureId);
+        const matchStatusRef = doc(db, 'matches', fixtureId);
 
         const unsubscribe = onSnapshot(matchStatusRef, (doc) => {
             const data = doc.data();
@@ -684,7 +691,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
         });
 
         return () => unsubscribe();
-    }, [firestore, fixtureId]);
+    }, [db, fixtureId]);
     
     const mergedLineups = useMemo(() => {
         if (lineups && playersDetails) {
@@ -696,7 +703,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
     if (!fixture) {
         return (
             <div>
-                <ScreenHeader title="تفاصيل المباراة" navigate={navigate} onBack={() => {}} canGoBack={false} />
+                <ScreenHeader title="تفاصيل المباراة" navigate={navigate} onBack={goBack} canGoBack={canGoBack} />
                 <div className="container mx-auto p-4">
                     {loading ? (
                         <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
@@ -713,7 +720,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
 
     return (
         <div>
-            <ScreenHeader title="تفاصيل المباراة" navigate={navigate} onBack={() => {}} canGoBack={false} />
+            <ScreenHeader title="تفاصيل المباراة" navigate={navigate} onBack={goBack} canGoBack={canGoBack} />
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} />
 
