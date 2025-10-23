@@ -743,7 +743,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} />
 
                 <Tabs defaultValue="details">
-                    <TabsList className="w-full">
+                    <TabsList>
                         <TabsTrigger value="details"><ShieldCheck className="mr-2 h-4 w-4" />تفاصيل</TabsTrigger>
                         <TabsTrigger value="lineups"><Users className="mr-2 h-4 w-4" />التشكيلات</TabsTrigger>
                         <TabsTrigger value="timeline"><Clock className="mr-2 h-4 w-4" />الاحداث</TabsTrigger>
