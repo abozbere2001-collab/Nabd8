@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -18,7 +19,6 @@ import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
-import { OddsTab } from '@/components/OddsTab';
 import { useFirebase } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
 import { doc, setDoc, deleteDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
@@ -287,12 +287,14 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
                 <TabsTrigger value="highlights">الأبرز</TabsTrigger>
                 <TabsTrigger value="all">كل الأحداث</TabsTrigger>
             </TabsList>
-            <TabsContent value="highlights">
-                <TimelineTabContent events={events} homeTeam={homeTeam} awayTeam={awayTeam} highlightsOnly={true} />
-            </TabsContent>
-            <TabsContent value="all">
-                <TimelineTabContent events={events} homeTeam={homeTeam} awayTeam={awayTeam} highlightsOnly={false} />
-            </TabsContent>
+            <ScrollArea className="h-[calc(100vh-250px)]">
+                <TabsContent value="highlights">
+                    <TimelineTabContent events={events} homeTeam={homeTeam} awayTeam={awayTeam} highlightsOnly={true} />
+                </TabsContent>
+                <TabsContent value="all">
+                    <TimelineTabContent events={events} homeTeam={homeTeam} awayTeam={awayTeam} highlightsOnly={false} />
+                </TabsContent>
+            </ScrollArea>
         </Tabs>
     );
 }
@@ -743,12 +745,12 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} />
 
-                <Tabs defaultValue="details">
+                <Tabs defaultValue="lineups">
                     <TabsList className="grid w-full grid-cols-4">
+                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                        <TabsTrigger value="timeline">الاحداث</TabsTrigger>
                         <TabsTrigger value="details">تفاصيل</TabsTrigger>
                         <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
-                        <TabsTrigger value="timeline">الاحداث</TabsTrigger>
-                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
                     </TabsList>
                     <TabsContent value="details" className="mt-4">
                         <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
