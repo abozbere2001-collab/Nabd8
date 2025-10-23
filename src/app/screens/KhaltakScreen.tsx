@@ -383,20 +383,26 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         if (!db) return;
         setLoadingMatches(true);
         const unsub = onSnapshot(collection(db, 'predictions'), snapshot => {
-            const matches = snapshot.docs.map(doc => {
-                const data = doc.data() as PredictionMatch;
-                // Fetch live results for finished matches
-                if (['FT', 'AET', 'PEN'].includes(data.fixtureData.fixture.status.short)) {
-                    fetch(`/api/football/fixtures?id=${data.fixtureData.fixture.id}`)
+            const matches = snapshot.docs
+                .map(doc => doc.data() as PredictionMatch)
+                .filter(m => m && m.fixtureData && m.fixtureData.fixture); // Ensure data is valid
+
+            matches.forEach(match => {
+                if (['FT', 'AET', 'PEN'].includes(match.fixtureData.fixture.status.short)) {
+                    fetch(`/api/football/fixtures?id=${match.fixtureData.fixture.id}`)
                         .then(res => res.json())
                         .then(fixtureUpdate => {
                             if (fixtureUpdate.response && fixtureUpdate.response.length > 0) {
-                                setPinnedMatches(prev => prev.map(m => m.fixtureData.fixture.id === fixtureUpdate.response[0].fixture.id ? { ...m, fixtureData: fixtureUpdate.response[0]} : m ));
+                                setPinnedMatches(prev => prev.map(m => 
+                                    m.fixtureData.fixture.id === fixtureUpdate.response[0].fixture.id 
+                                        ? { ...m, fixtureData: fixtureUpdate.response[0] } 
+                                        : m
+                                ));
                             }
-                        })
+                        });
                 }
-                return data;
-            }).filter(m => m && m.fixtureData && m.fixtureData.fixture);
+            });
+
             setPinnedMatches(matches);
             setLoadingMatches(false);
         }, error => {
