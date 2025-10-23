@@ -737,6 +737,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         if (mergedLineups && mergedLineups.length > 0) tabs.push({ id: 'lineups', label: 'التشكيلات' });
         if (events && events.length > 0) tabs.push({ id: 'timeline', label: 'الاحداث' });
         if (standings && standings.length > 0) tabs.push({ id: 'standings', label: 'الترتيب' });
+        tabs.push({ id: 'odds', label: 'الاحتمالات' });
         return tabs;
     }, [mergedLineups, events, standings]);
 
@@ -769,24 +770,27 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 onSave={(type, id, name) => handleSaveRename(type, Number(id), name)}
              />}
             <div className="container mx-auto p-4">
-                <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', fixture.fixture.id, {name: ''})} />
+                <MatchHeaderCard fixture={fixture} navigate={navigate} />
                 <Tabs defaultValue="details" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-5">
                         {availableTabs.map(tab => (
                              <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
                         ))}
                     </TabsList>
                     <TabsContent value="details" className="pt-4">
-                        <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
+                        <DetailsTab fixture={fixture} statistics={statistics} />
                     </TabsContent>
                     <TabsContent value="lineups" className="pt-4">
                         <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={(type, id, data) => handleOpenRename(type, id, data)} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
                     </TabsContent>
                     <TabsContent value="timeline" className="pt-4">
-                        <TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} />
+                        <TimelineTab events={events} homeTeamId={homeTeamId} />
                     </TabsContent>
                     <TabsContent value="standings" className="pt-4">
                         <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
+                    </TabsContent>
+                     <TabsContent value="odds" className="pt-4">
+                        <OddsTab fixtureId={fixture.fixture.id} />
                     </TabsContent>
                 </Tabs>
             </div>
