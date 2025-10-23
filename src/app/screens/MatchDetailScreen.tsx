@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -256,7 +256,8 @@ const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { ev
     
     const filteredEvents = React.useMemo(() => {
         if (!events) return [];
-        if (!highlightsOnly) return events.filter(e => e.type === 'Goal' || (e.type === 'Card' && e.detail.includes('Red')));
+        if (!highlightsOnly) return events;
+        return events.filter(e => e.type === 'Goal' || (e.type === 'Card' && e.detail.includes('Red')));
     }, [events, highlightsOnly]);
 
     if (filteredEvents.length === 0) {
@@ -452,7 +453,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                         </Avatar>
                         <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
                         {isAdmin && (
-                            <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
+                            <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name, activeLineup.coach.name);}}>
                                 <Pencil className="h-3 w-3" />
                             </Button>
                         )}
@@ -497,7 +498,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                                     <p className="font-semibold text-sm">{fullPlayer.name}</p>
                                     <p className="text-xs text-muted-foreground">{fullPlayer.position}</p>
                                 </div>
-                                 {isAdmin && <Button variant="ghost" size="icon" className="mr-auto" onClick={(e) => {e.stopPropagation(); onRename('player', p.player.id, p.player.name);}}><Pencil className="h-4 w-4" /></Button>}
+                                 {isAdmin && <Button variant="ghost" size="icon" className="mr-auto" onClick={(e) => {e.stopPropagation(); onRename('player', p.player.id, p.player.name, p.player.name);}}><Pencil className="h-4 w-4" /></Button>}
                             </div>
                         </Card>
                     )})}
@@ -602,9 +603,6 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
 
     const getDisplayName = useCallback((type: 'league' | 'team' | 'player' | 'coach', id: number, defaultName: string) => {
-        const hardcodedName = hardcodedTranslations[`${type}s`]?.[id];
-        if (hardcodedName) return hardcodedName;
-        
         const customName = customNames?.[`${type}s`]?.get(id);
         if (customName) return customName;
         
@@ -662,6 +660,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
         const controller = new AbortController();
         const signal = controller.signal;
+        let unsubStatus: (() => void) | undefined;
         
         const fetchAllDetails = async () => {
              setLoadingDetails(true);
@@ -722,22 +721,24 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                  if (!signal.aborted) setLoadingStandings(false);
             }
         };
-
-        const customStatusRef = doc(db, 'matchCustomizations', fixtureId);
-        const unsubStatus = onSnapshot(customStatusRef, (doc) => {
-            if(doc.exists()) {
-                setCustomStatus(doc.data().customStatus);
-            } else {
-                setCustomStatus(null);
-            }
-        });
+        
+        if (fixtureId && typeof fixtureId === 'string') {
+          const customStatusRef = doc(db, 'matchCustomizations', fixtureId);
+          unsubStatus = onSnapshot(customStatusRef, (doc) => {
+              if(doc.exists()) {
+                  setCustomStatus(doc.data().customStatus);
+              } else {
+                  setCustomStatus(null);
+              }
+          });
+        }
         
         fetchAllDetails();
         fetchStandings();
 
         return () => {
             controller.abort();
-            unsubStatus();
+            if (unsubStatus) unsubStatus();
         };
     }, [fixture, db, fetchAllCustomNames, fixtureId]);
     
@@ -899,3 +900,5 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
       </div>
     );
 }
+
+    
