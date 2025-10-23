@@ -367,11 +367,11 @@ const LineupsTab = ({ fixture, lineups, events, navigate, isAdmin, onRename, hom
 
             return (
                 <div 
-                    className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-800 rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2 bg-cover bg-center"
+                    className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-800 rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col justify-around p-2 bg-cover bg-center"
                     style={{backgroundImage: `url('${stadiumImage}')`}}
                 >
                     <div className="absolute inset-0 bg-black/30"></div>
-                     {sortedRows.reverse().map(row => (
+                     {[...sortedRows].reverse().map(row => (
                         <div key={row} className="relative z-10 flex justify-around items-center">
                             {formationGrid[row]?.map((p, i) => {
                                 const player = p.player;
@@ -769,7 +769,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 onSave={(type, id, name) => handleSaveRename(type, Number(id), name)}
              />}
             <div className="container mx-auto p-4">
-                <MatchHeaderCard fixture={fixture} navigate={navigate} />
+                <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', fixture.fixture.id, {name: ''})} />
                 <Tabs defaultValue="details" className="w-full">
                     <TabsList className="grid w-full grid-cols-4">
                         {availableTabs.map(tab => (
@@ -777,13 +777,13 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                         ))}
                     </TabsList>
                     <TabsContent value="details" className="pt-4">
-                        <DetailsTab fixture={fixture} statistics={statistics} />
+                        <DetailsTab fixture={fixture} statistics={statistics} loading={!statistics} />
                     </TabsContent>
                     <TabsContent value="lineups" className="pt-4">
                         <LineupsTab fixture={fixture} lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={(type, id, data) => handleOpenRename(type, id, data)} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
                     </TabsContent>
                     <TabsContent value="timeline" className="pt-4">
-                        <TimelineTab events={events} homeTeamId={homeTeamId} />
+                        <TimelineTab events={events} homeTeam={homeTeamId} awayTeam={fixture.teams.away} />
                     </TabsContent>
                     <TabsContent value="standings" className="pt-4">
                         <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
