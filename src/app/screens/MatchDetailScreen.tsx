@@ -1,24 +1,27 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shirt, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, Pencil } from 'lucide-react';
+import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
-import { useFirebase } from '@/firebase/provider';
+import { CURRENT_SEASON } from '@/lib/constants';
+import { OddsTab } from '@/components/OddsTab';
+// import { useTranslation } from '@/components/LanguageProvider';
+import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
-import { doc, setDoc, deleteDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -590,9 +593,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     
     const { firestore, isAdmin } = useFirebase();
     const { toast } = useToast();
-    const [renameItem, setRenameItem] = useState<RenameState | null>(null);
+    const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string, purpose: 'rename' } | null>(null);
 
-    const handleSaveRename = async (type: RenameType, id: number | string, newName: string) => {
+    const handleSaveRename = async (type: RenameType, id: number, newName: string) => {
         if (!isAdmin || !firestore) return;
     
         const collectionName = (type === 'status') ? 'matchCustomizations' : `${type}Customizations`;
@@ -625,13 +628,12 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         setRenameItem(null);
     };
     
-    const handleOpenRename = (type: RenameType, id: number | string, originalData: any) => {
+    const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
         setRenameItem({
             id: id,
             name: type === 'status' ? (customStatus || '') : (originalData.name || ''),
             type: type,
             purpose: 'rename',
-            originalData: originalData,
             originalName: type === 'status' ? '' : originalData.name,
         });
     };
