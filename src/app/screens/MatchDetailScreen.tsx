@@ -286,7 +286,7 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
     );
 }
 
-const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string, originalName: string) => void, homeTeamId: number, awayTeamId: number }) => {
+const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId, detailedPlayersMap }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string, originalName: string) => void, homeTeamId: number, awayTeamId: number, detailedPlayersMap: Map<number, { player: Player, statistics: any[] }> }) => {
     if (lineups === null) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
@@ -307,6 +307,18 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     const activeLineup = activeTeamTab === 'home' ? home : away;
     
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
+
+    const getPlayerWithDetails = (playerId: number, basePlayer: PlayerType): PlayerType => {
+        const detailedPlayer = detailedPlayersMap.get(playerId);
+        if (detailedPlayer) {
+            return {
+                ...basePlayer,
+                photo: detailedPlayer.player.photo || basePlayer.photo,
+                rating: detailedPlayer.statistics?.[0]?.games?.rating || basePlayer.rating,
+            };
+        }
+        return basePlayer;
+    };
     
     const renderPitch = (lineup: LineupData) => {
         const formationGrid: { [key: number]: PlayerWithStats[] } = {};
@@ -336,13 +348,19 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
         return (
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
                 {[...sortedRows].reverse().map(row => (
-                    <div key={row} className="flex justify-around items-center">
-                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />)}
+                    <div key={row} className="flex justify-around items-center w-full">
+                        {formationGrid[row]?.map(p => {
+                            const fullPlayer = getPlayerWithDetails(p.player.id, p.player);
+                            return <PlayerCard key={p.player.id || p.player.name} player={fullPlayer} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />
+                        })}
                     </div>
                 ))}
                  {ungriddedPlayers.length > 0 && (
                     <div className="flex justify-around items-center">
-                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />)}
+                        {ungriddedPlayers.map(p => {
+                            const fullPlayer = getPlayerWithDetails(p.player.id, p.player);
+                            return <PlayerCard key={p.player.id || p.player.name} player={fullPlayer} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />
+                        })}
                     </div>
                 )}
             </div>
@@ -464,45 +482,6 @@ const StandingsTab = ({ standings, homeTeamId, awayTeamId, navigate, loading }: 
     );
 };
 
-const mergePlayerData = (baseLineups: LineupData[], detailedPlayers: { player: Player, statistics: any[] }[]): LineupData[] => {
-    if (!detailedPlayers?.length || !baseLineups?.length) {
-        return baseLineups || [];
-    }
-
-    const playersMap = new Map<number, { player: Player, statistics: any[] }>();
-    detailedPlayers.forEach(p => {
-        if (p.player.id) {
-            playersMap.set(p.player.id, p);
-        }
-    });
-
-    const updatePlayerList = (playerList: PlayerWithStats[]): PlayerWithStats[] => {
-        if (!playerList) return [];
-        return playerList.map(pWithStats => {
-            const lineupPlayer = pWithStats.player;
-            if (lineupPlayer.id && playersMap.has(lineupPlayer.id)) {
-                const detailedPlayerInfo = playersMap.get(lineupPlayer.id)!;
-                const rating = detailedPlayerInfo.statistics?.[0]?.games?.rating;
-                
-                const mergedPlayer: PlayerType = {
-                    ...lineupPlayer,
-                    name: detailedPlayerInfo.player.name || lineupPlayer.name,
-                    photo: detailedPlayerInfo.player.photo || lineupPlayer.photo,
-                    rating: rating || lineupPlayer.rating,
-                };
-                return { ...pWithStats, player: mergedPlayer };
-            }
-            return pWithStats;
-        });
-    };
-
-    return baseLineups.map(lineup => ({
-        ...lineup,
-        startXI: updatePlayerList(lineup.startXI),
-        substitutes: updatePlayerList(lineup.substitutes),
-    }));
-};
-
 
 interface MatchDetailScreenProps extends ScreenProps {
     fixtureId: string;
@@ -514,7 +493,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const [lineups, setLineups] = useState<LineupData[] | null>(null);
     const [events, setEvents] = useState<MatchEvent[] | null>(null);
     const [statistics, setStatistics] = useState<MatchStatistics[] | null>(null);
-    const [playersDetails, setPlayersDetails] = useState<{player: Player, statistics: any[]}[] | null>(null);
+    const [detailedPlayersMap, setDetailedPlayersMap] = useState<Map<number, { player: Player, statistics: any[] }>>(new Map());
     const [customStatus, setCustomStatus] = useState<string | null>(null);
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> } | null>(null);
 
@@ -632,11 +611,20 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 const playersData = await playersRes.json();
 
                 if (signal.aborted) return;
+                
+                const playersMap = new Map<number, { player: Player, statistics: any[] }>();
+                if (playersData.response) {
+                    playersData.response.forEach((p: { player: Player, statistics: any[] }) => {
+                        if (p.player.id) {
+                            playersMap.set(p.player.id, p);
+                        }
+                    });
+                }
+                setDetailedPlayersMap(playersMap);
 
                 setLineups(lineupsData.response);
                 setEvents(eventsData.response);
                 setStatistics(statsData.response);
-                setPlayersDetails(playersData.response);
 
              } catch (error) {
                 if (!signal.aborted) console.error("Could not fetch match details:", error);
@@ -677,10 +665,6 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         };
     }, [fixture, db]);
     
-
-    const mergedLineups = useMemo(() => {
-        return mergePlayerData(lineups || [], playersDetails || []);
-    }, [lineups, playersDetails]);
     
     const processedFixture = useMemo(() => {
         if (!fixture) return null;
@@ -754,7 +738,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             <DetailsTab fixture={processedFixture} statistics={statistics} loading={loadingDetails} />
           </TabsContent>
           <TabsContent value="lineups" className="pt-4">
-            <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
+            <LineupsTab lineups={lineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} detailedPlayersMap={detailedPlayersMap} />
           </TabsContent>
           <TabsContent value="timeline" className="pt-4">
             <TimelineTab events={events} homeTeam={processedFixture.teams.home} awayTeam={processedFixture.teams.away} />
@@ -767,5 +751,3 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     </div>
   );
 }
-
-    
