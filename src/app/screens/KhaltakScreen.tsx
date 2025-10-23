@@ -378,7 +378,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         });
 
         return () => unsub();
-    }, [db, isAdmin]);
+    }, [db]);
 
 
     useEffect(() => {
@@ -481,18 +481,18 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         if (!db || !isAdmin) return;
         setIsUpdatingPoints(true);
         toast({ title: "بدء تحديث النقاط...", description: "جاري حساب النقاط لجميع المستخدمين." });
-    
+
         try {
-            const allPinnedMatchesSnapshot = await getDocs(query(collection(db, 'predictions')));
-            const allPinnedMatches = allPinnedMatchesSnapshot.docs.map(d => ({ id: d.id, ...d.data() as PredictionMatch }));
-    
             const batch = writeBatch(db);
             const userPointsMap = new Map<string, number>();
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
-            
+
+            const pinnedMatchesSnapshot = await getDocs(query(collection(db, 'predictions')));
+            const allPinnedMatches = pinnedMatchesSnapshot.docs.map(d => ({ id: d.id, ...d.data() as PredictionMatch }));
+
             for (const pinnedMatch of allPinnedMatches) {
-                 if (!pinnedMatch?.fixtureData?.fixture) continue;
-                 
+                if (!pinnedMatch?.fixtureData?.fixture) continue;
+                
                 const fixtureIdStr = pinnedMatch.id;
                 let currentFixtureData = pinnedMatch.fixtureData;
 
@@ -508,44 +508,33 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                                 batch.update(doc(db, 'predictions', fixtureIdStr), { fixtureData: currentFixtureData });
                             }
                         }
-                    } catch (e) {
-                         console.error(`Failed to update fixture ${currentFixtureData.fixture.id}`, e);
-                    }
+                    } catch (e) { console.error(`Failed to update fixture ${currentFixtureData.fixture.id}`, e); }
                 }
     
                 if (['FT', 'AET', 'PEN'].includes(currentFixtureData.fixture.status.short)) {
-                    try {
-                        const userPredictionsSnapshot = await getDocs(collection(db, 'predictions', fixtureIdStr, 'userPredictions'));
-                        if (userPredictionsSnapshot.empty) continue;
+                    const userPredictionsSnapshot = await getDocs(collection(db, 'predictions', fixtureIdStr, 'userPredictions'));
+                    if (userPredictionsSnapshot.empty) continue;
+                    
+                    for (const userPredDoc of userPredictionsSnapshot.docs) {
+                        const userPrediction = userPredDoc.data() as Prediction;
+                        const userId = userPrediction.userId;
+                        if (!userId) continue;
+    
+                        const newPoints = calculatePoints(userPrediction, currentFixtureData);
                         
-                        for (const userPredDoc of userPredictionsSnapshot.docs) {
-                            const userPrediction = userPredDoc.data() as Prediction;
-                            const userId = userPrediction.userId;
-                            if (!userId) continue;
-        
-                            const newPoints = calculatePoints(userPrediction, currentFixtureData);
-                            
-                            if (userPrediction.points !== newPoints) {
-                                batch.update(userPredDoc.ref, { points: newPoints });
-                            }
-                            
-                            userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + newPoints);
-                            
-                            if (!userDetailsMap.has(userId)) {
-                                 try {
-                                    const userDocSnap = await getDoc(doc(db, 'users', userId));
-                                    if (userDocSnap.exists()) {
-                                        const userData = userDocSnap.data() as UserProfile;
-                                        userDetailsMap.set(userId, { displayName: userData.displayName || 'مستخدم', photoURL: userData.photoURL || '' });
-                                    }
-                                } catch (e) {
-                                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${userId}`, operation: 'get' }));
-                                }
+                        if (userPrediction.points !== newPoints) {
+                            batch.update(userPredDoc.ref, { points: newPoints });
+                        }
+                        
+                        userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + newPoints);
+                        
+                        if (!userDetailsMap.has(userId)) {
+                            const userDocSnap = await getDoc(doc(db, 'users', userId));
+                            if (userDocSnap.exists()) {
+                                const userData = userDocSnap.data() as UserProfile;
+                                userDetailsMap.set(userId, { displayName: userData.displayName || 'مستخدم', photoURL: userData.photoURL || '' });
                             }
                         }
-                    } catch (e) {
-                        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `predictions/${fixtureIdStr}/userPredictions`, operation: 'list' }));
-                        continue;
                     }
                 }
             }
@@ -568,7 +557,12 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     
         } catch (error: any) {
             console.error("Error calculating all points:", error);
-            toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ أثناء تحديث لوحة الصدارة." });
+            const permissionError = new FirestorePermissionError({
+              path: error.path || 'unknown',
+              operation: error.operation || 'list',
+            })
+            errorEmitter.emit('permission-error', permissionError);
+            toast({ variant: 'destructive', title: "خطأ", description: error.message || "حدث خطأ أثناء تحديث لوحة الصدارة." });
         } finally {
             setIsUpdatingPoints(false);
         }
@@ -755,3 +749,6 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   );
 }
 
+
+
+    
