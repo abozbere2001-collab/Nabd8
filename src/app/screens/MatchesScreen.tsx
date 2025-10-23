@@ -50,8 +50,7 @@ const FixturesList = React.memo(({
     favorites,
     onFavoriteToggle,
     isAdmin,
-    onRename,
-    showOdds
+    onRename
 }: { 
     fixtures: FixtureType[], 
     loading: boolean,
@@ -66,7 +65,6 @@ const FixturesList = React.memo(({
     onFavoriteToggle: (league: FixtureType['league']) => void,
     isAdmin: boolean,
     onRename: (league: FixtureType['league']) => void,
-    showOdds: boolean
 }) => {
     
     const { favoriteTeamMatches, otherFixtures } = useMemo(() => {
@@ -152,7 +150,6 @@ const FixturesList = React.memo(({
                                 navigate={navigate}
                                 isPinnedForPrediction={pinnedPredictionMatches.has(f.fixture.id)}
                                 onPinToggle={onPinToggle}
-                                showOdds={showOdds}
                             />
                         ))}
                     </div>
@@ -179,7 +176,6 @@ const FixturesList = React.memo(({
                                     navigate={navigate}
                                     isPinnedForPrediction={pinnedPredictionMatches.has(f.fixture.id)}
                                     onPinToggle={onPinToggle}
-                                    showOdds={showOdds}
                                 />
                             ))}
                         </div>
@@ -275,7 +271,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [activeTab, setActiveTab] = useState<TabName>('my-results');
   const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
-  const [showOdds, setShowOdds] = useState(false);
 
   
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
@@ -533,9 +528,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             onBack={() => {}} 
             actions={
                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowOdds(prev => !prev)}>
-                      <TrendingUp className={cn("h-5 w-5", showOdds ? "text-primary" : "text-muted-foreground")} />
-                  </Button>
                   <SearchSheet navigate={navigate}>
                       <Button variant="ghost" size="icon" className="h-7 w-7">
                           <Search className="h-5 w-5" />
@@ -593,7 +585,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     onFavoriteToggle={handleFavoriteToggle}
                     isAdmin={isAdmin}
                     onRename={handleOpenRename}
-                    showOdds={showOdds}
                 />
             </TabsContent>
             
@@ -612,7 +603,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     onFavoriteToggle={handleFavoriteToggle}
                     isAdmin={isAdmin}
                     onRename={handleOpenRename}
-                    showOdds={showOdds}
                 />
             </TabsContent>
 

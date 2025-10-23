@@ -214,22 +214,22 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>الترتيب</TableHead>
                         <TableHead className="text-right">المستخدم</TableHead>
                         <TableHead className="text-center">النقاط</TableHead>
+                        <TableHead>الترتيب</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {leaderboard.map(score => (
                         <TableRow key={score.userId} className={cn(score.userId === userId && "bg-primary/10")}>
-                            <TableCell>{score.rank}</TableCell>
-                            <TableCell className="text-right">
+                             <TableCell className="text-right">
                                 <div className="flex items-center gap-2 justify-end">
                                     {score.userName}
                                     <Avatar className="h-6 w-6"><AvatarImage src={score.userPhoto}/></Avatar>
                                 </div>
                             </TableCell>
                             <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
+                            <TableCell>{score.rank}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
@@ -240,7 +240,6 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                          <Table>
                              <TableBody>
                                 <TableRow className="border-t-2 border-primary/50">
-                                    <TableCell>{userScore.rank || '-'}</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex items-center gap-2 justify-end">
                                             {userScore.userName}
@@ -248,6 +247,7 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center font-bold">{userScore.totalPoints}</TableCell>
+                                    <TableCell>{userScore.rank || '-'}</TableCell>
                                 </TableRow>
                              </TableBody>
                          </Table>

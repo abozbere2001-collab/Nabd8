@@ -11,7 +11,7 @@ import { Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PredictionOdds } from './PredictionOdds';
 
-export const FixtureItem = React.memo(({ fixture, navigate, customStatus, isPinnedForPrediction, onPinToggle, showOdds }: { fixture: FixtureType, navigate: ScreenProps['navigate'], customStatus?: string | null, isPinnedForPrediction?: boolean, onPinToggle?: (fixture: FixtureType) => void, showOdds?: boolean }) => {
+export const FixtureItem = React.memo(({ fixture, navigate, customStatus, isPinnedForPrediction, onPinToggle }: { fixture: FixtureType, navigate: ScreenProps['navigate'], customStatus?: string | null, isPinnedForPrediction?: boolean, onPinToggle?: (fixture: FixtureType) => void }) => {
     const { isAdmin } = useAdmin();
 
     const TeamDisplay = ({ team }: { team: FixtureType['teams']['home'] }) => (
@@ -53,12 +53,6 @@ export const FixtureItem = React.memo(({ fixture, navigate, customStatus, isPinn
                     <TeamDisplay team={fixture.teams.away} /> {/* الضيف في اليسار */}
                 </main>
             </div>
-
-            {showOdds && (
-                <div className="px-2 pb-2">
-                    <PredictionOdds fixtureId={fixture.fixture.id} />
-                </div>
-            )}
         </div>
     );
 });

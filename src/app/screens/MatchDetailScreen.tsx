@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -18,7 +19,6 @@ import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
-import { OddsTab } from '@/components/OddsTab';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
 import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection, onSnapshot } from 'firebase/firestore';
@@ -354,6 +354,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
     
     const getPlayerWithDetails = useCallback((basePlayer: PlayerType): PlayerType => {
+        if (!basePlayer.id) return basePlayer;
         const detailedPlayer = detailedPlayersMap.get(basePlayer.id);
         if (detailedPlayer) {
             return {
@@ -407,7 +408,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
             });
         });
         
-        const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
+        const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => b - a);
 
         return (
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
@@ -519,11 +520,11 @@ const StandingsTab = ({ standings, homeTeamId, awayTeamId, navigate, loading }: 
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead className="w-[40px]">#</TableHead>
                     <TableHead className="w-1/2 text-right">الفريق</TableHead>
                     <TableHead className="text-center">لعب</TableHead>
                     <TableHead className="text-center">ف/ت/خ</TableHead>
                     <TableHead className="text-center">نقاط</TableHead>
+                    <TableHead className="w-[40px] text-right">#</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -531,8 +532,7 @@ const StandingsTab = ({ standings, homeTeamId, awayTeamId, navigate, loading }: 
                     const isRelevantTeam = s.team.id === homeTeamId || s.team.id === awayTeamId;
                     return (
                         <TableRow key={s.team.id} className={cn(isRelevantTeam && "bg-primary/10", "cursor-pointer")} onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                            <TableCell className="font-bold">{s.rank}</TableCell>
-                            <TableCell>
+                             <TableCell>
                                 <div className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
                                     <span className="font-semibold truncate">{s.team.name}</span>
@@ -541,6 +541,7 @@ const StandingsTab = ({ standings, homeTeamId, awayTeamId, navigate, loading }: 
                             <TableCell className="text-center">{s.all.played}</TableCell>
                             <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
                             <TableCell className="text-center font-bold">{s.points}</TableCell>
+                            <TableCell className="font-bold">{s.rank}</TableCell>
                         </TableRow>
                     );
                 })}
@@ -678,17 +679,25 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                     let totalPages = 1;
 
                     while (currentPage <= totalPages) {
-                        const res = await fetch(`/api/football/players?team=${teamId}&season=${season}&page=${currentPage}`, { signal });
-                        if (signal.aborted) return [];
-                        const data = await res.json();
-                        if (data.response) {
-                            allPlayersForTeam.push(...data.response);
-                        }
-                        if (data.paging && data.paging.total > currentPage) {
-                            totalPages = data.paging.total;
-                            currentPage++;
-                        } else {
-                            break;
+                        try {
+                            const res = await fetch(`/api/football/players?team=${teamId}&season=${season}&page=${currentPage}`, { signal });
+                            if (signal.aborted) return [];
+                            if (res.ok) {
+                                const data = await res.json();
+                                if (data.response) {
+                                    allPlayersForTeam.push(...data.response);
+                                }
+                                if (data.paging && data.paging.total > currentPage) {
+                                    totalPages = data.paging.total;
+                                    currentPage++;
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                 break;
+                            }
+                        } catch (e) {
+                             break;
                         }
                     }
                     return allPlayersForTeam;
@@ -870,14 +879,11 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
               customStatus={customStatus}
             />
             <Tabs defaultValue="lineups" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="details">التفاصيل</TabsTrigger>
                 <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
                 <TabsTrigger value="timeline">الأحداث</TabsTrigger>
                 <TabsTrigger value="standings">الترتيب</TabsTrigger>
-                <TabsTrigger value="odds">
-                  <TrendingUp />
-                </TabsTrigger>
               </TabsList>
               <TabsContent value="details" className="pt-4">
                 <DetailsTab
@@ -914,13 +920,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                   loading={loadingStandings}
                 />
               </TabsContent>
-              <TabsContent value="odds" className="pt-4">
-                  <OddsTab fixtureId={processedFixture.fixture.id} />
-              </TabsContent>
             </Tabs>
           </div>
         </div>
       </div>
     );
 }
-
