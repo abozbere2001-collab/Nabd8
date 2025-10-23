@@ -304,42 +304,26 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
 const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId, fixture }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, originalData: any) => void, homeTeamId: number, awayTeamId: number, fixture: Fixture | null }) => {
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
     
-    if (lineups === null) {
-        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    }
-    
-    const home = lineups.find(l => l.team.id === homeTeamId);
-    const away = lineups.find(l => l.team.id === awayTeamId);
-
     const renderPitch = (lineup: LineupData | undefined) => {
         try {
-            if (!lineup || typeof lineup !== 'object') {
-                return (
-                    <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
-                        ⚠️ لم تتوفر بيانات التشكيلة بعد.
-                    </div>
-                );
-            }
-
             const isUpcoming = fixture?.fixture?.status?.short === 'NS' || fixture?.fixture?.status?.short === 'TBD';
-            const players = Array.isArray(lineup.startXI) ? lineup.startXI : [];
 
-            if (isUpcoming && players.length === 0) {
+            if (!lineup || typeof lineup !== 'object' || !Array.isArray(lineup.startXI) || lineup.startXI.length === 0) {
+                 if (isUpcoming) {
+                    return (
+                        <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
+                            📅 سيتم عرض التشكيلة فور إعلانها.
+                        </div>
+                    );
+                }
                 return (
                     <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
-                        📅 سيتم عرض التشكيلة فور إعلانها.
+                        ⚠️ التشكيلة غير متوفرة لهذه المباراة.
                     </div>
                 );
             }
-
-            if (players.length === 0) {
-                return (
-                    <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
-                        ⚠️ لا توجد تشكيلة متوفرة لهذه المباراة.
-                    </div>
-                );
-            }
-
+            
+            const players = lineup.startXI;
             const formationGrid: Record<number, PlayerWithStats[]> = {};
             const ungridded: PlayerWithStats[] = [];
 
@@ -404,6 +388,13 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
         }
     };
     
+    if (lineups === null) {
+        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    }
+    
+    const home = lineups.find(l => l.team.id === homeTeamId);
+    const away = lineups.find(l => l.team.id === awayTeamId);
+
     if (!home || !away) {
          return <p className="text-center text-muted-foreground p-8">خطأ في بيانات التشكيلة.</p>;
     }
