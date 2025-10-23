@@ -16,8 +16,8 @@ import { PredictionOdds } from './PredictionOdds';
 import { LiveMatchStatus } from './LiveMatchStatus';
 import { Loader2 } from 'lucide-react';
 
-const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { initialPredictionMatch: PredictionMatch, userPrediction?: Prediction, onSave: (fixtureId: number, home: string, away: string) => void }) => {
-    const [liveFixture, setLiveFixture] = useState<Fixture>(initialPredictionMatch.fixtureData);
+const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictionMatch: PredictionMatch, userPrediction?: Prediction, onSave: (fixtureId: number, home: string, away: string) => void }) => {
+    const [liveFixture, setLiveFixture] = useState<Fixture>(predictionMatch.fixtureData);
     const [isUpdating, setIsUpdating] = useState(false);
     
     const [homeValue, setHomeValue] = useState(userPrediction?.homeGoals?.toString() ?? '');
@@ -53,7 +53,7 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
             fetchLiveFixture(); 
             intervalId = setInterval(fetchLiveFixture, 60000);
         } else {
-             if (['NS', 'TBD'].includes(initialPredictionMatch.fixtureData.fixture.status.short) && new Date(initialPredictionMatch.fixtureData.fixture.timestamp * 1000) < new Date()) {
+             if (['NS', 'TBD'].includes(predictionMatch.fixtureData.fixture.status.short) && new Date(predictionMatch.fixtureData.fixture.timestamp * 1000) < new Date()) {
                 fetchLiveFixture();
              }
         }
@@ -63,7 +63,7 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                 clearInterval(intervalId);
             }
         };
-    }, [liveFixture.fixture.id, isMatchLiveOrFinished, isMatchFinished, initialPredictionMatch.fixtureData.fixture.status.short, initialPredictionMatch.fixtureData.fixture.timestamp]);
+    }, [liveFixture.fixture.id, isMatchLiveOrFinished, isMatchFinished, predictionMatch.fixtureData.fixture.status.short, predictionMatch.fixtureData.fixture.timestamp]);
 
 
     const getPredictionStatusColors = useCallback(() => {
@@ -178,4 +178,3 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
 };
 
 export default PredictionCard;
-
