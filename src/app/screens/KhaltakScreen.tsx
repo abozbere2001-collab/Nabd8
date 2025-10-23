@@ -14,7 +14,7 @@ import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import type { CrownedTeam, Favorites, Fixture, Standing, TopScorer, Prediction, Team, Player, UserScore, PredictionMatch } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { collection, onSnapshot, doc, updateDoc, deleteField, setDoc, query, where, getDocs, writeBatch, getDoc, orderBy, limit, collectionGroup } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, deleteField, setDoc, query, where, getDocs, writeBatch, getDoc, orderBy, limit } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
@@ -361,6 +361,24 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             
             setPinnedMatches(matches);
             setLoadingMatches(false);
+            
+            // After getting pinned matches, fetch user predictions for them
+            if (user && matches.length > 0) {
+                 const predictionsMap: { [key: number]: Prediction } = {};
+                 for (const match of matches) {
+                     const fixtureId = match.fixtureData.fixture.id;
+                     const predRef = doc(db, 'predictions', String(fixtureId), 'userPredictions', user.uid);
+                     try {
+                         const predSnap = await getDoc(predRef);
+                         if (predSnap.exists()) {
+                             predictionsMap[fixtureId] = predSnap.data() as Prediction;
+                         }
+                     } catch (e) {
+                        // This might fail if user has no prediction, which is fine.
+                     }
+                 }
+                 setUserPredictions(predictionsMap);
+            }
         }, error => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({path: 'predictions', operation: 'list'}));
             setLoadingMatches(false);
@@ -369,24 +387,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         return () => {
             unsubPredictions();
         };
-    }, [db]);
-
-    useEffect(() => {
-        if (!db || !user) return;
-        // This effect fetches all user predictions at once.
-        const userPredictionsQuery = query(collectionGroup(db, 'userPredictions'), where('userId', '==', user.uid));
-        const unsubUserPredictions = onSnapshot(userPredictionsQuery, (snapshot) => {
-            const predictionsMap: { [key: number]: Prediction } = {};
-            snapshot.forEach(doc => {
-                const data = doc.data() as Prediction;
-                predictionsMap[data.fixtureId] = data;
-            });
-            setUserPredictions(predictionsMap);
-        }, (error) => {
-            const permissionError = new FirestorePermissionError({ path: `userPredictions collection group for user ${user.uid}`, operation: 'list' });
-            errorEmitter.emit('permission-error', permissionError);
-        });
-        return () => unsubUserPredictions();
     }, [db, user]);
     
     
