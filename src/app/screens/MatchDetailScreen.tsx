@@ -422,21 +422,23 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
             <div className="pt-4">
                 <h3 className="text-center text-base font-bold mb-2">الاحتياط</h3>
                 <div className="space-y-2">
-                    {activeLineup.substitutes.map(p => (
+                    {activeLineup.substitutes.map(p => {
+                        const fullPlayer = getPlayerWithDetails(p.player.id, p.player);
+                        return (
                          <Card key={p.player.id || p.player.name} className="p-2 cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                             <div className="flex items-center gap-3">
                                 <Avatar className="h-8 w-8">
-                                    <AvatarImage src={p.player.photo} />
-                                    <AvatarFallback>{p.player.name?.charAt(0)}</AvatarFallback>
+                                    <AvatarImage src={fullPlayer.photo} />
+                                    <AvatarFallback>{fullPlayer.name?.charAt(0)}</AvatarFallback>
                                 </Avatar>
                                 <div>
-                                    <p className="font-semibold text-sm">{p.player.name}</p>
-                                    <p className="text-xs text-muted-foreground">{p.player.position}</p>
+                                    <p className="font-semibold text-sm">{fullPlayer.name}</p>
+                                    <p className="text-xs text-muted-foreground">{fullPlayer.position}</p>
                                 </div>
                                  {isAdmin && <Button variant="ghost" size="icon" className="mr-auto" onClick={(e) => {e.stopPropagation(); onRename('player', p.player.id, p.player.name, p.player.name)}}><Pencil className="h-4 w-4" /></Button>}
                             </div>
                         </Card>
-                    ))}
+                    )})}
                 </div>
             </div>
         </div>
@@ -725,7 +727,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
           )
       } />
       {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={() => setRenameItem(null)} item={{...renameItem, purpose: 'rename'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name)} />}
-      <div className="flex-1 overflow-y-auto p-4">
+       <div className="flex-1 overflow-y-auto p-4">
         <MatchHeaderCard fixture={processedFixture} navigate={navigate} customStatus={customStatus} />
         <Tabs defaultValue="details" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
