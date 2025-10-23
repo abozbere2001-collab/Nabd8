@@ -342,7 +342,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
 
     const [pinnedMatches, setPinnedMatches] = useState<PredictionMatch[]>([]);
     const [loadingMatches, setLoadingMatches] = useState(true);
-    
+
     const [allUserPredictions, setAllUserPredictions] = useState<{ [key: string]: Prediction }>({});
     const [loadingUserPredictions, setLoadingUserPredictions] = useState(true);
 
@@ -370,29 +370,31 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         if (!db || !user) {
             setLoadingUserPredictions(false);
             return;
-        }
-        setLoadingUserPredictions(true);
-        const userPredictionsRef = collection(db, 'users', user.uid, 'predictions');
-        const unsub = onSnapshot(userPredictionsRef, (snapshot) => {
-            const predictions: { [key: string]: Prediction } = {};
-            snapshot.forEach(doc => {
-                predictions[doc.id] = doc.data() as Prediction;
-            });
-            setAllUserPredictions(prev => ({...prev, ...predictions}));
+        };
+        if (pinnedMatches.length === 0) {
+            setAllUserPredictions({});
             setLoadingUserPredictions(false);
-        }, (error) => {
-            const permissionError = new FirestorePermissionError({
-                path: `users/${user.uid}/predictions`,
-                operation: 'list',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            console.error("Error fetching user predictions:", error);
+            return;
+        }
+
+        setLoadingUserPredictions(true);
+        const newPredictions: { [key: string]: Prediction } = {};
+        
+        const predictionPromises = pinnedMatches.map(match => {
+            const userPredictionRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
+            return getDoc(userPredictionRef).then(predDoc => {
+                if (predDoc.exists()) {
+                    newPredictions[match.id] = predDoc.data() as Prediction;
+                }
+            }).catch(e => console.warn(`Could not fetch prediction for match ${match.id}`, e));
+        });
+
+        Promise.all(predictionPromises).then(() => {
+            setAllUserPredictions(newPredictions);
             setLoadingUserPredictions(false);
         });
 
-        return () => unsub();
-    }, [db, user]);
-
+    }, [db, user, pinnedMatches]);
     
     const fetchLeaderboard = useCallback(async () => {
         if (!db) return;
@@ -439,7 +441,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         const awayGoals = parseInt(awayGoalsStr, 10);
         if (isNaN(homeGoals) || isNaN(awayGoals)) return;
     
-        const predictionRef = doc(db, 'users', user.uid, 'predictions', String(fixtureId));
+        const predictionRef = doc(db, 'predictions', String(fixtureId), 'userPredictions', user.uid);
         
         const predictionData: Prediction = {
             userId: user.uid,
@@ -463,103 +465,90 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     }, [user, db]);
 
     const handleCalculateAllPoints = useCallback(async () => {
-        // This is a placeholder for a secure, server-side Cloud Function.
-        // Executing this logic on the client is insecure and not scalable.
-        // It's here for prototyping purposes only.
-        if (!db || !isAdmin) {
-            toast({
-                variant: 'destructive',
-                title: "صلاحيات غير كافية",
-                description: "هذه العملية مخصصة للمدير فقط.",
-            });
-            return;
-        }
-
+        if (!db || !isAdmin) return;
         setIsUpdatingPoints(true);
-        toast({ title: "بدء تحديث النقاط...", description: "هذه عملية تجريبية وقد تستغرق بعض الوقت." });
-        
+        toast({ title: "بدء تحديث النقاط...", description: "قد تستغرق هذه العملية بعض الوقت." });
+
         try {
-            // In a real app, you would trigger a Cloud Function here.
-            // The function would perform the following steps securely:
-            
-            // 1. Get all finished fixtures from the 'predictions' collection.
             const currentPinnedMatchesSnapshot = await getDocs(collection(db, 'predictions'));
-            const finishedFixtures = currentPinnedMatchesSnapshot.docs
-                .map(doc => doc.data() as PredictionMatch)
-                .filter(m => m.fixtureData && ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short));
+            const currentPinnedMatches = currentPinnedMatchesSnapshot.docs.map(doc => ({
+                ...(doc.data() as PredictionMatch),
+                id: doc.id,
+            })).filter(m => m && m.fixtureData && m.fixtureData.fixture);
+
+            const finishedFixtures = currentPinnedMatches.filter(m => 
+                ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short) && m.fixtureData.goals.home !== null
+            );
 
             if (finishedFixtures.length === 0) {
-                toast({ title: "لا يوجد ما يمكن تحديثه", description: "لم تنتهِ أي من المباريات المثبتة بعد." });
+                toast({ title: "لا توجد مباريات منتهية", description: "لا يوجد ما يمكن تحديثه." });
                 setIsUpdatingPoints(false);
                 return;
             }
 
-            // 2. Get all users.
             const allUsersSnapshot = await getDocs(collection(db, 'users'));
-            const userPointsMap = new Map<string, { totalPoints: number; details: Pick<UserProfile, 'displayName' | 'photoURL'> }>();
+            const userPointsMap = new Map<string, number>();
+            const userDetailsMap = new Map<string, { displayName: string, photoURL: string }>();
 
             allUsersSnapshot.forEach(userDoc => {
                 const userData = userDoc.data() as UserProfile;
-                userPointsMap.set(userDoc.id, {
-                    totalPoints: 0, // Reset points before recalculating
-                    details: { displayName: userData.displayName || 'مستخدم', photoURL: userData.photoURL || '' }
+                userPointsMap.set(userDoc.id, 0); // Initialize/reset points to 0
+                userDetailsMap.set(userDoc.id, {
+                    displayName: userData.displayName || 'مستخدم',
+                    photoURL: userData.photoURL || ''
                 });
             });
-            
-            // 3. For each user, get their predictions and calculate points.
-            for (const userDoc of allUsersSnapshot.docs) {
-                const userId = userDoc.id;
-                let totalPoints = 0;
-                const userPredictionsSnapshot = await getDocs(collection(db, 'users', userId, 'predictions'));
-                
-                userPredictionsSnapshot.forEach(predDoc => {
-                    const prediction = predDoc.data() as Prediction;
-                    const fixture = finishedFixtures.find(f => f.fixtureData.fixture.id === prediction.fixtureId);
-                    if (fixture) {
-                        const points = calculatePoints(prediction, fixture.fixtureData);
-                        totalPoints += points;
-                    }
-                });
 
-                 const currentUserData = userPointsMap.get(userId);
-                if (currentUserData) {
-                    userPointsMap.set(userId, { ...currentUserData, totalPoints });
+            for (const match of finishedFixtures) {
+                const userPredictionsColRef = collection(db, 'predictions', match.id, 'userPredictions');
+                try {
+                    const userPredictionsSnapshot = await getDocs(userPredictionsColRef);
+                    if (userPredictionsSnapshot.empty) continue;
+
+                    const pointsUpdateBatch = writeBatch(db);
+                    userPredictionsSnapshot.forEach(userPredDoc => {
+                        const userPrediction = userPredDoc.data() as Prediction;
+                        const newPoints = calculatePoints(userPrediction, match.fixtureData);
+                        
+                        if (userPrediction.points !== newPoints) {
+                            pointsUpdateBatch.update(userPredDoc.ref, { points: newPoints });
+                        }
+                        
+                        const currentTotal = userPointsMap.get(userPrediction.userId) || 0;
+                        userPointsMap.set(userPrediction.userId, currentTotal + newPoints);
+                    });
+                    await pointsUpdateBatch.commit();
+                } catch (e) {
+                     errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `predictions/${match.id}/userPredictions`, operation: 'list' }));
+                     continue; 
                 }
             }
-
-            // 4. Update the 'leaderboard' collection in a batch.
-            const leaderboardBatch = writeBatch(db);
-
-            // First, clear the existing leaderboard to remove stale data
-            const existingLeaderboardSnapshot = await getDocs(collection(db, "leaderboard"));
-            existingLeaderboardSnapshot.forEach((doc) => leaderboardBatch.delete(doc.ref));
-
-            // Then, write the new scores
-            for (const [userId, scoreData] of userPointsMap.entries()) {
-                const leaderboardRef = doc(db, 'leaderboard', userId);
-                leaderboardBatch.set(leaderboardRef, {
-                    totalPoints: scoreData.totalPoints,
-                    userName: scoreData.details.displayName,
-                    userPhoto: scoreData.details.photoURL,
-                });
-            }
-
-            await leaderboardBatch.commit();
             
-            toast({ title: "نجاح!", description: "تم تحديث لوحة الصدارة بنجاح." });
-            fetchLeaderboard();
+            const leaderboardWriteBatch = writeBatch(db);
+            const existingLeaderboardSnapshot = await getDocs(collection(db, "leaderboard"));
+            existingLeaderboardSnapshot.forEach((doc) => leaderboardWriteBatch.delete(doc.ref));
 
-        } catch (error: any) {
-            console.error("Error calculating points on client:", error);
-            if(error.code === 'permission-denied') {
-                 toast({ variant: 'destructive', title: "خطأ في الصلاحيات", description: "فشلت عملية تحديث لوحة الصدارة. تحقق من قواعد الأمان." });
-            } else {
-                toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ غير متوقع أثناء تحديث لوحة الصدارة." });
+            for (const [userId, totalPoints] of userPointsMap.entries()) {
+                 const userDetails = userDetailsMap.get(userId);
+                 if (userDetails) {
+                    const leaderboardRef = doc(db, 'leaderboard', userId);
+                    leaderboardWriteBatch.set(leaderboardRef, {
+                        totalPoints,
+                        userName: userDetails.displayName,
+                        userPhoto: userDetails.photoURL,
+                    });
+                 }
             }
+            await leaderboardWriteBatch.commit();
+            
+            toast({ title: "نجاح!", description: `تم تحديث لوحة الصدارة بنجاح.` });
+            fetchLeaderboard();
+        } catch (error) {
+            console.error("Error calculating all points:", error);
+            toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ أثناء تحديث لوحة الصدارة." });
         } finally {
             setIsUpdatingPoints(false);
         }
-
     }, [db, isAdmin, toast, fetchLeaderboard]);
 
 
