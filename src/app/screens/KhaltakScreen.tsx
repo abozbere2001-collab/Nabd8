@@ -215,22 +215,22 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
             <Table>
                 <TableHeader>
                     <TableRow>
+                        <TableHead className="w-[50px] text-right">الترتيب</TableHead>
+                        <TableHead>المستخدم</TableHead>
                         <TableHead className="text-center">النقاط</TableHead>
-                        <TableHead className="text-right">المستخدم</TableHead>
-                        <TableHead>الترتيب</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {leaderboard.map(score => (
                         <TableRow key={score.userId} className={cn(score.userId === userId && "bg-primary/10")}>
-                            <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
-                            <TableCell className="text-right">
-                                <div className="flex items-center gap-2 justify-end">
-                                    {score.userName}
+                            <TableCell className="text-right font-bold">{score.rank}</TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6"><AvatarImage src={score.userPhoto}/></Avatar>
+                                    {score.userName}
                                 </div>
                             </TableCell>
-                            <TableCell>{score.rank}</TableCell>
+                            <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
@@ -241,14 +241,14 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                          <Table>
                              <TableBody>
                                 <TableRow className="border-t-2 border-primary/50">
-                                    <TableCell className="text-center font-bold">{userScore.totalPoints}</TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex items-center gap-2 justify-end">
-                                            {userScore.userName}
+                                    <TableCell className="w-[50px] text-right font-bold">{userScore.rank || '-'}</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
                                             <Avatar className="h-6 w-6"><AvatarImage src={userScore.userPhoto}/></Avatar>
+                                            {userScore.userName}
                                         </div>
                                     </TableCell>
-                                    <TableCell>{userScore.rank || '-'}</TableCell>
+                                    <TableCell className="text-center font-bold">{userScore.totalPoints}</TableCell>
                                 </TableRow>
                              </TableBody>
                          </Table>
@@ -465,73 +465,81 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     const handleCalculateAllPoints = useCallback(async () => {
         if (!db || !isAdmin) return;
         setIsUpdatingPoints(true);
-        toast({ title: "بدء تحديث النقاط...", description: "جاري حساب النقاط لجميع المستخدمين. قد تستغرق هذه العملية بعض الوقت." });
+        toast({ title: "بدء تحديث النتائج والنقاط...", description: "جاري جلب أحدث النتائج وحساب النقاط. قد تستغرق هذه العملية بعض الوقت." });
 
         try {
             const currentPinnedMatchesSnapshot = await getDocs(collection(db, 'predictions'));
             const currentPinnedMatches = currentPinnedMatchesSnapshot.docs.map(doc => ({
                 ...(doc.data() as PredictionMatch),
                 id: doc.id,
-            })).filter(m => m && m.fixtureData && m.fixtureData.fixture);
+            }));
 
             const allUsersSnapshot = await getDocs(collection(db, 'users'));
-            const leaderboardSnapshot = await getDocs(collection(db, 'leaderboard'));
-            
-            const userPointsMap = new Map<string, number>();
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
-
-            leaderboardSnapshot.forEach(doc => {
-                userPointsMap.set(doc.id, doc.data().totalPoints || 0);
-            });
             allUsersSnapshot.forEach(userDoc => {
                 const data = userDoc.data() as UserProfile;
                 userDetailsMap.set(userDoc.id, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
-                if (!userPointsMap.has(userDoc.id)) {
-                    userPointsMap.set(userDoc.id, 0);
-                }
+            });
+
+            // Get existing scores to avoid resetting them
+            const leaderboardSnapshot = await getDocs(collection(db, 'leaderboard'));
+            const userPointsMap = new Map<string, number>();
+             leaderboardSnapshot.forEach(doc => {
+                userPointsMap.set(doc.id, doc.data().totalPoints || 0);
             });
             
             const finishedFixtures = currentPinnedMatches.filter(m => 
                 ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short)
             );
-
+            
             if (finishedFixtures.length === 0) {
                 toast({ title: "لا توجد مباريات منتهية", description: "لا يوجد ما يمكن تحديثه." });
                 setIsUpdatingPoints(false);
                 return;
             }
-
+            
+            let updatedFixturesCount = 0;
+            
+            // --- Update Fixture Data and Calculate Points ---
             for (const match of finishedFixtures) {
                 const fixtureId = match.fixtureData.fixture.id;
-                const userPredictionsColRef = collection(db, 'predictions', String(fixtureId), 'userPredictions');
-                 try {
-                    const userPredictionsSnapshot = await getDocs(query(userPredictionsColRef, where('points', '==', 0)));
-                    if (userPredictionsSnapshot.empty) continue;
-                    
-                    const pointsUpdateBatch = writeBatch(db);
-                    userPredictionsSnapshot.forEach(userPredDoc => {
-                        const userPrediction = userPredDoc.data() as Prediction;
-                        const newPoints = calculatePoints(userPrediction, match.fixtureData);
-                        
-                        if (newPoints > 0) {
-                            pointsUpdateBatch.update(userPredDoc.ref, { points: newPoints });
-                            const currentTotalPoints = userPointsMap.get(userPrediction.userId) || 0;
-                            userPointsMap.set(userPrediction.userId, currentTotalPoints + newPoints);
-                        } else {
-                            // Still mark as calculated even if points are 0 to avoid re-calculation
-                            pointsUpdateBatch.update(userPredDoc.ref, { points: -1 }); // Using -1 to indicate checked and 0 points
-                        }
-                    });
-                    await pointsUpdateBatch.commit();
 
-                } catch (e) {
-                     errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `predictions/${fixtureId}/userPredictions`, operation: 'list' }));
-                     continue; 
-                }
+                // Fetch latest fixture data from API
+                const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
+                if (!fixtureRes.ok) continue;
+                const fixtureApiData = await fixtureRes.json();
+                const latestFixture: Fixture | undefined = fixtureApiData.response?.[0];
+
+                if (!latestFixture) continue;
+
+                const matchDocRef = doc(db, 'predictions', String(fixtureId));
+                // Update the fixture data in Firestore
+                await updateDoc(matchDocRef, { fixtureData: latestFixture });
+                updatedFixturesCount++;
+                
+                const userPredictionsColRef = collection(db, 'predictions', String(fixtureId), 'userPredictions');
+                const userPredictionsSnapshot = await getDocs(query(userPredictionsColRef, where('points', '==', 0)));
+                
+                if (userPredictionsSnapshot.empty) continue;
+                    
+                const pointsUpdateBatch = writeBatch(db);
+                userPredictionsSnapshot.forEach(userPredDoc => {
+                    const userPrediction = userPredDoc.data() as Prediction;
+                    const newPoints = calculatePoints(userPrediction, latestFixture);
+                    
+                    if (newPoints > 0) {
+                        pointsUpdateBatch.update(userPredDoc.ref, { points: newPoints });
+                        const currentTotalPoints = userPointsMap.get(userPrediction.userId) || 0;
+                        userPointsMap.set(userPrediction.userId, currentTotalPoints + newPoints);
+                    } else {
+                        pointsUpdateBatch.update(userPredDoc.ref, { points: -1 }); // Mark as checked with 0 points
+                    }
+                });
+                await pointsUpdateBatch.commit();
             }
             
+            // --- Update Leaderboard ---
             const leaderboardBatch = writeBatch(db);
-            
             for (const [userId, totalPoints] of userPointsMap.entries()) {
                  const userDetails = userDetailsMap.get(userId);
                  if (userDetails) {
@@ -545,8 +553,9 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             }
             await leaderboardBatch.commit();
             
-            toast({ title: "نجاح!", description: `تم تحديث لوحة الصدارة بنجاح.` });
+            toast({ title: "نجاح!", description: `تم تحديث ${updatedFixturesCount} مباريات ولوحة الصدارة.` });
             fetchLeaderboard();
+
         } catch (error) {
             console.error("Error calculating all points:", error);
             toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ أثناء تحديث لوحة الصدارة." });
@@ -601,7 +610,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                        {isAdmin && (
                            <Button onClick={handleCalculateAllPoints} disabled={isUpdatingPoints} size="sm">
                                {isUpdatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
-                               <span className="mr-2">تحديث النقاط</span>
+                               <span className="mr-2">تحديث النتائج والنقاط</span>
                            </Button>
                        )}
                   </CardHeader>
@@ -735,5 +744,3 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    
