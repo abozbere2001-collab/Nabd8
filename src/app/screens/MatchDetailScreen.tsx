@@ -304,17 +304,32 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
 const LineupsTab = ({ fixture, lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId }: { fixture: Fixture, lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, originalData: any) => void, homeTeamId: number, awayTeamId: number }) => {
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
     
+    if (lineups === null) {
+        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+    }
+    
+    const isUpcoming = fixture?.fixture?.status?.short === 'NS' || fixture?.fixture?.status?.short === 'TBD';
+    
+    if (lineups.length === 0 && isUpcoming) {
+        return <p className="text-center text-muted-foreground p-8">📅 لم يتم إعلان التشكيلة بعد.</p>;
+    }
+    
+    if (lineups.length === 0) {
+        return <p className="text-center text-muted-foreground p-8">⚠️ التشكيلة غير متوفرة لهذه المباراة.</p>;
+    }
+    
+    const home = lineups.find(l => l.team.id === homeTeamId);
+    const away = lineups.find(l => l.team.id === awayTeamId);
+
+    if (!home || !away) {
+         return <p className="text-center text-muted-foreground p-8">خطأ في بيانات التشكيلة.</p>;
+    }
+    
+    const activeLineup = activeTeamTab === 'home' ? home : away;
+    const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
+
     const renderPitch = (lineup: LineupData) => {
         try {
-            const isUpcoming = fixture?.fixture?.status?.short === 'NS' || fixture?.fixture?.status?.short === 'TBD';
-
-            if (!lineup || typeof lineup !== 'object' || !Array.isArray(lineup.startXI) || lineup.startXI.length === 0) {
-                 if (isUpcoming) {
-                    return <p className="text-center text-muted-foreground p-8">📅 لم يتم إعلان التشكيلة بعد.</p>;
-                 }
-                return <p className="text-center text-muted-foreground p-8">⚠️ التشكيلة غير متوفرة لهذه المباراة.</p>;
-            }
-            
             const players = lineup.startXI;
             const formationGrid: Record<number, PlayerWithStats[]> = {};
             const ungridded: PlayerWithStats[] = [];
@@ -343,11 +358,11 @@ const LineupsTab = ({ fixture, lineups, events, navigate, isAdmin, onRename, hom
             }
 
             const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
-            const stadiumImage = fixture.fixture.venue.image || "/pitch-vertical.svg";
+            const stadiumImage = "/pitch-vertical.svg";
 
             return (
                 <div 
-                    className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-800 rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col justify-around p-2 bg-cover bg-center"
+                    className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-800 rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2 bg-cover bg-center"
                     style={{backgroundImage: `url('${stadiumImage}')`}}
                 >
                     <div className="absolute inset-0 bg-black/30"></div>
@@ -394,30 +409,6 @@ const LineupsTab = ({ fixture, lineups, events, navigate, isAdmin, onRename, hom
             );
         }
     };
-    
-    if (lineups === null) {
-        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    }
-    
-    const isUpcoming = fixture?.fixture?.status?.short === 'NS' || fixture?.fixture?.status?.short === 'TBD';
-    
-    if (lineups.length === 0 && isUpcoming) {
-        return <p className="text-center text-muted-foreground p-8">📅 لم يتم إعلان التشكيلة بعد.</p>;
-    }
-    
-    if (lineups.length === 0) {
-        return <p className="text-center text-muted-foreground p-8">⚠️ التشكيلة غير متوفرة لهذه المباراة.</p>;
-    }
-    
-    const home = lineups.find(l => l.team.id === homeTeamId);
-    const away = lineups.find(l => l.team.id === awayTeamId);
-
-    if (!home || !away) {
-         return <p className="text-center text-muted-foreground p-8">خطأ في بيانات التشكيلة.</p>;
-    }
-    
-    const activeLineup = activeTeamTab === 'home' ? home : away;
-    const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
 
     return (
         <ScrollArea className="h-[calc(100vh-250px)]">
@@ -748,7 +739,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     if (!fixture) {
         return (
             <div>
-                <ScreenHeader title="تفاصيل المباراة" navigate={navigate} onBack={goBack} canGoBack={canGoBack} />
+                <ScreenHeader title="تفاصيل المباراة" onBack={goBack} canGoBack={canGoBack} />
                 <div className="container mx-auto p-4">
                     {loading ? (
                         <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
@@ -765,7 +756,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
     return (
         <div>
-            <ScreenHeader title="تفاصيل المباراة" navigate={navigate} onBack={goBack} canGoBack={canGoBack} />
+            <ScreenHeader title="تفاصيل المباراة" onBack={goBack} canGoBack={canGoBack} />
              {renameItem && <RenameDialog
                 isOpen={!!renameItem}
                 onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
@@ -773,50 +764,30 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 onSave={(type, id, name) => handleSaveRename(type, Number(id), name)}
              />}
             <div className="container mx-auto p-4">
-                <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', Number(fixtureId), {name: customStatus})}/>
-                 <Tabs defaultValue="details" className="w-full">
-                    <TabsList className={cn("grid w-full", `grid-cols-${availableTabs.length}`)}>
-                       {availableTabs.map(tab => (
-                         <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
-                       ))}
+                <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', fixture.fixture.id, {name: ''})} />
+                <Tabs defaultValue="details" className="w-full">
+                    <TabsList className="grid w-full grid-cols-4">
+                        {availableTabs.map(tab => (
+                             <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
+                        ))}
                     </TabsList>
-                    
-                    <TabsContent value="details" className="mt-4">
-                       <ScrollArea className="h-[calc(100vh-250px)]">
-                           <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
-                        </ScrollArea>
+                    <TabsContent value="details" className="pt-4">
+                        <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
                     </TabsContent>
-                    
-                     {availableTabs.some(t => t.id === 'lineups') && (
-                        <TabsContent value="lineups" className="mt-4">
-                           <LineupsTab 
-                             fixture={fixture}
-                             lineups={mergedLineups} 
-                             events={events} 
-                             navigate={navigate} 
-                             isAdmin={isAdmin} 
-                             onRename={handleOpenRename} 
-                             homeTeamId={homeTeamId} 
-                             awayTeamId={awayTeamId}
-                           />
-                       </TabsContent>
-                     )}
-
-                    {availableTabs.some(t => t.id === 'timeline') && (
-                      <TabsContent value="timeline" className="mt-4">
-                          <TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} />
-                      </TabsContent>
-                    )}
-                    
-                    {availableTabs.some(t => t.id === 'standings') && (
-                      <TabsContent value="standings" className="mt-4">
-                          <ScrollArea className="h-[calc(100vh-250px)]">
-                              <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
-                          </ScrollArea>
-                      </TabsContent>
-                    )}
+                    <TabsContent value="lineups" className="pt-4">
+                        <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={(type, id, data) => handleOpenRename(type, id, data)} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
+                    </TabsContent>
+                    <TabsContent value="timeline" className="pt-4">
+                        <TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} />
+                    </TabsContent>
+                    <TabsContent value="standings" className="pt-4">
+                        <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
+                    </TabsContent>
                 </Tabs>
             </div>
         </div>
     );
 }
+
+// Ensure you have a valid fallback for useTranslation if LanguageProvider is not setup
+const useTranslation = () => ({ t: (key: string) => key });
