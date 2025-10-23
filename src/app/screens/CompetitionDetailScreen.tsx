@@ -605,9 +605,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                 <TableCell className="font-bold px-2">{s.rank}</TableCell>
                                 <TableCell className="font-medium">
                                     <div className="flex items-center gap-2">
-                                        <p className="truncate">
-                                            {displayName}
-                                        </p>
+                                        <p className="truncate">{displayName}</p>
                                         <Avatar className="h-6 w-6">
                                             <AvatarImage src={s.team.logo} alt={s.team.name} />
                                             <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
