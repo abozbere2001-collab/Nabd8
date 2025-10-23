@@ -19,7 +19,7 @@ import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { OddsTab } from '@/components/OddsTab';
-import { useAdmin, useFirestore } from '@/firebase/provider';
+import { useAdmin } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
 import { doc, setDoc, deleteDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -528,10 +528,8 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const [standingsLoading, setStandingsLoading] = useState(true);
     const [customStatus, setCustomStatus] = useState<string | null>(null);
     const [playersDetails, setPlayersDetails] = useState<{player: Player, statistics: any[]}[] | null>(null);
-    const { isAdmin } = useAdmin();
+    const { isAdmin, db } = useAdmin();
     const { toast } = useToast();
-
-    const { db } = useFirestore();
     
     const rename = async (type: RenameType, id: number, originalData: any) => {
         if (!isAdmin || !db) return;
@@ -762,5 +760,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     );
 }
 
+
+    
 
     
