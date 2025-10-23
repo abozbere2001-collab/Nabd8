@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -15,23 +14,13 @@ import { PredictionOdds } from './PredictionOdds';
 export const FixtureItem = React.memo(({ fixture, navigate, customStatus, isPinnedForPrediction, onPinToggle, showOdds }: { fixture: FixtureType, navigate: ScreenProps['navigate'], customStatus?: string | null, isPinnedForPrediction?: boolean, onPinToggle?: (fixture: FixtureType) => void, showOdds?: boolean }) => {
     const { isAdmin } = useAdmin();
 
-    const HomeTeamDisplay = () => (
+    const TeamDisplay = ({ team }: { team: FixtureType['teams']['home'] }) => (
         <div className="flex flex-col items-center gap-1 flex-1 truncate">
             <Avatar className="h-8 w-8 flex-shrink-0">
-                <AvatarImage src={fixture.teams.home.logo} alt={fixture.teams.home.name} />
-                <AvatarFallback>{fixture.teams.home.name?.charAt(0) || ''}</AvatarFallback>
+                <AvatarImage src={team.logo} alt={team.name} />
+                <AvatarFallback>{team.name?.charAt(0) || ''}</AvatarFallback>
             </Avatar>
-            <span className="font-semibold text-xs truncate text-center w-full">{fixture.teams.home.name}</span>
-        </div>
-    );
-
-    const AwayTeamDisplay = () => (
-        <div className="flex flex-col items-center gap-1 flex-1 truncate">
-            <Avatar className="h-8 w-8 flex-shrink-0">
-                <AvatarImage src={fixture.teams.away.logo} alt={fixture.teams.away.name} />
-                <AvatarFallback>{fixture.teams.away.name?.charAt(0) || ''}</AvatarFallback>
-            </Avatar>
-            <span className="font-semibold text-xs truncate text-center w-full">{fixture.teams.away.name}</span>
+            <span className="font-semibold text-xs truncate text-center w-full">{team.name}</span>
         </div>
     );
 
@@ -55,12 +44,13 @@ export const FixtureItem = React.memo(({ fixture, navigate, customStatus, isPinn
                 className="flex-1 p-3 cursor-pointer"
                 onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
             >
-                <main className="flex items-start justify-between gap-2">
-                    <HomeTeamDisplay />
+                {/* ✅ The user's correct implementation */}
+                <main dir="rtl" className="flex items-start justify-between gap-2">
+                    <TeamDisplay team={fixture.teams.home} /> {/* المستضيف في اليمين */}
                     <div className="flex flex-col items-center justify-center min-w-[70px] pt-1 text-center">
                         <LiveMatchStatus fixture={fixture} customStatus={customStatus} />
                     </div>
-                    <AwayTeamDisplay />
+                    <TeamDisplay team={fixture.teams.away} /> {/* الضيف في اليسار */}
                 </main>
             </div>
 
