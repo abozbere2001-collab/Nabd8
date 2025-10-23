@@ -768,5 +768,4 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
   );
 }
 
-// Ensure you have a valid fallback for useTranslation if LanguageProvider is not setup
-const useTranslation = () => ({ t: (key: string) => key });
+    
