@@ -27,6 +27,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'status';
 interface RenameState {
@@ -743,13 +744,16 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} />
 
                 <Tabs defaultValue="details">
-                    <TabsList>
-                        <TabsTrigger value="details"><ShieldCheck className="mr-2 h-4 w-4" />تفاصيل</TabsTrigger>
-                        <TabsTrigger value="lineups"><Users className="mr-2 h-4 w-4" />التشكيلات</TabsTrigger>
-                        <TabsTrigger value="timeline"><Clock className="mr-2 h-4 w-4" />الاحداث</TabsTrigger>
-                        <TabsTrigger value="standings"><BarChart className="mr-2 h-4 w-4" />الترتيب</TabsTrigger>
-                        <TabsTrigger value="odds">المراهنات</TabsTrigger>
-                    </TabsList>
+                    <ScrollArea className="w-full whitespace-nowrap">
+                        <TabsList>
+                            <TabsTrigger value="details"><ShieldCheck className="mr-2 h-4 w-4" />تفاصيل</TabsTrigger>
+                            <TabsTrigger value="lineups"><Users className="mr-2 h-4 w-4" />التشكيلات</TabsTrigger>
+                            <TabsTrigger value="timeline"><Clock className="mr-2 h-4 w-4" />الاحداث</TabsTrigger>
+                            <TabsTrigger value="standings"><BarChart className="mr-2 h-4 w-4" />الترتيب</TabsTrigger>
+                            <TabsTrigger value="odds">المراهنات</TabsTrigger>
+                        </TabsList>
+                        <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
                     <TabsContent value="details" className="mt-4">
                         <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
                     </TabsContent>
@@ -775,7 +779,3 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         </div>
     );
 }
-
-    
-
-    
