@@ -360,6 +360,8 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             
             const updatedMatches = await Promise.all(matches.map(async (match) => {
                 if (['FT', 'AET', 'PEN'].includes(match.fixtureData.fixture.status.short)) {
+                    // Check if cache is fresh enough, otherwise fetch
+                    // For simplicity, let's always fetch for now to ensure results are up-to-date
                     try {
                         const res = await fetch(`/api/football/fixtures?id=${match.fixtureData.fixture.id}`);
                         if (res.ok) {
@@ -393,17 +395,14 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             const newPredictions: { [key: number]: Prediction } = {};
             const promises = pinnedMatches.map(async (match) => {
                 const fixtureId = match.fixtureData.fixture.id;
-                const userPredictionsRef = collection(db, 'predictions', String(fixtureId), 'userPredictions');
-                const q = query(userPredictionsRef, where("userId", "==", user.uid));
-                
+                const predRef = doc(db, 'predictions', String(fixtureId), 'userPredictions', user.uid);
                 try {
-                    const querySnapshot = await getDocs(q);
-                    if (!querySnapshot.empty) {
-                        const docSnap = querySnapshot.docs[0];
+                    const docSnap = await getDoc(predRef);
+                    if (docSnap.exists()) {
                         newPredictions[fixtureId] = docSnap.data() as Prediction;
                     }
-                } catch (error) {
-                    console.warn(`Could not fetch prediction for fixture ${fixtureId}`, error);
+                } catch (e) {
+                     errorEmitter.emit('permission-error', new FirestorePermissionError({ path: predRef.path, operation: 'get' }));
                 }
             });
 
@@ -493,9 +492,13 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 return;
             }
 
+            const allUsersSnapshot = await getDocs(collection(db, 'users'));
             const userPointsMap = new Map<string, { total: number; name: string; photo: string }>();
+            allUsersSnapshot.forEach(userDoc => {
+                const userData = userDoc.data();
+                userPointsMap.set(userDoc.id, { total: 0, name: userData.displayName || 'مستخدم', photo: userData.photoURL || '' });
+            });
             
-             // Step 1: Iterate through finished matches and update individual prediction points
             for (const match of finishedFixtures) {
                 const fixtureId = match.fixtureData.fixture.id;
                 const userPredictionsColRef = collection(db, 'predictions', String(fixtureId), 'userPredictions');
@@ -507,8 +510,14 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                     userPredictionsSnapshot.forEach(userPredDoc => {
                         const userPrediction = userPredDoc.data() as Prediction;
                         const newPoints = calculatePoints(userPrediction, match.fixtureData);
+                        
                         if (userPrediction.points !== newPoints) {
                             batch.update(userPredDoc.ref, { points: newPoints });
+                        }
+                        
+                        if (userPointsMap.has(userPrediction.userId)) {
+                            const currentUserData = userPointsMap.get(userPrediction.userId)!;
+                            currentUserData.total += newPoints;
                         }
                     });
                     await batch.commit();
@@ -518,33 +527,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                     continue; 
                 }
             }
-
-            // Step 2: Aggregate points for the leaderboard
-            const allUsersSnapshot = await getDocs(collection(db, 'users'));
-            for (const userDoc of allUsersSnapshot.docs) {
-                const userData = userDoc.data();
-                userPointsMap.set(userDoc.id, { total: 0, name: userData.displayName || 'مستخدم', photo: userData.photoURL || '' });
-            }
-
-            // Step 3: Re-fetch all predictions to calculate total scores
-            for (const match of finishedFixtures) {
-                const fixtureId = match.fixtureData.fixture.id;
-                const userPredictionsColRef = collection(db, 'predictions', String(fixtureId), 'userPredictions');
-                 try {
-                    const userPredictionsSnapshot = await getDocs(userPredictionsColRef);
-                    userPredictionsSnapshot.forEach(docSnap => {
-                        const pred = docSnap.data() as Prediction;
-                        if (userPointsMap.has(pred.userId)) {
-                            const current = userPointsMap.get(pred.userId)!;
-                            current.total += pred.points || 0;
-                        }
-                    });
-                } catch (e) {
-                    // Ignore errors here as we are just aggregating
-                }
-            }
             
-            // Step 4: Update the leaderboard collection
             const leaderboardBatch = writeBatch(db);
             for (const [userId, data] of userPointsMap.entries()) {
                 const leaderboardRef = doc(db, 'leaderboard', userId);
