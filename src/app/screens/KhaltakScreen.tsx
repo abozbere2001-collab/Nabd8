@@ -353,8 +353,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         if (!db) return;
         setLoadingMatches(true);
 
-        const predictionsRef = collection(db, 'predictions');
-        const unsubPredictions = onSnapshot(predictionsRef, async (snapshot) => {
+        const unsubPredictions = onSnapshot(collection(db, 'predictions'), async (snapshot) => {
             const matches = snapshot.docs.map(doc => ({
                 ...(doc.data() as PredictionMatch),
                 id: doc.id
@@ -367,26 +366,27 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             setLoadingMatches(false);
         });
 
-        let unsubUserPredictions: () => void = () => {};
-        if (user) {
-            const userPredictionsQuery = query(collectionGroup(db, 'userPredictions'), where('userId', '==', user.uid));
-            unsubUserPredictions = onSnapshot(userPredictionsQuery, (snapshot) => {
-                const predictionsMap: { [key: number]: Prediction } = {};
-                snapshot.forEach(doc => {
-                    const data = doc.data() as Prediction;
-                    predictionsMap[data.fixtureId] = data;
-                });
-                setUserPredictions(predictionsMap);
-            }, (error) => {
-                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `userPredictions collection group for user ${user.uid}`, operation: 'list' }));
-            });
-        }
-
-
         return () => {
             unsubPredictions();
-            unsubUserPredictions();
         };
+    }, [db]);
+
+    useEffect(() => {
+        if (!db || !user) return;
+        // This effect fetches all user predictions at once.
+        const userPredictionsQuery = query(collectionGroup(db, 'userPredictions'), where('userId', '==', user.uid));
+        const unsubUserPredictions = onSnapshot(userPredictionsQuery, (snapshot) => {
+            const predictionsMap: { [key: number]: Prediction } = {};
+            snapshot.forEach(doc => {
+                const data = doc.data() as Prediction;
+                predictionsMap[data.fixtureId] = data;
+            });
+            setUserPredictions(predictionsMap);
+        }, (error) => {
+            const permissionError = new FirestorePermissionError({ path: `userPredictions collection group for user ${user.uid}`, operation: 'list' });
+            errorEmitter.emit('permission-error', permissionError);
+        });
+        return () => unsubUserPredictions();
     }, [db, user]);
     
     
@@ -471,14 +471,10 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 setIsUpdatingPoints(false);
                 return;
             }
-
-            const allUsersSnapshot = await getDocs(collection(db, 'users'));
-            const userPointsMap = new Map<string, { total: number; name: string; photo: string }>();
-            allUsersSnapshot.forEach(userDoc => {
-                const userData = userDoc.data();
-                userPointsMap.set(userDoc.id, { total: 0, name: userData.displayName || 'مستخدم', photo: userData.photoURL || '' });
-            });
             
+            // Map to store total points for each user.
+            const userPointsMap = new Map<string, number>();
+
             for (const match of finishedFixtures) {
                 const fixtureId = match.fixtureData.fixture.id;
                 const userPredictionsColRef = collection(db, 'predictions', String(fixtureId), 'userPredictions');
@@ -495,10 +491,8 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                             pointsUpdateBatch.update(userPredDoc.ref, { points: newPoints });
                         }
                         
-                        if (userPointsMap.has(userPrediction.userId)) {
-                            const currentUserData = userPointsMap.get(userPrediction.userId)!;
-                            currentUserData.total += newPoints;
-                        }
+                        const currentPoints = userPointsMap.get(userPrediction.userId) || 0;
+                        userPointsMap.set(userPrediction.userId, currentPoints + newPoints);
                     });
                     await pointsUpdateBatch.commit();
 
@@ -509,13 +503,22 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             }
             
             const leaderboardBatch = writeBatch(db);
-            for (const [userId, data] of userPointsMap.entries()) {
-                const leaderboardRef = doc(db, 'leaderboard', userId);
-                leaderboardBatch.set(leaderboardRef, {
-                    totalPoints: data.total,
-                    userName: data.name,
-                    userPhoto: data.photo,
-                }, { merge: true });
+            const allUsersSnapshot = await getDocs(collection(db, 'users'));
+            const userDetailsMap = new Map<string, {name: string, photo: string}>();
+            allUsersSnapshot.forEach(userDoc => {
+                userDetailsMap.set(userDoc.id, { name: userDoc.data().displayName || 'مستخدم', photo: userDoc.data().photoURL || ''});
+            });
+
+            for (const [userId, totalPoints] of userPointsMap.entries()) {
+                const userDetails = userDetailsMap.get(userId);
+                if (userDetails) {
+                    const leaderboardRef = doc(db, 'leaderboard', userId);
+                    leaderboardBatch.set(leaderboardRef, {
+                        totalPoints: totalPoints,
+                        userName: userDetails.name,
+                        userPhoto: userDetails.photo,
+                    }, { merge: true });
+                }
             }
             await leaderboardBatch.commit();
             
@@ -524,9 +527,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         } catch (error) {
             console.error("Error calculating all points:", error);
             toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ أثناء تحديث لوحة الصدارة." });
-             if (!(error instanceof FirestorePermissionError)) {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'leaderboard or userPredictions', operation: 'write' }));
-            }
         } finally {
             setIsUpdatingPoints(false);
         }
