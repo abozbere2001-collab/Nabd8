@@ -688,6 +688,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             } else {
                 setCustomStatus(null);
             }
+        }, (error) => {
+            // Handle permission denied or other errors if necessary
+            console.warn("Could not subscribe to match status:", error);
         });
 
         return () => unsubscribe();
