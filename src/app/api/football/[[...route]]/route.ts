@@ -23,16 +23,18 @@ export async function GET(
   }
 
   // Smart Caching Strategy:
-  // - Fixtures by ID are volatile (results update), so don't cache them long.
-  // - Other data (teams, leagues) is more static.
+  // - Fixtures by ID are volatile (results update), so always fetch fresh data (no-store).
+  // - Other data (teams, leagues) is more static and can be cached longer.
   const isFixtureById = routePath === 'fixtures' && searchParams.has('id');
   const isVolatileRequest = isFixtureById || routePath.includes('odds') || routePath.includes('players/squads');
   // Disable caching for fixture lists by date, as they can be very large.
   const isLargeRequest = (routePath === 'fixtures' && searchParams.has('date')) || routePath.includes('players/squads');
   
-  const cacheOptions = isLargeRequest 
-    ? { cache: 'no-store' as RequestCache } 
-    : { next: { revalidate: isVolatileRequest ? 60 : 3600 } };
+  const cacheOptions = isFixtureById 
+    ? { cache: 'no-store' as RequestCache }
+    : isLargeRequest 
+      ? { cache: 'no-store' as RequestCache }
+      : { next: { revalidate: isVolatileRequest ? 60 : 3600 } };
   
 
   try {
