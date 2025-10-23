@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -76,5 +75,3 @@ export const FixtureItem = React.memo(({ fixture, navigate, customStatus, isPinn
     );
 });
 FixtureItem.displayName = 'FixtureItem';
-
-    
