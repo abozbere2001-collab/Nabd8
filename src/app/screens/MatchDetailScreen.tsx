@@ -352,6 +352,19 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
 const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId, detailedPlayersMap }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string, originalName: string) => void, homeTeamId: number, awayTeamId: number, detailedPlayersMap: Map<number, { player: PlayerType; statistics: any[] }> }) => {
     const { t } = useTranslation();
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
+    
+    const getPlayerWithDetails = useCallback((basePlayer: PlayerType): PlayerType => {
+        const detailedPlayer = detailedPlayersMap.get(basePlayer.id);
+        if (detailedPlayer) {
+            return {
+                ...basePlayer,
+                photo: detailedPlayer.player.photo || basePlayer.photo,
+                rating: detailedPlayer.statistics?.[0]?.games?.rating || basePlayer.rating,
+            };
+        }
+        return basePlayer;
+    }, [detailedPlayersMap]);
+
     if (lineups === null) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
@@ -370,18 +383,6 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     const activeLineup = activeTeamTab === 'home' ? home : away;
     
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
-
-    const getPlayerWithDetails = useCallback((basePlayer: PlayerType): PlayerType => {
-        const detailedPlayer = detailedPlayersMap.get(basePlayer.id);
-        if (detailedPlayer) {
-            return {
-                ...basePlayer,
-                photo: detailedPlayer.player.photo || basePlayer.photo,
-                rating: detailedPlayer.statistics?.[0]?.games?.rating || basePlayer.rating,
-            };
-        }
-        return basePlayer;
-    }, [detailedPlayersMap]);
     
     const renderPitch = (lineup: LineupData) => {
         const formationGrid: { [key: number]: PlayerWithStats[] } = {};
@@ -900,5 +901,3 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
       </div>
     );
 }
-
-    
