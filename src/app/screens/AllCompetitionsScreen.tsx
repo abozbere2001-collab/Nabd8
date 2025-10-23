@@ -474,7 +474,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                      return (
                          <li key={team.id} className="flex w-full items-center justify-between p-3 h-12 hover:bg-accent/80 transition-colors rounded-md">
                            <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: team.id })}>
-                             <Avatar className="h-6 w-6"><AvatarImage src={team.logo} alt={team.name} /></Avatar>
+                             <Avatar className="h-6 w-6 bg-white"><AvatarImage src={team.logo} alt={team.name} /></Avatar>
                              <span className="text-sm truncate">{team.name}</span>
                            </div>
                            <div className="flex items-center gap-1">
@@ -645,3 +645,5 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
+    

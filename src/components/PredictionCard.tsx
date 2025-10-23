@@ -14,26 +14,68 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { PredictionOdds } from './PredictionOdds';
 import { LiveMatchStatus } from './LiveMatchStatus';
+import { Loader2 } from 'lucide-react';
 
-const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictionMatch: PredictionMatch, userPrediction?: Prediction, onSave: (fixtureId: number, home: string, away: string) => void }) => {
-    const { fixtureData: fixture } = predictionMatch;
-    const isPredictionDisabled = new Date(fixture.fixture.timestamp * 1000) < new Date(Date.now() + 10 * 60 * 1000);
+const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { initialPredictionMatch: PredictionMatch, userPrediction?: Prediction, onSave: (fixtureId: number, home: string, away: string) => void }) => {
+    const [liveFixture, setLiveFixture] = useState<Fixture>(initialPredictionMatch.fixtureData);
+    const [isUpdating, setIsUpdating] = useState(false);
+    
     const [homeValue, setHomeValue] = useState(userPrediction?.homeGoals?.toString() ?? '');
     const [awayValue, setAwayValue] = useState(userPrediction?.awayGoals?.toString() ?? '');
     
     const debouncedHome = useDebounce(homeValue, 500);
     const debouncedAway = useDebounce(awayValue, 500);
 
-    const isMatchLiveOrFinished = ['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H', 'ET', 'BT', 'P'].includes(fixture.fixture.status.short);
-    const isMatchFinished = ['FT', 'AET', 'PEN'].includes(fixture.fixture.status.short);
+    const isMatchLiveOrFinished = useMemo(() => ['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H', 'ET', 'BT', 'P'].includes(liveFixture.fixture.status.short), [liveFixture]);
+    const isMatchFinished = useMemo(() => ['FT', 'AET', 'PEN'].includes(liveFixture.fixture.status.short), [liveFixture]);
+    const isPredictionDisabled = useMemo(() => new Date(liveFixture.fixture.timestamp * 1000) < new Date(Date.now() + 10 * 60 * 1000), [liveFixture]);
 
-    const getPredictionStatusColors = () => {
+    // Fetch live data for the match
+    useEffect(() => {
+        let intervalId: NodeJS.Timeout | null = null;
+
+        const fetchLiveFixture = async () => {
+            setIsUpdating(true);
+            try {
+                const res = await fetch(`/api/football/fixtures?id=${liveFixture.fixture.id}`);
+                const data = await res.json();
+                if (data.response && data.response.length > 0) {
+                    setLiveFixture(data.response[0]);
+                }
+            } catch (error) {
+                console.error("Failed to fetch live fixture data:", error);
+            } finally {
+                // Short timeout to prevent the loader from flashing too quickly
+                setTimeout(() => setIsUpdating(false), 500);
+            }
+        };
+
+        // Only poll if the match is live and not finished
+        if (isMatchLiveOrFinished && !isMatchFinished) {
+            fetchLiveFixture(); // Initial fetch
+            intervalId = setInterval(fetchLiveFixture, 60000); // Poll every 60 seconds
+        } else {
+             // If the match is not live, we might still want to fetch once to get the final score
+             if (['NS', 'TBD'].includes(initialPredictionMatch.fixtureData.fixture.status.short) && new Date(initialPredictionMatch.fixtureData.fixture.timestamp * 1000) < new Date()) {
+                fetchLiveFixture();
+             }
+        }
+
+        return () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
+    }, [liveFixture.fixture.id, isMatchLiveOrFinished, isMatchFinished, initialPredictionMatch.fixtureData.fixture.status.short, initialPredictionMatch.fixtureData.fixture.timestamp]);
+
+
+    const getPredictionStatusColors = useCallback(() => {
         if (!isMatchLiveOrFinished || !userPrediction) {
             return "bg-card text-foreground";
         }
 
-        const actualHome = fixture.goals.home;
-        const actualAway = fixture.goals.away;
+        const actualHome = liveFixture.goals.home;
+        const actualAway = liveFixture.goals.away;
         const predHome = userPrediction.homeGoals;
         const predAway = userPrediction.awayGoals;
         
@@ -51,20 +93,20 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
         }
 
         return "bg-destructive/20 text-destructive";
-    };
+    }, [isMatchLiveOrFinished, userPrediction, liveFixture.goals]);
     
-    const getPointsColor = () => {
+    const getPointsColor = useCallback(() => {
         if (!isMatchFinished || userPrediction?.points === undefined) return 'text-primary';
         if (userPrediction.points === 5) return 'text-green-500';
         if (userPrediction.points === 3) return 'text-yellow-500';
         return 'text-destructive';
-    };
+    }, [isMatchFinished, userPrediction]);
 
     useEffect(() => {
         if (debouncedHome !== '' && debouncedAway !== '' && (debouncedHome !== userPrediction?.homeGoals?.toString() || debouncedAway !== userPrediction?.awayGoals?.toString())) {
-            onSave(fixture.fixture.id, debouncedHome, debouncedAway);
+            onSave(liveFixture.fixture.id, debouncedHome, debouncedAway);
         }
-    }, [debouncedHome, debouncedAway, onSave, userPrediction, fixture.fixture.id]);
+    }, [debouncedHome, debouncedAway, onSave, userPrediction, liveFixture.fixture.id]);
 
     const handleHomeChange = (e: React.ChangeEvent<HTMLInputElement>) => setHomeValue(e.target.value);
     const handleAwayChange = (e: React.ChangeEvent<HTMLInputElement>) => setAwayValue(e.target.value);
@@ -79,8 +121,8 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
             <CardContent className="p-3">
                 <div className="flex items-center justify-between gap-1">
                      <div className="flex flex-col items-center gap-1 flex-1 justify-end truncate">
-                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                        <span className="font-semibold text-xs text-center truncate w-full">{fixture.teams.away.name}</span>
+                        <Avatar className="h-8 w-8"><AvatarImage src={liveFixture.teams.away.logo} /></Avatar>
+                        <span className="font-semibold text-xs text-center truncate w-full">{liveFixture.teams.away.name}</span>
                     </div>
                     <div className="flex items-center gap-1">
                         <Input 
@@ -89,11 +131,12 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
                             min="0" 
                             value={awayValue}
                             onChange={handleAwayChange}
-                            id={`away-${fixture.fixture.id}`}
+                            id={`away-${liveFixture.fixture.id}`}
                             disabled={isPredictionDisabled}
                         />
-                         <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
-                            <LiveMatchStatus fixture={fixture} />
+                         <div className="flex flex-col items-center justify-center min-w-[70px] text-center relative">
+                            {isUpdating && <Loader2 className="h-4 w-4 animate-spin absolute top-0"/>}
+                            <LiveMatchStatus fixture={liveFixture} />
                          </div>
                         <Input 
                             type="number" 
@@ -101,21 +144,21 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
                             min="0"
                             value={homeValue}
                             onChange={handleHomeChange}
-                            id={`home-${fixture.fixture.id}`}
+                            id={`home-${liveFixture.fixture.id}`}
                             disabled={isPredictionDisabled}
                         />
                     </div>
                    <div className="flex flex-col items-center gap-1 flex-1 truncate">
-                        <Avatar className="h-8 w-8"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                        <span className="font-semibold text-xs text-center truncate w-full">{fixture.teams.home.name}</span>
+                        <Avatar className="h-8 w-8"><AvatarImage src={liveFixture.teams.home.logo} /></Avatar>
+                        <span className="font-semibold text-xs text-center truncate w-full">{liveFixture.teams.home.name}</span>
                     </div>
                 </div>
                  <div className="text-center text-xs text-muted-foreground mt-2">
-                    <span>{fixture.league.name}</span>
+                    <span>{liveFixture.league.name}</span>
                 </div>
 
                 <div className="mt-2">
-                    <PredictionOdds fixtureId={fixture.fixture.id} />
+                    <PredictionOdds fixtureId={liveFixture.fixture.id} />
                 </div>
 
 
@@ -134,3 +177,5 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
 };
 
 export default PredictionCard;
+
+    
