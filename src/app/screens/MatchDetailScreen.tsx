@@ -465,7 +465,7 @@ const StandingsTab = ({ standings, homeTeamId, awayTeamId, navigate, loading }: 
 };
 
 const mergePlayerData = (baseLineups: LineupData[], detailedPlayers: { player: Player, statistics: any[] }[]): LineupData[] => {
-    if (!detailedPlayers || detailedPlayers.length === 0 || !baseLineups || baseLineups.length === 0) {
+    if (!detailedPlayers?.length || !baseLineups?.length) {
         return baseLineups || [];
     }
 
@@ -476,11 +476,9 @@ const mergePlayerData = (baseLineups: LineupData[], detailedPlayers: { player: P
         }
     });
 
-    const updatePlayerInList = (playerList: PlayerWithStats[]): PlayerWithStats[] => {
+    const updatePlayerList = (playerList: PlayerWithStats[]): PlayerWithStats[] => {
         if (!playerList) return [];
         return playerList.map(pWithStats => {
-            if (!pWithStats || !pWithStats.player) return pWithStats;
-
             const lineupPlayer = pWithStats.player;
             if (lineupPlayer.id && playersMap.has(lineupPlayer.id)) {
                 const detailedPlayerInfo = playersMap.get(lineupPlayer.id)!;
@@ -500,8 +498,8 @@ const mergePlayerData = (baseLineups: LineupData[], detailedPlayers: { player: P
 
     return baseLineups.map(lineup => ({
         ...lineup,
-        startXI: updatePlayerInList(lineup.startXI),
-        substitutes: updatePlayerInList(lineup.substitutes),
+        startXI: updatePlayerList(lineup.startXI),
+        substitutes: updatePlayerList(lineup.substitutes),
     }));
 };
 
@@ -681,10 +679,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     
 
     const mergedLineups = useMemo(() => {
-        if (lineups && playersDetails) {
-            return mergePlayerData(lineups, playersDetails)
-        }
-        return lineups;
+        return mergePlayerData(lineups, playersDetails || []);
     }, [lineups, playersDetails]);
     
     const processedFixture = useMemo(() => {
