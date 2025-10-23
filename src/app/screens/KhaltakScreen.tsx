@@ -344,7 +344,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     const [pinnedMatches, setPinnedMatches] = useState<PredictionMatch[]>([]);
     const [loadingMatches, setLoadingMatches] = useState(true);
 
-    // This state will now hold ALL user predictions fetched once.
     const [allUserPredictions, setAllUserPredictions] = useState<{ [key: number]: Prediction }>({});
     const [loadingUserPredictions, setLoadingUserPredictions] = useState(true);
 
@@ -372,36 +371,38 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         return () => unsubPredictions();
     }, [db]);
 
-     // This useEffect fetches ALL user predictions once and for all.
     useEffect(() => {
-        if (!db || !user) {
-            setLoadingUserPredictions(false);
-            return;
-        };
+        if (!db || !user) return;
         setLoadingUserPredictions(true);
-        
-        // This query fetches all documents in the 'userPredictions' subcollections where the userId matches.
-        // It requires a composite index on (userId, fixtureId) on the userPredictions collection group.
-        const userPredictionsQuery = query(collectionGroup(db, 'userPredictions'), where('userId', '==', user.uid));
-        
-        const unsubUserPredictions = onSnapshot(userPredictionsQuery, (snapshot) => {
-            const predictionsMap: { [key: number]: Prediction } = {};
-            snapshot.forEach(doc => {
-                const prediction = doc.data() as Prediction;
-                predictionsMap[prediction.fixtureId] = prediction;
-            });
-            setAllUserPredictions(predictionsMap);
-            setLoadingUserPredictions(false);
-        }, (error) => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: `userPredictions collection group for user ${user.uid}`,
-                operation: 'list'
-            }));
-            setLoadingUserPredictions(false);
-        });
+        const predictionsUnsubscribers: (() => void)[] = [];
 
-        return () => unsubUserPredictions();
+        const fetchUserPredictions = async () => {
+            const predictionsRef = collection(db, 'predictions');
+            const predictionsSnapshot = await getDocs(predictionsRef);
+            
+            let newPredictions: { [key: number]: Prediction } = {};
 
+            for (const matchDoc of predictionsSnapshot.docs) {
+                const userPredictionRef = doc(db, 'predictions', matchDoc.id, 'userPredictions', user.uid);
+                
+                const unsub = onSnapshot(userPredictionRef, (predDoc) => {
+                    if (predDoc.exists()) {
+                        const prediction = predDoc.data() as Prediction;
+                        setAllUserPredictions(prev => ({ ...prev, [prediction.fixtureId]: prediction }));
+                    }
+                }, error => {
+                     errorEmitter.emit('permission-error', new FirestorePermissionError({path: userPredictionRef.path, operation: 'get'}));
+                });
+                predictionsUnsubscribers.push(unsub);
+            }
+            setLoadingUserPredictions(false);
+        };
+
+        fetchUserPredictions();
+        
+        return () => {
+            predictionsUnsubscribers.forEach(unsub => unsub());
+        };
     }, [db, user]);
     
     
@@ -516,17 +517,22 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 }
             }
             
-            const leaderboardBatch = writeBatch(db);
+            // Fetch all user profiles once
             const allUsersSnapshot = await getDocs(collection(db, 'users'));
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
             allUsersSnapshot.forEach(userDoc => {
                 const data = userDoc.data() as UserProfile;
-                userDetailsMap.set(userDoc.id, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || ''});
+                userDetailsMap.set(userDoc.id, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
             });
 
-            for (const [userId, totalPoints] of userPointsMap.entries()) {
+            // Prepare leaderboard batch update
+            const leaderboardBatch = writeBatch(db);
+            const allUserIds = new Set([...userPointsMap.keys(), ...leaderboard.map(l => l.userId)]);
+
+            for (const userId of allUserIds) {
                 const userDetails = userDetailsMap.get(userId);
                 if (userDetails) {
+                    const totalPoints = userPointsMap.get(userId) || 0;
                     const leaderboardRef = doc(db, 'leaderboard', userId);
                     leaderboardBatch.set(leaderboardRef, {
                         totalPoints: totalPoints,
@@ -545,7 +551,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         } finally {
             setIsUpdatingPoints(false);
         }
-    }, [db, isAdmin, toast, fetchLeaderboard, pinnedMatches]);
+    }, [db, isAdmin, toast, fetchLeaderboard, pinnedMatches, leaderboard]);
 
 
     const filteredMatches = useMemo(() => {
@@ -727,4 +733,5 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
 
