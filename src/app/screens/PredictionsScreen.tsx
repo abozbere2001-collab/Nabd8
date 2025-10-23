@@ -22,6 +22,9 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
     // CRITICAL FIX: Ensure fixture.goals exists and scores are not null before calculating.
