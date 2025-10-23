@@ -215,7 +215,7 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>الترتيب</TableHead>
+                        <TableHead className="text-right">الترتيب</TableHead>
                         <TableHead>المستخدم</TableHead>
                         <TableHead className="text-center">النقاط</TableHead>
                     </TableRow>

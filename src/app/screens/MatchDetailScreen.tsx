@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
+import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, Pencil } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
@@ -408,7 +408,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
             });
         });
         
-        const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => b - a);
+        const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
 
         return (
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
@@ -520,11 +520,11 @@ const StandingsTab = ({ standings, homeTeamId, awayTeamId, navigate, loading }: 
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead className="w-1/2 text-right">الفريق</TableHead>
+                    <TableHead className="w-[40px] text-right px-2">#</TableHead>
+                    <TableHead>الفريق</TableHead>
                     <TableHead className="text-center">لعب</TableHead>
                     <TableHead className="text-center">ف/ت/خ</TableHead>
                     <TableHead className="text-center">نقاط</TableHead>
-                    <TableHead className="w-[40px] text-right">#</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -532,6 +532,7 @@ const StandingsTab = ({ standings, homeTeamId, awayTeamId, navigate, loading }: 
                     const isRelevantTeam = s.team.id === homeTeamId || s.team.id === awayTeamId;
                     return (
                         <TableRow key={s.team.id} className={cn(isRelevantTeam && "bg-primary/10", "cursor-pointer")} onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
+                             <TableCell className="font-bold px-2">{s.rank}</TableCell>
                              <TableCell>
                                 <div className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
@@ -541,7 +542,6 @@ const StandingsTab = ({ standings, homeTeamId, awayTeamId, navigate, loading }: 
                             <TableCell className="text-center">{s.all.played}</TableCell>
                             <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
                             <TableCell className="text-center font-bold">{s.points}</TableCell>
-                            <TableCell className="font-bold">{s.rank}</TableCell>
                         </TableRow>
                     );
                 })}
@@ -687,12 +687,8 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                                 if (data.response) {
                                     allPlayersForTeam.push(...data.response);
                                 }
-                                if (data.paging && data.paging.total > currentPage) {
-                                    totalPages = data.paging.total;
-                                    currentPage++;
-                                } else {
-                                    break;
-                                }
+                                totalPages = data.paging.total;
+                                currentPage++;
                             } else {
                                  break;
                             }
@@ -926,3 +922,4 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
       </div>
     );
 }
+

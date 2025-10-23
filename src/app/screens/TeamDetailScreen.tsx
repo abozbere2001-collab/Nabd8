@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
@@ -372,7 +373,7 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[40px] text-left px-2">#</TableHead>
+                                <TableHead className="w-[40px] text-right px-2">#</TableHead>
                                 <TableHead>الفريق</TableHead>
                                 <TableHead className="text-center">لعب</TableHead>
                                 <TableHead className="text-center">ف/ت/خ</TableHead>
@@ -709,3 +710,4 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
+

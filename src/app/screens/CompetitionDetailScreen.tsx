@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -587,7 +588,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[40px] text-left px-2">#</TableHead>
+                            <TableHead className="w-[40px] text-right px-2">#</TableHead>
                             <TableHead>الفريق</TableHead>
                             <TableHead className="text-center">لعب</TableHead>
                             <TableHead className="text-center">ف</TableHead>
@@ -635,7 +636,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-8 text-left px-2">#</TableHead>
+                            <TableHead className="w-8 text-right px-2">#</TableHead>
                             <TableHead>اللاعب</TableHead>
                             <TableHead className="text-center w-12">الأهداف</TableHead>
                         </TableRow>
@@ -646,7 +647,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const teamName = getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name);
                             return (
                                 <TableRow key={player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
-                                    <TableCell className="font-bold text-left px-2">{index + 1}</TableCell>
+                                    <TableCell className="font-bold text-right px-2">{index + 1}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-10 w-10">
@@ -713,3 +714,4 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+
