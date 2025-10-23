@@ -744,16 +744,12 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} />
 
                 <Tabs defaultValue="details">
-                    <ScrollArea className="w-full whitespace-nowrap">
-                        <TabsList>
-                            <TabsTrigger value="details"><ShieldCheck className="mr-2 h-4 w-4" />تفاصيل</TabsTrigger>
-                            <TabsTrigger value="lineups"><Users className="mr-2 h-4 w-4" />التشكيلات</TabsTrigger>
-                            <TabsTrigger value="timeline"><Clock className="mr-2 h-4 w-4" />الاحداث</TabsTrigger>
-                            <TabsTrigger value="standings"><BarChart className="mr-2 h-4 w-4" />الترتيب</TabsTrigger>
-                            <TabsTrigger value="odds">المراهنات</TabsTrigger>
-                        </TabsList>
-                        <ScrollBar orientation="horizontal" />
-                    </ScrollArea>
+                    <TabsList className="grid w-full grid-cols-4">
+                        <TabsTrigger value="details">تفاصيل</TabsTrigger>
+                        <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
+                        <TabsTrigger value="timeline">الاحداث</TabsTrigger>
+                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                    </TabsList>
                     <TabsContent value="details" className="mt-4">
                         <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
                     </TabsContent>
@@ -765,9 +761,6 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                     </TabsContent>
                     <TabsContent value="standings" className="mt-4">
                         <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
-                    </TabsContent>
-                     <TabsContent value="odds" className="mt-4">
-                        <OddsTab fixtureId={Number(fixtureId)} />
                     </TabsContent>
                 </Tabs>
                 {isAdmin && (
