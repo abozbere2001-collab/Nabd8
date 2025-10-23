@@ -226,8 +226,8 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                             <TableCell>{score.rank}</TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-2">
-                                    <Avatar className="h-6 w-6"><AvatarImage src={score.userPhoto}/></Avatar>
                                     {score.userName}
+                                    <Avatar className="h-6 w-6"><AvatarImage src={score.userPhoto}/></Avatar>
                                 </div>
                             </TableCell>
                             <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
@@ -244,8 +244,8 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                                     <TableCell>{userScore.rank || '-'}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <Avatar className="h-6 w-6"><AvatarImage src={userScore.userPhoto}/></Avatar>
                                             {userScore.userName}
+                                            <Avatar className="h-6 w-6"><AvatarImage src={userScore.userPhoto}/></Avatar>
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center font-bold">{userScore.totalPoints}</TableCell>
@@ -468,27 +468,31 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         toast({ title: "بدء تحديث النقاط...", description: "جاري حساب النقاط لجميع المستخدمين. قد تستغرق هذه العملية بعض الوقت." });
 
         try {
-            // FIX: Fetch the most recent list of pinned matches inside the function
             const currentPinnedMatchesSnapshot = await getDocs(collection(db, 'predictions'));
             const currentPinnedMatches = currentPinnedMatchesSnapshot.docs.map(doc => ({
                 ...(doc.data() as PredictionMatch),
                 id: doc.id,
             })).filter(m => m && m.fixtureData && m.fixtureData.fixture);
 
-
             const allUsersSnapshot = await getDocs(collection(db, 'users'));
+            const leaderboardSnapshot = await getDocs(collection(db, 'leaderboard'));
+            
             const userPointsMap = new Map<string, number>();
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
 
+            leaderboardSnapshot.forEach(doc => {
+                userPointsMap.set(doc.id, doc.data().totalPoints || 0);
+            });
             allUsersSnapshot.forEach(userDoc => {
                 const data = userDoc.data() as UserProfile;
-                // CRITICAL FIX: Reset points to 0 for every user before recalculating
-                userPointsMap.set(userDoc.id, 0); 
                 userDetailsMap.set(userDoc.id, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
+                if (!userPointsMap.has(userDoc.id)) {
+                    userPointsMap.set(userDoc.id, 0);
+                }
             });
             
             const finishedFixtures = currentPinnedMatches.filter(m => 
-                m.fixtureData && ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short)
+                ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short)
             );
 
             if (finishedFixtures.length === 0) {
@@ -501,7 +505,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 const fixtureId = match.fixtureData.fixture.id;
                 const userPredictionsColRef = collection(db, 'predictions', String(fixtureId), 'userPredictions');
                  try {
-                    const userPredictionsSnapshot = await getDocs(userPredictionsColRef);
+                    const userPredictionsSnapshot = await getDocs(query(userPredictionsColRef, where('points', '==', 0)));
                     if (userPredictionsSnapshot.empty) continue;
                     
                     const pointsUpdateBatch = writeBatch(db);
@@ -509,14 +513,14 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                         const userPrediction = userPredDoc.data() as Prediction;
                         const newPoints = calculatePoints(userPrediction, match.fixtureData);
                         
-                        // Only update if points have changed
-                        if (userPrediction.points !== newPoints) {
+                        if (newPoints > 0) {
                             pointsUpdateBatch.update(userPredDoc.ref, { points: newPoints });
+                            const currentTotalPoints = userPointsMap.get(userPrediction.userId) || 0;
+                            userPointsMap.set(userPrediction.userId, currentTotalPoints + newPoints);
+                        } else {
+                            // Still mark as calculated even if points are 0 to avoid re-calculation
+                            pointsUpdateBatch.update(userPredDoc.ref, { points: -1 }); // Using -1 to indicate checked and 0 points
                         }
-                        
-                        // CRITICAL FIX: Use the newly calculated points for the sum
-                        const currentTotalPoints = userPointsMap.get(userPrediction.userId) || 0;
-                        userPointsMap.set(userPrediction.userId, currentTotalPoints + newPoints);
                     });
                     await pointsUpdateBatch.commit();
 
@@ -597,7 +601,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                        {isAdmin && (
                            <Button onClick={handleCalculateAllPoints} disabled={isUpdatingPoints} size="sm">
                                {isUpdatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
-                               <span className="mr-2">تحديث لوحة الصدارة</span>
+                               <span className="mr-2">تحديث النقاط</span>
                            </Button>
                        )}
                   </CardHeader>

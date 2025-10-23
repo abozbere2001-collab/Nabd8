@@ -624,9 +624,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                             </div>
                         </AccordionTrigger>
                         <AccordionContent className="p-2">
-                            <Accordion type="multiple" className="w-full space-y-2">
-                                {renderClubCompetitions()}
-                            </Accordion>
+                             <Avatar className="h-6 w-6 bg-white p-0.5">
+                                <AvatarImage src={league.logo} alt={league.name} className="object-contain" />
+                            </Avatar>
                         </AccordionContent>
                     </AccordionItem>
                  </Accordion>

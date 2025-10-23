@@ -111,7 +111,7 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
                     </div>
                 </div>
                  <div className="text-center text-xs text-muted-foreground mt-2">
-                    <span>{fixture.league.name}</span> - <span>{format(new Date(fixture.fixture.date), "EEE, d MMM", { locale: ar })}</span>
+                    <span>{fixture.league.name}</span>
                 </div>
 
                 <div className="mt-2">
@@ -119,7 +119,7 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
                 </div>
 
 
-                {isMatchFinished && userPrediction?.points !== undefined && (
+                {isMatchFinished && userPrediction?.points !== undefined && userPrediction.points >= 0 && (
                      <p className={cn("text-center font-bold text-sm mt-2", getPointsColor())}>
                         +{userPrediction.points} نقاط
                     </p>
