@@ -1,18 +1,18 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shirt, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, Pencil, TrendingUp } from 'lucide-react';
+import { Shirt, ArrowRight, ArrowLeft, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, TrendingUp, Pencil } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
@@ -20,17 +20,22 @@ import { CURRENT_SEASON } from '@/lib/constants';
 import { OddsTab } from '@/components/OddsTab';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
-import { doc, setDoc, deleteDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
+// This is a temporary fallback. In a real app, you would use a proper i18n library.
+const useTranslation = () => ({ t: (key: string) => key.replace(/_/g, ' ') });
+
+
 type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'status';
 
 
 const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerType, navigate: ScreenProps['navigate'], onRename: () => void, isAdmin: boolean }) => {
+    const { t } = useTranslation();
     const fallbackImage = "https://media.api-sports.io/football/players/0.png";
     const playerImage = player.photo && player.photo.trim() !== '' ? player.photo : fallbackImage;
 
@@ -72,7 +77,7 @@ const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerTyp
                     </div>
                 )}
             </div>
-            <span className="mt-1 text-[10px] font-semibold text-center truncate w-16">{player?.name || "غير معروف"}</span>
+            <span className="mt-1 text-[11px] font-semibold text-center truncate w-16">{player?.name || t('unknown')}</span>
         </div>
     );
 };
@@ -107,27 +112,81 @@ const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture
     );
 };
 
+const ShotMap = ({ homeStats, awayStats }: { homeStats: any[], awayStats: any[] }) => {
+    const { t } = useTranslation();
+    const findStat = (stats: any[], type: string): number => {
+        const value = stats.find(s => s.type === type)?.value;
+        if (typeof value === 'string') return parseInt(value, 10) || 0;
+        return value || 0;
+    };
+
+    const homeShotsInside = findStat(homeStats, "Shots insidebox");
+    const homeShotsOutside = findStat(homeStats, "Shots outsidebox");
+    const awayShotsInside = findStat(awayStats, "Shots insidebox");
+    const awayShotsOutside = findStat(awayStats, "Shots outsidebox");
+    
+    if ((homeShotsInside + homeShotsOutside + awayShotsInside + awayShotsOutside) === 0) {
+        return null; // Don't render if there are no shot stats
+    }
+
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-lg text-center">{t('shot_map')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="relative w-full max-w-sm mx-auto aspect-[3/2] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50" style={{backgroundImage: "url('/pitch-horizontal.svg')"}}>
+                    {/* Home Team (Right side) */}
+                    <div className="absolute right-[18%] top-1/2 -translate-y-1/2 text-center text-white">
+                        <p className="font-bold text-2xl drop-shadow-lg">{homeShotsInside}</p>
+                        <p className="text-xs">{t('inside_box')}</p>
+                    </div>
+                     <div className="absolute right-[40%] top-1/2 -translate-y-1/2 text-center text-white">
+                        <p className="font-bold text-2xl drop-shadow-lg">{homeShotsOutside}</p>
+                         <p className="text-xs">{t('outside_box')}</p>
+                    </div>
+
+                    {/* Away Team (Left side) */}
+                     <div className="absolute left-[18%] top-1/2 -translate-y-1/2 text-center text-white">
+                        <p className="font-bold text-2xl drop-shadow-lg">{awayShotsInside}</p>
+                         <p className="text-xs">{t('inside_box')}</p>
+                    </div>
+                    <div className="absolute left-[40%] top-1/2 -translate-y-1/2 text-center text-white">
+                        <p className="font-bold text-2xl drop-shadow-lg">{awayShotsOutside}</p>
+                        <p className="text-xs">{t('outside_box')}</p>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
 const DetailsTab = ({ fixture, statistics, loading }: { fixture: Fixture; statistics: MatchStatistics[] | null; loading: boolean }) => {
+    const { t } = useTranslation();
     const homeStats = statistics?.find(s => s.team.id === fixture.teams.home.id)?.statistics || [];
     const awayStats = statistics?.find(s => s.team.id === fixture.teams.away.id)?.statistics || [];
 
     const findStat = (stats: any[], type: string) => stats.find(s => s.type === type)?.value ?? '0';
 
     const statMapping: { labelKey: string; type: string; isProgress?: boolean }[] = [
-      { labelKey: "الاستحواذ", type: "Ball Possession", isProgress: true },
-      { labelKey: "التسديدات", type: "Total Shots" },
-      { labelKey: "تسديدات على المرمى", type: "Shots on Goal" },
-      { labelKey: "تسديدات خارج المرمى", type: "Shots off Goal" },
-      { labelKey: "تسديدات محجوبة", type: "Blocked Shots"},
-      { labelKey: "الأخطاء", type: "Fouls" },
-      { labelKey: "البطاقات الصفراء", type: "Yellow Cards" },
-      { labelKey: "البطاقات الحمراء", type: "Red Cards" },
-      { labelKey: "الركنيات", type: "Corner Kicks" },
-      { labelKey: "التسلل", type: "Offsides" },
+      { labelKey: "possession", type: "Ball Possession", isProgress: true },
+      { labelKey: "total_shots", type: "Total Shots" },
+      { labelKey: "shots_on_goal", type: "Shots on Goal" },
+      { labelKey: "shots_off_goal", type: "Shots off Goal" },
+      { labelKey: "blocked_shots", type: "Blocked Shots"},
+      { labelKey: "fouls", type: "Fouls" },
+      { labelKey: "yellow_cards", type: "Yellow Cards" },
+      { labelKey: "red_cards", type: "Red Cards" },
+      { labelKey: "corner_kicks", type: "Corner Kicks" },
+      { labelKey: "offsides", type: "Offsides" },
     ];
 
     return (
         <div className="space-y-4">
+             {statistics && statistics.length > 0 && (
+                <ShotMap homeStats={homeStats} awayStats={awayStats} />
+            )}
             <Card>
                 <CardContent className="p-4 text-sm text-right">
                     <div className="flex justify-between py-2 border-b">
@@ -162,7 +221,7 @@ const DetailsTab = ({ fixture, statistics, loading }: { fixture: Fixture; statis
                                     <div key={stat.type} className="space-y-2">
                                         <div className="flex justify-between items-center text-xs font-bold">
                                             <span>{homeValueRaw}</span>
-                                            <span className="text-muted-foreground">{stat.labelKey}</span>
+                                            <span className="text-muted-foreground">{t(stat.labelKey)}</span>
                                             <span>{awayValueRaw}</span>
                                         </div>
                                         <div className="flex items-center gap-1" dir="ltr">
@@ -175,7 +234,7 @@ const DetailsTab = ({ fixture, statistics, loading }: { fixture: Fixture; statis
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
                                     <span>{homeValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{stat.labelKey}</span>
+                                    <span className="text-muted-foreground font-normal">{t(stat.labelKey)}</span>
                                     <span>{awayValueRaw}</span>
                                 </div>
                             )
@@ -191,6 +250,7 @@ const DetailsTab = ({ fixture, statistics, loading }: { fixture: Fixture; statis
 
 
 const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { events: MatchEvent[] | null, homeTeam: Fixture['teams']['home'], awayTeam: Fixture['teams']['away'], highlightsOnly: boolean }) => {
+    const { t } = useTranslation();
     if (events === null) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     
     const filteredEvents = React.useMemo(() => {
@@ -271,6 +331,7 @@ const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { ev
 };
 
 const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | null; homeTeam: Fixture['teams']['home'], awayTeam: Fixture['teams']['away'] }) => {
+    const { t } = useTranslation();
     return (
         <Tabs defaultValue="highlights" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
@@ -288,6 +349,7 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
 }
 
 const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId, detailedPlayersMap }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string, originalName: string) => void, homeTeamId: number, awayTeamId: number, detailedPlayersMap: Map<number, { player: PlayerType; statistics: any[] }> }) => {
+    const { t } = useTranslation();
     if (lineups === null) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
@@ -377,13 +439,13 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                 </TabsList>
             </Tabs>
             
-            <div className="font-bold text-center text-muted-foreground text-sm">التشكيلة: {activeLineup.formation}</div>
+            <div className="font-bold text-center text-muted-foreground text-sm">{t('formation')}: {activeLineup.formation}</div>
             
             {renderPitch(activeLineup)}
             
             <Card>
                 <CardContent className="p-3 text-center">
-                    <h3 className="font-bold text-sm mb-2">المدرب</h3>
+                    <h3 className="font-bold text-sm mb-2">{t('coach')}</h3>
                      <div className="relative inline-flex flex-col items-center gap-1">
                         <Avatar className="h-12 w-12">
                             <AvatarImage src={activeLineup.coach.photo} />
@@ -401,7 +463,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
 
             {substitutionEvents.length > 0 && (
                 <Card>
-                    <CardHeader><CardTitle className="text-base text-center">التبديلات</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="text-base text-center">{t('substitutions')}</CardTitle></CardHeader>
                     <CardContent className="space-y-2">
                         {substitutionEvents.map((event, index) => (
                             <div key={index} className="flex items-center justify-between text-xs p-1 border-b last:border-b-0">
@@ -421,7 +483,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
             )}
             
             <div className="pt-4">
-                <h3 className="text-center text-base font-bold mb-2">الاحتياط</h3>
+                <h3 className="text-center text-base font-bold mb-2">{t('substitutes')}</h3>
                 <div className="space-y-2">
                     {activeLineup.substitutes.map(p => {
                         const fullPlayer = getPlayerWithDetails(p.player);
@@ -448,8 +510,9 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
 
 
 const StandingsTab = ({ standings, homeTeamId, awayTeamId, navigate, loading }: { standings: Standing[] | null, homeTeamId: number, awayTeamId: number, navigate: ScreenProps['navigate'], loading: boolean }) => {
+    const { t } = useTranslation();
     if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    if (!standings || standings.length === 0) return <p className="text-center text-muted-foreground p-8">الترتيب غير متاح لهذه البطولة حاليًا.</p>;
+    if (!standings || standings.length === 0) return <p className="text-center text-muted-foreground p-8">{t('standings_not_available')}</p>;
     
     return (
         <Table>
@@ -722,93 +785,95 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     
     return (
       <div className="flex h-full flex-col bg-background">
-        <ScreenHeader
-          title={'تفاصيل المباراة'}
-          onBack={goBack}
-          canGoBack={canGoBack}
-          actions={
-            isAdmin && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() =>
-                  handleOpenRename(
-                    'status',
-                    processedFixture.fixture.id,
-                    customStatus || ''
-                  )
-                }
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            )
-          }
-        />
-        {renameItem && (
-          <RenameDialog
-            isOpen={!!renameItem}
-            onOpenChange={() => setRenameItem(null)}
-            item={{ ...renameItem, purpose: 'rename' }}
-            onSave={(type, id, name) =>
-              handleSaveRename(type, Number(id), name)
+        <div className="flex-1 flex flex-col min-h-0">
+          <ScreenHeader
+            title={'تفاصيل المباراة'}
+            onBack={goBack}
+            canGoBack={canGoBack}
+            actions={
+              isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() =>
+                    handleOpenRename(
+                      'status',
+                      processedFixture.fixture.id,
+                      customStatus || ''
+                    )
+                  }
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )
             }
           />
-        )}
-        <div className="flex-1 overflow-y-auto p-4">
-          <MatchHeaderCard
-            fixture={processedFixture}
-            navigate={navigate}
-            customStatus={customStatus}
-          />
-          <Tabs defaultValue="lineups" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="details">التفاصيل</TabsTrigger>
-              <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
-              <TabsTrigger value="timeline">الأحداث</TabsTrigger>
-              <TabsTrigger value="standings">الترتيب</TabsTrigger>
-              <TabsTrigger value="odds">
-                <TrendingUp />
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="details" className="pt-4">
-              <DetailsTab
-                fixture={processedFixture}
-                statistics={statistics}
-                loading={loadingDetails}
-              />
-            </TabsContent>
-            <TabsContent value="lineups" className="pt-4">
-              <LineupsTab
-                lineups={lineups}
-                events={events}
-                navigate={navigate}
-                isAdmin={isAdmin}
-                onRename={handleOpenRename}
-                homeTeamId={homeTeamId}
-                awayTeamId={awayTeamId}
-                detailedPlayersMap={detailedPlayersMap}
-              />
-            </TabsContent>
-            <TabsContent value="timeline" className="pt-4">
-              <TimelineTab
-                events={events}
-                homeTeam={processedFixture.teams.home}
-                awayTeam={processedFixture.teams.away}
-              />
-            </TabsContent>
-            <TabsContent value="standings" className="pt-4">
-              <StandingsTab
-                standings={processedStandings}
-                homeTeamId={homeTeamId}
-                awayTeamId={awayTeamId}
-                navigate={navigate}
-                loading={loadingStandings}
-              />
-            </TabsContent>
-            <TabsContent value="odds" className="pt-4">
-                <OddsTab fixtureId={processedFixture.fixture.id} />
-            </TabsContent>
-          </Tabs>
+          {renameItem && (
+            <RenameDialog
+              isOpen={!!renameItem}
+              onOpenChange={() => setRenameItem(null)}
+              item={{ ...renameItem, purpose: 'rename' }}
+              onSave={(type, id, name) =>
+                handleSaveRename(type, Number(id), name)
+              }
+            />
+          )}
+          <div className="flex-1 overflow-y-auto p-4">
+            <MatchHeaderCard
+              fixture={processedFixture}
+              navigate={navigate}
+              customStatus={customStatus}
+            />
+            <Tabs defaultValue="lineups" className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="details">التفاصيل</TabsTrigger>
+                <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
+                <TabsTrigger value="timeline">الأحداث</TabsTrigger>
+                <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                <TabsTrigger value="odds">
+                  <TrendingUp />
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="details" className="pt-4">
+                <DetailsTab
+                  fixture={processedFixture}
+                  statistics={statistics}
+                  loading={loadingDetails}
+                />
+              </TabsContent>
+              <TabsContent value="lineups" className="pt-4">
+                <LineupsTab
+                  lineups={lineups}
+                  events={events}
+                  navigate={navigate}
+                  isAdmin={isAdmin}
+                  onRename={handleOpenRename}
+                  homeTeamId={homeTeamId}
+                  awayTeamId={awayTeamId}
+                  detailedPlayersMap={detailedPlayersMap}
+                />
+              </TabsContent>
+              <TabsContent value="timeline" className="pt-4">
+                <TimelineTab
+                  events={events}
+                  homeTeam={processedFixture.teams.home}
+                  awayTeam={processedFixture.teams.away}
+                />
+              </TabsContent>
+              <TabsContent value="standings" className="pt-4">
+                <StandingsTab
+                  standings={processedStandings}
+                  homeTeamId={homeTeamId}
+                  awayTeamId={awayTeamId}
+                  navigate={navigate}
+                  loading={loadingStandings}
+                />
+              </TabsContent>
+              <TabsContent value="odds" className="pt-4">
+                  <OddsTab fixtureId={processedFixture.fixture.id} />
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
       </div>
     );
