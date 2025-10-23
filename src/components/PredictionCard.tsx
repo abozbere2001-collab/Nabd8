@@ -128,9 +128,9 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                             type="number" 
                             className={cn("w-10 h-9 text-center text-md font-bold", isColoredCard && 'bg-black/20 border-white/30 text-white placeholder:text-white/70')}
                             min="0" 
-                            value={awayValue}
-                            onChange={handleAwayChange}
-                            id={`away-${liveFixture.fixture.id}`}
+                            value={homeValue}
+                            onChange={handleHomeChange}
+                            id={`home-${liveFixture.fixture.id}`}
                             disabled={isPredictionDisabled}
                         />
                          <div className="flex flex-col items-center justify-center min-w-[70px] text-center relative">
@@ -141,9 +141,9 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                             type="number" 
                             className={cn("w-10 h-9 text-center text-md font-bold", isColoredCard && 'bg-black/20 border-white/30 text-white placeholder:text-white/70')}
                             min="0"
-                            value={homeValue}
-                            onChange={handleHomeChange}
-                            id={`home-${liveFixture.fixture.id}`}
+                            value={awayValue}
+                            onChange={handleAwayChange}
+                            id={`away-${liveFixture.fixture.id}`}
                             disabled={isPredictionDisabled}
                         />
                     </div>

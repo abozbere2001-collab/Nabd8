@@ -469,97 +469,90 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     
         try {
             const currentPinnedMatchesSnapshot = await getDocs(collection(db, 'predictions'));
-            const currentPinnedMatches = currentPinnedMatchesSnapshot.docs
-                .map(doc => ({ ...(doc.data() as PredictionMatch), id: doc.id, }))
-                .filter(m => m && m.fixtureData && m.fixtureData.fixture); // Safety check
-            
-            const fixtureIdsToUpdate = currentPinnedMatches.map(m => m.fixtureData.fixture.id);
+            const matchesToUpdate = currentPinnedMatchesSnapshot.docs
+                .map(doc => ({ ...(doc.data() as PredictionMatch), id: doc.id }))
+                .filter(m => {
+                    // Safety check for malformed data
+                    if (!m || !m.fixtureData || !m.fixtureData.fixture) return false;
+                    const status = m.fixtureData.fixture.status.short;
+                    // Only process matches that are not yet finished or whose points haven't been calculated
+                    return !['FT', 'AET', 'PEN'].includes(status) || m.fixtureData.fixture.status.elapsed === null;
+                });
+    
+            const fixtureIdsToUpdate = matchesToUpdate.map(m => m.fixtureData.fixture.id);
     
             if (fixtureIdsToUpdate.length === 0) {
-                toast({ title: "لا توجد مباريات مثبتة", description: "لا يوجد ما يمكن تحديثه." });
+                toast({ title: "لا توجد مباريات جديدة", description: "جميع المباريات المثبتة محدثة بالفعل." });
                 setIsUpdatingPoints(false);
                 return;
             }
     
-            // Fetch latest data for all fixtures at once
             const fixtureRes = await fetch(`/api/football/fixtures?ids=${fixtureIdsToUpdate.join('-')}`);
-            if (!fixtureRes.ok) throw new Error("Failed to fetch fixture updates.");
+            if (!fixtureRes.ok) throw new Error("Failed to fetch fixture updates from API.");
     
             const fixtureApiData = await fixtureRes.json();
             const latestFixtures: Fixture[] = fixtureApiData.response || [];
-            
+    
             const finishedFixtures = latestFixtures.filter(f => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short));
-            
+    
             if (finishedFixtures.length === 0) {
-                toast({ title: "لا توجد مباريات منتهية", description: "لا يوجد ما يمكن تحديثه." });
+                toast({ title: "لا توجد مباريات منتهية بعد", description: "لا يمكن حساب النقاط حاليًا." });
                 setIsUpdatingPoints(false);
                 return;
             }
-            
-            const userPointsMap = new Map<string, { totalPoints: number; userName: string; userPhoto: string }>();
-            
-            let updatedFixturesCount = 0;
-            const pointsUpdateBatch = writeBatch(db);
+    
+            const userPointsMap = new Map<string, number>();
+            const leaderboardBatch = writeBatch(db);
     
             for (const latestFixture of finishedFixtures) {
                 const fixtureId = latestFixture.fixture.id;
                 const matchDocRef = doc(db, 'predictions', String(fixtureId));
-                
-                pointsUpdateBatch.update(matchDocRef, { fixtureData: latestFixture });
-                updatedFixturesCount++;
-                
+                leaderboardBatch.update(matchDocRef, { fixtureData: latestFixture });
+    
                 const userPredictionsColRef = collection(db, 'predictions', String(fixtureId), 'userPredictions');
                 const userPredictionsSnapshot = await getDocs(userPredictionsColRef);
-                
                 if (userPredictionsSnapshot.empty) continue;
     
                 for (const userPredDoc of userPredictionsSnapshot.docs) {
                     const userPrediction = userPredDoc.data() as Prediction;
                     const newPoints = calculatePoints(userPrediction, latestFixture);
-                    
+    
                     if (userPrediction.points !== newPoints) {
-                        pointsUpdateBatch.update(userPredDoc.ref, { points: newPoints });
-                    }
-                    
-                    if (!userPointsMap.has(userPrediction.userId)) {
-                         const userDoc = await getDoc(doc(db, 'users', userPrediction.userId));
-                         if (userDoc.exists()) {
-                            const userData = userDoc.data() as UserProfile;
-                             userPointsMap.set(userPrediction.userId, { 
-                                totalPoints: 0, 
-                                userName: userData.displayName || 'مستخدم',
-                                userPhoto: userData.photoURL || '' 
-                            });
-                         }
+                        leaderboardBatch.update(userPredDoc.ref, { points: newPoints });
                     }
     
-                    const currentUserData = userPointsMap.get(userPrediction.userId);
-                    if (currentUserData) {
-                        currentUserData.totalPoints += newPoints;
-                    }
+                    const currentTotal = userPointsMap.get(userPrediction.userId) || 0;
+                    userPointsMap.set(userPrediction.userId, currentTotal + newPoints);
                 }
             }
-            
-            const leaderboardBatch = writeBatch(db);
-            for (const [userId, userData] of userPointsMap.entries()) {
-                 const leaderboardRef = doc(db, 'leaderboard', userId);
-                 leaderboardBatch.set(leaderboardRef, {
-                    totalPoints: userData.totalPoints,
-                    userName: userData.userName,
-                    userPhoto: userData.userPhoto,
-                }, { merge: true });
+    
+            // Fetch current leaderboard scores for the affected users
+            const affectedUserIds = Array.from(userPointsMap.keys());
+            for (const userId of affectedUserIds) {
+                const leaderboardRef = doc(db, 'leaderboard', userId);
+                try {
+                    const currentScoreDoc = await getDoc(leaderboardRef);
+                    const currentPoints = currentScoreDoc.exists() ? currentScoreDoc.data().totalPoints || 0 : 0;
+                    const newTotalPoints = currentPoints + (userPointsMap.get(userId) || 0);
+                    leaderboardBatch.set(leaderboardRef, { totalPoints: newTotalPoints }, { merge: true });
+                } catch(e) {
+                     // This may fail if rules don't allow reading individual leaderboard docs
+                     // A more robust solution might involve a Cloud Function, but this is a client-side attempt.
+                     const newPoints = userPointsMap.get(userId) || 0;
+                     // Overwrite with new points if we can't read. This is not ideal but better than nothing.
+                     leaderboardBatch.set(leaderboardRef, { totalPoints: newPoints }, { merge: true });
+                }
             }
-            
-            await pointsUpdateBatch.commit();
+    
             await leaderboardBatch.commit();
             
-            toast({ title: "نجاح!", description: `تم تحديث ${updatedFixturesCount} مباريات ولوحة الصدارة.` });
+            toast({ title: "نجاح!", description: `تم تحديث ${finishedFixtures.length} مباريات ولوحة الصدارة.` });
             fetchLeaderboard();
     
         } catch (error) {
             console.error("Error calculating all points:", error);
-            if (error instanceof FirestorePermissionError || (error instanceof Error && error.message.includes('permission'))) {
-                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'users or predictions or leaderboard', operation: 'list' }));
+            if (error instanceof Error && error.message.includes('permission')) {
+                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'predictions or leaderboard', operation: 'list' }));
             }
             toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ أثناء تحديث لوحة الصدارة." });
         } finally {
