@@ -565,7 +565,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> } | null>(null);
 
     const [loadingFixture, setLoadingFixture] = useState(true);
-    const [loadingDetails, setLoadingDetails] = useState(true);
+    const [loadingDetails, setLoadingDetails] = useState(false);
     const [loadingStandings, setLoadingStandings] = useState(true);
     
     const { isAdmin, db } = useAdmin();
@@ -607,6 +607,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         const customName = customNames?.[`${type}s`]?.get(id);
         if (customName) return customName;
         
+        const hardcodedName = hardcodedTranslations?.[`${type}s`]?.[id];
+        if (hardcodedName) return hardcodedName;
+
         return defaultName;
     }, [customNames]);
 
@@ -724,8 +727,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         };
         
         if (fixtureId && typeof fixtureId === 'string') {
-          const customStatusRef = doc(db, 'matchCustomizations', fixtureId);
-          unsubStatus = onSnapshot(customStatusRef, (doc) => {
+          unsubStatus = onSnapshot(doc(db, 'matchCustomizations', fixtureId), (doc) => {
               if(doc.exists()) {
                   setCustomStatus(doc.data().customStatus);
               } else {
