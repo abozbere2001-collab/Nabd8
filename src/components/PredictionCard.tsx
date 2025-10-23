@@ -113,6 +113,7 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
     },[userPrediction]);
 
     const cardColors = getPredictionStatusColors();
+    const isColoredCard = cardColors !== 'bg-card text-foreground';
 
     return (
         <Card className={cn("transition-colors", cardColors)}>
@@ -120,12 +121,12 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                 <div className="flex items-center justify-between gap-1">
                      <div className="flex flex-col items-center gap-1 flex-1 justify-end truncate">
                         <Avatar className="h-8 w-8"><AvatarImage src={liveFixture.teams.home.logo} /></Avatar>
-                        <span className="font-semibold text-xs text-center truncate w-full">{liveFixture.teams.home.name}</span>
+                        <span className={cn("font-semibold text-xs text-center truncate w-full", isColoredCard && "text-white")}>{liveFixture.teams.home.name}</span>
                     </div>
                     <div className="flex items-center gap-1">
                         <Input 
                             type="number" 
-                            className={cn("w-10 h-9 text-center text-md font-bold", cardColors !== 'bg-card text-foreground' && 'bg-black/20 border-white/30 text-white placeholder:text-white/70')}
+                            className={cn("w-10 h-9 text-center text-md font-bold", isColoredCard && 'bg-black/20 border-white/30 text-white placeholder:text-white/70')}
                             min="0" 
                             value={homeValue}
                             onChange={handleHomeChange}
@@ -138,7 +139,7 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                          </div>
                         <Input 
                             type="number" 
-                            className={cn("w-10 h-9 text-center text-md font-bold", cardColors !== 'bg-card text-foreground' && 'bg-black/20 border-white/30 text-white placeholder:text-white/70')}
+                            className={cn("w-10 h-9 text-center text-md font-bold", isColoredCard && 'bg-black/20 border-white/30 text-white placeholder:text-white/70')}
                             min="0"
                             value={awayValue}
                             onChange={handleAwayChange}
@@ -148,10 +149,10 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                     </div>
                    <div className="flex flex-col items-center gap-1 flex-1 truncate">
                         <Avatar className="h-8 w-8"><AvatarImage src={liveFixture.teams.away.logo} /></Avatar>
-                        <span className="font-semibold text-xs text-center truncate w-full">{liveFixture.teams.away.name}</span>
+                        <span className={cn("font-semibold text-xs text-center truncate w-full", isColoredCard && "text-white")}>{liveFixture.teams.away.name}</span>
                     </div>
                 </div>
-                 <div className={cn("text-center text-xs mt-2", isMatchLiveOrFinished ? (cardColors !== 'bg-card text-foreground' ? 'text-white/80' : 'text-muted-foreground') : 'text-muted-foreground')}>
+                 <div className={cn("text-center text-xs mt-2", isMatchLiveOrFinished ? (isColoredCard ? 'text-white/80' : 'text-muted-foreground') : 'text-muted-foreground')}>
                     <span>{liveFixture.league.name}</span>
                 </div>
 
@@ -166,13 +167,15 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                     </p>
                 )}
                 
-                {!isMatchFinished && userPrediction && <p className={cn("text-center text-xs mt-2", cardColors !== 'bg-card text-foreground' ? 'text-green-300' : 'text-green-500')}>تم حفظ توقعك</p>}
+                {!isMatchFinished && userPrediction && <p className={cn("text-center text-xs mt-2", isColoredCard ? 'text-green-300' : 'text-green-500')}>تم حفظ توقعك</p>}
 
                 
-                {isPredictionDisabled && !userPrediction && !isMatchFinished && <p className={cn("text-center text-xs mt-2", cardColors !== 'bg-card text-foreground' ? 'text-red-300' : 'text-red-500')}>أغلق باب التوقع</p>}
+                {isPredictionDisabled && !userPrediction && !isMatchFinished && <p className={cn("text-center text-xs mt-2", isColoredCard ? 'text-red-300' : 'text-red-500')}>أغلق باب التوقع</p>}
             </CardContent>
         </Card>
     );
 };
 
 export default PredictionCard;
+
+    
