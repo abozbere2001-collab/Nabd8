@@ -327,10 +327,12 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
     
 const renderPitch = (lineup: LineupData) => {
+    // ✅ تأكيد أن البيانات موجودة
     if (!lineup || !Array.isArray(lineup.startXI) || lineup.startXI.length === 0) {
         return <p className="text-center text-muted-foreground p-4">⚠️ التشكيلة غير متوفرة لهذه المباراة.</p>;
     }
 
+    // ✅ تأمين الحقول الداخلية قبل أي عمليات
     const formationGrid: { [key: number]: PlayerWithStats[] } = {};
     const ungriddedPlayers: PlayerWithStats[] = [];
 
@@ -344,6 +346,7 @@ const renderPitch = (lineup: LineupData) => {
         }
     });
 
+    // ✅ ترتيب الصفوف بدون أخطاء
     Object.keys(formationGrid).forEach(rowKey => {
         const row = Number(rowKey);
         if (Array.isArray(formationGrid[row])) {
@@ -786,3 +789,5 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         </div>
     );
 }
+
+    
