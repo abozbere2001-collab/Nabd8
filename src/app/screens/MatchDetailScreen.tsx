@@ -18,7 +18,6 @@ import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { OddsTab } from '@/components/OddsTab';
-// import { useTranslation } from '@/components/LanguageProvider';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
 import { doc, setDoc, deleteDoc, writeBatch, getDocs, collection, onSnapshot } from 'firebase/firestore';
@@ -333,6 +332,10 @@ const LineupsTab = ({ fixture, lineups, events, navigate, isAdmin, onRename, hom
 
     const renderPitch = (lineup: LineupData) => {
         try {
+            if (!lineup || !Array.isArray(lineup.startXI)) {
+                return <p className="text-center text-muted-foreground p-4">بيانات اللاعبين الأساسيين غير متوفرة.</p>;
+            }
+
             const players = lineup.startXI;
             const formationGrid: Record<number, PlayerWithStats[]> = {};
             const ungridded: PlayerWithStats[] = [];
@@ -741,7 +744,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     if (!fixture) {
         return (
             <div>
-                <ScreenHeader title="تفاصيل المباراة" onBack={goBack} canGoBack={canGoBack} />
+                <ScreenHeader title="تفاصيل المباراة" navigate={navigate} onBack={goBack} canGoBack={canGoBack} />
                 <div className="container mx-auto p-4">
                     {loading ? (
                         <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
@@ -758,7 +761,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
     return (
         <div>
-            <ScreenHeader title="تفاصيل المباراة" onBack={goBack} canGoBack={canGoBack} />
+            <ScreenHeader title="تفاصيل المباراة" navigate={navigate} onBack={goBack} canGoBack={canGoBack} />
              {renameItem && <RenameDialog
                 isOpen={!!renameItem}
                 onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
@@ -780,7 +783,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                         <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={(type, id, data) => handleOpenRename(type, id, data)} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
                     </TabsContent>
                     <TabsContent value="timeline" className="pt-4">
-                        <TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} />
+                        <TimelineTab events={events} homeTeamId={fixture.teams.home.id} />
                     </TabsContent>
                     <TabsContent value="standings" className="pt-4">
                         <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
