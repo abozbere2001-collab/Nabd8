@@ -387,29 +387,27 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     }, [db]);
     
      useEffect(() => {
-        if (!user || !db || pinnedMatches.length === 0) {
-            return;
-        }
+        if (!user || !db || pinnedMatches.length === 0) return;
 
         const fetchUserPredictions = async () => {
             const newPredictions: { [key: number]: Prediction } = {};
-            for (const match of pinnedMatches) {
+            const promises = pinnedMatches.map(async (match) => {
                 const fixtureId = match.fixtureData.fixture.id;
-                const predRef = doc(db, 'predictions', String(fixtureId), 'userPredictions', user.uid);
+                const userPredictionsRef = collection(db, 'predictions', String(fixtureId), 'userPredictions');
+                const q = query(userPredictionsRef, where("userId", "==", user.uid));
+                
                 try {
-                    const docSnap = await getDoc(predRef);
-                    if (docSnap.exists()) {
+                    const querySnapshot = await getDocs(q);
+                    if (!querySnapshot.empty) {
+                        const docSnap = querySnapshot.docs[0];
                         newPredictions[fixtureId] = docSnap.data() as Prediction;
                     }
                 } catch (error) {
                     console.warn(`Could not fetch prediction for fixture ${fixtureId}`, error);
-                    // Emit a more specific error if needed
-                    errorEmitter.emit('permission-error', new FirestorePermissionError({
-                        path: `predictions/${fixtureId}/userPredictions/${user.uid}`,
-                        operation: 'get'
-                    }));
                 }
-            }
+            });
+
+            await Promise.all(promises);
             setUserPredictions(newPredictions);
         };
 
@@ -495,7 +493,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 return;
             }
 
-            const userPointsMap = new Map<string, { total: number, name: string, photo: string }>();
+            const userPointsMap = new Map<string, { total: number; name: string; photo: string }>();
             
              // Step 1: Iterate through finished matches and update individual prediction points
             for (const match of finishedFixtures) {
@@ -751,4 +749,3 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
