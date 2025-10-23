@@ -326,50 +326,52 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
     
-    const renderPitch = (lineup: LineupData) => {
-        if (!lineup || !Array.isArray(lineup.startXI)) {
-            return <p className="text-center text-muted-foreground p-4">بيانات اللاعبين الأساسيين غير متوفرة.</p>;
+const renderPitch = (lineup: LineupData) => {
+    if (!lineup || !Array.isArray(lineup.startXI) || lineup.startXI.length === 0) {
+        return <p className="text-center text-muted-foreground p-4">⚠️ التشكيلة غير متوفرة لهذه المباراة.</p>;
+    }
+
+    const formationGrid: { [key: number]: PlayerWithStats[] } = {};
+    const ungriddedPlayers: PlayerWithStats[] = [];
+
+    lineup.startXI.forEach(p => {
+        if (p && p.player && typeof p.player.grid === 'string') {
+            const [row] = p.player.grid.split(':').map(Number);
+            if (!formationGrid[row]) formationGrid[row] = [];
+            formationGrid[row].push(p);
+        } else if (p) {
+            ungriddedPlayers.push(p);
         }
-        
-        const formationGrid: { [key: number]: PlayerWithStats[] } = {};
-        const ungriddedPlayers: PlayerWithStats[] = [];
+    });
 
-        lineup.startXI.forEach(p => {
-            if (p.player.grid && typeof p.player.grid === 'string') {
-                const [row] = p.player.grid.split(':').map(Number);
-                if (!formationGrid[row]) formationGrid[row] = [];
-                formationGrid[row].push(p);
-            } else {
-                ungriddedPlayers.push(p);
-            }
-        });
-
-        Object.keys(formationGrid).forEach(rowKey => {
-            const row = Number(rowKey);
+    Object.keys(formationGrid).forEach(rowKey => {
+        const row = Number(rowKey);
+        if (Array.isArray(formationGrid[row])) {
             formationGrid[row].sort((a, b) => {
-                const colA = Number(a.player.grid?.split(':')[1] || 0);
-                const colB = Number(b.player.grid?.split(':')[1] || 0);
+                const colA = Number(a?.player?.grid?.split(':')[1] || 0);
+                const colB = Number(b?.player?.grid?.split(':')[1] || 0);
                 return colA - colB;
             });
-        });
+        }
+    });
         
-        const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
+    const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
 
-        return (
-             <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
-                {sortedRows.map(row => (
-                    <div key={row} className="flex justify-around items-center">
-                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player)} />)}
-                    </div>
-                ))}
-                 {ungriddedPlayers.length > 0 && (
-                    <div className="flex justify-around items-center">
-                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player)} />)}
-                    </div>
-                )}
-            </div>
-        )
-    }
+    return (
+         <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
+            {sortedRows.map(row => (
+                <div key={row} className="flex justify-around items-center w-full">
+                    {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player)} />)}
+                </div>
+            ))}
+             {ungriddedPlayers.length > 0 && (
+                <div className="flex justify-around items-center w-full">
+                    {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player)} />)}
+                </div>
+            )}
+        </div>
+    )
+}
 
     return (
         <ScrollArea className="h-[calc(100vh-250px)]">
@@ -757,14 +759,12 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', Number(fixtureId), {name: customStatus})}/>
                  <Tabs defaultValue="lineups" className="w-full">
-                    <div className="w-full overflow-x-auto">
-                        <TabsList className="grid w-full grid-cols-4">
-                            <TabsTrigger value="standings">الترتيب</TabsTrigger>
-                            <TabsTrigger value="timeline">الاحداث</TabsTrigger>
-                            <TabsTrigger value="details">تفاصيل</TabsTrigger>
-                            <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
-                        </TabsList>
-                    </div>
+                    <TabsList className="grid w-full grid-cols-4">
+                        <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
+                        <TabsTrigger value="timeline">الاحداث</TabsTrigger>
+                        <TabsTrigger value="details">تفاصيل</TabsTrigger>
+                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                    </TabsList>
                     <TabsContent value="details" className="mt-4">
                        <ScrollArea className="h-[calc(100vh-250px)]">
                            <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
