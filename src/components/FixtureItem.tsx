@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -44,13 +45,12 @@ export const FixtureItem = React.memo(({ fixture, navigate, customStatus, isPinn
                 className="flex-1 p-3 cursor-pointer"
                 onClick={() => navigate('MatchDetails', { fixtureId: fixture.fixture.id, fixture })}
             >
-                {/* ✅ The user's correct implementation */}
                 <main dir="rtl" className="flex items-start justify-between gap-2">
-                    <TeamDisplay team={fixture.teams.home} /> {/* المستضيف في اليمين */}
+                    <TeamDisplay team={fixture.teams.home} />
                     <div className="flex flex-col items-center justify-center min-w-[70px] pt-1 text-center">
                         <LiveMatchStatus fixture={fixture} customStatus={customStatus} />
                     </div>
-                    <TeamDisplay team={fixture.teams.away} /> {/* الضيف في اليسار */}
+                    <TeamDisplay team={fixture.teams.away} />
                 </main>
             </div>
         </div>

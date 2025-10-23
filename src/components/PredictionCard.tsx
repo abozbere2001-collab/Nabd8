@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -28,7 +27,7 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
 
     const isMatchLiveOrFinished = useMemo(() => ['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H', 'ET', 'BT', 'P'].includes(liveFixture.fixture.status.short), [liveFixture]);
     const isMatchFinished = useMemo(() => ['FT', 'AET', 'PEN'].includes(liveFixture.fixture.status.short), [liveFixture]);
-    const isPredictionDisabled = useMemo(() => new Date(liveFixture.fixture.timestamp * 1000) < new Date(Date.now() + 10 * 60 * 1000), [liveFixture]);
+    const isPredictionDisabled = useMemo(() => new Date(liveFixture.fixture.timestamp * 1000) < new Date(), [liveFixture]);
 
     // Fetch live data for the match
     useEffect(() => {
@@ -45,17 +44,14 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
             } catch (error) {
                 console.error("Failed to fetch live fixture data:", error);
             } finally {
-                // Short timeout to prevent the loader from flashing too quickly
                 setTimeout(() => setIsUpdating(false), 500);
             }
         };
 
-        // Only poll if the match is live and not finished
         if (isMatchLiveOrFinished && !isMatchFinished) {
-            fetchLiveFixture(); // Initial fetch
-            intervalId = setInterval(fetchLiveFixture, 60000); // Poll every 60 seconds
+            fetchLiveFixture(); 
+            intervalId = setInterval(fetchLiveFixture, 60000);
         } else {
-             // If the match is not live, we might still want to fetch once to get the final score
              if (['NS', 'TBD'].includes(initialPredictionMatch.fixtureData.fixture.status.short) && new Date(initialPredictionMatch.fixtureData.fixture.timestamp * 1000) < new Date()) {
                 fetchLiveFixture();
              }
@@ -116,22 +112,24 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
         setAwayValue(userPrediction?.awayGoals?.toString() ?? '');
     },[userPrediction]);
 
+    const cardColors = getPredictionStatusColors();
+
     return (
-        <Card className={cn("transition-colors", getPredictionStatusColors())}>
+        <Card className={cn("transition-colors", cardColors)}>
             <CardContent className="p-3">
                 <div className="flex items-center justify-between gap-1">
                      <div className="flex flex-col items-center gap-1 flex-1 justify-end truncate">
-                        <Avatar className="h-8 w-8"><AvatarImage src={liveFixture.teams.away.logo} /></Avatar>
-                        <span className="font-semibold text-xs text-center truncate w-full">{liveFixture.teams.away.name}</span>
+                        <Avatar className="h-8 w-8"><AvatarImage src={liveFixture.teams.home.logo} /></Avatar>
+                        <span className="font-semibold text-xs text-center truncate w-full">{liveFixture.teams.home.name}</span>
                     </div>
                     <div className="flex items-center gap-1">
                         <Input 
                             type="number" 
-                            className="w-10 h-9 text-center text-md font-bold" 
+                            className={cn("w-10 h-9 text-center text-md font-bold", cardColors !== 'bg-card text-foreground' && 'bg-black/20 border-white/30 text-white placeholder:text-white/70')}
                             min="0" 
-                            value={awayValue}
-                            onChange={handleAwayChange}
-                            id={`away-${liveFixture.fixture.id}`}
+                            value={homeValue}
+                            onChange={handleHomeChange}
+                            id={`home-${liveFixture.fixture.id}`}
                             disabled={isPredictionDisabled}
                         />
                          <div className="flex flex-col items-center justify-center min-w-[70px] text-center relative">
@@ -140,20 +138,20 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                          </div>
                         <Input 
                             type="number" 
-                            className="w-10 h-9 text-center text-md font-bold" 
+                            className={cn("w-10 h-9 text-center text-md font-bold", cardColors !== 'bg-card text-foreground' && 'bg-black/20 border-white/30 text-white placeholder:text-white/70')}
                             min="0"
-                            value={homeValue}
-                            onChange={handleHomeChange}
-                            id={`home-${liveFixture.fixture.id}`}
+                            value={awayValue}
+                            onChange={handleAwayChange}
+                            id={`away-${liveFixture.fixture.id}`}
                             disabled={isPredictionDisabled}
                         />
                     </div>
                    <div className="flex flex-col items-center gap-1 flex-1 truncate">
-                        <Avatar className="h-8 w-8"><AvatarImage src={liveFixture.teams.home.logo} /></Avatar>
-                        <span className="font-semibold text-xs text-center truncate w-full">{liveFixture.teams.home.name}</span>
+                        <Avatar className="h-8 w-8"><AvatarImage src={liveFixture.teams.away.logo} /></Avatar>
+                        <span className="font-semibold text-xs text-center truncate w-full">{liveFixture.teams.away.name}</span>
                     </div>
                 </div>
-                 <div className={cn("text-center text-xs mt-2", isMatchLiveOrFinished ? 'text-white/80' : 'text-muted-foreground')}>
+                 <div className={cn("text-center text-xs mt-2", isMatchLiveOrFinished ? (cardColors !== 'bg-card text-foreground' ? 'text-white/80' : 'text-muted-foreground') : 'text-muted-foreground')}>
                     <span>{liveFixture.league.name}</span>
                 </div>
 
@@ -168,9 +166,10 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                     </p>
                 )}
                 
-                {!isMatchFinished && userPrediction && <p className="text-center text-green-400 text-xs mt-2">تم حفظ توقعك</p>}
+                {!isMatchFinished && userPrediction && <p className={cn("text-center text-xs mt-2", cardColors !== 'bg-card text-foreground' ? 'text-green-300' : 'text-green-500')}>تم حفظ توقعك</p>}
+
                 
-                {isPredictionDisabled && !userPrediction && !isMatchFinished && <p className="text-center text-red-400 text-xs mt-2">أغلق باب التوقع</p>}
+                {isPredictionDisabled && !userPrediction && !isMatchFinished && <p className={cn("text-center text-xs mt-2", cardColors !== 'bg-card text-foreground' ? 'text-red-300' : 'text-red-500')}>أغلق باب التوقع</p>}
             </CardContent>
         </Card>
     );

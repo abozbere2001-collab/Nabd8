@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -481,17 +480,31 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 const data = userDoc.data() as UserProfile;
                 userDetailsMap.set(userDoc.id, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
             });
-
-            // Get existing scores to avoid resetting them
+            
             const leaderboardSnapshot = await getDocs(collection(db, 'leaderboard'));
             const userPointsMap = new Map<string, number>();
-             leaderboardSnapshot.forEach(doc => {
+            leaderboardSnapshot.forEach(doc => {
                 userPointsMap.set(doc.id, doc.data().totalPoints || 0);
             });
             
-            const finishedFixtures = currentPinnedMatches.filter(m => 
-                m && m.fixtureData && m.fixtureData.fixture && ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short)
-            );
+            const fixtureIdsToUpdate = currentPinnedMatches
+                .filter(m => m && m.fixtureData && m.fixtureData.fixture)
+                .map(m => m.fixtureData.fixture.id);
+
+            if (fixtureIdsToUpdate.length === 0) {
+                toast({ title: "لا توجد مباريات مثبتة", description: "لا يوجد ما يمكن تحديثه." });
+                setIsUpdatingPoints(false);
+                return;
+            }
+
+            // Fetch latest data for all fixtures at once
+            const fixtureRes = await fetch(`/api/football/fixtures?ids=${fixtureIdsToUpdate.join('-')}`);
+            if (!fixtureRes.ok) throw new Error("Failed to fetch fixture updates.");
+
+            const fixtureApiData = await fixtureRes.json();
+            const latestFixtures: Fixture[] = fixtureApiData.response || [];
+            
+            const finishedFixtures = latestFixtures.filter(f => ['FT', 'AET', 'PEN'].includes(f.fixture.status.short));
             
             if (finishedFixtures.length === 0) {
                 toast({ title: "لا توجد مباريات منتهية", description: "لا يوجد ما يمكن تحديثه." });
@@ -501,21 +514,10 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             
             let updatedFixturesCount = 0;
             
-            // --- Update Fixture Data and Calculate Points ---
-            for (const match of finishedFixtures) {
-                if (!match.fixtureData || !match.fixtureData.fixture) continue;
-                const fixtureId = match.fixtureData.fixture.id;
-
-                // Fetch latest fixture data from API
-                const fixtureRes = await fetch(`/api/football/fixtures?id=${fixtureId}`);
-                if (!fixtureRes.ok) continue;
-                const fixtureApiData = await fixtureRes.json();
-                const latestFixture: Fixture | undefined = fixtureApiData.response?.[0];
-
-                if (!latestFixture) continue;
-
+            for (const latestFixture of finishedFixtures) {
+                const fixtureId = latestFixture.fixture.id;
                 const matchDocRef = doc(db, 'predictions', String(fixtureId));
-                // Update the fixture data in Firestore
+                
                 await updateDoc(matchDocRef, { fixtureData: latestFixture });
                 updatedFixturesCount++;
                 
@@ -534,13 +536,12 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                         const currentTotalPoints = userPointsMap.get(userPrediction.userId) || 0;
                         userPointsMap.set(userPrediction.userId, currentTotalPoints + newPoints);
                     } else {
-                        pointsUpdateBatch.update(userPredDoc.ref, { points: -1 }); // Mark as checked with 0 points
+                        pointsUpdateBatch.update(userPredDoc.ref, { points: -1 }); 
                     }
                 });
                 await pointsUpdateBatch.commit();
             }
             
-            // --- Update Leaderboard ---
             const leaderboardBatch = writeBatch(db);
             for (const [userId, totalPoints] of userPointsMap.entries()) {
                  const userDetails = userDetailsMap.get(userId);
