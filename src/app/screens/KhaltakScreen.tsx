@@ -168,28 +168,30 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
 };
 
 const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
-    const { home, away } = fixture.goals;
-    if (home === null || away === null) {
-        return 0; // Return 0 if the match result is not available
+    // CRITICAL FIX: Ensure fixture.goals exists and scores are not null before calculating.
+    if (!fixture.goals || fixture.goals.home === null || fixture.goals.away === null) {
+      return 0; // Match not finished or score unavailable, no points.
     }
   
+    const actualHome = fixture.goals.home;
+    const actualAway = fixture.goals.away;
     const predHome = prediction.homeGoals;
     const predAway = prediction.awayGoals;
   
-    // Exact score prediction
-    if (home === predHome && away === predAway) {
+    // Exact score prediction: 5 points
+    if (actualHome === predHome && actualAway === predAway) {
       return 5;
     }
   
-    const actualWinner = home > away ? 'home' : home < away ? 'away' : 'draw';
+    const actualWinner = actualHome > actualAway ? 'home' : actualHome < actualAway ? 'away' : 'draw';
     const predWinner = predHome > predAway ? 'home' : predHome < predAway ? 'away' : 'draw';
   
-    // Correct outcome prediction (win/draw/loss)
+    // Correct outcome prediction (win/draw/loss): 3 points
     if (actualWinner === predWinner) {
       return 3;
     }
   
-    // Incorrect prediction
+    // Incorrect prediction: 0 points
     return 0;
 };
 
@@ -355,14 +357,16 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     
-     useEffect(() => {
+    useEffect(() => {
         if (!db) return;
+        setLoadingMatches(true);
         const q = query(collection(db, 'predictions'));
+        
         const unsub = onSnapshot(q, (snapshot) => {
             const matches = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...(doc.data() as PredictionMatch),
-            })).filter(m => m && m.fixtureData && m.fixtureData.fixture);
+            })).filter(m => m && m.fixtureData && m.fixtureData.fixture); // Ensure fixtureData exists
             setPinnedMatches(matches);
             setLoadingMatches(false);
         }, (error) => {
@@ -374,7 +378,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         });
 
         return () => unsub();
-    }, [db]);
+    }, [db, isAdmin]);
 
 
     useEffect(() => {
@@ -482,45 +486,34 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             const allPinnedMatchesSnapshot = await getDocs(query(collection(db, 'predictions')));
             const allPinnedMatches = allPinnedMatchesSnapshot.docs.map(d => ({ id: d.id, ...d.data() as PredictionMatch }));
     
-            const allMatchesWithLatestData = await Promise.all(
-                allPinnedMatches.map(async (pinnedMatch) => {
-                    if (!pinnedMatch?.fixtureData?.fixture) return { ...pinnedMatch, fixtureData: null };
-                    
-                    const status = pinnedMatch.fixtureData.fixture.status.short;
-                    if (['FT', 'AET', 'PEN'].includes(status)) {
-                        return pinnedMatch;
-                    }
-                    
-                    try {
-                        const fixtureRes = await fetch(`/api/football/fixtures?id=${pinnedMatch.fixtureData.fixture.id}`);
-                        if (fixtureRes.ok) {
-                            const fixtureApiData = await fixtureRes.json();
-                            if (fixtureApiData.response?.[0]) {
-                                return { ...pinnedMatch, fixtureData: fixtureApiData.response[0] };
-                            }
-                        }
-                    } catch (e) {
-                         console.error(`Failed to update fixture ${pinnedMatch.fixtureData.fixture.id}`, e);
-                    }
-                    return pinnedMatch;
-                })
-            );
-    
             const batch = writeBatch(db);
             const userPointsMap = new Map<string, number>();
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
-    
-            for (const pinnedMatch of allMatchesWithLatestData) {
-                if (!pinnedMatch?.fixtureData?.fixture) continue;
-    
+            
+            for (const pinnedMatch of allPinnedMatches) {
+                 if (!pinnedMatch?.fixtureData?.fixture) continue;
+                 
                 const fixtureIdStr = pinnedMatch.id;
-    
-                // Update the fixture data in Firestore if it has changed
-                if (pinnedMatch.fixtureData !== allPinnedMatches.find(p => p.id === fixtureIdStr)?.fixtureData) {
-                    batch.update(doc(db, 'predictions', fixtureIdStr), { fixtureData: pinnedMatch.fixtureData });
+                let currentFixtureData = pinnedMatch.fixtureData;
+
+                const isFinished = ['FT', 'AET', 'PEN'].includes(currentFixtureData.fixture.status.short);
+                
+                if (!isFinished && new Date(currentFixtureData.fixture.timestamp * 1000) < new Date()) {
+                     try {
+                        const fixtureRes = await fetch(`/api/football/fixtures?id=${currentFixtureData.fixture.id}`);
+                        if (fixtureRes.ok) {
+                            const fixtureApiData = await fixtureRes.json();
+                            if (fixtureApiData.response?.[0]) {
+                                currentFixtureData = fixtureApiData.response[0];
+                                batch.update(doc(db, 'predictions', fixtureIdStr), { fixtureData: currentFixtureData });
+                            }
+                        }
+                    } catch (e) {
+                         console.error(`Failed to update fixture ${currentFixtureData.fixture.id}`, e);
+                    }
                 }
     
-                if (['FT', 'AET', 'PEN'].includes(pinnedMatch.fixtureData.fixture.status.short)) {
+                if (['FT', 'AET', 'PEN'].includes(currentFixtureData.fixture.status.short)) {
                     try {
                         const userPredictionsSnapshot = await getDocs(collection(db, 'predictions', fixtureIdStr, 'userPredictions'));
                         if (userPredictionsSnapshot.empty) continue;
@@ -530,12 +523,12 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                             const userId = userPrediction.userId;
                             if (!userId) continue;
         
-                            const newPoints = calculatePoints(userPrediction, pinnedMatch.fixtureData);
+                            const newPoints = calculatePoints(userPrediction, currentFixtureData);
                             
                             if (userPrediction.points !== newPoints) {
                                 batch.update(userPredDoc.ref, { points: newPoints });
                             }
-        
+                            
                             userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + newPoints);
                             
                             if (!userDetailsMap.has(userId)) {
@@ -546,8 +539,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                                         userDetailsMap.set(userId, { displayName: userData.displayName || 'مستخدم', photoURL: userData.photoURL || '' });
                                     }
                                 } catch (e) {
-                                    console.warn(`Could not fetch user profile for ${userId}`, e);
-                                     errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${userId}`, operation: 'get' }));
+                                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${userId}`, operation: 'get' }));
                                 }
                             }
                         }
@@ -762,3 +754,4 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
