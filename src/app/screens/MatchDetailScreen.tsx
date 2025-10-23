@@ -410,8 +410,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
         const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
 
         return (
-             <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
-                {[...sortedRows].reverse().map(row => (
+             <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
+                {sortedRows.map(row => (
                     <div key={row} className="flex justify-around items-center w-full">
                         {formationGrid[row]?.map(p => {
                             const fullPlayer = getPlayerWithDetails(p.player);
