@@ -19,7 +19,7 @@ import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { OddsTab } from '@/components/OddsTab';
-import { useAdmin } from '@/firebase/provider';
+import { useFirebase } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
 import { doc, setDoc, deleteDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -536,7 +536,8 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const [standingsLoading, setStandingsLoading] = useState(true);
     const [customStatus, setCustomStatus] = useState<string | null>(null);
     const [playersDetails, setPlayersDetails] = useState<{player: Player, statistics: any[]}[] | null>(null);
-    const { isAdmin, db } = useAdmin();
+    
+    const { firestore: db, isAdmin } = useFirebase();
     const { toast } = useToast();
     const [renameItem, setRenameItem] = useState<RenameState | null>(null);
 
@@ -698,7 +699,6 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 setCustomStatus(null);
             }
         }, (error) => {
-            // Handle permission denied or other errors if necessary
             console.warn("Could not subscribe to match status:", error);
         });
 
@@ -775,3 +775,5 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         </div>
     );
 }
+
+    
