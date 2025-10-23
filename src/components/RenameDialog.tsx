@@ -73,6 +73,7 @@ export function RenameDialog({
     if (!item) return '';
     if (item.purpose === 'crown') return `تتويج ${item.name}`;
     if (item.purpose === 'note') return `إضافة ملاحظة على ${item.name}`;
+    if (item.type === 'status') return 'تغيير حالة المباراة المخصصة';
     return `تعديل اسم ${itemTypeMap[item.type]}`;
   }
   
@@ -80,14 +81,15 @@ export function RenameDialog({
       if (!item) return '';
       if(item.purpose === 'crown') return 'أضف ملاحظة خاصة لهذا الفريق المتوج لعرضها في قسم "ملعبي".'
       if(item.purpose === 'note') return 'سيتم حفظ هذا العنصر مع ملاحظتك في قسم "بلدي".';
+      if(item.type === 'status') return 'اكتب الحالة التي تريد عرضها للمباراة قبل بدئها (مثال: "قناة العرض: الرابعة"). اترك الحقل فارغًا للإزالة.';
       if(isAdmin && item.purpose === 'rename') {
-        const originalName = item?.originalData?.name || item?.originalName || item?.name;
+        const originalName = item?.originalName || item?.name;
         return `الاسم الأصلي: ${originalName}. اتركه فارغًا للعودة للاسم الأصلي.`;
       }
       return '';
   }
 
-  const showNameField = isAdmin && item?.purpose === 'rename';
+  const showNameField = (isAdmin && item?.purpose === 'rename') || item?.type === 'status';
   const showNoteField = item?.purpose === 'note' || item?.purpose === 'crown';
 
   return (
@@ -105,12 +107,14 @@ export function RenameDialog({
           
           {showNameField && (
             <div className="grid w-full items-center gap-1.5">
-                <Label htmlFor="name">الاسم المخصص (للترجمة)</Label>
+                <Label htmlFor="name">
+                    {item?.type === 'status' ? 'الحالة المخصصة' : 'الاسم المخصص (للترجمة)'}
+                </Label>
                 <Input
                 id="name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder={'الاسم الجديد'}
+                placeholder={item?.type === 'status' ? 'مثال: منقولة على الرابعة' : 'الاسم الجديد'}
                 />
             </div>
           )}

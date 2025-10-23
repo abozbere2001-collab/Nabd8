@@ -29,6 +29,14 @@ import { Button } from '@/components/ui/button';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
 type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'status';
+interface RenameState {
+  id: string | number;
+  name: string;
+  type: RenameType;
+  purpose: 'rename' | 'note' | 'crown';
+  originalData?: any;
+  originalName?: string;
+}
 
 
 const PlayerCard = ({ player, navigate, onRename, isAdmin }: { player: PlayerType, navigate: ScreenProps['navigate'], onRename: () => void, isAdmin: boolean }) => {
@@ -91,16 +99,16 @@ const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture
                     <span className="text-[10px]">{format(new Date(fixture.fixture.date), 'd MMMM yyyy', { locale: ar })}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
-                        <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
+                    <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
+                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                      <div className="relative flex flex-col items-center justify-center min-w-[120px] text-center">
                         <LiveMatchStatus fixture={fixture} large customStatus={customStatus} />
                     </div>
-                    <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
-                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
+                    <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
+                        <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                 </div>
             </CardContent>
@@ -162,22 +170,22 @@ const DetailsTab = ({ fixture, statistics, loading }: { fixture: Fixture; statis
                                 return (
                                     <div key={stat.type} className="space-y-2">
                                         <div className="flex justify-between items-center text-xs font-bold">
-                                            <span>{homeValueRaw}</span>
-                                            <span className="text-muted-foreground">{stat.labelKey}</span>
                                             <span>{awayValueRaw}</span>
+                                            <span className="text-muted-foreground">{stat.labelKey}</span>
+                                            <span>{homeValueRaw}</span>
                                         </div>
                                         <div className="flex items-center gap-1" dir="ltr">
-                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-l-full" className="rounded-l-full"/>
-                                            <Progress value={awayVal} indicatorClassName="bg-accent rounded-r-full" className="rounded-r-full" style={{transform: 'rotate(180deg)'}}/>
+                                            <Progress value={awayVal} indicatorClassName="bg-accent rounded-l-full" className="rounded-l-full" style={{transform: 'rotate(180deg)'}}/>
+                                            <Progress value={homeVal} indicatorClassName="bg-primary rounded-r-full" className="rounded-r-full" />
                                         </div>
                                     </div>
                                 )
                             }
                             return (
                                 <div key={stat.type} className="flex justify-between items-center text-sm font-bold">
-                                    <span>{homeValueRaw}</span>
-                                    <span className="text-muted-foreground font-normal">{stat.labelKey}</span>
                                     <span>{awayValueRaw}</span>
+                                    <span className="text-muted-foreground font-normal">{stat.labelKey}</span>
+                                    <span>{homeValueRaw}</span>
                                 </div>
                             )
                         })
@@ -530,42 +538,44 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const [playersDetails, setPlayersDetails] = useState<{player: Player, statistics: any[]}[] | null>(null);
     const { isAdmin, db } = useAdmin();
     const { toast } = useToast();
-    
-    const rename = async (type: RenameType, id: number, originalData: any) => {
-        if (!isAdmin || !db) return;
-        
-        const originalName = originalData?.name || '';
-        
-        const docRef = doc(db, `${type}Customizations`, String(id));
-        
-        // This is a simplified rename dialog trigger for the example.
-        // A real implementation would use a component like <RenameDialog>.
-        const newName = prompt(`Enter new name for ${originalName}:`);
+    const [renameItem, setRenameItem] = useState<RenameState | null>(null);
 
-        if (newName === null) return; // User cancelled
+    const handleSaveRename = async (type: RenameType, id: number | string, newName: string) => {
+        if (!isAdmin || !db || !renameItem?.originalData) return;
+
+        const originalName = renameItem.originalData.name || '';
+        const collectionName = `${type}Customizations`;
+        const docRef = doc(db, collectionName, String(id));
 
         try {
-            if (newName.trim()) {
+            if (newName.trim() && newName.trim() !== originalName) {
                 await setDoc(docRef, { customName: newName.trim() }, { merge: true });
-                toast({
-                    title: `تم تغيير الاسم`,
-                    description: `تم تغيير اسم ${type} بنجاح إلى ${newName.trim()}.`,
-                });
+                toast({ title: `تم تغيير الاسم`, description: `تم تغيير اسم ${type} بنجاح.` });
             } else {
                 await deleteDoc(docRef);
-                 toast({
-                    title: `تمت إزالة الاسم`,
-                    description: `تمت إزالة الاسم المخصص بنجاح.`,
-                });
+                toast({ title: `تمت إزالة الاسم`, description: `تمت إزالة الاسم المخصص بنجاح.` });
             }
+            // You might want to trigger a data re-fetch here if needed
         } catch (error: any) {
-            console.error("Error renaming document:", error);
+            console.error(`Error renaming ${type}:`, error);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: docRef.path,
                 operation: newName.trim() ? 'write' : 'delete',
                 requestResourceData: { customName: newName.trim() }
             }));
         }
+        setRenameItem(null);
+    };
+    
+    const handleOpenRename = (type: RenameType, id: number, originalData: any) => {
+        setRenameItem({
+            id: id,
+            name: originalData.name || '',
+            type: type,
+            purpose: 'rename',
+            originalData: originalData,
+            originalName: originalData.name,
+        });
     };
 
     useEffect(() => {
@@ -723,6 +733,12 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     return (
         <div>
             <ScreenHeader title="تفاصيل المباراة" navigate={navigate} onBack={goBack} canGoBack={canGoBack} />
+             {renameItem && <RenameDialog
+                isOpen={!!renameItem}
+                onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
+                item={renameItem}
+                onSave={(type, id, name) => handleSaveRename(type, Number(id), name)}
+             />}
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} />
 
@@ -738,7 +754,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                         <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
                     </TabsContent>
                      <TabsContent value="lineups">
-                        <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={rename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
+                        <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
                     </TabsContent>
                     <TabsContent value="timeline">
                         <TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} />
@@ -752,15 +768,10 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 </Tabs>
                 {isAdmin && (
                     <div className="fixed bottom-4 left-4 bg-primary text-primary-foreground rounded-md p-2 z-50">
-                        <Button onClick={() => rename('status', Number(fixtureId), {name: customStatus})} variant="outline">تغيير حالة المباراة</Button>
+                        <Button onClick={() => handleOpenRename('status', Number(fixtureId), {name: customStatus})} variant="outline">تغيير حالة المباراة</Button>
                     </div>
                 )}
             </div>
         </div>
     );
 }
-
-
-    
-
-    
