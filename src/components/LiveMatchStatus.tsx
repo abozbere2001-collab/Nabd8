@@ -24,7 +24,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
 
     useEffect(() => {
         let interval: NodeJS.Timeout | null = null;
-        if (live && status.elapsed !== null) {
+        if (live && status.elapsed !== null && !isNaN(status.elapsed)) {
             const initialSeconds = status.elapsed * 60;
             const timerStart = Date.now() - (initialSeconds * 1000);
 
@@ -42,7 +42,7 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
     }, [status.short, status.elapsed, live]);
 
     const formatTime = (totalSeconds: number | null) => {
-        if (totalSeconds === null) return status.elapsed;
+        if (totalSeconds === null || isNaN(totalSeconds)) return status.elapsed;
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
@@ -59,8 +59,6 @@ export const LiveMatchStatus = ({ fixture, large = false, customStatus }: { fixt
             };
         }
         
-        // This is the core logic change.
-        // It now correctly uses goals.home and goals.away
         if (goals.home === null || goals.away === null) {
             if (status.short === "PST") return { main: "مؤجلة", sub: "", isLive: false };
             if (status.short === "TBD") return { main: "لم تحدد", sub: "", isLive: false };

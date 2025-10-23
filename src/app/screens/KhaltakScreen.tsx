@@ -335,7 +335,6 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
 const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     const { isAdmin } = useAdmin();
     const [mainTab, setMainTab] = useState('voting');
-    const [calculatingPoints, setCalculatingPoints] = useState(false);
     const { toast } = useToast();
     
     const [leaderboard, setLeaderboard] = useState<UserScore[]>([]);
@@ -427,7 +426,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                     setUserPredictions(prev => ({...prev, [pred.fixtureId]: pred}));
                 }
             }, err => {
-                // This might fail if user has no permission, which is ok, we just won't show the prediction.
                 console.warn(`Could not listen to prediction for fixture ${id}:`, err.message);
             });
         });
@@ -470,66 +468,55 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         });
     }, [user, db]);
 
-    const handleCalculateAllPoints = useCallback(async () => {
-        if (!db) return;
-        setCalculatingPoints(true);
-        toast({ title: 'بدء تحديث لوحة الصدارة', description: 'سيتم تحديث نقاط جميع المستخدمين. قد تستغرق هذه العملية بعض الوقت.' });
+     // Auto-calculate points for the current user when they visit the tab
+    useEffect(() => {
+        if (!db || !user || !pinnedMatches.length || !Object.keys(userPredictions).length) return;
 
-        try {
-            const predictionsSnapshot = await getDocs(collection(db, 'predictions'));
-            const finishedFixtures = predictionsSnapshot.docs
-                .map(doc => doc.data() as PredictionMatch)
-                .filter(f => f && f.fixtureData && ['FT', 'AET', 'PEN'].includes(f.fixtureData.fixture.status.short));
-
+        const calculateMyPoints = async () => {
+            let totalPointsGained = 0;
             const pointsBatch = writeBatch(db);
-            const userPoints = new Map<string, number>();
 
-            for (const fixtureMatch of finishedFixtures) {
+            for (const fixtureMatch of pinnedMatches) {
                 const fixture = fixtureMatch.fixtureData;
-                const userPredictionsSnapshot = await getDocs(collection(db, `predictions/${fixture.fixture.id}/userPredictions`));
+                const userPred = userPredictions[fixture.fixture.id];
                 
-                userPredictionsSnapshot.forEach(predDoc => {
-                    const prediction = predDoc.data() as Prediction;
-                    const points = calculatePoints(prediction, fixture);
-
-                    if (prediction.points !== points) {
-                        pointsBatch.update(predDoc.ref, { points });
+                // Check if match is finished AND the user has a prediction for it AND points haven't been calculated yet (points === 0)
+                if (fixture.goals.home !== null && fixture.goals.away !== null && userPred && (userPred.points === 0 || userPred.points === undefined)) {
+                    if (['FT', 'AET', 'PEN'].includes(fixture.fixture.status.short)) {
+                        const newPoints = calculatePoints(userPred, fixture);
+                        if (newPoints > 0) {
+                            const predRef = doc(db, 'predictions', String(fixture.fixture.id), 'userPredictions', user.uid);
+                            pointsBatch.update(predRef, { points: newPoints });
+                            totalPointsGained += newPoints;
+                        }
                     }
-                    
-                    const currentPoints = userPoints.get(prediction.userId) || 0;
-                    userPoints.set(prediction.userId, currentPoints - (prediction.points || 0) + points);
-                });
+                }
             }
 
-            await pointsBatch.commit();
-            
-            const leaderboardBatch = writeBatch(db);
-            const allUsersSnapshot = await getDocs(collection(db, 'users'));
-            const usersData = new Map(allUsersSnapshot.docs.map(d => [d.id, d.data()]));
-
-            for (const [userId, points] of userPoints.entries()) {
-                const leaderboardRef = doc(db, 'leaderboard', userId);
-                const userDoc = await getDoc(leaderboardRef);
-                const currentTotal = userDoc.exists() ? userDoc.data().totalPoints : 0;
+            if (totalPointsGained > 0) {
+                const leaderboardRef = doc(db, 'leaderboard', user.uid);
+                const userLeaderboardDoc = await getDoc(leaderboardRef);
+                const currentTotal = userLeaderboardDoc.exists() ? userLeaderboardDoc.data().totalPoints : 0;
                 
-                leaderboardBatch.set(leaderboardRef, {
-                    totalPoints: currentTotal + points,
-                    userName: usersData.get(userId)?.displayName || 'مستخدم غير معروف',
-                    userPhoto: usersData.get(userId)?.photoURL || '',
+                pointsBatch.set(leaderboardRef, {
+                    totalPoints: currentTotal + totalPointsGained,
+                    userName: user.displayName || 'مستخدم غير معروف',
+                    userPhoto: user.photoURL || '',
                 }, { merge: true });
+                
+                try {
+                    await pointsBatch.commit();
+                    toast({ title: "تم تحديث نقاطك!", description: `لقد حصلت على ${totalPointsGained} نقطة جديدة.`});
+                    fetchLeaderboard(); // Refresh leaderboard view
+                } catch(e) {
+                     console.error("Failed to auto-update points:", e);
+                }
             }
+        };
+        
+        calculateMyPoints();
 
-            await leaderboardBatch.commit();
-            toast({ title: 'اكتمل التحديث الشامل', description: 'تم تحديث لوحة الصدارة بنجاح.' });
-            fetchLeaderboard();
-
-        } catch (error: any) {
-            console.error("Error calculating all points:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: `فشل تحديث لوحة الصدارة: ${error.message}` });
-        } finally {
-            setCalculatingPoints(false);
-        }
-    }, [db, toast, fetchLeaderboard]);
+    }, [db, user, pinnedMatches, userPredictions, toast, fetchLeaderboard]);
 
 
     const filteredMatches = useMemo(() => {
@@ -571,13 +558,8 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
 
            <TabsContent value="leaderboard" className="mt-4 flex-1 overflow-y-auto">
                <Card>
-                  <CardHeader className="flex-row items-center justify-between">
+                  <CardHeader>
                        <CardTitle>لوحة الصدارة</CardTitle>
-                       {isAdmin && (
-                           <Button onClick={handleCalculateAllPoints} disabled={calculatingPoints} size="sm">
-                               {calculatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : "تحديث لوحة الصدارة"}
-                           </Button>
-                       )}
                   </CardHeader>
                   <CardContent className="p-0">
                        <LeaderboardDisplay leaderboard={leaderboard} loadingLeaderboard={loadingLeaderboard} userScore={currentUserScore} userId={user?.uid}/>
