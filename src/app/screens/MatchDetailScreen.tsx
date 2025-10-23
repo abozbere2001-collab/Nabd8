@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -6,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -255,8 +256,7 @@ const TimelineTabContent = ({ events, homeTeam, awayTeam, highlightsOnly }: { ev
     
     const filteredEvents = React.useMemo(() => {
         if (!events) return [];
-        if (!highlightsOnly) return events;
-        return events.filter(e => e.type === 'Goal' || (e.type === 'Card' && e.detail.includes('Red')));
+        if (!highlightsOnly) return events.filter(e => e.type === 'Goal' || (e.type === 'Card' && e.detail.includes('Red')));
     }, [events, highlightsOnly]);
 
     if (filteredEvents.length === 0) {
@@ -350,6 +350,7 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
 
 const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId, detailedPlayersMap }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, name: string, originalName: string) => void, homeTeamId: number, awayTeamId: number, detailedPlayersMap: Map<number, { player: PlayerType; statistics: any[] }> }) => {
     const { t } = useTranslation();
+    const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
     if (lineups === null) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
@@ -364,8 +365,6 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     if (!home || !away) {
          return <p className="text-center text-muted-foreground p-8">خطأ في بيانات التشكيلة.</p>;
     }
-
-    const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
     
     const activeLineup = activeTeamTab === 'home' ? home : away;
     
@@ -453,7 +452,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                         </Avatar>
                         <span className="font-semibold text-xs">{activeLineup.coach.name}</span>
                         {isAdmin && (
-                            <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name, activeLineup.coach.name);}}>
+                            <Button variant="ghost" size="icon" className="absolute -top-1 -right-8 h-6 w-6" onClick={(e) => {e.stopPropagation(); onRename('coach', activeLineup.coach.id, activeLineup.coach.name);}}>
                                 <Pencil className="h-3 w-3" />
                             </Button>
                         )}
@@ -498,7 +497,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                                     <p className="font-semibold text-sm">{fullPlayer.name}</p>
                                     <p className="text-xs text-muted-foreground">{fullPlayer.position}</p>
                                 </div>
-                                 {isAdmin && <Button variant="ghost" size="icon" className="mr-auto" onClick={(e) => {e.stopPropagation(); onRename('player', p.player.id, p.player.name, p.player.name)}}><Pencil className="h-4 w-4" /></Button>}
+                                 {isAdmin && <Button variant="ghost" size="icon" className="mr-auto" onClick={(e) => {e.stopPropagation(); onRename('player', p.player.id, p.player.name);}}><Pencil className="h-4 w-4" /></Button>}
                             </div>
                         </Card>
                     )})}
@@ -559,7 +558,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const [lineups, setLineups] = useState<LineupData[] | null>(null);
     const [events, setEvents] = useState<MatchEvent[] | null>(null);
     const [statistics, setStatistics] = useState<MatchStatistics[] | null>(null);
-    const [detailedPlayersMap, setDetailedPlayersMap] = useState<Map<number, { player: PlayerType, statistics: any[] }>>(new Map());
+    const [detailedPlayersMap, setDetailedPlayersMap] = useState<Map<number, { player: PlayerType; statistics: any[] }>>(new Map());
     const [customStatus, setCustomStatus] = useState<string | null>(null);
     const [customNames, setCustomNames] = useState<{ [key: string]: Map<number, string> } | null>(null);
 
@@ -571,6 +570,47 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const { toast } = useToast();
     const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName: string } | null>(null);
 
+    const { t } = useTranslation();
+    
+    const fetchAllCustomNames = useCallback(async () => {
+        if (!db) {
+            setCustomNames({});
+            return;
+        }
+        try {
+            const [leagues, teams, players, coaches] = await Promise.all([
+                getDocs(collection(db, "leagueCustomizations")),
+                getDocs(collection(db, "teamCustomizations")),
+                getDocs(collection(db, "playerCustomizations")),
+                getDocs(collection(db, "coachCustomizations"))
+            ]);
+            const names: { [key: string]: Map<number, string> } = {
+                leagues: new Map(),
+                teams: new Map(),
+                players: new Map(),
+                coaches: new Map()
+            };
+            leagues.forEach(doc => names.leagues.set(Number(doc.id), doc.data().customName));
+            teams.forEach(doc => names.teams.set(Number(doc.id), doc.data().customName));
+            players.forEach(doc => names.players.set(Number(doc.id), doc.data().customName));
+            coaches.forEach(doc => names.coaches.set(Number(doc.id), doc.data().customName));
+            setCustomNames(names);
+        } catch (error) {
+             setCustomNames({});
+        }
+    }, [db]);
+
+
+    const getDisplayName = useCallback((type: 'league' | 'team' | 'player' | 'coach', id: number, defaultName: string) => {
+        const hardcodedName = hardcodedTranslations[`${type}s`]?.[id];
+        if (hardcodedName) return hardcodedName;
+        
+        const customName = customNames?.[`${type}s`]?.get(id);
+        if (customName) return customName;
+        
+        return defaultName;
+    }, [customNames]);
+
     const handleSaveRename = (type: RenameType, id: number, newName: string) => {
         if (!isAdmin || !db || !renameItem) return;
         const collectionName = `${type}Customizations`;
@@ -581,17 +621,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
         operation.then(() => {
             toast({ title: `تم تعديل الاسم`, description: 'قد تحتاج لإعادة التحميل لرؤية التغييرات فوراً.' });
-            // Optimistically update local state for immediate feedback
-            setCustomNames(prev => {
-                if (!prev) return null;
-                const newMap = new Map(prev[type]);
-                if (newName && newName !== originalName) {
-                    newMap.set(id, newName);
-                } else {
-                    newMap.delete(id);
-                }
-                return { ...prev, [type]: newMap };
-            });
+            fetchAllCustomNames();
         }).catch((error) => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: docRef.path,
@@ -601,14 +631,6 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         });
         setRenameItem(null);
     };
-
-    const getDisplayName = useCallback((type: 'team' | 'league' | 'player' | 'coach', id: number, defaultName: string) => {
-        const nameFromCustom = customNames?.[type]?.get(id);
-        if (nameFromCustom) return nameFromCustom;
-
-        const nameFromHardcoded = hardcodedTranslations[`${type}s` as const]?.[id];
-        return nameFromHardcoded || defaultName;
-    }, [customNames]);
     
     
     useEffect(() => {
@@ -641,15 +663,10 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         const controller = new AbortController();
         const signal = controller.signal;
         
-        const fetchAllNamesAndDetails = async () => {
+        const fetchAllDetails = async () => {
              setLoadingDetails(true);
              try {
-                const namesPromise = Promise.all([
-                    getDocs(collection(db, "leagueCustomizations")),
-                    getDocs(collection(db, "teamCustomizations")),
-                    getDocs(collection(db, "playerCustomizations")),
-                    getDocs(collection(db, "coachCustomizations")),
-                ]);
+                await fetchAllCustomNames();
                 
                 const detailsPromise = Promise.all([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixture.fixture.id}`, { signal }),
@@ -658,17 +675,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                     fetch(`/api/football/players?fixture=${fixture.fixture.id}`, { signal }),
                 ]);
 
-                const [namesSnapshots, detailsResponses] = await Promise.all([namesPromise, detailsPromise]);
+                const detailsResponses = await detailsPromise;
                 if (signal.aborted) return;
                 
-                const [leaguesSnapshot, teamsSnapshot, playersSnapshot, coachSnapshot] = namesSnapshots;
-                const names: { [key: string]: Map<number, string> } = {
-                    league: new Map(leaguesSnapshot.docs.map(d => [Number(d.id), d.data().customName])),
-                    team: new Map(teamsSnapshot.docs.map(d => [Number(d.id), d.data().customName])),
-                    player: new Map(playersSnapshot.docs.map(d => [Number(d.id), d.data().customName])),
-                    coach: new Map(coachSnapshot.docs.map(d => [Number(d.id), d.data().customName])),
-                };
-                setCustomNames(names);
                 
                 const [lineupsRes, eventsRes, statsRes, playersRes] = detailsResponses;
                 const lineupsData = await lineupsRes.json();
@@ -713,23 +722,24 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                  if (!signal.aborted) setLoadingStandings(false);
             }
         };
-        
-        const customStatusUnsub = onSnapshot(doc(db, "matchCustomizations", fixture.fixture.id.toString()), (doc) => {
-            if (doc.exists()) {
+
+        const customStatusRef = doc(db, 'matchCustomizations', fixtureId);
+        const unsubStatus = onSnapshot(customStatusRef, (doc) => {
+            if(doc.exists()) {
                 setCustomStatus(doc.data().customStatus);
             } else {
                 setCustomStatus(null);
             }
         });
-
-        fetchAllNamesAndDetails();
+        
+        fetchAllDetails();
         fetchStandings();
 
         return () => {
             controller.abort();
-            customStatusUnsub();
+            unsubStatus();
         };
-    }, [fixture, db]);
+    }, [fixture, db, fetchAllCustomNames, fixtureId]);
     
     
     const processedFixture = useMemo(() => {
@@ -754,6 +764,17 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             }
         }));
     }, [standings, getDisplayName]);
+
+    const processedLineups = useMemo(() => {
+        if (!lineups) return null;
+        return lineups.map(l => ({
+            ...l,
+            team: { ...l.team, name: getDisplayName('team', l.team.id, l.team.name) },
+            coach: { ...l.coach, name: getDisplayName('coach', l.coach.id, l.coach.name) },
+            startXI: l.startXI.map(p => ({ ...p, player: { ...p.player, name: getDisplayName('player', p.player.id, p.player.name) }})),
+            substitutes: l.substitutes.map(p => ({ ...p, player: { ...p.player, name: getDisplayName('player', p.player.id, p.player.name) }})),
+        }));
+    }, [lineups, getDisplayName]);
     
     const handleOpenRename = (type: RenameType, id: number, originalName: string) => {
         const currentName = getDisplayName(type as 'player' | 'coach' | 'team' | 'league', id, originalName);
@@ -843,7 +864,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
               </TabsContent>
               <TabsContent value="lineups" className="pt-4">
                 <LineupsTab
-                  lineups={lineups}
+                  lineups={processedLineups}
                   events={events}
                   navigate={navigate}
                   isAdmin={isAdmin}
