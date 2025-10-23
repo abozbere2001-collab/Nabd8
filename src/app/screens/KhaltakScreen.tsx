@@ -367,33 +367,27 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
 
 
     useEffect(() => {
-        if (!db || !user) {
-            setLoadingUserPredictions(false);
-            return;
-        };
-        if (pinnedMatches.length === 0) {
-            setAllUserPredictions({});
+        if (!db || !user || pinnedMatches.length === 0) {
             setLoadingUserPredictions(false);
             return;
         }
 
         setLoadingUserPredictions(true);
         const newPredictions: { [key: string]: Prediction } = {};
-        
-        const predictionPromises = pinnedMatches.map(match => {
-            const userPredictionRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
-            return getDoc(userPredictionRef).then(predDoc => {
-                if (predDoc.exists()) {
-                    newPredictions[match.id] = predDoc.data() as Prediction;
+
+        const fetchPromises = pinnedMatches.map(match => {
+            const predRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
+            return getDoc(predRef).then(docSnap => {
+                if (docSnap.exists()) {
+                    newPredictions[match.id] = docSnap.data() as Prediction;
                 }
             }).catch(e => console.warn(`Could not fetch prediction for match ${match.id}`, e));
         });
 
-        Promise.all(predictionPromises).then(() => {
+        Promise.all(fetchPromises).then(() => {
             setAllUserPredictions(newPredictions);
             setLoadingUserPredictions(false);
         });
-
     }, [db, user, pinnedMatches]);
     
     const fetchLeaderboard = useCallback(async () => {
@@ -731,3 +725,5 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
