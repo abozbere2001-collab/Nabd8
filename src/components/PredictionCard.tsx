@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -95,7 +96,7 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
                              isMatchLiveOrFinished ? getPredictionStatusColors() : "text-sm",
                             )}>
                              {isMatchLiveOrFinished
-                               ? `${fixture.goals.away ?? 0} - ${fixture.goals.home ?? 0}`
+                               ? `${fixture.goals.away ?? ''} - ${fixture.goals.home ?? ''}`
                                : format(new Date(fixture.fixture.date), "HH:mm")}
                          </div>
                         <Input 
