@@ -349,10 +349,11 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     
-     useEffect(() => {
+    useEffect(() => {
         if (!db) return;
-        setLoadingMatches(true);
-        const unsub = onSnapshot(collection(db, 'predictions'), (snapshot) => {
+
+        // Listener for all pinned matches
+        const unsubMatches = onSnapshot(collection(db, 'predictions'), (snapshot) => {
             const matches = snapshot.docs.map(doc => ({
                 ...(doc.data() as PredictionMatch),
                 id: doc.id,
@@ -361,27 +362,44 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             setLoadingMatches(false);
         });
 
-        return () => unsub();
-    }, [db]);
-
-
-    useEffect(() => {
-        if (!db || !user) return;
-        setLoadingUserPredictions(true);
-        const unsubscribers = pinnedMatches.map(match => {
-            const predRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
-            return onSnapshot(predRef, docSnap => {
-                if (docSnap.exists()) {
-                    setAllUserPredictions(prev => ({
-                        ...prev,
-                        [match.id]: docSnap.data() as Prediction
-                    }));
-                }
+        // Listener for the current user's predictions across all matches
+        const unsubUserPredictions = () => {
+            if (!user) return () => {};
+            const userPredictions: { [key: string]: Function } = {};
+            const matchesQuery = query(collection(db, 'predictions'));
+            return onSnapshot(matchesQuery, (matchesSnapshot) => {
+                matchesSnapshot.forEach(matchDoc => {
+                    if (userPredictions[matchDoc.id]) {
+                        userPredictions[matchDoc.id](); // Unsubscribe from old listener
+                    }
+                    const predRef = doc(db, 'predictions', matchDoc.id, 'userPredictions', user.uid);
+                    userPredictions[matchDoc.id] = onSnapshot(predRef, predDoc => {
+                        if (predDoc.exists()) {
+                            setAllUserPredictions(prev => ({
+                                ...prev,
+                                [matchDoc.id]: predDoc.data() as Prediction
+                            }));
+                        } else {
+                            setAllUserPredictions(prev => {
+                                const newPreds = { ...prev };
+                                delete newPreds[matchDoc.id];
+                                return newPreds;
+                            });
+                        }
+                    });
+                });
+                setLoadingUserPredictions(false);
             });
-        });
-        setLoadingUserPredictions(false);
-        return () => unsubscribers.forEach(unsub => unsub());
-    }, [db, user, pinnedMatches]);
+        };
+
+        const finalUnsubUserPredictions = unsubUserPredictions();
+
+        return () => {
+            unsubMatches();
+            finalUnsubUserPredictions();
+        };
+    }, [db, user]);
+    
     
     const fetchLeaderboard = useCallback(async () => {
         if (!db) return;
@@ -409,6 +427,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             }
         } catch (error) {
             console.error("Error fetching leaderboard:", error);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'leaderboard', operation: 'list' }));
         } finally {
             setLoadingLeaderboard(false);
         }
@@ -437,7 +456,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             points: 0,
             timestamp: new Date().toISOString()
         };
-
+        
         setDoc(predictionRef, predictionData, { merge: true }).catch(serverError => {
              const permissionError = new FirestorePermissionError({
                 path: predictionRef.path,
@@ -451,31 +470,28 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     const handleCalculateAllPoints = useCallback(async () => {
         if (!db || !isAdmin) return;
         setIsUpdatingPoints(true);
-        toast({ title: "بدء تحديث النقاط...", description: "قد تستغرق هذه العملية بعض الوقت." });
+        toast({ title: "بدء تحديث النقاط...", description: "جاري مسح لوحة الصدارة وإعادة حسابها." });
     
         try {
-            // 1. Fetch all finished, pinned matches
-            const predictionsQuery = query(collection(db, "predictions"), where("fixtureData.fixture.status.short", "in", ["FT", "AET", "PEN"]));
-            const finishedMatchesSnapshot = await getDocs(predictionsQuery);
-            const finishedMatches = finishedMatchesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as PredictionMatch }));
+            // 1. CLEAR THE ENTIRE LEADERBOARD
+            const leaderboardBatch = writeBatch(db);
+            const existingLeaderboardSnapshot = await getDocs(collection(db, "leaderboard"));
+            existingLeaderboardSnapshot.forEach(doc => leaderboardBatch.delete(doc.ref));
+            await leaderboardBatch.commit();
+            
+            // 2. Fetch all finished, pinned matches
+            const finishedMatchesQuery = query(collection(db, "predictions"), where("fixtureData.fixture.status.short", "in", ["FT", "AET", "PEN"]));
+            const finishedMatchesSnapshot = await getDocs(finishedMatchesQuery);
+            const finishedMatches = finishedMatchesSnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as PredictionMatch) }));
     
             if (finishedMatches.length === 0) {
-                toast({ title: "لا توجد مباريات منتهية", description: "لا يوجد ما يمكن تحديثه." });
-                setIsUpdatingPoints(false);
+                toast({ title: "لا توجد مباريات منتهية", description: "تم مسح لوحة الصدارة." });
+                fetchLeaderboard();
                 return;
             }
-    
-            // 2. Prepare user maps
+            
             const userPointsMap = new Map<string, number>();
-            const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
-            const allUsersSnapshot = await getDocs(collection(db, 'users'));
-            allUsersSnapshot.forEach(userDoc => {
-                const data = userDoc.data() as UserProfile;
-                userPointsMap.set(userDoc.id, 0); // Initialize all users with 0 points
-                userDetailsMap.set(userDoc.id, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
-            });
     
-            // 3. Calculate points for each user across all finished matches
             for (const match of finishedMatches) {
                 const userPredictionsSnapshot = await getDocs(collection(db, "predictions", match.id, "userPredictions"));
                 userPredictionsSnapshot.forEach(predDoc => {
@@ -485,38 +501,44 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                     userPointsMap.set(prediction.userId, currentPoints + points);
                 });
             }
-    
-            // 4. Wipe and rebuild the leaderboard
-            const leaderboardBatch = writeBatch(db);
-            const existingLeaderboardSnapshot = await getDocs(collection(db, "leaderboard"));
-            existingLeaderboardSnapshot.forEach(doc => leaderboardBatch.delete(doc.ref));
             
+            // 3. REBUILD THE LEADERBOARD
+            const rebuildBatch = writeBatch(db);
+            const userDetailsCache = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
+
             for (const [userId, totalPoints] of userPointsMap.entries()) {
-                 const userDetails = userDetailsMap.get(userId);
-                 if (userDetails) {
-                    const leaderboardRef = doc(db, 'leaderboard', userId);
-                    leaderboardBatch.set(leaderboardRef, {
-                        totalPoints,
-                        userName: userDetails.displayName,
-                        userPhoto: userDetails.photoURL,
-                    });
+                 let userDetails = userDetailsCache.get(userId);
+                 if (!userDetails) {
+                    const userDoc = await getDoc(doc(db, 'users', userId));
+                    if(userDoc.exists()){
+                        const data = userDoc.data() as UserProfile;
+                        userDetails = { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' };
+                        userDetailsCache.set(userId, userDetails);
+                    } else {
+                        userDetails = { displayName: 'مستخدم محذوف', photoURL: '' };
+                    }
                  }
+
+                 const leaderboardRef = doc(db, 'leaderboard', userId);
+                 rebuildBatch.set(leaderboardRef, {
+                     totalPoints,
+                     userName: userDetails.displayName,
+                     userPhoto: userDetails.photoURL,
+                 });
             }
             
-            await leaderboardBatch.commit();
+            await rebuildBatch.commit();
             
             toast({ title: "نجاح!", description: "تمت إعادة بناء لوحة الصدارة بنجاح." });
             fetchLeaderboard();
     
         } catch (error: any) {
             console.error("Error calculating points:", error);
-            toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ أثناء تحديث لوحة الصدارة." });
-            if (error.code === 'permission-denied') {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: `Multiple collections`,
-                    operation: 'list'
-                }));
-            }
+            toast({ variant: 'destructive', title: "خطأ فادح", description: "حدث خطأ أثناء تحديث لوحة الصدارة." });
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'leaderboard or predictions',
+                operation: 'list'
+            }));
         } finally {
             setIsUpdatingPoints(false);
         }
