@@ -359,31 +359,39 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             })).filter(m => m && m.fixtureData && m.fixtureData.fixture);
             setPinnedMatches(matches);
             setLoadingMatches(false);
+        }, (error) => {
+             errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'predictions', operation: 'list' }));
+        });
+        
+        return () => unsubMatches();
+    }, [db]);
 
-             // After getting matches, fetch all user predictions for those matches
-            if (user && matches.length > 0) {
-                setLoadingUserPredictions(true);
-                const newPredictions: { [key: string]: Prediction } = {};
-                const predictionPromises = matches.map(match => {
-                    const userPredictionRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
-                    return getDoc(userPredictionRef).then(predDoc => {
-                        if (predDoc.exists()) {
-                            newPredictions[match.id] = predDoc.data() as Prediction;
-                        }
-                    }).catch(e => console.warn(`Could not fetch prediction for match ${match.id}`, e));
-                });
 
-                Promise.all(predictionPromises).then(() => {
-                    setAllUserPredictions(newPredictions);
-                    setLoadingUserPredictions(false);
-                });
-            } else {
-                setLoadingUserPredictions(false);
-            }
+    useEffect(() => {
+        if (!db || !user || !pinnedMatches.length) {
+            setLoadingUserPredictions(false);
+            return;
+        };
+
+        setLoadingUserPredictions(true);
+        const newPredictions: { [key: string]: Prediction } = {};
+        const promises = pinnedMatches.map(match => {
+            const predRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
+            return getDoc(predRef).then(docSnap => {
+                if (docSnap.exists()) {
+                    newPredictions[match.id] = docSnap.data() as Prediction;
+                }
+            }).catch(() => {
+                // Ignore errors for individual predictions, maybe user has no prediction for it
+            });
         });
 
-        return () => unsubMatches();
-    }, [db, user]);
+        Promise.all(promises).then(() => {
+            setAllUserPredictions(newPredictions);
+            setLoadingUserPredictions(false);
+        });
+
+    }, [db, user, pinnedMatches]);
     
     
     const fetchLeaderboard = useCallback(async () => {
@@ -460,61 +468,54 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         toast({ title: "بدء تحديث النقاط...", description: "جاري مسح لوحة الصدارة وإعادة حسابها." });
     
         try {
-            // 1. CLEAR THE ENTIRE LEADERBOARD
+            // 1. Clear the entire leaderboard first
             const leaderboardClearBatch = writeBatch(db);
             const existingLeaderboardSnapshot = await getDocs(collection(db, "leaderboard"));
             existingLeaderboardSnapshot.forEach(doc => leaderboardClearBatch.delete(doc.ref));
             await leaderboardClearBatch.commit();
+
+            // 2. Fetch all matches and user details
+            const currentPinnedMatchesSnapshot = await getDocs(collection(db, 'predictions'));
+            const matchesData = currentPinnedMatchesSnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as PredictionMatch) }));
+            const finishedFixtures = matchesData.filter(m => m.fixtureData && ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short));
             
-            // 2. Aggregate all participants and their points from predictions
             const userPointsMap = new Map<string, number>();
-            const userDetailsCache = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
-            const participantUserIds = new Set<string>();
+            const userDetailsCache = new Map<string, { displayName: string, photoURL: string }>();
 
-            const allMatchesSnapshot = await getDocs(collection(db, "predictions"));
-            
-            for (const matchDoc of allMatchesSnapshot.docs) {
-                const match = { id: matchDoc.id, ...matchDoc.data() } as PredictionMatch & { id: string };
-                // Ensure fixtureData and fixture exist before processing
-                if (!match.fixtureData || !match.fixtureData.fixture) continue;
-
+            // 3. Process predictions for finished matches
+            for (const match of finishedFixtures) {
+                if (!match.fixtureData) continue;
                 const userPredictionsSnapshot = await getDocs(collection(db, "predictions", match.id, "userPredictions"));
 
                 for (const predDoc of userPredictionsSnapshot.docs) {
                     const prediction = predDoc.data() as Prediction;
-                    participantUserIds.add(prediction.userId);
+                    const points = calculatePoints(prediction, match.fixtureData);
+                    const currentPoints = userPointsMap.get(prediction.userId) || 0;
+                    userPointsMap.set(prediction.userId, currentPoints + points);
 
-                    if (['FT', 'AET', 'PEN'].includes(match.fixtureData.fixture.status.short)) {
-                        const points = calculatePoints(prediction, match.fixtureData);
-                        const currentPoints = userPointsMap.get(prediction.userId) || 0;
-                        userPointsMap.set(prediction.userId, currentPoints + points);
+                    if (!userDetailsCache.has(prediction.userId)) {
+                        const userDoc = await getDoc(doc(db, 'users', prediction.userId));
+                        if(userDoc.exists()){
+                            const data = userDoc.data() as UserProfile;
+                            userDetailsCache.set(prediction.userId, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
+                        }
                     }
                 }
             }
 
-            // 3. Fetch details for all participants
-            for (const userId of participantUserIds) {
-                if (!userDetailsCache.has(userId)) {
-                    const userDoc = await getDoc(doc(db, 'users', userId));
-                    if(userDoc.exists()){
-                        const data = userDoc.data() as UserProfile;
-                        userDetailsCache.set(userId, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
-                    }
-                }
-            }
-            
-            // 4. REBUILD THE LEADERBOARD
+            // 4. Rebuild the leaderboard
             const rebuildBatch = writeBatch(db);
-            for (const [userId, userDetails] of userDetailsCache.entries()) {
-                 const totalPoints = userPointsMap.get(userId) || 0;
-                 const leaderboardRef = doc(db, 'leaderboard', userId);
-                 rebuildBatch.set(leaderboardRef, {
-                     totalPoints,
-                     userName: userDetails.displayName,
-                     userPhoto: userDetails.photoURL,
-                 });
+            for (const [userId, totalPoints] of userPointsMap.entries()) {
+                 const userDetails = userDetailsCache.get(userId);
+                 if (userDetails) {
+                    const leaderboardRef = doc(db, 'leaderboard', userId);
+                    rebuildBatch.set(leaderboardRef, {
+                        totalPoints,
+                        userName: userDetails.displayName,
+                        userPhoto: userDetails.photoURL,
+                    });
+                 }
             }
-            
             await rebuildBatch.commit();
             
             toast({ title: "نجاح!", description: "تمت إعادة بناء لوحة الصدارة بنجاح." });
