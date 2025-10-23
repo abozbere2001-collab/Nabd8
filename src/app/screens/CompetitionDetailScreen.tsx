@@ -587,8 +587,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[40px] text-right">#</TableHead>
-                            <TableHead className="text-right">الفريق</TableHead>
+                            <TableHead className="w-[40px] text-left px-2">#</TableHead>
+                            <TableHead>الفريق</TableHead>
                             <TableHead className="text-center">لعب</TableHead>
                             <TableHead className="text-center">ف</TableHead>
                             <TableHead className="text-center">ت</TableHead>
@@ -601,7 +601,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const displayName = getDisplayName('team', s.team.id, s.team.name);
                             return (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                                <TableCell className="font-bold">{s.rank}</TableCell>
+                                <TableCell className="font-bold px-2">{s.rank}</TableCell>
                                 <TableCell className="font-medium">
                                     <div className="flex items-center gap-2">
                                         <div className="relative">
@@ -635,8 +635,8 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-8 text-right">#</TableHead>
-                            <TableHead className="text-right">اللاعب</TableHead>
+                            <TableHead className="w-8 text-left px-2">#</TableHead>
+                            <TableHead>اللاعب</TableHead>
                             <TableHead className="text-center w-12">الأهداف</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -646,7 +646,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const teamName = getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name);
                             return (
                                 <TableRow key={player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
-                                    <TableCell className="font-bold text-right">{index + 1}</TableCell>
+                                    <TableCell className="font-bold text-left px-2">{index + 1}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-10 w-10">

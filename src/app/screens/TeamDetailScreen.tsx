@@ -372,8 +372,8 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[40px] text-right">#</TableHead>
-                                <TableHead className="text-right">الفريق</TableHead>
+                                <TableHead className="w-[40px] text-left px-2">#</TableHead>
+                                <TableHead>الفريق</TableHead>
                                 <TableHead className="text-center">لعب</TableHead>
                                 <TableHead className="text-center">ف/ت/خ</TableHead>
                                 <TableHead className="text-center">نقاط</TableHead>
@@ -382,7 +382,7 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
                         <TableBody>
                             {processedStandings.map(s => (
                                 <TableRow key={s.team.id} className={cn(s.team.id === teamId && 'bg-primary/10')}>
-                                    <TableCell className="font-bold">{s.rank}</TableCell>
+                                    <TableCell className="font-bold px-2">{s.rank}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
