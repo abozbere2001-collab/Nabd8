@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -16,7 +17,6 @@ import { Shirt, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, A
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
-import { CURRENT_SEASON } from '@/lib/constants';
 import { useFirebase } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
 import { doc, setDoc, deleteDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
@@ -25,7 +25,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type RenameType = 'player' | 'coach' | 'team' | 'league' | 'continent' | 'country' | 'status';
 interface RenameState {
@@ -304,125 +304,93 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
 
 const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId, fixture }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, originalData: any) => void, homeTeamId: number, awayTeamId: number, fixture: Fixture | null }) => {
     const [activeTeamTab, setActiveTeamTab] = useState<'home' | 'away'>('home');
+    
     if (lineups === null) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    }
-    
-    if (lineups.length < 2) {
-        return <p className="text-center text-muted-foreground p-8">التشكيلات غير متاحة حاليًا.</p>;
     }
     
     const home = lineups.find(l => l.team.id === homeTeamId);
     const away = lineups.find(l => l.team.id === awayTeamId);
 
+    const renderPitch = (lineup: LineupData) => {
+        try {
+            if (!lineup || typeof lineup !== 'object') {
+                return <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">⚠️ لم تتوفر بيانات التشكيلة بعد.</div>;
+            }
+
+            const isUpcoming = fixture?.fixture?.status?.short === 'NS' || fixture?.fixture?.status?.short === 'TBD';
+            const players = Array.isArray(lineup.startXI) ? lineup.startXI : [];
+
+            if (isUpcoming && players.length === 0) {
+                return <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">📅 سيتم عرض التشكيلة فور إعلانها.</div>;
+            }
+
+            if (players.length === 0) {
+                return <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">⚠️ التشكيلة غير متوفرة لهذه المباراة.</div>;
+            }
+
+            const formationGrid: Record<number, PlayerWithStats[]> = {};
+            const ungridded: PlayerWithStats[] = [];
+
+            for (const p of players) {
+                if (!p || !p.player) continue;
+                const grid = p.player.grid;
+                if (typeof grid === 'string') {
+                    const [row] = grid.split(':').map(Number);
+                    if (!formationGrid[row]) formationGrid[row] = [];
+                    formationGrid[row].push(p);
+                } else {
+                    ungridded.push(p);
+                }
+            }
+            
+            for (const rowKey of Object.keys(formationGrid)) {
+                const row = Number(rowKey);
+                if (Array.isArray(formationGrid[row])) {
+                    formationGrid[row].sort((a, b) => {
+                        const colA = Number(a?.player?.grid?.split(':')[1] || 0);
+                        const colB = Number(b?.player?.grid?.split(':')[1] || 0);
+                        return colA - colB;
+                    });
+                }
+            }
+
+            if (Object.keys(formationGrid).length === 0) {
+                return <div className="text-center text-muted-foreground p-4">⚠️ لا توجد بيانات لاعبين في هذه التشكيلة.</div>;
+            }
+
+            return (
+                <div className="flex flex-col justify-between items-center h-full py-4 gap-3">
+                    {Object.entries(formationGrid).map(([row, playersInRow]) => (
+                        <div key={row} className="flex justify-center gap-3">
+                            {playersInRow.map((p, i) => {
+                                const player = p.player;
+                                return (
+                                    <PlayerCard
+                                        key={player.id ?? i}
+                                        player={player}
+                                        navigate={navigate}
+                                        onRename={() => onRename('player', player.id ?? 0, p)}
+                                        isAdmin={isAdmin}
+                                    />
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
+            );
+        } catch (err) {
+            console.error('❌ renderPitch error:', err);
+            return <div className="text-center text-red-500 p-4">حدث خطأ أثناء عرض التشكيلة.</div>;
+        }
+    };
+    
     if (!home || !away) {
          return <p className="text-center text-muted-foreground p-8">خطأ في بيانات التشكيلة.</p>;
     }
     
     const activeLineup = activeTeamTab === 'home' ? home : away;
-    
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
-    
-const renderPitch = (lineup: LineupData | null | undefined, fixture?: any) => {
-  try {
-    // ✅ حماية كاملة من null أو undefined
-    if (!lineup || typeof lineup !== 'object') {
-      return (
-        <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
-          ⚠️ لم تتوفر بيانات التشكيلة بعد.
-        </div>
-      );
-    }
-
-    const isUpcoming =
-      fixture?.fixture?.status?.short === 'NS' ||
-      fixture?.fixture?.status?.short === 'TBD';
-    const players = Array.isArray(lineup.startXI) ? lineup.startXI : [];
-
-    // ✅ حالة المباراة القادمة (لم تبدأ بعد)
-    if (isUpcoming && players.length === 0) {
-      return (
-        <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
-          📅 سيتم عرض التشكيلة فور إعلانها.
-        </div>
-      );
-    }
-
-    // ✅ في حال لا توجد بيانات حالياً
-    if (players.length === 0) {
-      return (
-        <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
-          ⚠️ لا توجد تشكيلة متوفرة لهذه المباراة.
-        </div>
-      );
-    }
-
-    // ✅ بناء التشكيلة (شبكة الملعب)
-    const formationGrid: Record<number, PlayerWithStats[]> = {};
-    const ungridded: PlayerWithStats[] = [];
-
-    for (const p of players) {
-      if (!p || !p.player) continue;
-      const grid = p.player.grid;
-      if (typeof grid === 'string') {
-        const [row, col] = grid.split(':').map(Number);
-        if (!formationGrid[row]) formationGrid[row] = [];
-        formationGrid[row].push(p);
-      } else {
-        ungridded.push(p);
-      }
-    }
-
-    // ✅ ترتيب اللاعبين داخل كل صف
-    for (const rowKey of Object.keys(formationGrid)) {
-      const row = Number(rowKey);
-      if (Array.isArray(formationGrid[row])) {
-        formationGrid[row].sort((a, b) => {
-          const colA = Number(a?.player?.grid?.split(':')[1] || 0);
-          const colB = Number(b?.player?.grid?.split(':')[1] || 0);
-          return colA - colB;
-        });
-      }
-    }
-
-    // ✅ عرض الشبكة الفعلية
-    return (
-      <div className="flex flex-col justify-between items-center h-full py-4 gap-3">
-        {Object.entries(formationGrid).length > 0 ? (
-          Object.entries(formationGrid).map(([row, players]) => (
-            <div key={row} className="flex justify-center gap-3">
-              {players.map((p, i) => {
-                const player = p.player;
-                return (
-                  <PlayerCard
-                    key={player.id ?? i}
-                    player={player}
-                    navigate={navigate}
-                    onRename={() =>
-                      onRename('player', player.id ?? 0, p)
-                    }
-                    isAdmin={isAdmin}
-                  />
-                );
-              })}
-            </div>
-          ))
-        ) : (
-          <div className="text-center text-muted-foreground p-4">
-            ⚠️ لا توجد بيانات لاعبين في هذه التشكيلة.
-          </div>
-        )}
-      </div>
-    );
-  } catch (err) {
-    console.error('❌ renderPitch error:', err);
-    return (
-      <div className="text-center text-red-500 p-4">
-        حدث خطأ أثناء عرض التشكيلة.
-      </div>
-    );
-  }
-};
 
     return (
         <ScrollArea className="h-[calc(100vh-250px)]">
@@ -436,7 +404,7 @@ const renderPitch = (lineup: LineupData | null | undefined, fixture?: any) => {
                 
                 <div className="font-bold text-center text-muted-foreground text-sm">التشكيلة: {activeLineup.formation}</div>
                 
-                {renderPitch(activeLineup, fixture)}
+                {renderPitch(activeLineup)}
                 
                 <Card>
                     <CardContent className="p-3 text-center">
@@ -484,7 +452,7 @@ const renderPitch = (lineup: LineupData | null | undefined, fixture?: any) => {
                 <div className="pt-4">
                     <h3 className="text-center text-base font-bold mb-2">الاحتياط</h3>
                     <div className="space-y-1">
-                        {activeLineup.substitutes.map(p => (
+                        {activeLineup.substitutes && activeLineup.substitutes.map(p => (
                              <div key={p.player.id || p.player.name} className="p-2 rounded-lg bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-8 w-8">
@@ -698,52 +666,48 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         const fetchLineups = async () => {
             try {
                 const response = await fetch(`/api/football/fixtures/lineups?fixture=${fixture.fixture.id}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 setLineups(data.response);
             } catch (error) {
                 console.error("Could not fetch lineups:", error);
+                setLineups([]); // Set to empty array on error
             }
         };
         
         const fetchEvents = async () => {
             try {
                 const response = await fetch(`/api/football/fixtures/events?fixture=${fixture.fixture.id}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 setEvents(data.response);
             } catch (error) {
                 console.error("Could not fetch match events:", error);
+                setEvents([]); // Set to empty array on error
             }
         };
         
         const fetchStatistics = async () => {
             try {
                 const response = await fetch(`/api/football/fixtures/statistics?fixture=${fixture.fixture.id}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 setStatistics(data.response);
             } catch (error) {
                 console.error("Could not fetch match statistics:", error);
+                setStatistics([]); // Set to empty array on error
             }
         };
         
         const fetchPlayers = async () => {
             try {
                 const response = await fetch(`/api/football/players?fixture=${fixture.fixture.id}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 setPlayersDetails(data.response);
             } catch (error) {
                 console.error("Could not fetch players details:", error);
+                setPlayersDetails([]); // Set to empty array on error
             }
         };
         
@@ -756,20 +720,10 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
     useEffect(() => {
         if (!firestore || !fixtureId) return;
-
         const matchStatusRef = doc(firestore, 'matchCustomizations', String(fixtureId));
-
         const unsubscribe = onSnapshot(matchStatusRef, (doc) => {
-            const data = doc.data();
-            if (data && data.status) {
-                setCustomStatus(data.status);
-            } else {
-                setCustomStatus(null);
-            }
-        }, (error) => {
-            console.warn("Could not subscribe to match status:", error);
+            setCustomStatus(doc.data()?.status || null);
         });
-
         return () => unsubscribe();
     }, [firestore, fixtureId]);
     
@@ -779,6 +733,15 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         }
         return lineups;
     }, [lineups, playersDetails]);
+
+    const availableTabs = useMemo(() => {
+        const tabs = [{ id: 'details', label: 'تفاصيل' }];
+        if (lineups && lineups.length > 0) tabs.push({ id: 'lineups', label: 'التشكيلات' });
+        if (events && events.length > 0) tabs.push({ id: 'timeline', label: 'الاحداث' });
+        if (standings && standings.length > 0) tabs.push({ id: 'standings', label: 'الترتيب' });
+        return tabs;
+    }, [lineups, events, standings]);
+
 
     if (!fixture) {
         return (
@@ -809,31 +772,50 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
              />}
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', Number(fixtureId), {name: customStatus})}/>
-                 <Tabs defaultValue="lineups" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4">
-                        <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
-                        <TabsTrigger value="timeline">الاحداث</TabsTrigger>
-                        <TabsTrigger value="details">تفاصيل</TabsTrigger>
-                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                 <Tabs defaultValue="details" className="w-full">
+                    <TabsList className={cn("grid w-full", `grid-cols-${availableTabs.length}`)}>
+                       {availableTabs.map(tab => (
+                         <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
+                       ))}
                     </TabsList>
+                    
                     <TabsContent value="details" className="mt-4">
                        <ScrollArea className="h-[calc(100vh-250px)]">
                            <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
                         </ScrollArea>
                     </TabsContent>
-                     <TabsContent value="lineups" className="mt-4">
-                        <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} fixture={fixture} />
-                    </TabsContent>
-                    <TabsContent value="timeline" className="mt-4">
-                        <TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} />
-                    </TabsContent>
-                    <TabsContent value="standings" className="mt-4">
-                        <ScrollArea className="h-[calc(100vh-250px)]">
-                            <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
-                        </ScrollArea>
-                    </TabsContent>
+                    
+                     {availableTabs.some(t => t.id === 'lineups') && (
+                        <TabsContent value="lineups" className="mt-4">
+                           <LineupsTab 
+                             lineups={mergedLineups} 
+                             events={events} 
+                             navigate={navigate} 
+                             isAdmin={isAdmin} 
+                             onRename={handleOpenRename} 
+                             homeTeamId={homeTeamId} 
+                             awayTeamId={awayTeamId}
+                             fixture={fixture}
+                           />
+                       </TabsContent>
+                     )}
+
+                    {availableTabs.some(t => t.id === 'timeline') && (
+                      <TabsContent value="timeline" className="mt-4">
+                          <TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} />
+                      </TabsContent>
+                    )}
+                    
+                    {availableTabs.some(t => t.id === 'standings') && (
+                      <TabsContent value="standings" className="mt-4">
+                          <ScrollArea className="h-[calc(100vh-250px)]">
+                              <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
+                          </ScrollArea>
+                      </TabsContent>
+                    )}
                 </Tabs>
             </div>
         </div>
     );
 }
+
