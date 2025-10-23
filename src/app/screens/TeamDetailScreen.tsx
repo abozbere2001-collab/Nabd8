@@ -187,7 +187,9 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
     return (
         <div className="space-y-2">
             {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={(isOpen) => !isOpen && setRenameItem(null)} item={{...renameItem, type: 'player', purpose: 'rename'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name, renameItem.originalName)} />}
-            {players.map(player => (
+            {players.map(player => {
+                if (!player) return null;
+                return (
                 <Card key={player.id} className="p-2">
                     <div className="flex items-center gap-3">
                          <div className="flex-1 flex items-center gap-3 cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
@@ -213,7 +215,7 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
                         )}
                     </div>
                 </Card>
-            ))}
+            )})}
         </div>
     );
 };

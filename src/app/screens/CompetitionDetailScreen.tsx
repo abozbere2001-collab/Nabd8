@@ -638,17 +638,18 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {topScorers.map(({ player, statistics }, index) => {
-                            const displayName = getDisplayName('player', player.id, player.name);
-                            const teamName = getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name);
+                        {topScorers.map((scorer, index) => {
+                            if (!scorer || !scorer.player) return null;
+                            const displayName = getDisplayName('player', scorer.player.id, scorer.player.name);
+                            const teamName = getDisplayName('team', scorer.statistics[0]?.team.id, scorer.statistics[0]?.team.name);
                             return (
-                                <TableRow key={player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
+                                <TableRow key={scorer.player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: scorer.player.id })}>
                                     <TableCell className="font-bold text-right px-2">{index + 1}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-10 w-10">
-                                                <AvatarImage src={player.photo} alt={player.name} />
-                                                <AvatarFallback>{player.name.substring(0, 2)}</AvatarFallback>
+                                                <AvatarImage src={scorer.player.photo} alt={scorer.player.name} />
+                                                <AvatarFallback>{scorer.player.name.substring(0, 2)}</AvatarFallback>
                                             </Avatar>
                                             <div>
                                                 <p className="font-semibold truncate">{displayName}</p>
@@ -656,7 +657,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="font-bold text-lg text-center">{statistics[0]?.goals.total}</TableCell>
+                                    <TableCell className="font-bold text-lg text-center">{scorer.statistics[0]?.goals.total}</TableCell>
                                 </TableRow>
                             )})}
                     </TableBody>
@@ -675,7 +676,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 </div>
             ) : teams.length > 0 ? (
                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
-                    {teams.map(({ team }) => {
+                    {teams.map((teamData) => {
+                        if (!teamData || !teamData.team) return null;
+                        const { team } = teamData;
                         const displayName = getDisplayName('team', team.id, team.name);
                         const isFavoritedTeam = !!favorites?.teams?.[team.id];
                         const isCrowned = !!favorites.crownedTeams?.[team.id];

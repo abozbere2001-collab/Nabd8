@@ -216,7 +216,7 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                 <TableHeader>
                     <TableRow>
                         <TableHead>الترتيب</TableHead>
-                        <TableHead className="text-right">المستخدم</TableHead>
+                        <TableHead>المستخدم</TableHead>
                         <TableHead className="text-center">النقاط</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -224,10 +224,10 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                     {leaderboard.map(score => (
                         <TableRow key={score.userId} className={cn(score.userId === userId && "bg-primary/10")}>
                             <TableCell>{score.rank}</TableCell>
-                            <TableCell className="text-right">
-                                <div className="flex items-center gap-2 justify-end">
-                                    {score.userName}
+                            <TableCell>
+                                <div className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6"><AvatarImage src={score.userPhoto}/></Avatar>
+                                    {score.userName}
                                 </div>
                             </TableCell>
                             <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
@@ -242,10 +242,10 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                              <TableBody>
                                 <TableRow className="border-t-2 border-primary/50">
                                     <TableCell>{userScore.rank || '-'}</TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex items-center gap-2 justify-end">
-                                            {userScore.userName}
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
                                             <Avatar className="h-6 w-6"><AvatarImage src={userScore.userPhoto}/></Avatar>
+                                            {userScore.userName}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center font-bold">{userScore.totalPoints}</TableCell>
