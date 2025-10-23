@@ -460,9 +460,8 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename }: { lineups:
 
 
 const StandingsTab = ({ standings, homeTeamId, awayTeamId, navigate, loading }: { standings: Standing[] | null, homeTeamId: number, awayTeamId: number, navigate: ScreenProps['navigate'], loading: boolean }) => {
-    const { t } = useTranslation();
     if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-    if (!standings || standings.length === 0) return <p className="text-center text-muted-foreground p-8">{t('standings_not_available')}</p>;
+    if (!standings || standings.length === 0) return <p className="text-center text-muted-foreground p-8">الترتيب غير متاح</p>;
     
     return (
         <Table>
@@ -563,7 +562,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         const collectionName = `${type}Customizations`;
         const docRef = doc(db, collectionName, String(id));
         setDoc(docRef, { customName: newName })
-            .then(() => toast({ title: `تم تغيير ${type}`, description: `تم حفظ التغييرات بنجاح.` }))
+            .then(() => toast({ title: `تم تعديل الاسم`, description: 'تم حفظ التغييرات بنجاح.' }))
             .catch((error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: docRef.path,
@@ -659,12 +658,12 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     if (!fixture) {
         return (
             <div>
-                <ScreenHeader title="تفاصيل المباراة" onBack={goBack} canGoBack={canGoBack} />
+                <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} />
                 <div className="container mx-auto p-4">
                     {loading ? (
                         <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
                     ) : (
-                        <p className="text-center text-muted-foreground p-8">تعذر جلب المباراة.</p>
+                        <p className="text-center text-muted-foreground p-8">لم يتم العثور على المباراة</p>
                     )}
                 </div>
             </div>
@@ -676,16 +675,16 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
     return (
         <div>
-            <ScreenHeader title="تفاصيل المباراة" onBack={goBack} canGoBack={canGoBack} />
+            <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} />
              {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={() => setRenameItem(null)} item={{...renameItem, purpose: 'rename'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name)} />}
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} />
                 <Tabs defaultValue="details" className="w-full">
                     <TabsList className="grid w-full grid-cols-4">
-                        <TabsTrigger value="details">تفاصيل</TabsTrigger>
-                        <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
-                        <TabsTrigger value="timeline">الاحداث</TabsTrigger>
-                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                        <TabsTrigger value="details">{'التفاصيل'}</TabsTrigger>
+                        <TabsTrigger value="lineups">{'التشكيلات'}</TabsTrigger>
+                        <TabsTrigger value="timeline">{'الأحداث'}</TabsTrigger>
+                        <TabsTrigger value="standings">{'الترتيب'}</TabsTrigger>
                     </TabsList>
                     <TabsContent value="details" className="pt-4">
                         <DetailsTab fixture={fixture} statistics={statistics} />
@@ -707,4 +706,3 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
 // Ensure you have a valid fallback for useTranslation if LanguageProvider is not setup
 const useTranslation = () => ({ t: (key: string) => key });
-```
