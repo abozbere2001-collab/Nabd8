@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -312,21 +311,33 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     const home = lineups.find(l => l.team.id === homeTeamId);
     const away = lineups.find(l => l.team.id === awayTeamId);
 
-    const renderPitch = (lineup: LineupData) => {
+    const renderPitch = (lineup: LineupData | undefined) => {
         try {
             if (!lineup || typeof lineup !== 'object') {
-                return <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">⚠️ لم تتوفر بيانات التشكيلة بعد.</div>;
+                return (
+                    <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
+                        ⚠️ لم تتوفر بيانات التشكيلة بعد.
+                    </div>
+                );
             }
 
             const isUpcoming = fixture?.fixture?.status?.short === 'NS' || fixture?.fixture?.status?.short === 'TBD';
             const players = Array.isArray(lineup.startXI) ? lineup.startXI : [];
 
             if (isUpcoming && players.length === 0) {
-                return <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">📅 سيتم عرض التشكيلة فور إعلانها.</div>;
+                return (
+                    <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
+                        📅 سيتم عرض التشكيلة فور إعلانها.
+                    </div>
+                );
             }
 
             if (players.length === 0) {
-                return <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">⚠️ التشكيلة غير متوفرة لهذه المباراة.</div>;
+                return (
+                    <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
+                        ⚠️ لا توجد تشكيلة متوفرة لهذه المباراة.
+                    </div>
+                );
             }
 
             const formationGrid: Record<number, PlayerWithStats[]> = {};
@@ -356,7 +367,11 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
             }
 
             if (Object.keys(formationGrid).length === 0) {
-                return <div className="text-center text-muted-foreground p-4">⚠️ لا توجد بيانات لاعبين في هذه التشكيلة.</div>;
+                return (
+                    <div className="text-center text-muted-foreground p-4">
+                        ⚠️ لا توجد بيانات لاعبين في هذه التشكيلة.
+                    </div>
+                );
             }
 
             return (
@@ -370,7 +385,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                                         key={player.id ?? i}
                                         player={player}
                                         navigate={navigate}
-                                        onRename={() => onRename('player', player.id ?? 0, p)}
+                                        onRename={() => onRename('player', player.id, p)}
                                         isAdmin={isAdmin}
                                     />
                                 );
@@ -381,7 +396,11 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
             );
         } catch (err) {
             console.error('❌ renderPitch error:', err);
-            return <div className="text-center text-red-500 p-4">حدث خطأ أثناء عرض التشكيلة.</div>;
+            return (
+                <div className="text-center text-red-500 p-4">
+                    حدث خطأ أثناء عرض التشكيلة.
+                </div>
+            );
         }
     };
     
@@ -452,7 +471,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                 <div className="pt-4">
                     <h3 className="text-center text-base font-bold mb-2">الاحتياط</h3>
                     <div className="space-y-1">
-                        {activeLineup.substitutes && activeLineup.substitutes.map(p => (
+                        {activeLineup.substitutes.map(p => (
                              <div key={p.player.id || p.player.name} className="p-2 rounded-lg bg-card cursor-pointer" onClick={() => p.player.id && navigate('PlayerDetails', { playerId: p.player.id })}>
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-8 w-8">
@@ -818,4 +837,3 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         </div>
     );
 }
-
