@@ -588,13 +588,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[40px] text-right px-2">#</TableHead>
-                            <TableHead>الفريق</TableHead>
-                            <TableHead className="text-center">لعب</TableHead>
-                            <TableHead className="text-center">ف</TableHead>
-                            <TableHead className="text-center">ت</TableHead>
-                            <TableHead className="text-center">خ</TableHead>
                             <TableHead className="text-center">نقاط</TableHead>
+                            <TableHead className="text-center">خ</TableHead>
+                            <TableHead className="text-center">ت</TableHead>
+                            <TableHead className="text-center">ف</TableHead>
+                            <TableHead className="text-center">لعب</TableHead>
+                            <TableHead>الفريق</TableHead>
+                            <TableHead className="w-[40px] text-right px-2">#</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -603,9 +603,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const displayName = getDisplayName('team', s.team.id, s.team.name);
                             return (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                                <TableCell className="font-bold px-2">{s.rank}</TableCell>
+                                <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                <TableCell className="text-center">{s.all.lose}</TableCell>
+                                <TableCell className="text-center">{s.all.draw}</TableCell>
+                                <TableCell className="text-center">{s.all.win}</TableCell>
+                                <TableCell className="text-center">{s.all.played}</TableCell>
                                 <TableCell className="font-medium">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 justify-end">
                                         <p className="truncate">{displayName}</p>
                                         <Avatar className="h-6 w-6">
                                             <AvatarImage src={s.team.logo} alt={s.team.name} />
@@ -613,11 +617,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                         </Avatar>
                                     </div>
                                 </TableCell>
-                                <TableCell className="text-center">{s.all.played}</TableCell>
-                                <TableCell className="text-center">{s.all.win}</TableCell>
-                                <TableCell className="text-center">{s.all.draw}</TableCell>
-                                <TableCell className="text-center">{s.all.lose}</TableCell>
-                                <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                <TableCell className="font-bold px-2">{s.rank}</TableCell>
                             </TableRow>
                         )})}
                     </TableBody>
@@ -633,9 +633,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-8 text-right px-2">#</TableHead>
-                            <TableHead>اللاعب</TableHead>
                             <TableHead className="text-center w-12">الأهداف</TableHead>
+                            <TableHead>اللاعب</TableHead>
+                            <TableHead className="w-8 text-right px-2">#</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -645,20 +645,20 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const teamName = getDisplayName('team', scorer.statistics[0]?.team.id, scorer.statistics[0]?.team.name);
                             return (
                                 <TableRow key={scorer.player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: scorer.player.id })}>
-                                    <TableCell className="font-bold text-right px-2">{index + 1}</TableCell>
+                                    <TableCell className="font-bold text-lg text-center">{scorer.statistics[0]?.goals.total}</TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-3 justify-end">
+                                            <div>
+                                                <p className="font-semibold truncate text-right">{displayName}</p>
+                                                <p className="text-xs text-muted-foreground truncate text-right">{teamName}</p>
+                                            </div>
                                             <Avatar className="h-10 w-10">
                                                 <AvatarImage src={scorer.player.photo} alt={scorer.player.name} />
                                                 <AvatarFallback>{scorer.player.name.substring(0, 2)}</AvatarFallback>
                                             </Avatar>
-                                            <div>
-                                                <p className="font-semibold truncate">{displayName}</p>
-                                                <p className="text-xs text-muted-foreground truncate">{teamName}</p>
-                                            </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="font-bold text-lg text-center">{scorer.statistics[0]?.goals.total}</TableCell>
+                                    <TableCell className="font-bold text-right px-2">{index + 1}</TableCell>
                                 </TableRow>
                             )})}
                     </TableBody>
@@ -714,3 +714,5 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
     </div>
   );
 }
+
+    
