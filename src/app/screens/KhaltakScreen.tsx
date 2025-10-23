@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -215,22 +216,22 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead className="text-center">النقاط</TableHead>
-                        <TableHead>المستخدم</TableHead>
                         <TableHead className="w-[50px] text-right">الترتيب</TableHead>
+                        <TableHead>المستخدم</TableHead>
+                        <TableHead className="text-center">النقاط</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {leaderboard.map(score => (
                         <TableRow key={score.userId} className={cn(score.userId === userId && "bg-primary/10")}>
-                            <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
+                            <TableCell className="text-right font-bold">{score.rank}</TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6"><AvatarImage src={score.userPhoto}/></Avatar>
                                     {score.userName}
                                 </div>
                             </TableCell>
-                            <TableCell className="text-right font-bold">{score.rank}</TableCell>
+                            <TableCell className="text-center font-bold">{score.totalPoints}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
@@ -241,14 +242,14 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                          <Table>
                              <TableBody>
                                 <TableRow className="border-t-2 border-primary/50">
-                                    <TableCell className="text-center font-bold">{userScore.totalPoints}</TableCell>
+                                    <TableCell className="w-[50px] text-right font-bold">{userScore.rank || '-'}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             <Avatar className="h-6 w-6"><AvatarImage src={userScore.userPhoto}/></Avatar>
                                             {userScore.userName}
                                         </div>
                                     </TableCell>
-                                    <TableCell className="w-[50px] text-right font-bold">{userScore.rank || '-'}</TableCell>
+                                    <TableCell className="text-center font-bold">{userScore.totalPoints}</TableCell>
                                 </TableRow>
                              </TableBody>
                          </Table>
@@ -489,7 +490,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             });
             
             const finishedFixtures = currentPinnedMatches.filter(m => 
-                ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short)
+                m && m.fixtureData && m.fixtureData.fixture && ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short)
             );
             
             if (finishedFixtures.length === 0) {
@@ -502,6 +503,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             
             // --- Update Fixture Data and Calculate Points ---
             for (const match of finishedFixtures) {
+                if (!match.fixtureData || !match.fixtureData.fixture) continue;
                 const fixtureId = match.fixtureData.fixture.id;
 
                 // Fetch latest fixture data from API
@@ -744,5 +746,3 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    

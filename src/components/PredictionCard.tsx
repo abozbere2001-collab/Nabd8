@@ -82,17 +82,17 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
         if (actualHome === null || actualAway === null) return "bg-card text-foreground";
 
         if (actualHome === predHome && actualAway === predAway) {
-            return "bg-green-500/20 text-green-500";
+            return "bg-green-500/80 text-white";
         }
 
         const actualWinner = actualHome > actualAway ? 'home' : actualHome < actualAway ? 'away' : 'draw';
         const predWinner = predHome > predAway ? 'home' : predHome < predAway ? 'away' : 'draw';
         
         if (actualWinner === predWinner) {
-            return "bg-yellow-500/20 text-yellow-500";
+            return "bg-yellow-500/80 text-white";
         }
 
-        return "bg-destructive/20 text-destructive";
+        return "bg-destructive/80 text-white";
     }, [isMatchLiveOrFinished, userPrediction, liveFixture.goals]);
     
     const getPointsColor = useCallback(() => {
@@ -117,7 +117,7 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
     },[userPrediction]);
 
     return (
-        <Card className={cn("transition-colors", isMatchLiveOrFinished && getPredictionStatusColors())}>
+        <Card className={cn("transition-colors", getPredictionStatusColors())}>
             <CardContent className="p-3">
                 <div className="flex items-center justify-between gap-1">
                      <div className="flex flex-col items-center gap-1 flex-1 justify-end truncate">
@@ -153,7 +153,7 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                         <span className="font-semibold text-xs text-center truncate w-full">{liveFixture.teams.home.name}</span>
                     </div>
                 </div>
-                 <div className="text-center text-xs text-muted-foreground mt-2">
+                 <div className={cn("text-center text-xs mt-2", isMatchLiveOrFinished ? 'text-white/80' : 'text-muted-foreground')}>
                     <span>{liveFixture.league.name}</span>
                 </div>
 
@@ -168,14 +168,12 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
                     </p>
                 )}
                 
-                {!isMatchFinished && userPrediction && <p className="text-center text-green-600 text-xs mt-2">تم حفظ توقعك</p>}
+                {!isMatchFinished && userPrediction && <p className="text-center text-green-400 text-xs mt-2">تم حفظ توقعك</p>}
                 
-                {isPredictionDisabled && !userPrediction && !isMatchFinished && <p className="text-center text-red-600 text-xs mt-2">أغلق باب التوقع</p>}
+                {isPredictionDisabled && !userPrediction && !isMatchFinished && <p className="text-center text-red-400 text-xs mt-2">أغلق باب التوقع</p>}
             </CardContent>
         </Card>
     );
 };
 
 export default PredictionCard;
-
-    
