@@ -349,10 +349,9 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     
-    useEffect(() => {
+     useEffect(() => {
         if (!db) return;
 
-        // Listener for all pinned matches
         const unsubMatches = onSnapshot(collection(db, 'predictions'), (snapshot) => {
             const matches = snapshot.docs.map(doc => ({
                 ...(doc.data() as PredictionMatch),
@@ -362,41 +361,36 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             setLoadingMatches(false);
         });
 
-        // Listener for the current user's predictions across all matches
-        const unsubUserPredictions = () => {
-            if (!user) return () => {};
-            const userPredictions: { [key: string]: Function } = {};
-            const matchesQuery = query(collection(db, 'predictions'));
-            return onSnapshot(matchesQuery, (matchesSnapshot) => {
-                matchesSnapshot.forEach(matchDoc => {
-                    if (userPredictions[matchDoc.id]) {
-                        userPredictions[matchDoc.id](); // Unsubscribe from old listener
-                    }
-                    const predRef = doc(db, 'predictions', matchDoc.id, 'userPredictions', user.uid);
-                    userPredictions[matchDoc.id] = onSnapshot(predRef, predDoc => {
-                        if (predDoc.exists()) {
-                            setAllUserPredictions(prev => ({
-                                ...prev,
-                                [matchDoc.id]: predDoc.data() as Prediction
-                            }));
-                        } else {
-                            setAllUserPredictions(prev => {
-                                const newPreds = { ...prev };
-                                delete newPreds[matchDoc.id];
-                                return newPreds;
-                            });
-                        }
-                    });
-                });
-                setLoadingUserPredictions(false);
-            });
-        };
+        if (!user) {
+            setLoadingUserPredictions(false);
+            return () => unsubMatches();
+        }
 
-        const finalUnsubUserPredictions = unsubUserPredictions();
+        const predictionListeners: Function[] = [];
+        const unsubUserPredictions = onSnapshot(query(collection(db, 'predictions')), (matchesSnapshot) => {
+            predictionListeners.forEach(unsub => unsub());
+            matchesSnapshot.forEach(matchDoc => {
+                const predRef = doc(db, 'predictions', matchDoc.id, 'userPredictions', user.uid);
+                const unsub = onSnapshot(predRef, predDoc => {
+                    if (predDoc.exists()) {
+                        setAllUserPredictions(prev => ({ ...prev, [matchDoc.id]: predDoc.data() as Prediction }));
+                    } else {
+                        setAllUserPredictions(prev => {
+                            const newPreds = { ...prev };
+                            delete newPreds[matchDoc.id];
+                            return newPreds;
+                        });
+                    }
+                });
+                predictionListeners.push(unsub);
+            });
+            setLoadingUserPredictions(false);
+        });
 
         return () => {
             unsubMatches();
-            finalUnsubUserPredictions();
+            unsubUserPredictions();
+            predictionListeners.forEach(unsub => unsub());
         };
     }, [db, user]);
     
@@ -479,27 +473,31 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             existingLeaderboardSnapshot.forEach(doc => leaderboardBatch.delete(doc.ref));
             await leaderboardBatch.commit();
             
-            // 2. Fetch all finished, pinned matches
-            const finishedMatchesQuery = query(collection(db, "predictions"), where("fixtureData.fixture.status.short", "in", ["FT", "AET", "PEN"]));
-            const finishedMatchesSnapshot = await getDocs(finishedMatchesQuery);
-            const finishedMatches = finishedMatchesSnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as PredictionMatch) }));
-    
-            if (finishedMatches.length === 0) {
-                toast({ title: "لا توجد مباريات منتهية", description: "تم مسح لوحة الصدارة." });
-                fetchLeaderboard();
-                return;
-            }
-            
+            // 2. Aggregate all participants and calculate points
             const userPointsMap = new Map<string, number>();
-    
-            for (const match of finishedMatches) {
+            const allMatchesSnapshot = await getDocs(collection(db, "predictions"));
+            const allMatches = allMatchesSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as PredictionMatch & { id: string }));
+
+            for (const match of allMatches) {
                 const userPredictionsSnapshot = await getDocs(collection(db, "predictions", match.id, "userPredictions"));
+
+                // Add all participants from this match to the map if they are not there
                 userPredictionsSnapshot.forEach(predDoc => {
                     const prediction = predDoc.data() as Prediction;
-                    const points = calculatePoints(prediction, match.fixtureData);
-                    const currentPoints = userPointsMap.get(prediction.userId) || 0;
-                    userPointsMap.set(prediction.userId, currentPoints + points);
+                    if (!userPointsMap.has(prediction.userId)) {
+                        userPointsMap.set(prediction.userId, 0);
+                    }
                 });
+                
+                // If match is finished, calculate and add points
+                if (['FT', 'AET', 'PEN'].includes(match.fixtureData.fixture.status.short)) {
+                    userPredictionsSnapshot.forEach(predDoc => {
+                        const prediction = predDoc.data() as Prediction;
+                        const points = calculatePoints(prediction, match.fixtureData);
+                        const currentPoints = userPointsMap.get(prediction.userId) || 0;
+                        userPointsMap.set(prediction.userId, currentPoints + points);
+                    });
+                }
             }
             
             // 3. REBUILD THE LEADERBOARD
