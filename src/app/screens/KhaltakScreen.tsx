@@ -476,18 +476,16 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 ...(doc.data() as PredictionMatch)
             }));
     
-            // Filter for matches that are not yet finished to update their status from API
             const matchesToUpdateApiStatus = allPinnedMatches.filter(m => 
                 m && m.fixtureData && m.fixtureData.fixture && !['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short)
             );
             
             const fixtureIdsToUpdate = matchesToUpdateApiStatus
-                .map(m => m.fixtureData.fixture.id)
-                .filter(id => id); // Filter out any potential undefined IDs
+                .map(m => m.fixtureData?.fixture?.id)
+                .filter(Boolean);
     
             let apiUpdatedFixturesMap = new Map<number, Fixture>();
     
-            // Fetch updates in chunks to avoid long URLs if necessary
             if (fixtureIdsToUpdate.length > 0) {
                 const fixtureRes = await fetch(`/api/football/fixtures?ids=${fixtureIdsToUpdate.join('-')}`);
                 if (fixtureRes.ok) {
@@ -498,14 +496,12 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 }
             }
     
-            // Create a combined list of matches with the most recent data
             const allMatchesWithLatestData = allPinnedMatches.map(pinnedMatch => {
                 if (!pinnedMatch || !pinnedMatch.fixtureData || !pinnedMatch.fixtureData.fixture) return null;
                 const updatedFixture = apiUpdatedFixturesMap.get(pinnedMatch.fixtureData.fixture.id);
                 return updatedFixture ? { ...pinnedMatch, fixtureData: updatedFixture } : pinnedMatch;
             }).filter(Boolean) as (PredictionMatch & {id: string})[];
             
-            // Now filter for matches that are actually finished and have a result
             const finishedMatchesForPoints = allMatchesWithLatestData.filter(m =>
                 m.fixtureData.fixture && 
                 ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short) && 
@@ -518,7 +514,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 return;
             }
             
-            const batch = writeBatch(db);
+            const mainBatch = writeBatch(db);
             const userPointsMap = new Map<string, number>();
             const userDetailsCache = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
 
@@ -526,7 +522,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 if (!match.id || !match.fixtureData) continue;
     
                 const matchDocRef = doc(db, 'predictions', match.id);
-                batch.update(matchDocRef, { fixtureData: match.fixtureData });
+                mainBatch.update(matchDocRef, { fixtureData: match.fixtureData });
     
                 const userPredictionsColRef = collection(db, 'predictions', match.id, 'userPredictions');
                 const userPredictionsSnapshot = await getDocs(userPredictionsColRef);
@@ -538,7 +534,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                     const newPoints = calculatePoints(userPrediction, match.fixtureData);
     
                     if (userPrediction.points !== newPoints) {
-                        batch.update(userPredDoc.ref, { points: newPoints });
+                        mainBatch.update(userPredDoc.ref, { points: newPoints });
                     }
                     
                     userPointsMap.set(userPrediction.userId, (userPointsMap.get(userPrediction.userId) || 0) + newPoints);
@@ -557,7 +553,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 const userDetails = userDetailsCache.get(userId);
                 if (userDetails) {
                     const leaderboardRef = doc(db, 'leaderboard', userId);
-                    batch.set(leaderboardRef, {
+                    mainBatch.set(leaderboardRef, {
                         totalPoints,
                         userName: userDetails.displayName,
                         userPhoto: userDetails.photoURL,
@@ -565,7 +561,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 }
             }
     
-            await batch.commit();
+            await mainBatch.commit();
             
             toast({ title: "نجاح!", description: `تم تحديث لوحة الصدارة بنجاح.` });
             fetchLeaderboard();
@@ -764,3 +760,4 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
