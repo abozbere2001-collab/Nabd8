@@ -381,6 +381,26 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             }));
 
             setPinnedMatches(updatedMatches);
+
+             // After getting pinned matches, fetch user predictions for them
+            if (user) {
+                const predictionsMap: { [key: number]: Prediction } = {};
+                for (const match of updatedMatches) {
+                    const fixtureId = match.fixtureData.fixture.id;
+                    const predDocRef = doc(db, 'predictions', String(fixtureId), 'userPredictions', user.uid);
+                    try {
+                        const docSnap = await getDoc(predDocRef);
+                        if (docSnap.exists()) {
+                            predictionsMap[fixtureId] = docSnap.data() as Prediction;
+                        }
+                    } catch (e) {
+                         // This might fail if rules don't allow direct get, but list might work for admin
+                         console.warn(`Could not fetch individual prediction for fixture ${fixtureId}`);
+                    }
+                }
+                setUserPredictions(predictionsMap);
+            }
+
             setLoadingMatches(false);
 
         }, error => {
@@ -389,26 +409,9 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         });
 
         return () => unsub();
-    }, [db]);
+    }, [db, user]);
     
-     useEffect(() => {
-        if (!user || !db) return;
-
-        const q = query(collectionGroup(db, 'userPredictions'), where('userId', '==', user.uid));
-        const unsub = onSnapshot(q, (snapshot) => {
-            const predictions: { [key: number]: Prediction } = {};
-            snapshot.forEach(doc => {
-                const data = doc.data() as Prediction;
-                predictions[data.fixtureId] = data;
-            });
-            setUserPredictions(predictions);
-        }, error => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({path: `userPredictions collection group for user ${user.uid}`, operation: 'list'}));
-        });
-
-        return () => unsub();
-    }, [user, db]);
-
+    
     const fetchLeaderboard = useCallback(async () => {
         if (!db) return;
         setLoadingLeaderboard(true);
@@ -733,5 +736,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
 
     
