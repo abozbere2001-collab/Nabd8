@@ -327,7 +327,6 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
     
     const renderPitch = (lineup: LineupData) => {
-        // Safety check: if startXI is missing or not an array, return null or a message.
         if (!lineup || !Array.isArray(lineup.startXI)) {
             return <p className="text-center text-muted-foreground p-4">بيانات اللاعبين الأساسيين غير متوفرة.</p>;
         }
@@ -758,12 +757,14 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', Number(fixtureId), {name: customStatus})}/>
                  <Tabs defaultValue="lineups" className="w-full">
-                     <TabsList className="grid w-full grid-cols-4">
-                        <TabsTrigger value="standings">الترتيب</TabsTrigger>
-                        <TabsTrigger value="timeline">الاحداث</TabsTrigger>
-                        <TabsTrigger value="details">تفاصيل</TabsTrigger>
-                        <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
-                    </TabsList>
+                    <div className="w-full overflow-x-auto">
+                        <TabsList className="grid w-full grid-cols-4">
+                            <TabsTrigger value="standings">الترتيب</TabsTrigger>
+                            <TabsTrigger value="timeline">الاحداث</TabsTrigger>
+                            <TabsTrigger value="details">تفاصيل</TabsTrigger>
+                            <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
+                        </TabsList>
+                    </div>
                     <TabsContent value="details" className="mt-4">
                        <ScrollArea className="h-[calc(100vh-250px)]">
                            <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
@@ -785,5 +786,3 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         </div>
     );
 }
-
-
