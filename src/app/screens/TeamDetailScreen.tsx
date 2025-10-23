@@ -188,7 +188,7 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
         <div className="space-y-2">
             {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={(isOpen) => !isOpen && setRenameItem(null)} item={{...renameItem, type: 'player', purpose: 'rename'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name, renameItem.originalName)} />}
             {players.map(player => {
-                if (!player) return null;
+                if (!player?.id) return null;
                 return (
                 <Card key={player.id} className="p-2">
                     <div className="flex items-center gap-3">
@@ -385,7 +385,9 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {processedStandings.map(s => (
+                            {processedStandings.map(s => {
+                                if (!s.team?.id) return null;
+                                return (
                                 <TableRow key={s.team.id} className={cn(s.team.id === teamId && 'bg-primary/10')}>
                                     <TableCell className="font-bold px-2">{s.rank}</TableCell>
                                     <TableCell>
@@ -400,7 +402,7 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
                                     <TableCell className="text-center">{s.all.lose}</TableCell>
                                     <TableCell className="text-center font-bold">{s.points}</TableCell>
                                 </TableRow>
-                            ))}
+                            )})}
                         </TableBody>
                     </Table>
                 ) : <p className="text-center text-muted-foreground p-8">الترتيب غير متاح.</p>}

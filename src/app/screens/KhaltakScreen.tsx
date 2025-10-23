@@ -216,7 +216,7 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                 <TableHeader>
                     <TableRow>
                         <TableHead>الترتيب</TableHead>
-                        <TableHead>المستخدم</TableHead>
+                        <TableHead className="text-right">المستخدم</TableHead>
                         <TableHead className="text-center">النقاط</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -224,8 +224,8 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                     {leaderboard.map(score => (
                         <TableRow key={score.userId} className={cn(score.userId === userId && "bg-primary/10")}>
                             <TableCell>{score.rank}</TableCell>
-                            <TableCell>
-                                <div className="flex items-center gap-2">
+                            <TableCell className="text-right">
+                                <div className="flex items-center gap-2 justify-end">
                                     {score.userName}
                                     <Avatar className="h-6 w-6"><AvatarImage src={score.userPhoto}/></Avatar>
                                 </div>
@@ -242,8 +242,8 @@ const LeaderboardDisplay = React.memo(({ leaderboard, loadingLeaderboard, userSc
                              <TableBody>
                                 <TableRow className="border-t-2 border-primary/50">
                                     <TableCell>{userScore.rank || '-'}</TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
+                                    <TableCell className="text-right">
+                                        <div className="flex items-center gap-2 justify-end">
                                             {userScore.userName}
                                             <Avatar className="h-6 w-6"><AvatarImage src={userScore.userPhoto}/></Avatar>
                                         </div>

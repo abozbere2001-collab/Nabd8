@@ -408,7 +408,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
             });
         });
         
-        const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
+        const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => b - a);
 
         return (
              <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
@@ -529,6 +529,7 @@ const StandingsTab = ({ standings, homeTeamId, awayTeamId, navigate, loading }: 
             </TableHeader>
             <TableBody>
                 {standings.map((s) => {
+                    if (!s.team?.id) return null;
                     const isRelevantTeam = s.team.id === homeTeamId || s.team.id === awayTeamId;
                     return (
                         <TableRow key={s.team.id} className={cn(isRelevantTeam && "bg-primary/10", "cursor-pointer")} onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>

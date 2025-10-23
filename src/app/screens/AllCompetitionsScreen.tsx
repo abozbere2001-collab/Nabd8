@@ -391,7 +391,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                  const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                currentFavorites[itemType]![itemId] = favData;
+                currentFavorites[itemType]![itemId] = favData as any;
             }
             setLocalFavorites(currentFavorites);
             setFavorites(currentFavorites);
@@ -624,9 +624,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                             </div>
                         </AccordionTrigger>
                         <AccordionContent className="p-2">
-                             <Avatar className="h-6 w-6 bg-white p-0.5">
-                                <AvatarImage src={league.logo} alt={league.name} className="object-contain" />
-                            </Avatar>
+                            {renderClubCompetitions()}
                         </AccordionContent>
                     </AccordionItem>
                  </Accordion>

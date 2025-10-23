@@ -599,6 +599,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     </TableHeader>
                     <TableBody>
                         {standings.map((s) => {
+                            if (!s.team?.id) return null;
                             const displayName = getDisplayName('team', s.team.id, s.team.name);
                             return (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
@@ -639,7 +640,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     </TableHeader>
                     <TableBody>
                         {topScorers.map((scorer, index) => {
-                            if (!scorer || !scorer.player) return null;
+                            if (!scorer?.player?.id) return null;
                             const displayName = getDisplayName('player', scorer.player.id, scorer.player.name);
                             const teamName = getDisplayName('team', scorer.statistics[0]?.team.id, scorer.statistics[0]?.team.name);
                             return (
