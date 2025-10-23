@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ScreenProps } from '@/app/page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -796,5 +796,3 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
 // Ensure you have a valid fallback for useTranslation if LanguageProvider is not setup
 const useTranslation = () => ({ t: (key: string) => key });
-
-    
