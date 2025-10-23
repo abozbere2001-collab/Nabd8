@@ -26,7 +26,7 @@ const PredictionCard = ({ initialPredictionMatch, userPrediction, onSave }: { in
     const debouncedHome = useDebounce(homeValue, 500);
     const debouncedAway = useDebounce(awayValue, 500);
 
-    const isMatchLiveOrFinished = useMemo(() => ['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H', 'ET', 'BT', 'P'].includes(liveFixture.fixture.status.short), [liveFixture]);
+    const isMatchLiveOrFinished = useMemo(() => ['LIVE', '1H', 'HT', '2H', 'ET', 'BT', 'P', 'FT', 'AET', 'PEN'].includes(liveFixture.fixture.status.short), [liveFixture]);
     const isMatchFinished = useMemo(() => ['FT', 'AET', 'PEN'].includes(liveFixture.fixture.status.short), [liveFixture]);
     const isPredictionDisabled = useMemo(() => new Date(liveFixture.fixture.timestamp * 1000) < new Date(), [liveFixture]);
 
