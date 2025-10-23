@@ -304,7 +304,7 @@ const TimelineTab = ({ events, homeTeam, awayTeam }: { events: MatchEvent[] | nu
     );
 }
 
-const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, originalData: any) => void, homeTeamId: number, awayTeamId: number }) => {
+const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, awayTeamId, fixture }: { lineups: LineupData[] | null; events: MatchEvent[] | null; navigate: ScreenProps['navigate'], isAdmin: boolean, onRename: (type: RenameType, id: number, originalData: any) => void, homeTeamId: number, awayTeamId: number, fixture: Fixture | null }) => {
     if (lineups === null) {
         return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
     }
@@ -326,55 +326,82 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
     
-const renderPitch = (lineup: LineupData) => {
-    // ✅ تأكيد أن البيانات موجودة
-    if (!lineup || !Array.isArray(lineup.startXI) || lineup.startXI.length === 0) {
-        return <p className="text-center text-muted-foreground p-4">⚠️ التشكيلة غير متوفرة لهذه المباراة.</p>;
-    }
+    const renderPitch = (lineup: LineupData | null | undefined, fixture?: any) => {
+        // ✅ تحقق من وجود بيانات التشكيلة والمباراة
+        const isUpcoming = fixture?.fixture?.status?.short === 'NS' || fixture?.fixture?.status?.short === 'TBD';
+        const noLineup = !lineup || !Array.isArray(lineup.startXI) || lineup.startXI.length === 0;
 
-    // ✅ تأمين الحقول الداخلية قبل أي عمليات
-    const formationGrid: { [key: number]: PlayerWithStats[] } = {};
-    const ungriddedPlayers: PlayerWithStats[] = [];
-
-    lineup.startXI.forEach(p => {
-        if (p && p.player && typeof p.player.grid === 'string') {
-            const [row] = p.player.grid.split(':').map(Number);
-            if (!formationGrid[row]) formationGrid[row] = [];
-            formationGrid[row].push(p);
-        } else if (p) {
-            ungriddedPlayers.push(p);
+        // ✅ إذا كانت المباراة قادمة ولا توجد تشكيلة بعد
+        if (isUpcoming && noLineup) {
+            return (
+                <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
+                    📅 لم يتم إعلان التشكيلة بعد، سيتم تحديثها عند اقتراب المباراة.
+                </div>
+            );
         }
-    });
 
-    // ✅ ترتيب الصفوف بدون أخطاء
-    Object.keys(formationGrid).forEach(rowKey => {
-        const row = Number(rowKey);
-        if (Array.isArray(formationGrid[row])) {
-            formationGrid[row].sort((a, b) => {
-                const colA = Number(a?.player?.grid?.split(':')[1] || 0);
-                const colB = Number(b?.player?.grid?.split(':')[1] || 0);
-                return colA - colB;
-            });
+        // ✅ إذا كانت المباراة منتهية أو جارية ولكن لا توجد بيانات
+        if (noLineup) {
+            return (
+                <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
+                    ⚠️ التشكيلة غير متوفرة لهذه المباراة.
+                </div>
+            );
         }
-    });
+
+        // ✅ بناء الشبكة الآمنة
+        const formationGrid: Record<number, PlayerWithStats[]> = {};
+        const ungriddedPlayers: PlayerWithStats[] = [];
+
+        lineup.startXI.forEach(p => {
+            if (p?.player?.grid && typeof p.player.grid === 'string') {
+                const [row] = p.player.grid.split(':').map(Number);
+                if (!formationGrid[row]) formationGrid[row] = [];
+                formationGrid[row].push(p);
+            } else if (p) {
+                ungriddedPlayers.push(p);
+            }
+        });
+
+        // ✅ ترتيب اللاعبين في كل صف حسب العمود
+        Object.keys(formationGrid).forEach(rowKey => {
+            const row = Number(rowKey);
+            if (Array.isArray(formationGrid[row])) {
+                formationGrid[row].sort((a, b) => {
+                    const colA = Number(a?.player?.grid?.split(':')[1] || 0);
+                    const colB = Number(b?.player?.grid?.split(':')[1] || 0);
+                    return colA - colB;
+                });
+            }
+        });
         
-    const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
+        const sortedRows = Object.keys(formationGrid).map(Number).sort((a, b) => a - b);
 
-    return (
-         <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
-            {sortedRows.map(row => (
-                <div key={row} className="flex justify-around items-center w-full">
-                    {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player)} />)}
+        // ✅ في حال لم يكن هناك أي صفوف بعد الترتيب
+        if (sortedRows.length === 0 && ungriddedPlayers.length === 0) {
+            return (
+                <div className="flex justify-center items-center h-full p-4 text-center text-muted-foreground">
+                    ⚠️ لا توجد بيانات لاعبين في هذه التشكيلة.
                 </div>
-            ))}
-             {ungriddedPlayers.length > 0 && (
-                <div className="flex justify-around items-center w-full">
-                    {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player)} />)}
-                </div>
-            )}
-        </div>
-    )
-}
+            );
+        }
+
+        // ✅ عرض التشكيلة الفعلية
+        return (
+            <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-green-700 bg-cover bg-center rounded-lg overflow-hidden border-4 border-green-900/50 flex flex-col-reverse justify-around p-2" style={{backgroundImage: "url('/pitch-vertical.svg')"}}>
+                {sortedRows.map(row => (
+                    <div key={row} className="flex justify-around items-center w-full">
+                        {formationGrid[row]?.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player)} />)}
+                    </div>
+                ))}
+                {ungriddedPlayers.length > 0 && (
+                    <div className="flex justify-around items-center w-full">
+                        {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player)} />)}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     return (
         <ScrollArea className="h-[calc(100vh-250px)]">
@@ -388,7 +415,7 @@ const renderPitch = (lineup: LineupData) => {
                 
                 <div className="font-bold text-center text-muted-foreground text-sm">التشكيلة: {activeLineup.formation}</div>
                 
-                {renderPitch(activeLineup)}
+                {renderPitch(activeLineup, fixture)}
                 
                 <Card>
                     <CardContent className="p-3 text-center">
@@ -774,7 +801,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                         </ScrollArea>
                     </TabsContent>
                      <TabsContent value="lineups" className="mt-4">
-                        <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
+                        <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} fixture={fixture} />
                     </TabsContent>
                     <TabsContent value="timeline" className="mt-4">
                         <TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} />
@@ -789,5 +816,6 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         </div>
     );
 }
+
 
     
