@@ -168,26 +168,30 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
 };
 
 const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
-    if (fixture.goals.home === null || fixture.goals.away === null || !['FT', 'AET', 'PEN'].includes(fixture.fixture.status.short)) {
-        return userPrediction.points ?? 0;
+    const { home, away } = fixture.goals;
+    if (home === null || away === null) {
+      // If the match result is not available, don't award or penalize points.
+      // Return the points that might have already been calculated in a previous run.
+      return prediction.points ?? 0;
     }
-
-    const actualHome = fixture.goals.home;
-    const actualAway = fixture.goals.away;
+  
     const predHome = prediction.homeGoals;
     const predAway = prediction.awayGoals;
-
-    if (actualHome === predHome && actualAway === predAway) {
-        return 5;
+  
+    // Exact score prediction
+    if (home === predHome && away === predAway) {
+      return 5;
     }
-
-    const actualWinner = actualHome > actualAway ? 'home' : actualHome < actualAway ? 'away' : 'draw';
+  
+    const actualWinner = home > away ? 'home' : home < away ? 'away' : 'draw';
     const predWinner = predHome > predAway ? 'home' : predHome < predAway ? 'away' : 'draw';
-    
+  
+    // Correct outcome prediction (win/draw/loss)
     if (actualWinner === predWinner) {
-        return 3;
+      return 3;
     }
-
+  
+    // Incorrect prediction
     return 0;
 };
 
@@ -356,7 +360,8 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
      useEffect(() => {
         if (!db) return;
 
-        const unsub = onSnapshot(query(collection(db, 'predictions')), (snapshot) => {
+        const q = query(collection(db, 'predictions'));
+        const unsub = onSnapshot(q, (snapshot) => {
             const matches = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...(doc.data() as PredictionMatch),
@@ -475,16 +480,17 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         if (!db || !isAdmin) return;
         setIsUpdatingPoints(true);
         toast({ title: "بدء تحديث النقاط...", description: "جاري حساب النقاط لجميع المستخدمين." });
-
+    
         try {
             const allPinnedMatchesSnapshot = await getDocs(query(collection(db, "predictions")));
             const allPinnedMatches = allPinnedMatchesSnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as PredictionMatch) }));
-
+    
             const allMatchesWithLatestData = await Promise.all(
                 allPinnedMatches.map(async (pinnedMatch) => {
                     if (!pinnedMatch?.fixtureData?.fixture) return pinnedMatch;
                     
                     const status = pinnedMatch.fixtureData.fixture.status.short;
+                    // Only fetch updates for matches that are not yet finished.
                     if (['FT', 'AET', 'PEN'].includes(status)) {
                         return pinnedMatch;
                     }
@@ -503,19 +509,18 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                     return pinnedMatch;
                 })
             );
-
+    
             const batch = writeBatch(db);
             const userPointsMap = new Map<string, number>();
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
-
+    
             for (const pinnedMatch of allMatchesWithLatestData) {
                 if (!pinnedMatch?.fixtureData?.fixture) continue;
-
-                // Update the fixture data in Firestore if it was changed
+    
                 if (pinnedMatch.fixtureData !== allPinnedMatches.find(p => p.id === pinnedMatch.id)?.fixtureData) {
                     batch.update(doc(db, 'predictions', pinnedMatch.id), { fixtureData: pinnedMatch.fixtureData });
                 }
-
+    
                 if (['FT', 'AET', 'PEN'].includes(pinnedMatch.fixtureData.fixture.status.short)) {
                     const userPredictionsSnapshot = await getDocs(collection(db, 'predictions', pinnedMatch.id, 'userPredictions'));
                     
@@ -523,13 +528,13 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                         const userPrediction = userPredDoc.data() as Prediction;
                         const userId = userPrediction.userId;
                         if (!userId) continue;
-
+    
                         const newPoints = calculatePoints(userPrediction, pinnedMatch.fixtureData);
                         
                         if (userPrediction.points !== newPoints) {
                             batch.update(userPredDoc.ref, { points: newPoints });
                         }
-
+    
                         userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + newPoints);
                         
                         if (!userDetailsMap.has(userId)) {
@@ -558,17 +563,17 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                     }, { merge: true });
                 }
             }
-
+    
             await batch.commit();
             toast({ title: "نجاح!", description: `تم تحديث لوحة الصدارة بنجاح.` });
             fetchLeaderboard();
-
+    
         } catch (error: any) {
             console.error("Error calculating all points:", error);
-            if (error.code === 'permission-denied' || error.message.includes('permission-denied')) {
+            if (error.code?.includes('permission-denied')) {
                  errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: 'predictions or leaderboard or users', 
-                    operation: 'list or get',
+                    path: 'users or predictions or leaderboard', 
+                    operation: 'list',
                 }));
              } else {
                 toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ أثناء تحديث لوحة الصدارة." });
