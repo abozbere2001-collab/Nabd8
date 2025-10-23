@@ -99,16 +99,16 @@ const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture
                     <span className="text-[10px]">{format(new Date(fixture.fixture.date), 'd MMMM yyyy', { locale: ar })}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
-                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
+                    <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
+                        <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="relative flex flex-col items-center justify-center min-w-[120px] text-center">
                         <LiveMatchStatus fixture={fixture} large customStatus={customStatus} />
                     </div>
-                    <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
-                        <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
+                    <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
+                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                 </div>
             </CardContent>
@@ -537,16 +537,16 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const [customStatus, setCustomStatus] = useState<string | null>(null);
     const [playersDetails, setPlayersDetails] = useState<{player: Player, statistics: any[]}[] | null>(null);
     
-    const { firestore: db, isAdmin } = useFirebase();
+    const { firestore, isAdmin } = useFirebase();
     const { toast } = useToast();
     const [renameItem, setRenameItem] = useState<RenameState | null>(null);
 
     const handleSaveRename = async (type: RenameType, id: number | string, newName: string) => {
-        if (!isAdmin || !db || !renameItem?.originalData) return;
+        if (!isAdmin || !firestore || !renameItem?.originalData) return;
 
         const originalName = renameItem.originalData.name || '';
         const collectionName = `${type}Customizations`;
-        const docRef = doc(db, collectionName, String(id));
+        const docRef = doc(firestore, collectionName, String(id));
 
         try {
             if (newName.trim() && newName.trim() !== originalName) {
@@ -687,9 +687,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     }, [fixture]);
 
     useEffect(() => {
-        if (!db || !fixtureId) return;
+        if (!firestore || !fixtureId) return;
 
-        const matchStatusRef = doc(db, 'matches', fixtureId);
+        const matchStatusRef = doc(firestore, 'matches', fixtureId);
 
         const unsubscribe = onSnapshot(matchStatusRef, (doc) => {
             const data = doc.data();
@@ -703,7 +703,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         });
 
         return () => unsubscribe();
-    }, [db, fixtureId]);
+    }, [firestore, fixtureId]);
     
     const mergedLineups = useMemo(() => {
         if (lineups && playersDetails) {
