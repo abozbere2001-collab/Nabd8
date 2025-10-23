@@ -588,13 +588,13 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="text-center">نقاط</TableHead>
-                            <TableHead className="text-center">خ</TableHead>
-                            <TableHead className="text-center">ت</TableHead>
-                            <TableHead className="text-center">ف</TableHead>
-                            <TableHead className="text-center">لعب</TableHead>
-                            <TableHead>الفريق</TableHead>
                             <TableHead className="w-[40px] text-right px-2">#</TableHead>
+                            <TableHead>الفريق</TableHead>
+                            <TableHead className="text-center">لعب</TableHead>
+                            <TableHead className="text-center">ف</TableHead>
+                            <TableHead className="text-center">ت</TableHead>
+                            <TableHead className="text-center">خ</TableHead>
+                            <TableHead className="text-center">نقاط</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -602,25 +602,23 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const displayName = getDisplayName('team', s.team.id, s.team.name);
                             return (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
-                                <TableCell className="text-center font-bold">{s.points}</TableCell>
-                                <TableCell className="text-center">{s.all.lose}</TableCell>
-                                <TableCell className="text-center">{s.all.draw}</TableCell>
-                                <TableCell className="text-center">{s.all.win}</TableCell>
-                                <TableCell className="text-center">{s.all.played}</TableCell>
+                                <TableCell className="font-bold px-2">{s.rank}</TableCell>
                                 <TableCell className="font-medium">
                                     <div className="flex items-center gap-2">
-                                        <div className="relative">
-                                            <Avatar className="h-6 w-6">
-                                                <AvatarImage src={s.team.logo} alt={s.team.name} />
-                                                <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
-                                            </Avatar>
-                                        </div>
                                         <p className="truncate">
                                             {displayName}
                                         </p>
+                                        <Avatar className="h-6 w-6">
+                                            <AvatarImage src={s.team.logo} alt={s.team.name} />
+                                            <AvatarFallback>{s.team.name.substring(0,1)}</AvatarFallback>
+                                        </Avatar>
                                     </div>
                                 </TableCell>
-                                <TableCell className="font-bold px-2">{s.rank}</TableCell>
+                                <TableCell className="text-center">{s.all.played}</TableCell>
+                                <TableCell className="text-center">{s.all.win}</TableCell>
+                                <TableCell className="text-center">{s.all.draw}</TableCell>
+                                <TableCell className="text-center">{s.all.lose}</TableCell>
+                                <TableCell className="text-center font-bold">{s.points}</TableCell>
                             </TableRow>
                         )})}
                     </TableBody>
@@ -636,9 +634,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="text-center w-12">الأهداف</TableHead>
-                            <TableHead>اللاعب</TableHead>
                             <TableHead className="w-8 text-right px-2">#</TableHead>
+                            <TableHead>اللاعب</TableHead>
+                            <TableHead className="text-center w-12">الأهداف</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -647,7 +645,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const teamName = getDisplayName('team', statistics[0]?.team.id, statistics[0]?.team.name);
                             return (
                                 <TableRow key={player.id} className="cursor-pointer" onClick={() => navigate('PlayerDetails', { playerId: player.id })}>
-                                    <TableCell className="font-bold text-lg text-center">{statistics[0]?.goals.total}</TableCell>
+                                    <TableCell className="font-bold text-right px-2">{index + 1}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-10 w-10">
@@ -660,7 +658,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                                             </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="font-bold text-right px-2">{index + 1}</TableCell>
+                                    <TableCell className="font-bold text-lg text-center">{statistics[0]?.goals.total}</TableCell>
                                 </TableRow>
                             )})}
                     </TableBody>
