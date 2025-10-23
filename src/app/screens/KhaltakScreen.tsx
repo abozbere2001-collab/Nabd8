@@ -166,7 +166,7 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
 };
 
 const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
-    if (fixture.goals.home === null || fixture.goals.away === null) return 0;
+    if (!fixture || !fixture.goals || fixture.goals.home === null || fixture.goals.away === null) return 0;
 
     const actualHome = fixture.goals.home;
     const actualAway = fixture.goals.away;
@@ -349,7 +349,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     
-    useEffect(() => {
+     useEffect(() => {
         if (!db) return;
 
         const unsub = onSnapshot(collection(db, 'predictions'), (snapshot) => {
@@ -369,16 +369,21 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
 
 
     useEffect(() => {
-        if (!db || !user || !pinnedMatches.length) {
+        if (!db || !user ) {
             setLoadingUserPredictions(false);
             return;
         }
         
         setLoadingUserPredictions(true);
-
+        // This effect now fetches all user predictions for all pinned matches at once.
         const fetchAllPredictions = async () => {
+            if (pinnedMatches.length === 0) {
+                 setLoadingUserPredictions(false);
+                 return;
+            }
             const newPredictions: { [key: string]: Prediction } = {};
             const predictionPromises = pinnedMatches.map(match => {
+                if (!match || !match.id) return Promise.resolve();
                 const userPredictionRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
                 return getDoc(userPredictionRef).then(predDoc => {
                     if (predDoc.exists()) {
@@ -463,88 +468,79 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         });
     }, [user, db]);
 
-     const handleCalculateAllPoints = useCallback(async () => {
+    const handleCalculateAllPoints = useCallback(async () => {
         if (!db || !isAdmin) return;
         setIsUpdatingPoints(true);
         toast({ title: "بدء تحديث النقاط...", description: "جاري تحديث لوحة الصدارة." });
-    
+
         try {
-            const finishedFixtures = pinnedMatches.filter(m => 
-                m.fixtureData && ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short)
-            );
-            
-            if (finishedFixtures.length === 0) {
-                toast({ title: "لا توجد مباريات منتهية", description: "لا يوجد ما يمكن تحديثه." });
-                setIsUpdatingPoints(false);
-                return;
-            }
-
-            const pointsUpdateBatch = writeBatch(db);
-            
-            for (const match of finishedFixtures) {
-                const fixtureData = match.fixtureData;
-                if (!fixtureData || !fixtureData.fixture) continue;
-                
-                const userPredictionsSnapshot = await getDocs(collection(db, "predictions", match.id, "userPredictions"));
-
-                userPredictionsSnapshot.forEach(userPredDoc => {
-                    const prediction = userPredDoc.data() as Prediction;
-                    const newPoints = calculatePoints(prediction, fixtureData);
-                    
-                    const userLeaderboardRef = doc(db, 'leaderboard', prediction.userId);
-
-                    // Note: This needs to be handled by a Cloud Function for scalability,
-                    // as incrementing isn't available directly in security rules.
-                    // The client-side update is an approximation.
-                    // For now, we fetch, calculate, and set.
-                    pointsUpdateBatch.set(userLeaderboardRef, { totalPoints: newPoints }, { merge: true });
-                });
-            }
-
-            // This simplified client-side logic is not scalable and has race conditions.
-            // A proper implementation requires Cloud Functions to aggregate points atomically.
-            // The following is a placeholder for what should be a backend process.
-            
             const userPoints = new Map<string, number>();
+            const allParticipants = new Set<string>();
             const userDetailsCache = new Map<string, { displayName: string, photoURL: string }>();
 
-            for (const match of finishedFixtures) {
+            // Step 1: Gather all participants and initialize points to 0
+            for (const match of pinnedMatches) {
+                 if (!match || !match.id) continue;
                 const userPredictionsSnapshot = await getDocs(collection(db, "predictions", match.id, "userPredictions"));
-                for (const predDoc of userPredictionsSnapshot.docs) {
+                userPredictionsSnapshot.forEach(predDoc => {
+                    const prediction = predDoc.data() as Prediction;
+                    if (prediction.userId) {
+                        allParticipants.add(prediction.userId);
+                        if (!userPoints.has(prediction.userId)) {
+                            userPoints.set(prediction.userId, 0);
+                        }
+                    }
+                });
+            }
+            
+            // Step 2: Calculate points only for finished matches
+            const finishedFixtures = pinnedMatches.filter(m =>
+                m.fixtureData && ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short)
+            );
+
+            for (const match of finishedFixtures) {
+                if (!match || !match.id || !match.fixtureData) continue;
+                const userPredictionsSnapshot = await getDocs(collection(db, "predictions", match.id, "userPredictions"));
+                userPredictionsSnapshot.forEach(predDoc => {
                     const prediction = predDoc.data() as Prediction;
                     const points = calculatePoints(prediction, match.fixtureData);
                     userPoints.set(prediction.userId, (userPoints.get(prediction.userId) || 0) + points);
-                    
-                    if (!userDetailsCache.has(prediction.userId)) {
-                        const userDoc = await getDoc(doc(db, 'users', prediction.userId));
-                        if(userDoc.exists()){
-                            const data = userDoc.data() as UserProfile;
-                            userDetailsCache.set(prediction.userId, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
-                        }
+                });
+            }
+
+            // Step 3: Fetch user details for all participants
+            const participantIds = Array.from(allParticipants);
+            for (const userId of participantIds) {
+                if (!userDetailsCache.has(userId)) {
+                    const userDoc = await getDoc(doc(db, 'users', userId));
+                    if (userDoc.exists()) {
+                        const data = userDoc.data() as UserProfile;
+                        userDetailsCache.set(userId, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
                     }
                 }
             }
 
+            // Step 4: Batch write to leaderboard
+            const leaderboardBatch = writeBatch(db);
             for (const [userId, totalPoints] of userPoints.entries()) {
-                 const userDetails = userDetailsCache.get(userId);
-                 if (userDetails) {
+                const userDetails = userDetailsCache.get(userId);
+                if (userDetails) {
                     const leaderboardRef = doc(db, 'leaderboard', userId);
-                    pointsUpdateBatch.set(leaderboardRef, {
+                    leaderboardBatch.set(leaderboardRef, {
                         totalPoints,
                         userName: userDetails.displayName,
                         userPhoto: userDetails.photoURL,
                     }, { merge: true });
-                 }
+                }
             }
-            
-            await pointsUpdateBatch.commit();
-            
-            toast({ title: "نجاح!", description: `تم تحديث لوحة الصدارة بنجاح.` });
+
+            await leaderboardBatch.commit();
+            toast({ title: "نجاح!", description: `تم تحديث لوحة الصدارة لـ ${userPoints.size} مشارك.` });
             fetchLeaderboard();
-    
+
         } catch (error: any) {
             console.error("Error calculating points:", error);
-            toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ أثناء تحديث لوحة الصدارة." });
+            toast({ variant: 'destructive', title: "خطأ", description: error.message || "حدث خطأ أثناء تحديث لوحة الصدارة." });
         } finally {
             setIsUpdatingPoints(false);
         }
@@ -618,7 +614,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const [mainTab, setMainTab] = useState<'predictions' | 'myTeams'>('myTeams');
 
   useEffect(() => {
-    if (!user || !db) return;
+    if (!user || !db || user.isAnonymous) return;
     const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const unsubscribe = onSnapshot(favRef, 
       (doc) => {
@@ -647,7 +643,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
 
 
   const handleRemoveCrowned = (teamId: number) => {
-    if (!user || !db) return;
+    if (!user || !db || user.isAnonymous) return;
     const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
     const fieldPath = `crownedTeams.${teamId}`;
     
@@ -661,7 +657,7 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     setSelectedTeamId(teamId);
   }
   
-  if (!user) {
+  if (!user || user.isAnonymous) {
     return (
        <div className="flex h-full flex-col bg-background">
           <ScreenHeader title="ملعبي" onBack={goBack} canGoBack={canGoBack} />
