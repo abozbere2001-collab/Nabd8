@@ -351,56 +351,52 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     
-   useEffect(() => {
-        if (!db || !user) {
-            setLoadingMatches(false);
-            setLoadingUserPredictions(false);
-            return;
-        }
-
-        setLoadingMatches(true);
-        setLoadingUserPredictions(true);
-
-        const unsubPinnedMatches = onSnapshot(collection(db, 'predictions'), (snapshot) => {
+    useEffect(() => {
+        if (!db) return;
+        
+        const unsub = onSnapshot(collection(db, 'predictions'), (snapshot) => {
             const matches = snapshot.docs.map(doc => ({
                 ...(doc.data() as PredictionMatch),
-                id: doc.id
+                id: doc.id,
             })).filter(m => m && m.fixtureData && m.fixtureData.fixture);
             setPinnedMatches(matches);
             setLoadingMatches(false);
-
-            // Once we have the matches, we can fetch the user's predictions for them.
-            const newPredictions: { [key: number]: Prediction } = {};
-            const predictionPromises = matches.map(match => {
-                const fixtureId = parseInt(match.id, 10);
-                if (isNaN(fixtureId)) return Promise.resolve();
-
-                const userPredictionRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
-                return getDoc(userPredictionRef).then(predDoc => {
-                    if (predDoc.exists()) {
-                        newPredictions[fixtureId] = predDoc.data() as Prediction;
-                    }
-                });
-            });
-
-            Promise.all(predictionPromises).then(() => {
-                setAllUserPredictions(newPredictions);
-                setLoadingUserPredictions(false);
-            }).catch(e => {
-                console.error("Failed to fetch user predictions", e);
-                setLoadingUserPredictions(false);
-            });
-
-        }, error => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({path: 'predictions', operation: 'list'}));
-            setLoadingMatches(false);
-            setLoadingUserPredictions(false);
         });
 
-        return () => {
-            unsubPinnedMatches();
-        };
-    }, [db, user]);
+        return () => unsub();
+    }, [db]);
+
+     useEffect(() => {
+        if (!db || !user) return;
+        setLoadingUserPredictions(true);
+        // This effect now fetches all user predictions for all pinned matches
+        if (pinnedMatches.length === 0) {
+            setLoadingUserPredictions(false);
+            return;
+        }
+        
+        const newPredictions: { [key: number]: Prediction } = {};
+        const predictionPromises = pinnedMatches.map(match => {
+            const fixtureId = parseInt(match.id, 10);
+            if (isNaN(fixtureId)) return Promise.resolve();
+
+            const userPredictionRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
+            return getDoc(userPredictionRef).then(predDoc => {
+                if (predDoc.exists()) {
+                    newPredictions[fixtureId] = predDoc.data() as Prediction;
+                }
+            });
+        });
+        
+        Promise.all(predictionPromises).then(() => {
+            setAllUserPredictions(prev => ({ ...prev, ...newPredictions }));
+            setLoadingUserPredictions(false);
+        }).catch(e => {
+            console.error("Failed to fetch user predictions", e);
+            setLoadingUserPredictions(false);
+        });
+        
+    }, [db, user, pinnedMatches]);
     
     const fetchLeaderboard = useCallback(async () => {
         if (!db) return;
@@ -470,24 +466,30 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         });
     }, [user, db]);
 
-     const handleCalculateAllPoints = useCallback(async () => {
+      const handleCalculateAllPoints = useCallback(async () => {
         if (!db || !isAdmin) return;
         setIsUpdatingPoints(true);
         toast({ title: "بدء تحديث النقاط...", description: "جاري حساب النقاط لجميع المستخدمين. قد تستغرق هذه العملية بعض الوقت." });
 
         try {
+            // Fetch the most recent list of pinned matches inside the function
+            const pinnedMatchesSnapshot = await getDocs(collection(db, 'predictions'));
+            const currentPinnedMatches = pinnedMatchesSnapshot.docs.map(doc => ({
+                ...(doc.data() as PredictionMatch),
+                id: doc.id,
+            })).filter(m => m && m.fixtureData && m.fixtureData.fixture);
+
             const allUsersSnapshot = await getDocs(collection(db, 'users'));
             const userPointsMap = new Map<string, number>();
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
 
-            // Step 1: Initialize all users' points to 0 and cache their details.
             allUsersSnapshot.forEach(userDoc => {
                 const data = userDoc.data() as UserProfile;
-                userPointsMap.set(userDoc.id, 0);
+                userPointsMap.set(userDoc.id, 0); // CRITICAL: Reset points to 0
                 userDetailsMap.set(userDoc.id, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
             });
             
-            const finishedFixtures = pinnedMatches.filter(m => 
+            const finishedFixtures = currentPinnedMatches.filter(m => 
                 m.fixtureData && ['FT', 'AET', 'PEN'].includes(m.fixtureData.fixture.status.short)
             );
 
@@ -497,7 +499,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 return;
             }
 
-            // Step 2: Accumulate points from all finished prediction matches.
             for (const match of finishedFixtures) {
                 const fixtureId = match.fixtureData.fixture.id;
                 const userPredictionsColRef = collection(db, 'predictions', String(fixtureId), 'userPredictions');
@@ -510,11 +511,11 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                         const userPrediction = userPredDoc.data() as Prediction;
                         const newPoints = calculatePoints(userPrediction, match.fixtureData);
                         
+                        // Only update if points have changed
                         if (userPrediction.points !== newPoints) {
                             pointsUpdateBatch.update(userPredDoc.ref, { points: newPoints });
                         }
                         
-                        // Use the new points for the sum, not the old ones
                         const currentTotalPoints = userPointsMap.get(userPrediction.userId) || 0;
                         userPointsMap.set(userPrediction.userId, currentTotalPoints + newPoints);
                     });
@@ -526,7 +527,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 }
             }
             
-            // Step 3: Batch update the leaderboard.
             const leaderboardBatch = writeBatch(db);
             
             for (const [userId, totalPoints] of userPointsMap.entries()) {
@@ -550,7 +550,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         } finally {
             setIsUpdatingPoints(false);
         }
-    }, [db, isAdmin, toast, fetchLeaderboard, pinnedMatches]);
+    }, [db, isAdmin, toast, fetchLeaderboard]);
 
 
     const filteredMatches = useMemo(() => {
