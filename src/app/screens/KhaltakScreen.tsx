@@ -357,7 +357,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
              const matches = snapshot.docs.map(doc => doc.data() as PredictionMatch).filter(m => m && m.fixtureData && m.fixtureData.fixture);
              
             const updatedMatches = await Promise.all(matches.map(async (match) => {
-                // If match is finished, always fetch the latest data to ensure score is up-to-date
                 if (['FT', 'AET', 'PEN'].includes(match.fixtureData.fixture.status.short)) {
                      try {
                         const res = await fetch(`/api/football/fixtures?id=${match.fixtureData.fixture.id}`);
@@ -387,31 +386,36 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
     }, [db]);
     
     useEffect(() => {
-        if (!user || !db || pinnedMatches.length === 0) {
+        if (!user || !db) {
             setUserPredictions({});
             return;
         }
 
-        const fetchUserPredictions = async () => {
-            const preds: { [key: number]: Prediction } = {};
-            for (const match of pinnedMatches) {
-                const fixtureId = match.fixtureData.fixture.id;
-                const predRef = doc(db, 'predictions', String(fixtureId), 'userPredictions', user.uid);
-                 try {
-                    const predSnap = await getDoc(predRef);
-                    if (predSnap.exists()) {
-                        preds[fixtureId] = predSnap.data() as Prediction;
-                    }
-                } catch(e) {
-                     errorEmitter.emit('permission-error', new FirestorePermissionError({ path: predRef.path, operation: 'get' }));
-                }
-            }
-            setUserPredictions(preds);
-        };
-        
-        fetchUserPredictions();
+        const userPredictionsQuery = query(
+            collectionGroup(db, 'userPredictions'),
+            where('userId', '==', user.uid)
+        );
 
-    }, [user, db, pinnedMatches]);
+        const unsub = onSnapshot(userPredictionsQuery, (snapshot) => {
+            const preds: { [key: number]: Prediction } = {};
+            snapshot.forEach(doc => {
+                const data = doc.data() as Prediction;
+                if (data.fixtureId) {
+                    preds[data.fixtureId] = data;
+                }
+            });
+            setUserPredictions(preds);
+        }, (error) => {
+            console.error("Error fetching user predictions:", error);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: `userPredictions collection group for user ${user.uid}`,
+                operation: 'list'
+            }));
+        });
+    
+        return () => unsub();
+
+    }, [user, db]);
 
     const fetchLeaderboard = useCallback(async () => {
         if (!db) return;
@@ -499,12 +503,15 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                 
                 try {
                     const userPredictionsSnapshot = await getDocs(userPredictionsColRef);
+                    const batch = writeBatch(db);
 
                     for (const userPredDoc of userPredictionsSnapshot.docs) {
                         const userPrediction = userPredDoc.data() as Prediction;
                         const newPoints = calculatePoints(userPrediction, match.fixtureData);
 
-                        await updateDoc(userPredDoc.ref, { points: newPoints });
+                        if (userPrediction.points !== newPoints) {
+                           batch.update(userPredDoc.ref, { points: newPoints });
+                        }
 
                         if (!userPointsMap.has(userPrediction.userId)) {
                              try {
@@ -518,16 +525,28 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                                 }
                             } catch(e) { /* User might be deleted, skip */ }
                         }
-                        if(userPointsMap.has(userPrediction.userId)) {
-                            const current = userPointsMap.get(userPrediction.userId)!;
-                            current.total += newPoints;
-                        }
+                        // This calculation will be redone fully below
                     }
+                    await batch.commit();
+
                 } catch(e) {
                      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: userPredictionsColRef.path, operation: 'list' }));
                      continue; // Skip to next match if we can't read predictions for this one
                 }
             }
+            
+            // Now, get all predictions for all users and recalculate total scores
+            const allUserPredictionsQuery = collectionGroup(db, 'userPredictions');
+            const allUserPredictionsSnapshot = await getDocs(allUserPredictionsQuery);
+
+            allUserPredictionsSnapshot.forEach(docSnap => {
+                const pred = docSnap.data() as Prediction;
+                 if (userPointsMap.has(pred.userId)) {
+                    const current = userPointsMap.get(pred.userId)!;
+                    current.total += pred.points || 0;
+                }
+            });
+
 
             const leaderboardBatch = writeBatch(db);
             for (const [userId, data] of userPointsMap.entries()) {
