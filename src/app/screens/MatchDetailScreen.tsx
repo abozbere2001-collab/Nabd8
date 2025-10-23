@@ -671,35 +671,35 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
              try {
                 await fetchAllCustomNames();
                 
-                const detailsPromise = Promise.all([
+                const [lineupsRes, eventsRes, statsRes, homePlayersRes, awayPlayersRes] = await Promise.all([
                     fetch(`/api/football/fixtures/lineups?fixture=${fixture.fixture.id}`, { signal }),
                     fetch(`/api/football/fixtures/events?fixture=${fixture.fixture.id}`, { signal }),
                     fetch(`/api/football/fixtures/statistics?fixture=${fixture.fixture.id}`, { signal }),
-                    fetch(`/api/football/players?fixture=${fixture.fixture.id}`, { signal }),
+                    fetch(`/api/football/players?team=${fixture.teams.home.id}&season=${fixture.league.season}`, { signal }),
+                    fetch(`/api/football/players?team=${fixture.teams.away.id}&season=${fixture.league.season}`, { signal }),
                 ]);
 
-                const detailsResponses = await detailsPromise;
                 if (signal.aborted) return;
                 
-                
-                const [lineupsRes, eventsRes, statsRes, playersRes] = detailsResponses;
                 const lineupsData = await lineupsRes.json();
                 const eventsData = await eventsRes.json();
                 const statsData = await statsRes.json();
-                const playersData = await playersRes.json();
+                const homePlayersData = await homePlayersRes.json();
+                const awayPlayersData = await awayPlayersRes.json();
+
 
                 if (signal.aborted) return;
                 
                 const playersMap = new Map<number, { player: PlayerType, statistics: any[] }>();
-                if (playersData.response) {
-                    playersData.response.forEach((p: { player: PlayerType, statistics: any[] }) => {
-                        if (p.player.id) {
-                            playersMap.set(p.player.id, p);
-                        }
-                    });
-                }
-                setDetailedPlayersMap(playersMap);
+                const allPlayers = [...(homePlayersData.response || []), ...(awayPlayersData.response || [])];
 
+                allPlayers.forEach((p: { player: PlayerType, statistics: any[] }) => {
+                    if (p.player.id) {
+                        playersMap.set(p.player.id, p);
+                    }
+                });
+                
+                setDetailedPlayersMap(playersMap);
                 setLineups(lineupsData.response);
                 setEvents(eventsData.response);
                 setStatistics(statsData.response);
@@ -903,3 +903,4 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
       </div>
     );
 }
+
