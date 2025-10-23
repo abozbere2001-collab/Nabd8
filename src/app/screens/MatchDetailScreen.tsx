@@ -12,11 +12,12 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { Fixture, Standing, LineupData, MatchEvent, MatchStatistics, PlayerWithStats, Player as PlayerType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shirt, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, Pencil } from 'lucide-react';
+import { Shirt, Square, Clock, Loader2, Users, BarChart, ShieldCheck, ArrowUp, ArrowDown, Pencil, TrendingUp } from 'lucide-react';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { Progress } from '@/components/ui/progress';
 import { LiveMatchStatus } from '@/components/LiveMatchStatus';
 import { CURRENT_SEASON } from '@/lib/constants';
+import { OddsTab } from '@/components/OddsTab';
 import { useAdmin, useFirestore } from '@/firebase/provider';
 import { RenameDialog } from '@/components/RenameDialog';
 import { doc, setDoc, deleteDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
@@ -308,7 +309,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
 
-    const getPlayerWithDetails = (basePlayer: PlayerType): PlayerType => {
+    const getPlayerWithDetails = useCallback((basePlayer: PlayerType): PlayerType => {
         const detailedPlayer = detailedPlayersMap.get(basePlayer.id);
         if (detailedPlayer) {
             return {
@@ -318,7 +319,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
             };
         }
         return basePlayer;
-    };
+    }, [detailedPlayersMap]);
     
     const renderPitch = (lineup: LineupData) => {
         const formationGrid: { [key: number]: PlayerWithStats[] } = {};
@@ -720,41 +721,95 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     const awayTeamId = processedFixture.teams.away.id;
     
     return (
-        <div className="flex h-full flex-col bg-background">
-            <ScreenHeader title={'تفاصيل المباراة'} onBack={goBack} canGoBack={canGoBack} actions={
-                isAdmin && (
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenRename('status', processedFixture.fixture.id, customStatus || '')}><Pencil className="h-4 w-4" /></Button>
-                )
-            } />
-            {renameItem && <RenameDialog isOpen={!!renameItem} onOpenChange={() => setRenameItem(null)} item={{...renameItem, purpose: 'rename'}} onSave={(type, id, name) => handleSaveRename(type, Number(id), name)} />}
-            <div className="flex-1 overflow-y-auto p-4">
-                <MatchHeaderCard fixture={processedFixture} navigate={navigate} customStatus={customStatus} />
-                <Tabs defaultValue="lineups" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4">
-                        <TabsTrigger value="details">{'التفاصيل'}</TabsTrigger>
-                        <TabsTrigger value="lineups">{'التشكيلات'}</TabsTrigger>
-                        <TabsTrigger value="timeline">{'الأحداث'}</TabsTrigger>
-                        <TabsTrigger value="standings">{'الترتيب'}</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="details" className="pt-4">
-                        <DetailsTab fixture={processedFixture} statistics={statistics} loading={loadingDetails} />
-                    </TabsContent>
-                    <TabsContent value="lineups" className="pt-4">
-                        <LineupsTab lineups={lineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} detailedPlayersMap={detailedPlayersMap} />
-                    </TabsContent>
-                    <TabsContent value="timeline" className="pt-4">
-                        <TimelineTab events={events} homeTeam={processedFixture.teams.home} awayTeam={processedFixture.teams.away} />
-                    </TabsContent>
-                    <TabsContent value="standings" className="pt-4">
-                        <StandingsTab standings={processedStandings} homeTeamId={homeTeamId} awayTeamId={awayTeamId} navigate={navigate} loading={loadingStandings} />
-                    </TabsContent>
-                </Tabs>
-            </div>
+      <div className="flex h-full flex-col bg-background">
+        <ScreenHeader
+          title={'تفاصيل المباراة'}
+          onBack={goBack}
+          canGoBack={canGoBack}
+          actions={
+            isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() =>
+                  handleOpenRename(
+                    'status',
+                    processedFixture.fixture.id,
+                    customStatus || ''
+                  )
+                }
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )
+          }
+        />
+        {renameItem && (
+          <RenameDialog
+            isOpen={!!renameItem}
+            onOpenChange={() => setRenameItem(null)}
+            item={{ ...renameItem, purpose: 'rename' }}
+            onSave={(type, id, name) =>
+              handleSaveRename(type, Number(id), name)
+            }
+          />
+        )}
+        <div className="flex-1 overflow-y-auto p-4">
+          <MatchHeaderCard
+            fixture={processedFixture}
+            navigate={navigate}
+            customStatus={customStatus}
+          />
+          <Tabs defaultValue="lineups" className="w-full">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="details">التفاصيل</TabsTrigger>
+              <TabsTrigger value="lineups">التشكيلات</TabsTrigger>
+              <TabsTrigger value="timeline">الأحداث</TabsTrigger>
+              <TabsTrigger value="standings">الترتيب</TabsTrigger>
+              <TabsTrigger value="odds">
+                <TrendingUp />
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="details" className="pt-4">
+              <DetailsTab
+                fixture={processedFixture}
+                statistics={statistics}
+                loading={loadingDetails}
+              />
+            </TabsContent>
+            <TabsContent value="lineups" className="pt-4">
+              <LineupsTab
+                lineups={lineups}
+                events={events}
+                navigate={navigate}
+                isAdmin={isAdmin}
+                onRename={handleOpenRename}
+                homeTeamId={homeTeamId}
+                awayTeamId={awayTeamId}
+                detailedPlayersMap={detailedPlayersMap}
+              />
+            </TabsContent>
+            <TabsContent value="timeline" className="pt-4">
+              <TimelineTab
+                events={events}
+                homeTeam={processedFixture.teams.home}
+                awayTeam={processedFixture.teams.away}
+              />
+            </TabsContent>
+            <TabsContent value="standings" className="pt-4">
+              <StandingsTab
+                standings={processedStandings}
+                homeTeamId={homeTeamId}
+                awayTeamId={awayTeamId}
+                navigate={navigate}
+                loading={loadingStandings}
+              />
+            </TabsContent>
+            <TabsContent value="odds" className="pt-4">
+                <OddsTab fixtureId={processedFixture.fixture.id} />
+            </TabsContent>
+          </Tabs>
         </div>
+      </div>
     );
 }
-
-// Ensure you have a valid fallback for useTranslation if LanguageProvider is not setup
-const useTranslation = () => ({ t: (key: string) => key });
-
-    
