@@ -327,6 +327,11 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
     const substitutionEvents = events?.filter(e => e.type === 'subst' && e.team.id === activeLineup.team.id) || [];
     
     const renderPitch = (lineup: LineupData) => {
+        // Safety check: if startXI is missing or not an array, return null or a message.
+        if (!lineup || !Array.isArray(lineup.startXI)) {
+            return <p className="text-center text-muted-foreground p-4">بيانات اللاعبين الأساسيين غير متوفرة.</p>;
+        }
+        
         const formationGrid: { [key: number]: PlayerWithStats[] } = {};
         const ungriddedPlayers: PlayerWithStats[] = [];
 
@@ -753,7 +758,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', Number(fixtureId), {name: customStatus})}/>
                  <Tabs defaultValue="lineups" className="w-full">
-                     <TabsList className="grid grid-cols-4">
+                     <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="standings">الترتيب</TabsTrigger>
                         <TabsTrigger value="timeline">الاحداث</TabsTrigger>
                         <TabsTrigger value="details">تفاصيل</TabsTrigger>
@@ -780,4 +785,5 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         </div>
     );
 }
+
 
