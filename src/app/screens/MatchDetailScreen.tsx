@@ -99,16 +99,16 @@ const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture
                     <span className="text-[10px]">{format(new Date(fixture.fixture.date), 'd MMMM yyyy', { locale: ar })}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                     <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
-                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
-                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
+                    <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
+                        <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="relative flex flex-col items-center justify-center min-w-[120px] text-center">
                         <LiveMatchStatus fixture={fixture} large customStatus={customStatus} />
                     </div>
-                    <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
-                        <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
-                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
+                    <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
+                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
+                        <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
                 </div>
             </CardContent>
@@ -742,7 +742,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} />
 
-                <Tabs defaultValue="details" className="space-y-4">
+                <Tabs defaultValue="details">
                     <TabsList className="w-full">
                         <TabsTrigger value="details"><ShieldCheck className="mr-2 h-4 w-4" />تفاصيل</TabsTrigger>
                         <TabsTrigger value="lineups"><Users className="mr-2 h-4 w-4" />التشكيلات</TabsTrigger>
@@ -750,19 +750,19 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                         <TabsTrigger value="standings"><BarChart className="mr-2 h-4 w-4" />الترتيب</TabsTrigger>
                         <TabsTrigger value="odds">المراهنات</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="details">
+                    <TabsContent value="details" className="mt-4">
                         <DetailsTab fixture={fixture} statistics={statistics} loading={loading} />
                     </TabsContent>
-                     <TabsContent value="lineups">
+                     <TabsContent value="lineups" className="mt-4">
                         <LineupsTab lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={handleOpenRename} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
                     </TabsContent>
-                    <TabsContent value="timeline">
+                    <TabsContent value="timeline" className="mt-4">
                         <TimelineTab events={events} homeTeam={fixture.teams.home} awayTeam={fixture.teams.away} />
                     </TabsContent>
-                    <TabsContent value="standings">
+                    <TabsContent value="standings" className="mt-4">
                         <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
                     </TabsContent>
-                     <TabsContent value="odds">
+                     <TabsContent value="odds" className="mt-4">
                         <OddsTab fixtureId={Number(fixtureId)} />
                     </TabsContent>
                 </Tabs>
@@ -775,5 +775,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         </div>
     );
 }
+
+    
 
     
