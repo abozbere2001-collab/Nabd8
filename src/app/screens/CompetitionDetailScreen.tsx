@@ -588,6 +588,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 <Table>
                     <TableHeader>
                         <TableRow>
+                            <TableHead className="w-[40px] text-right">#</TableHead>
                             <TableHead className="w-1/2 text-right">الفريق</TableHead>
                             <TableHead className="text-center">لعب</TableHead>
                             <TableHead className="text-center">ف</TableHead>
@@ -601,9 +602,9 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                             const displayName = getDisplayName('team', s.team.id, s.team.name);
                             return (
                             <TableRow key={s.team.id} className="cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: s.team.id })}>
+                                <TableCell className="font-bold">{s.rank}</TableCell>
                                 <TableCell className="font-medium">
                                     <div className="flex items-center gap-2">
-                                         <span>{s.rank}</span>
                                         <div className="relative">
                                             <Avatar className="h-6 w-6">
                                                 <AvatarImage src={s.team.logo} alt={s.team.name} />
