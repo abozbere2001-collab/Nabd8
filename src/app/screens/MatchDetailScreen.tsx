@@ -341,7 +341,7 @@ const LineupsTab = ({ lineups, events, navigate, isAdmin, onRename, homeTeamId, 
                     </div>
                 ))}
                  {ungriddedPlayers.length > 0 && (
-                     <div className="flex justify-around items-center">
+                    <div className="flex justify-around items-center">
                         {ungriddedPlayers.map(p => <PlayerCard key={p.player.id || p.player.name} player={p.player} navigate={navigate} isAdmin={isAdmin} onRename={() => onRename('player', p.player.id, p.player.name, p.player.name)} />)}
                     </div>
                 )}
