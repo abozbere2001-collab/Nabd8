@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -95,7 +96,7 @@ const MatchHeaderCard = ({ fixture, navigate, customStatus, isAdmin, onRenameSta
                         <Avatar className="h-5 w-5"><AvatarImage src={fixture.league.logo} /></Avatar>
                         <span className="text-[10px]">{fixture.league.name}</span>
                     </div>
-                    <span className="text-[10px]">{format(new Date(fixture.fixture.date), 'd MMMM yyyy', { locale: ar })}</span>
+                    <span>{format(new Date(fixture.fixture.date), 'd MMMM yyyy', { locale: ar })}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
@@ -769,7 +770,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 onSave={(type, id, name) => handleSaveRename(type, Number(id), name)}
              />}
             <div className="container mx-auto p-4">
-                <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', fixture.fixture.id, {name: ''})} />
+                <MatchHeaderCard fixture={fixture} navigate={navigate} />
                 <Tabs defaultValue="details" className="w-full">
                     <TabsList className="grid w-full grid-cols-4">
                         {availableTabs.map(tab => (
@@ -777,13 +778,13 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                         ))}
                     </TabsList>
                     <TabsContent value="details" className="pt-4">
-                        <DetailsTab fixture={fixture} statistics={statistics} loading={!statistics} />
+                        <DetailsTab fixture={fixture} statistics={statistics} />
                     </TabsContent>
                     <TabsContent value="lineups" className="pt-4">
                         <LineupsTab fixture={fixture} lineups={mergedLineups} events={events} navigate={navigate} isAdmin={isAdmin} onRename={(type, id, data) => handleOpenRename(type, id, data)} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
                     </TabsContent>
                     <TabsContent value="timeline" className="pt-4">
-                        <TimelineTab events={events} homeTeam={homeTeamId} awayTeam={fixture.teams.away} />
+                        <TimelineTab events={events} homeTeamId={homeTeamId} />
                     </TabsContent>
                     <TabsContent value="standings" className="pt-4">
                         <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
@@ -796,3 +797,5 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
 // Ensure you have a valid fallback for useTranslation if LanguageProvider is not setup
 const useTranslation = () => ({ t: (key: string) => key });
+
+    
