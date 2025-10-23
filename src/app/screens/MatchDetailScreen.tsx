@@ -753,7 +753,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} isAdmin={isAdmin} onRenameStatus={() => handleOpenRename('status', Number(fixtureId), {name: customStatus})}/>
                  <Tabs defaultValue="lineups" className="w-full">
-                     <TabsList className="grid w-full grid-cols-4">
+                     <TabsList className="grid grid-cols-4">
                         <TabsTrigger value="standings">الترتيب</TabsTrigger>
                         <TabsTrigger value="timeline">الاحداث</TabsTrigger>
                         <TabsTrigger value="details">تفاصيل</TabsTrigger>
