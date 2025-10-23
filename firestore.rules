@@ -1,356 +1,184 @@
 /**
  * @file Firestore Security Rules
- * @description This ruleset enforces a hybrid security model, combining user-owned data with public read access and administrative control.
+ * @description This ruleset enforces a strict user-ownership model for user data,
+ * allows public read access to competitions, teams, matches and news, and restricts
+ * write access to those collections. User favorites are stored under each user's
+ * document. Predictions are stored in two levels: pinned matches are publicly readable,
+ * while individual user predictions are only accessible by the user themselves.
+ * Leaderboard scores are publicly readable but can only be updated by a trusted process.
  *
  * Data Structure:
- * - /users/{userId}: User profiles, accessible only to the owning user and admins.
- * - /users/{userId}/favorites/data: User's favorite teams/competitions, accessible only to the owning user.
- * - /competitions/{competitionId}, /teams/{teamId}, /news/{newsId}, /matches/{matchId}: Public read access, write access restricted to admins.
- * - /admins/{adminId}: Admin user data, accessible only to admins.
- * - /predictions/{fixtureId}: Matches pinned for predictions. Publicly readable, writable only by admins.
- * - /predictions/{fixtureId}/userPredictions/{userId}: Individual user predictions for a match, accessible only to the owning user.
- * - /leaderboard/{userId}: User's leaderboard score, writable by the user themselves or an admin.
+ * - /users/{userId}: User profile information.
+ * - /competitions/{competitionId}: Competition data.
+ * - /teams/{teamId}: Team data.
+ * - /matches/{matchId}: Match data.
+ * - /news/{newsId}: News articles.
+ * - /admins/{adminId}: Admin user data.
+ * - /users/{userId}/favorites/data: User's favorite teams and competitions.
+ * - /predictions/{fixtureId}: Admin-pinned matches available for user predictions.
+ * - /predictions/{fixtureId}/userPredictions/{userId}: User predictions for a specific match.
+ * - /leaderboard/{userId}: Aggregated prediction scores for each user.
  *
  * Key Security Decisions:
- * - Public read access for core data (competitions, teams, news, matches) to maximize app usability.
- * - Strict ownership model for user profiles and favorites to protect privacy.
- * - Administrative control over content management and configuration.
- * - Matches data is read only from API, not users.
+ * - Users can only read/write their own user document and favorites data.
+ * - Competitions, teams, matches and news are publicly readable. Writes are not allowed through the rules.
+ * - Individual user predictions are only accessible by the user themselves.
+ * - Leaderboard scores are publicly readable, but writes are not allowed through the rules.
+ * - Listing of users and admins is disallowed.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions ---
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-    
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      // Check if the user is signed in and their UID exists in the 'admins' collection.
-      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-    
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
     /**
-     * @description Rules for user profiles. Users can read any profile, but only write to their own.
+     * @description Allows users to read and write their own user document.
      * @path /users/{userId}
-     * @allow (read) auth != null
-     * @allow (write) auth.uid == userId
-     * @deny (write) auth.uid != userId
-     * @principle Enforces document ownership for writes and authentication for reads.
+     * @allow (create, update, get, delete) if request.auth.uid == userId
+     * @deny (create, update, get, delete) if request.auth.uid != userId
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      allow get: if isSignedIn();
-      allow list: if false; // Listing users is not permitted.
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
-    }
-    
-    /**
-     * @description Rules for user favorites. Users can only manage their own favorites.
-     * @path /users/{userId}/favorites/data
-     * @allow (read) auth.uid == userId
-     * @allow (write) auth.uid == userId
-     * @deny (write) auth.uid != userId
-     * @principle Restricts access to a user's own favorites data.
-     */
-    match /users/{userId}/favorites/data {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+      function isSignedIn() {
+        return request.auth != null;
+      }
       allow get: if isOwner(userId);
-      allow list: if false; // Not designed to be listed.
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
-    }
-    
-    /**
-     * @description Rules for user predictions. Owner can list their own predictions.
-     * @path /users/{userId}/predictions/{fixtureId}
-     * @allow (read) auth.uid == userId
-     * @allow (write) auth.uid == userId
-     * @deny (write) auth.uid != userId
-     * @principle Restricts access to a user's own prediction data.
-     */
-    match /users/{userId}/predictions/{fixtureId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-        allow create: if isOwner(userId);
-        allow update: if isExistingOwner(userId);
-        allow delete: if isExistingOwner(userId);
+      allow list: if false; // Prevent user enumeration
+
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isSignedIn() && isOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isSignedIn() && isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Rules for competitions. Anyone can read, only admins can write.
+     * @description Allows public read access to competition data.
      * @path /competitions/{competitionId}
-     * @allow (read) true
-     * @allow (write) isAdmin()
-     * @deny (write) !isAdmin()
-     * @principle Allows public read access, restricts writes to admins.
+     * @allow (get, list) if true
+     * @deny (create, update, delete) always
+     * @principle Public read access for competitions.
      */
     match /competitions/{competitionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
-    
+
     /**
-     * @description Rules for teams. Anyone can read, only admins can write.
+     * @description Allows public read access to team data.
      * @path /teams/{teamId}
-     * @allow (read) true
-     * @allow (write) isAdmin()
-     * @deny (write) !isAdmin()
-     * @principle Allows public read access, restricts writes to admins.
+     * @allow (get, list) if true
+     * @deny (create, update, delete) always
+     * @principle Public read access for teams.
      */
     match /teams/{teamId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-    
-    /**
-     * @description Rules for news. Anyone can read, only admins can write.
-     * @path /news/{newsId}
-     * @allow (read) true
-     * @allow (write) isAdmin()
-     * @deny (write) !isAdmin()
-     * @principle Allows public read access, restricts writes to admins.
-     */
-    match /news/{newsId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Rules for matches. Anyone can read, no one can write (data from API).
+     * @description Allows public read access to match data.
      * @path /matches/{matchId}
-     * @allow (read) true
-     * @deny (write) true
-     * @principle Allows public read access, denies all writes.
+     * @allow (get, list) if true
+     * @deny (create, update, delete) always
+     * @principle Public read access for matches.
      */
     match /matches/{matchId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-    
-    /**
-     * @description Rules for managed competitions. Anyone can read, only admins can write.
-     * @path /managedCompetitions/{competitionId}
-     * @allow (read) true
-     * @allow (write) isAdmin()
-     * @deny (write) !isAdmin()
-     * @principle Allows public read access, restricts writes to admins.
-     */
-    match /managedCompetitions/{competitionId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin() && resource != null;
-        allow delete: if isAdmin() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Rules for league customizations. Everyone can read, only admins can write.
-     * @path /leagueCustomizations/{leagueId}
-     * @allow (read) true
-     * @allow (write) isAdmin()
-     * @deny (write) !isAdmin()
-     * @principle Allows public read access, restricts writes to admins.
+     * @description Allows public read access to news articles.
+     * @path /news/{newsId}
+     * @allow (get, list) if true
+     * @deny (create, update, delete) always
+     * @principle Public read access for news.
      */
-    match /leagueCustomizations/{leagueId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-    /**
-     * @description Rules for team customizations. Everyone can read, only admins can write.
-     * @path /teamCustomizations/{teamId}
-     * @allow (read) true
-     * @allow (write) isAdmin()
-     * @deny (write) !isAdmin()
-     * @principle Allows public read access, restricts writes to admins.
-     */
-    match /teamCustomizations/{teamId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-    /**
-     * @description Rules for player customizations. Everyone can read, only admins can write.
-     * @path /playerCustomizations/{playerId}
-     * @allow (read) true
-     * @allow (write) isAdmin()
-     * @deny (write) !isAdmin()
-     * @principle Allows public read access, restricts writes to admins.
-     */
-    match /playerCustomizations/{playerId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-    /**
-     * @description Rules for continent customizations. Everyone can read, only admins can write.
-     * @path /continentCustomizations/{continentId}
-     * @allow (read) true
-     * @allow (write) isAdmin()
-     * @deny (write) !isAdmin()
-     * @principle Allows public read access, restricts writes to admins.
-     */
-    match /continentCustomizations/{continentId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-    /**
-     * @description Rules for country customizations. Everyone can read, only admins can write.
-     * @path /countryCustomizations/{countryId}
-     * @allow (read) true
-     * @allow (write) isAdmin()
-     * @deny (write) !isAdmin()
-     * @principle Allows public read access, restricts writes to admins.
-     */
-    match /countryCustomizations/{countryId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-     /**
-      * @description Rules for match customizations. Everyone can read, only admins can write.
-      * @path /matchCustomizations/{fixtureId}
-      * @allow (read) true
-      * @allow (write) isAdmin()
-      * @deny (write) !isAdmin()
-      * @principle Allows public read access, restricts writes to admins.
-      */
-    match /matchCustomizations/{fixtureId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+    match /news/{newsId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Rules for admin user data. Only admins can read or write.
+     * @description Restricts access to admin documents.
      * @path /admins/{adminId}
-     * @allow (read) isAdmin()
-     * @allow (write) isAdmin()
-     * @deny (write) !isAdmin()
-     * @principle Restricts access to admin data to admin users.
+     * @allow (get) if false
+     * @allow (list) if false
+     * @deny (create, update, delete) always
+     * @principle Only accessible server-side.
      */
     match /admins/{adminId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow get, list: if false; // Prevent admin enumeration
+      allow create, update, delete: if false;
     }
-    
+
     /**
-     * @description Rules for predictions. Everyone can read, only admins can write.
+     * @description Allows users to read and write their own favorites data.
+     * @path /users/{userId}/favorites/data
+     * @allow (create, update, get, delete) if request.auth.uid == userId
+     * @deny (create, update, get, delete) if request.auth.uid != userId
+     * @principle Enforces document ownership for favorites.
+     */
+    match /users/{userId}/favorites/data {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isSignedIn() && isOwner(userId) && resource.data.userId == userId;
+      allow delete: if isSignedIn() && isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Allows public read access to prediction matches.
      * @path /predictions/{fixtureId}
-     * @allow (read) true
-     * @allow (write) isAdmin()
-     * @deny (write) !isAdmin()
-     * @principle Allows public read access, restricts writes to admins.
+     * @allow (get, list) if true
+     * @deny (create, update, delete) always
+     * @principle Public read access for prediction matches.
      */
     match /predictions/{fixtureId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin() && resource != null;
-        allow delete: if isAdmin() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+     /**
+     * @description Allows a user to only read and write their own prediction for a given fixture.
+     * @path /predictions/{fixtureId}/userPredictions/{userId}
+     * @allow (create, update, get, delete) if request.auth.uid == userId
+     * @deny (create, update, get, delete) if request.auth.uid != userId
+     * @principle Enforces ownership of user predictions.
+     */
+    match /predictions/{fixtureId}/userPredictions/{userId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      allow get: if isOwner(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId) && resource != null;
+      allow delete: if isSignedIn() && isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Rules for leaderboard scores. Anyone can read, the user or an admin can write.
+     * @description Allows public read access to leaderboard data, but restricts write access.
      * @path /leaderboard/{userId}
-     * @allow (read) true
-     * @allow (write) auth.uid == userId
-     * @deny (write) auth.uid != userId
-     * @principle Allows public read access, restricts writes to the user or an admin.
+     * @allow (get, list) if true
+     * @deny (create, update, delete) always
+     * @principle Public read access for leaderboard, restricted writes.
      */
     match /leaderboard/{userId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if isOwner(userId) || isAdmin();
-        allow update: if (isExistingOwner(userId) || isAdmin()) ;
-        allow delete: if isExistingOwner(userId) || isAdmin();
-    }
-
-     /**
-      * @description Rules for a user's individual prediction for a match.
-      * @path /predictions/{fixtureId}/userPredictions/{userId}
-      * @allow (read) request.auth.uid == userId
-      * @allow (write) request.auth.uid == userId
-      * @deny (write) request.auth.uid != userId
-      * @principle Ensures only the user can read/write their own predictions.
-      */
-    match /predictions/{fixtureId}/userPredictions/{userId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-        allow create: if isOwner(userId) ;
-        allow update: if isExistingOwner(userId);
-        allow delete: if isExistingOwner(userId);
-    }
-
-    /**
-     * @description Rules for season predictions. Signed in users can read/write their own, based on a userId field.
-     * @path /seasonPredictions/{predictionId}
-     * @allow (read) request.auth != null && resource.data.userId == request.auth.uid
-     * @allow (write) request.auth != null && request.resource.data.userId == request.auth.uid
-     * @deny (write) request.auth == null || request.resource.data.userId != request.auth.uid
-     * @principle Enforces document ownership for reads and writes, based on a userId field.
-     */
-    match /seasonPredictions/{predictionId} {
-       allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-       allow list: if isSignedIn();
-       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-       allow update: if isSignedIn() && resource != null && resource.data.userId == request.auth.uid;
-       allow delete: if isSignedIn() && resource != null && resource.data.userId == request.auth.uid;
-    }
-    
-     /**
-      * @description Rules for the app config cache. Admins can write, everyone can read.
-      * @path /appConfig/cache
-      * @allow (read) true
-      * @allow (write) isAdmin()
-      * @deny (write) !isAdmin()
-      * @principle Allows public read access, restricts writes to admins.
-      */
-     match /appConfig/cache {
-    	allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
   }
 }
