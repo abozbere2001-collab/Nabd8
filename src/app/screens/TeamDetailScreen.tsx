@@ -372,26 +372,26 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[40px] text-left">#</TableHead>
-                                <TableHead className="text-left">الفريق</TableHead>
-                                <TableHead className="text-center">لعب</TableHead>
-                                <TableHead className="text-center">ف/ت/خ</TableHead>
                                 <TableHead className="text-center">نقاط</TableHead>
+                                <TableHead className="text-center">ف/ت/خ</TableHead>
+                                <TableHead className="text-center">لعب</TableHead>
+                                <TableHead className="text-right">الفريق</TableHead>
+                                <TableHead className="w-[40px] text-right">#</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {processedStandings.map(s => (
                                 <TableRow key={s.team.id} className={cn(s.team.id === teamId && 'bg-primary/10')}>
-                                    <TableCell className="font-bold">{s.rank}</TableCell>
+                                    <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                    <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
+                                    <TableCell className="text-center">{s.all.played}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             <Avatar className="h-6 w-6"><AvatarImage src={s.team.logo} /></Avatar>
                                             <span className="font-semibold truncate">{s.team.name}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-center">{s.all.played}</TableCell>
-                                    <TableCell className="text-center text-xs">{`${s.all.win}/${s.all.draw}/${s.all.lose}`}</TableCell>
-                                    <TableCell className="text-center font-bold">{s.points}</TableCell>
+                                    <TableCell className="font-bold">{s.rank}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
