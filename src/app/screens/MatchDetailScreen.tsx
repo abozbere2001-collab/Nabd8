@@ -90,14 +90,14 @@ const MatchHeaderCard = ({ fixture, navigate, customStatus }: { fixture: Fixture
                     <span className="text-[10px]">{format(new Date(fixture.fixture.date), 'd MMMM yyyy', { locale: ar })}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
+                    <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.home.id })}>
                         <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.home.logo} /></Avatar>
                         <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.home.name}</span>
                     </div>
                      <div className="relative flex flex-col items-center justify-center min-w-[120px] text-center">
                         <LiveMatchStatus fixture={fixture} large customStatus={customStatus} />
                     </div>
-                    <div className="flex flex-col items-center gap-2 flex-1 truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
+                    <div className="flex flex-col items-center gap-2 flex-1 justify-end truncate cursor-pointer" onClick={() => navigate('TeamDetails', { teamId: fixture.teams.away.id })}>
                          <Avatar className="h-10 w-10 border-2 border-primary/50"><AvatarImage src={fixture.teams.away.logo} /></Avatar>
                         <span className="font-bold text-sm text-center truncate w-full">{fixture.teams.away.name}</span>
                     </div>
@@ -530,7 +530,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
     const { isAdmin } = useAdmin();
     const { toast } = useToast();
 
-    const firestore = useFirestore();
+    const { db: firestore } = useFirestore();
     
     const rename = async (type: RenameType, id: number, originalData: any) => {
         if (!isAdmin || !firestore) return;
@@ -566,7 +566,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
         const fetchFixture = async () => {
             setLoading(true);
             try {
-                const response = await fetch(`/api/fixtures/${fixtureId}`);
+                const response = await fetch(`/api/football/fixtures?id=${fixtureId}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -588,7 +588,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
         const fetchStandings = async () => {
             setStandingsLoading(true);
             try {
-                const response = await fetch(`/api/standings?league=${fixture.league.id}&season=${fixture.league.season}`);
+                const response = await fetch(`/api/football/standings?league=${fixture.league.id}&season=${fixture.league.season}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -609,7 +609,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
 
         const fetchLineups = async () => {
             try {
-                const response = await fetch(`/api/lineups?fixture=${fixture.fixture.id}`);
+                const response = await fetch(`/api/football/fixtures/lineups?fixture=${fixture.fixture.id}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -622,7 +622,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
         
         const fetchEvents = async () => {
             try {
-                const response = await fetch(`/api/events?fixture=${fixture.fixture.id}`);
+                const response = await fetch(`/api/football/fixtures/events?fixture=${fixture.fixture.id}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -635,7 +635,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
         
         const fetchStatistics = async () => {
             try {
-                const response = await fetch(`/api/statistics?fixture=${fixture.fixture.id}`);
+                const response = await fetch(`/api/football/fixtures/statistics?fixture=${fixture.fixture.id}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -655,7 +655,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
          if (!fixture) return;
         const fetchPlayers = async () => {
             try {
-                const response = await fetch(`/api/players?fixture=${fixture.fixture.id}`);
+                const response = await fetch(`/api/football/players?fixture=${fixture.fixture.id}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -696,7 +696,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
     if (!fixture) {
         return (
             <div>
-                <ScreenHeader title="تفاصيل المباراة" navigate={navigate} />
+                <ScreenHeader title="تفاصيل المباراة" navigate={navigate} onBack={() => {}} canGoBack={false} />
                 <div className="container mx-auto p-4">
                     {loading ? (
                         <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
@@ -713,7 +713,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
 
     return (
         <div>
-            <ScreenHeader title="تفاصيل المباراة" navigate={navigate} />
+            <ScreenHeader title="تفاصيل المباراة" navigate={navigate} onBack={() => {}} canGoBack={false} />
             <div className="container mx-auto p-4">
                 <MatchHeaderCard fixture={fixture} navigate={navigate} customStatus={customStatus} />
 
@@ -738,7 +738,7 @@ export default function MatchDetailScreen({ fixtureId, navigate }: MatchDetailSc
                         <StandingsTab standings={standings} fixture={fixture} navigate={navigate} loading={standingsLoading} />
                     </TabsContent>
                      <TabsContent value="odds">
-                        <OddsTab fixtureId={fixtureId} />
+                        <OddsTab fixtureId={Number(fixtureId)} />
                     </TabsContent>
                 </Tabs>
                 {isAdmin && (
