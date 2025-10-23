@@ -368,19 +368,21 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
 
 
     useEffect(() => {
-        if (!db || !user) return;
+        if (!db || !user || pinnedMatches.length === 0) {
+            setLoadingUserPredictions(false);
+            return;
+        }
         setLoadingUserPredictions(true);
 
         const fetchAllPredictions = async () => {
             const newPredictions: { [key: string]: Prediction } = {};
-            // Create a list of promises to fetch predictions for each pinned match
             const predictionPromises = pinnedMatches.map(match => {
                 const userPredictionRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
                 return getDoc(userPredictionRef).then(predDoc => {
                     if (predDoc.exists()) {
-                        newPredictions[match.id] = predDoc.data() as Prediction;
+                        newPredictions[match.id] = { ...predDoc.data(), id: predDoc.id } as Prediction;
                     }
-                }).catch(e => console.warn(`Could not fetch prediction for match ${match.id}`, e));
+                });
             });
 
             await Promise.all(predictionPromises);
@@ -388,11 +390,7 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             setLoadingUserPredictions(false);
         };
 
-        if (pinnedMatches.length > 0) {
-            fetchAllPredictions();
-        } else {
-            setLoadingUserPredictions(false);
-        }
+        fetchAllPredictions();
     }, [db, user, pinnedMatches]);
     
     const fetchLeaderboard = useCallback(async () => {
@@ -469,13 +467,11 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
         toast({ title: "بدء تحديث النقاط...", description: "جاري حساب النقاط لجميع المستخدمين. قد تستغرق هذه العملية بعض الوقت." });
 
         try {
-            // FIX: Fetch the most recent list of pinned matches inside the function
             const currentPinnedMatchesSnapshot = await getDocs(collection(db, 'predictions'));
             const currentPinnedMatches = currentPinnedMatchesSnapshot.docs.map(doc => ({
                 ...(doc.data() as PredictionMatch),
                 id: doc.id,
             })).filter(m => m && m.fixtureData && m.fixtureData.fixture);
-
 
             const allUsersSnapshot = await getDocs(collection(db, 'users'));
             const userPointsMap = new Map<string, number>();
@@ -483,7 +479,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
 
             allUsersSnapshot.forEach(userDoc => {
                 const data = userDoc.data() as UserProfile;
-                // CRITICAL FIX: Reset points to 0 for every user before recalculating
                 userPointsMap.set(userDoc.id, 0); 
                 userDetailsMap.set(userDoc.id, { displayName: data.displayName || 'مستخدم', photoURL: data.photoURL || '' });
             });
@@ -510,12 +505,10 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
                         const userPrediction = userPredDoc.data() as Prediction;
                         const newPoints = calculatePoints(userPrediction, match.fixtureData);
                         
-                        // Only update if points have changed
                         if (userPrediction.points !== newPoints) {
                             pointsUpdateBatch.update(userPredDoc.ref, { points: newPoints });
                         }
                         
-                        // CRITICAL FIX: Use the newly calculated points for the sum
                         const currentTotalPoints = userPointsMap.get(userPrediction.userId) || 0;
                         userPointsMap.set(userPrediction.userId, currentTotalPoints + newPoints);
                     });
@@ -528,7 +521,6 @@ const PredictionsTabContent = ({ user, db }: { user: any, db: any }) => {
             }
             
             const leaderboardBatch = writeBatch(db);
-            
             for (const [userId, totalPoints] of userPointsMap.entries()) {
                  const userDetails = userDetailsMap.get(userId);
                  if (userDetails) {
@@ -733,3 +725,4 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   );
 }
 
+    
