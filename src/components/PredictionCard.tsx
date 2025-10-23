@@ -13,6 +13,7 @@ import type { Fixture, Prediction, PredictionMatch } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { PredictionOdds } from './PredictionOdds';
+import { LiveMatchStatus } from './LiveMatchStatus';
 
 const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictionMatch: PredictionMatch, userPrediction?: Prediction, onSave: (fixtureId: number, home: string, away: string) => void }) => {
     const { fixtureData: fixture } = predictionMatch;
@@ -23,7 +24,7 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
     const debouncedHome = useDebounce(homeValue, 500);
     const debouncedAway = useDebounce(awayValue, 500);
 
-    const isMatchLiveOrFinished = ['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H'].includes(fixture.fixture.status.short);
+    const isMatchLiveOrFinished = ['FT', 'AET', 'PEN', 'LIVE', 'HT', '1H', '2H', 'ET', 'BT', 'P'].includes(fixture.fixture.status.short);
     const isMatchFinished = ['FT', 'AET', 'PEN'].includes(fixture.fixture.status.short);
 
     const getPredictionStatusColors = () => {
@@ -74,7 +75,7 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
     },[userPrediction]);
 
     return (
-        <Card>
+        <Card className={cn("transition-colors", isMatchLiveOrFinished && getPredictionStatusColors())}>
             <CardContent className="p-3">
                 <div className="flex items-center justify-between gap-1">
                      <div className="flex flex-col items-center gap-1 flex-1 justify-end truncate">
@@ -91,13 +92,8 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
                             id={`away-${fixture.fixture.id}`}
                             disabled={isPredictionDisabled}
                         />
-                         <div className={cn(
-                            "font-bold text-md px-1 rounded-md min-w-[60px] text-center transition-colors",
-                             isMatchLiveOrFinished ? getPredictionStatusColors() : "text-sm",
-                            )}>
-                             {isMatchLiveOrFinished
-                               ? `${fixture.goals.away ?? ''} - ${fixture.goals.home ?? ''}`
-                               : format(new Date(fixture.fixture.date), "HH:mm")}
+                         <div className="flex flex-col items-center justify-center min-w-[70px] text-center">
+                            <LiveMatchStatus fixture={fixture} />
                          </div>
                         <Input 
                             type="number" 
