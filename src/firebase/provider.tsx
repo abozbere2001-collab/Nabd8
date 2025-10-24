@@ -13,11 +13,10 @@ import { FirestorePermissionError } from './errors';
 import { errorEmitter } from './error-emitter';
 
 // --- Admin Management ---
-// Add UIDs of permanent admins here. This provides a fallback if the admins collection is not accessible.
-const ADMIN_UIDS = [
-    'qptIHofUmhVs5qGCxDiIfIyqBck1', // abozbere2001@gmail.com
-    'iYkr5WjpfxMFK5yanOLqGM4JHgw2', // sagralnarey@gmail.com
-];
+const ADMIN_UIDS = {
+    'qptIHofUmhVs5qGCxDiIfIyqBck1': true, // abozbere2001@gmail.com
+    'iYkr5WjpfxMFK5yanOLqGM4JHgw2': true, // sagralnarey@gmail.com
+};
 
 
 interface FirebaseContextProps {
@@ -26,6 +25,7 @@ interface FirebaseContextProps {
   auth: Auth | null;
   user: User | null;
   isAdmin: boolean;
+  isCheckingAdmin: boolean;
   isProUser: boolean;
   setProUser: (isPro: boolean) => Promise<void>;
   makeAdmin: () => Promise<void>;
@@ -47,55 +47,47 @@ export const FirebaseProvider = ({
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
   const [isProUser, setProUser] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const checkUserStatus = useCallback(async (firebaseUser: User | null) => {
+    setIsLoading(true);
+    setIsCheckingAdmin(true);
+
     if (!firebaseUser) {
         setUser(null);
         setIsAdmin(false);
         setProUser(false);
         setIsLoading(false);
+        setIsCheckingAdmin(false);
         return;
     }
 
     setUser(firebaseUser);
-    setIsLoading(true);
 
-    // Check against the hardcoded list first for immediate access
-    const isHardcodedAdmin = ADMIN_UIDS.includes(firebaseUser.uid);
-    if (isHardcodedAdmin) {
-        setIsAdmin(true);
-    }
-
-    try {
-        if (firestore) {
-            // Also check the Firestore 'admins' collection
+    const isHardcodedAdmin = !!ADMIN_UIDS[firebaseUser.uid as keyof typeof ADMIN_UIDS];
+    
+    let isFirestoreAdmin = false;
+    if (firestore) {
+        try {
             const adminDocRef = doc(firestore, 'admins', firebaseUser.uid);
-            const adminDoc = await getDoc(adminDocRef).catch(() => null);
-            
-            // A user is admin if they are in the hardcoded list OR in the DB collection
-            setIsAdmin(isHardcodedAdmin || (adminDoc?.exists() ?? false));
+            const adminDoc = await getDoc(adminDocRef);
+            isFirestoreAdmin = adminDoc.exists();
 
             const userDocRef = doc(firestore, 'users', firebaseUser.uid);
             const userDoc = await getDoc(userDocRef);
+            setProUser(userDoc.exists() && userDoc.data()?.isProUser || false);
 
-            if (userDoc.exists()) {
-                setProUser(userDoc.data()?.isProUser || false);
-            } else {
-                 setProUser(false);
-            }
-        } else {
-            // Fallback to only hardcoded list if firestore is not available
-            setIsAdmin(isHardcodedAdmin);
+        } catch (error) {
+            console.warn("Failed to check user status from Firestore.", error);
         }
-
-    } catch (error) {
-        console.warn("Failed to check user status from Firestore, falling back to defaults.", error);
-        setIsAdmin(isHardcodedAdmin); // Fallback to hardcoded admin status on error
-    } finally {
-        setIsLoading(false);
     }
+    
+    setIsAdmin(isHardcodedAdmin || isFirestoreAdmin);
+    setIsCheckingAdmin(false);
+    setIsLoading(false);
+
   }, [firestore]);
 
 
@@ -141,7 +133,7 @@ export const FirebaseProvider = ({
   }
 
 
-  const value = { firebaseApp, firestore, auth, user, isAdmin, isProUser, setProUser: handleSetPro, makeAdmin: handleMakeAdmin, isLoading };
+  const value = { firebaseApp, firestore, auth, user, isAdmin, isCheckingAdmin, isProUser, setProUser: handleSetPro, makeAdmin: handleMakeAdmin, isLoading };
 
   return (
     <FirebaseContext.Provider value={value}>
@@ -180,6 +172,7 @@ export const useAdmin = () => {
     }
     return { 
         isAdmin: context.isAdmin,
+        isCheckingAdmin: context.isCheckingAdmin,
         db: context.firestore,
         makeAdmin: context.makeAdmin,
     };
@@ -211,3 +204,5 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | 
   
   return memoized;
 }
+
+    

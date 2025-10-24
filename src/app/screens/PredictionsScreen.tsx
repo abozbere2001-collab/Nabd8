@@ -190,7 +190,7 @@ const DateScroller = ({ selectedDateKey, onDateSelect }: {selectedDateKey: strin
 
 export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     const { user } = useAuth();
-    const { isAdmin, db } = useAdmin();
+    const { isAdmin, db, isCheckingAdmin } = useAdmin();
     const { toast } = useToast();
 
     const [mainTab, setMainTab] = useState('voting');
@@ -208,12 +208,16 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     useEffect(() => {
-        if (!db || !isAdmin) { // Only fetch if admin
+        // Wait until we know if the user is an admin or not.
+        if (isCheckingAdmin) return;
+        
+        if (!db || !isAdmin) {
             setLoadingMatches(false);
-            setLoadingUserPredictions(false);
+            setPinnedMatches([]);
             return;
         }
         
+        setLoadingMatches(true);
         const q = query(collection(db, 'predictions'));
         const unsub = onSnapshot(q, (snapshot) => {
             const matches = snapshot.docs.map(doc => ({
@@ -231,7 +235,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         });
 
         return () => unsub();
-    }, [db, isAdmin]);
+    }, [db, isAdmin, isCheckingAdmin]);
 
 
     useEffect(() => {
@@ -338,11 +342,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             const batch = writeBatch(db);
             const userPointsMap = new Map<string, number>();
 
-            const usersSnapshot = await getDocs(collection(db, "users"));
-            usersSnapshot.forEach(doc => {
-                userPointsMap.set(doc.id, 0);
-            });
-
+            // Get all predictions from all pinned matches
             const predictionsSnapshot = await getDocs(collection(db, "predictions"));
             
             for (const pinnedMatchDoc of predictionsSnapshot.docs) {
@@ -365,11 +365,17 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                 }
             }
             
+            // Get all user profiles to update leaderboard with names/photos
+            const usersSnapshot = await getDocs(collection(db, "users"));
+            const userProfiles = new Map<string, UserProfile>();
+            usersSnapshot.forEach(doc => {
+                userProfiles.set(doc.id, doc.data() as UserProfile);
+            });
+
+            // Prepare batch write for leaderboard
             for (const [userId, totalPoints] of userPointsMap.entries()) {
-                const userDocRef = doc(db, 'users', userId);
-                const userDoc = await getDoc(userDocRef);
-                if (userDoc.exists()) {
-                    const userData = userDoc.data() as UserProfile;
+                const userData = userProfiles.get(userId);
+                if (userData) {
                     const leaderboardRef = doc(db, 'leaderboard', userId);
                     batch.set(leaderboardRef, {
                         totalPoints,
@@ -428,7 +434,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                <TabsContent value="voting" className="flex-1 flex flex-col mt-0 data-[state=inactive]:hidden min-h-0">
                     <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
                     <div className="flex-1 overflow-y-auto p-1 space-y-4 pt-4">
-                        {loadingMatches ? (
+                        {loadingMatches || isCheckingAdmin ? (
                             <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
                         ) : !user ? (
                             <div className="text-center text-muted-foreground pt-10">
@@ -474,5 +480,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     );
 };
 
+
+    
 
     
