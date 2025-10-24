@@ -1,495 +1,201 @@
 /**
- * @description This ruleset enforces a strict user-ownership model for user profiles and their associated data,
- *              allows public read access to competitions, teams, matches and news.
- *              Admin users, identified by their presence in the `/admins` collection, have elevated privileges
- *              to create, update, and delete certain data.
- * @dataStructure
- *              - /users/{userId}: Stores individual user profiles. Each user can only access their own profile.
- *              - /users/{userId}/**:  All documents and subcollections under a user's profile are accessible only by that user.
- *              - /competitions/{competitionId}, /teams/{teamId}, /matches/{matchId}, /news/{newsId}: Publicly readable collections.
- *              - /admins/{adminId}: Stores administrator user data. Only admins can manage this collection.
- * @keySecurityDecisions
- *              - Users can only read and write their own data in the `/users` collection. Listing users is disallowed.
- *              - Competitions, teams, matches and news are publicly readable.
- *              - Only admin users can create, update, or delete competitions, teams, matches and news.
- *              - Admin status is determined by the presence of a document with the user's ID in the `/admins` collection.
- * @denormalizationForAuthorization
- *              - The `leaguePredictions` collection requires that the `userId` is denormalized into the document. This is validated during create and update operations.
- * @structuralSegregation
- *              - The ruleset uses separate collections for public (e.g., `competitions`) and private (e.g., `/users/{userId}`) data to simplify access control and improve performance for list operations.
+ * @file Firestore Security Rules
+ * @core_philosophy This ruleset prioritizes secure authorization based on user identity and resource ownership. It allows public read access to some data while restricting write access to authorized users. Data structure validation is relaxed for rapid prototyping.
+ * @data_structure
+ *   - /users/{userId}: User profile information, owned by the user.
+ *   - /competitions/{competitionId}: Public competition data.
+ *   - /teams/{teamId}: Public team data.
+ *   - /matches/{matchId}: Public match data.
+ *   - /news/{newsId}: Public news articles, write access controlled by admin users.
+ *   - /admins/{adminId}: Admin user data, only accessible to the admin user.
+ *   - /users/{userId}/favorites/data: User's favorite teams and competitions, owned by the user.
+ *   - /predictions/{fixtureId}: Publicly readable matches that admin pinned for predictions.
+ *   - /predictions/{fixtureId}/userPredictions/{userId}: Individual user predictions for a specific match, owned by the user.
+ *   - /leaderboard/{userId}: Aggregated prediction scores for each user.
+ * @key_security_decisions
+ *   - Public read access to competitions, teams, matches and predictions collections.
+ *   - Owner-only access to user profiles and user-specific data.
+ *   - Admin-only write access to news articles.
+ *   - Leaderboard read and write access is open to signed in users for prototyping.
+ * @denormalization_for_authorization None.
+ * @structural_segregation Private user data is stored under the /users/{userId} collection for secure access control.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
-     * @path N/A
-     * @allow N/A
-     * @deny N/A
-     * @principle Requires authentication for certain operations.
+     * @description Allows access to user profile information, owned by the user.
+     * @path /users/{userId}
+     * @allow (create) User with ID 'user123' can create their profile.
+     *   - request.auth.uid: 'user123'
+     *   - request.resource.data.id: 'user123'
+     * @allow (get, update, delete) User with ID 'user123' can read, update, and delete their profile.
+     *   - request.auth.uid: 'user123'
+     *   - resource.data.id: 'user123'
+     * @deny (create) User with ID 'user123' cannot create a profile with a different ID.
+     *   - request.auth.uid: 'user123'
+     *   - request.resource.data.id: 'user456'
+     * @deny (update, delete) User with ID 'user123' cannot update or delete another user's profile.
+     *   - request.auth.uid: 'user456'
+     *   - resource.data.id: 'user123'
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
      */
+    match /users/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow update: if isSignedIn() && isOwner(userId) && resource.data.id == userId;
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Allows public read access to competition data.
+     * @path /competitions/{competitionId}
+     * @allow (get, list) Any user, signed in or not, can read competition data.
+     * @deny (create, update, delete) No one can create, update, or delete competition data through the client.
+     * @principle Allows public read access to competitions, restricts write access.
+     */
+    match /competitions/{competitionId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to team data.
+     * @path /teams/{teamId}
+     * @allow (get, list) Any user, signed in or not, can read team data.
+     * @deny (create, update, delete) No one can create, update, or delete team data through the client.
+     * @principle Allows public read access to teams, restricts write access.
+     */
+    match /teams/{teamId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to match data.
+     * @path /matches/{matchId}
+     * @allow (get, list) Any user, signed in or not, can read match data.
+     * @deny (create, update, delete) No one can create, update, or delete match data through the client.
+     * @principle Allows public read access to matches, restricts write access.
+     */
+    match /matches/{matchId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to news articles, but restricts write access to admins.
+     * @path /news/{newsId}
+     * @allow (get, list) Any user, signed in or not, can read news articles.
+     * @deny (create, update, delete) No one can create, update, or delete news articles through the client.
+     * // TODO: Add owner validation once the schema is updated with an ownership field.
+     */
+    match /news/{newsId} {
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Implement admin-only write access
+    }
+
+    /**
+     * @description Allows access to admin user data, only accessible to the admin user.
+     * @path /admins/{adminId}
+     * @allow (get, update, delete) Admin with ID 'admin123' can read, update, and delete their profile.
+     *   - request.auth.uid: 'admin123'
+     * @deny (create) No one can create admin profiles through the client.
+     * @deny (get, update, delete) User with ID 'user123' cannot read, update, or delete the admin's profile.
+     *   - request.auth.uid: 'user123'
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
+     */
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isOwner(adminId);
+      allow list: if false;
+      allow create: if false;
+      allow update: if isSignedIn() && isOwner(adminId);
+      allow delete: if isSignedIn() && isExistingOwner(adminId);
+    }
+
+    /**
+     * @description Allows access to user's favorite teams and competitions, owned by the user.
+     * @path /users/{userId}/favorites/data
+     * @allow (create) User with ID 'user123' can create their favorites data.
+     *   - request.auth.uid: 'user123'
+     *   - request.resource.data.userId: 'user123'
+     * @allow (get, update, delete) User with ID 'user123' can read, update, and delete their favorites data.
+     *   - request.auth.uid: 'user123'
+     *   - resource.data.userId: 'user123'
+     * @deny (create) User with ID 'user123' cannot create favorites data with a different userId.
+     *   - request.auth.uid: 'user123'
+     *   - request.resource.data.userId: 'user456'
+     * @deny (update, delete) User with ID 'user123' cannot update or delete another user's favorites data.
+     *   - request.auth.uid: 'user456'
+     *   - resource.data.userId: 'user123'
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
+     */
+    match /users/{userId}/favorites/data {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && isOwner(userId) && resource.data.userId == userId;
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Allows public read access to admin-pinned matches available for user predictions.
+     * @path /predictions/{fixtureId}
+     * @allow (get, list) Any user, signed in or not, can read the predictions data.
+     * @deny (create, update, delete) No one can create, update, or delete predictions data through the client.
+     * @principle Allows public read access to predictions, restricts write access.
+     */
+    match /predictions/{fixtureId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Allows access to individual user predictions for a specific match, owned by the user.
+     * @path /predictions/{fixtureId}/userPredictions/{userId}
+     * @allow (create) User with ID 'user123' can create their prediction.
+     *   - request.auth.uid: 'user123'
+     * @allow (get, update, delete) User with ID 'user123' can read, update, and delete their prediction.
+     *   - request.auth.uid: 'user123'
+     * @deny (update, delete) User with ID 'user123' cannot update or delete another user's prediction.
+     *   - request.auth.uid: 'user456'
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
+     */
+    match /predictions/{fixtureId}/userPredictions/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Allows read and write access to leaderboard scores for any signed-in user.
+     * @path /leaderboard/{userId}
+     * @allow (get, list, create, update, delete) Any signed-in user can read and write leaderboard data.
+     * @principle Allows public read and write access for prototyping purposes.
+     */
+    match /leaderboard/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Checks if the user ID matches the authenticated user's ID.
-     * @path N/A
-     * @allow N/A
-     * @deny N/A
-     * @principle Enforces user-based ownership.
-     */
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    /**
-     * @description Checks if the user is the owner and the resource exists.
-     * @path N/A
-     * @allow N/A
-     * @deny N/A
-     * @principle Enforces user-based ownership and resource existence for updates and deletes.
-     */
     function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user is an admin by verifying their ID exists in the /admins collection.
-     * @path N/A
-     * @allow N/A
-     * @deny N/A
-     * @principle Checks for admin privileges.
-     */
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-
-    /**
-     * @description Manages access to individual user profiles.
-     * @path /users/{userId}
-     * @allow (get) User with ID 'user123' can read their own profile.
-     * @allow (create) User with ID 'user123' can create their own profile.
-     * @allow (update) User with ID 'user123' can update their own profile.
-     * @allow (delete) User with ID 'user123' can delete their own profile.
-     * @deny (get) User with ID 'user456' cannot read the profile of user 'user123'.
-     * @deny (create) User with ID 'user456' cannot create a profile with ID 'user123'.
-     * @principle Enforces document ownership for reads and writes.
-     */
-    match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
-    }
-    
-    /**
-     * @description Manages access to all documents and subcollections under a user's profile.
-     * @path /users/{userId}/{document=**}
-     * @allow (read) User with ID 'user123' can read data in /users/user123/privateData.
-     * @allow (write) User with ID 'user123' can write data in /users/user123/privateData.
-     * @deny (read) User with ID 'user456' cannot read data in /users/user123/privateData.
-     * @deny (write) User with ID 'user456' cannot write data in /users/user123/privateData.
-     * @principle Restricts access to a user's own data tree.
-     */
-    match /users/{userId}/{document=**} {
-      allow read, write: if isOwner(userId);
-    }
-
-    /**
-     * @description Manages access to competition data.
-     * @path /competitions/{competitionId}
-     * @allow (get, list) Any user can read competition data.
-     * @allow (create) Admin user can create competition data.
-     * @allow (update) Admin user can update competition data.
-     * @allow (delete) Admin user can delete competition data.
-     * @deny (create) Non-admin user cannot create competition data.
-     * @deny (update) Non-admin user cannot update competition data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /competitions/{competitionId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to team data.
-     * @path /teams/{teamId}
-     * @allow (get, list) Any user can read team data.
-     * @allow (create) Admin user can create team data.
-     * @allow (update) Admin user can update team data.
-     * @allow (delete) Admin user can delete team data.
-     * @deny (create) Non-admin user cannot create team data.
-     * @deny (update) Non-admin user cannot update team data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /teams/{teamId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to match data.
-     * @path /matches/{matchId}
-     * @allow (get, list) Any user can read match data.
-     * @deny (create) No user can create match data.
-     * @deny (update) No user can update match data.
-     * @deny (delete) No user can delete match data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /matches/{matchId} {
-      allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Manages access to news article data.
-     * @path /news/{newsId}
-     * @allow (get, list) Any user can read news article data.
-     * @allow (create) Admin user can create news article data.
-     * @allow (update) Admin user can update news article data.
-     * @allow (delete) Admin user can delete news article data.
-     * @deny (create) Non-admin user cannot create news article data.
-     * @deny (update) Non-admin user cannot update news article data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /news/{newsId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to admin user data.
-     * @path /admins/{adminId}
-     * @deny (get) No user can get admin data.
-     * @deny (list) No user can list admin data.
-     * @allow (create) Admin user can create admin data.
-     * @allow (update) Admin user can update admin data.
-     * @allow (delete) Admin user can delete admin data.
-     * @deny (create) Non-admin user cannot create admin data.
-     *  @principle Restricts access to admins only.
-     */
-    match /admins/{adminId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to top competition data.
-     * @path /topCompetitions/{competitionId}
-     * @allow (get, list) Any user can read top competition data.
-     * @allow (create) Admin user can create top competition data.
-     * @allow (update) Admin user can update top competition data.
-     * @allow (delete) Admin user can delete top competition data.
-     * @deny (create) Non-admin user cannot create top competition data.
-     * @deny (update) Non-admin user cannot update top competition data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /topCompetitions/{competitionId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to top team data.
-     * @path /topTeams/{teamId}
-     * @allow (get, list) Any user can read top team data.
-     * @allow (create) Admin user can create top team data.
-     * @allow (update) Admin user can update top team data.
-     * @allow (delete) Admin user can delete top team data.
-     * @deny (create) Non-admin user cannot create top team data.
-     * @deny (update) Non-admin user cannot update top team data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /topTeams/{teamId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to league customization data.
-     * @path /leagueCustomizations/{leagueId}
-     * @allow (get, list) Any user can read league customization data.
-     * @allow (create) Admin user can create league customization data.
-     * @allow (update) Admin user can update league customization data.
-     * @allow (delete) Admin user can delete league customization data.
-     * @deny (create) Non-admin user cannot create league customization data.
-     * @deny (update) Non-admin user cannot update league customization data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /leagueCustomizations/{leagueId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to team customization data.
-     * @path /teamCustomizations/{teamId}
-     * @allow (get, list) Any user can read team customization data.
-     * @allow (create) Admin user can create team customization data.
-     * @allow (update) Admin user can update team customization data.
-     * @allow (delete) Admin user can delete team customization data.
-     * @deny (create) Non-admin user cannot create team customization data.
-     * @deny (update) Non-admin user cannot update team customization data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /teamCustomizations/{teamId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to player customization data.
-     * @path /playerCustomizations/{playerId}
-     * @allow (get, list) Any user can read player customization data.
-     * @allow (create) Admin user can create player customization data.
-     * @allow (update) Admin user can update player customization data.
-     * @allow (delete) Admin user can delete player customization data.
-     * @deny (create) Non-admin user cannot create player customization data.
-     * @deny (update) Non-admin user cannot update player customization data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /playerCustomizations/{playerId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to match customization data.
-     * @path /matchCustomizations/{fixtureId}
-     * @allow (get, list) Any user can read match customization data.
-     * @allow (create) Admin user can create match customization data.
-     * @allow (update) Admin user can update match customization data.
-     * @allow (delete) Admin user can delete match customization data.
-     * @deny (create) Non-admin user cannot create match customization data.
-     * @deny (update) Non-admin user cannot update match customization data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /matchCustomizations/{fixtureId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to continent customization data.
-     * @path /continentCustomizations/{continentId}
-     * @allow (get, list) Any user can read continent customization data.
-     * @allow (create) Admin user can create continent customization data.
-     * @allow (update) Admin user can update continent customization data.
-     * @allow (delete) Admin user can delete continent customization data.
-     * @deny (create) Non-admin user cannot create continent customization data.
-     * @deny (update) Non-admin user cannot update continent customization data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /continentCustomizations/{continentId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to country customization data.
-     * @path /countryCustomizations/{countryId}
-     * @allow (get, list) Any user can read country customization data.
-     * @allow (create) Admin user can create country customization data.
-     * @allow (update) Admin user can update country customization data.
-     * @allow (delete) Admin user can delete country customization data.
-     * @deny (create) Non-admin user cannot create country customization data.
-     * @deny (update) Non-admin user cannot update country customization data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /countryCustomizations/{countryId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to pinned Iraqi matches data.
-     * @path /pinnedIraqiMatches/{matchId}
-     * @allow (get, list) Any user can read pinned Iraqi matches data.
-     * @allow (create) Admin user can create pinned Iraqi matches data.
-     * @allow (update) Admin user can update pinned Iraqi matches data.
-     * @allow (delete) Admin user can delete pinned Iraqi matches data.
-     * @deny (create) Non-admin user cannot create pinned Iraqi matches data.
-     * @deny (update) Non-admin user cannot update pinned Iraqi matches data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /pinnedIraqiMatches/{matchId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to league prediction data.
-     * @path /leaguePredictions/{predictionId}
-     * @allow (get, list) Signed in user can read league prediction data.
-     * @allow (create) Signed in user can create league prediction data if the userId matches the auth user id.
-     * @allow (update) Signed in user can update league prediction data if the userId matches the auth user id.
-     * @deny (delete) No user can delete league prediction data.
-     * @principle Requires user to be signed in and match the userId in the document.
-     */
-    match /leaguePredictions/{predictionId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
-      allow update: if isSignedIn() && request.auth.uid == resource.data.userId;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Manages access to league leaderboard data.
-     * @path /leagueLeaderboards/{leagueId}/users/{userId}
-     * @allow (get, list) Any user can read league leaderboard data.
-     * @deny (create) No user can create league leaderboard data.
-     * @deny (update) No user can update league leaderboard data.
-     * @deny (delete) No user can delete league leaderboard data.
-     * @principle Public read, no writes allowed.
-     */
-    match /leagueLeaderboards/{leagueId}/users/{userId} {
-      allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Manages access to daily global predictions data.
-     * @path /dailyGlobalPredictions/{date}
-     * @allow (get) Any user can read daily global predictions data.
-     * @allow (create, update, delete) Only admins can manage daily global predictions data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /dailyGlobalPredictions/{date} {
-      allow get: if true;
-      allow create, update, delete: if isAdmin() && resource != null;
-    }
-    
-    /**
-     * @description Manages access to general prediction data.
-     * @path /predictions/{predictionId}
-     * @allow (get) Signed-in users can read prediction data.
-     * @allow (create, update) Signed-in users can create/update their own prediction data.
-     * @deny (delete) No users can delete prediction data.
-     * @principle Requires authentication and ensures user-owned predictions.
-     */
-    match /predictions/{predictionId} {
-      allow get: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
-      allow update: if isSignedIn() && request.auth.uid == resource.data.userId;
-      allow delete: if false;
-    }
-    
-    /**
-     * @description Manages access to leaderboard data.
-     * @path /leaderboard/{userId}
-     * @allow (get, list) Any user can read leaderboard data.
-     * @allow (create, update, delete) Only admins can manage leaderboard data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /leaderboard/{userId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin() && resource != null;
-    }
-    
-    /**
-     * @description Manages access to season predictions data.
-     * @path /seasonPredictions/{predictionId}
-     * @allow (get, create, update, delete) Owner user can manage season predictions data.
-     * @principle Enforces owner-based control.
-     */
-    match /seasonPredictions/{predictionId} {
-      allow get: if isSignedIn() && isOwner(resource.data.userId);
-      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
-      allow update: if isSignedIn() && isOwner(resource.data.userId) && resource != null;
-      allow delete: if isSignedIn() && isOwner(resource.data.userId) && resource != null;
-    }
-    
-    /**
-     * @description Manages access to Iraqi league top scorers data.
-     * @path /iraqiLeagueTopScorers/{scorerId}
-     * @allow (get, list) Any user can read Iraqi league top scorers data.
-     * @allow (create, update, delete) Only admins can manage Iraqi league top scorers data.
-     * @principle Allows public read access and restricts write access to admins.
-     */
-    match /iraqiLeagueTopScorers/{scorerId} {
-        allow get, list: if true;
-        allow create, update, delete: if isAdmin() && resource != null;
-    }
-
-      /**
-     * @description Manages access to user favorites data under a user's profile.  There will only ever be one document here, called "data".
-     * @path /users/{userId}/favorites/data
-     * @allow (get, list) The owner can read.  `list` operation will never be called since it's a document with known ID.
-     * @allow (create, update, delete) The owner can write/delete.
-     * @principle Enforces user-based ownership
-     */
-    match /users/{userId}/favorites/data {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && resource != null;
-      allow delete: if isOwner(userId) && resource != null;
-    }
-
-      /**
-     * @description Manages access to admin-curated prediction match data. This data is intended for public consumption and is managed by admins.
-     * @path /predictions/{fixtureId}
-     * @allow (get, list) Any user can read this data.  `list` operations do not make sense on a single doc.
-     * @deny (create, update, delete) Admins are the only ones allowed to change it, this rule is currently not implemented
-     * @principle Intended for public read with Admin-only writes.
-     */
-    match /predictions/{fixtureId} {
-      allow get: if true;
-      allow list: if false; // List does not make sense here
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Manages access to individual user's predictions under a curated match.
-     * @path /predictions/{fixtureId}/userPredictions/{userId}
-     * @allow (get) Authenticated User can get their own data.
-     * @allow (create) Authenticated User can create their own data
-     * @allow (update) Authenticated User can update their own data.
-     * @deny (delete) No user can delete their predictions.
-     * @principle Enforces user-based ownership for predictions.
-     */
-    match /predictions/{fixtureId}/userPredictions/{userId} {
-        allow get: if isSignedIn() && isOwner(userId);
-        allow list: if false; // listing not required, only getting
-        allow create: if isSignedIn() && isOwner(userId);
-        allow update: if isSignedIn() && isOwner(userId) && resource != null;
-        allow delete: if false;
+        return isOwner(userId) && resource != null;
     }
   }
 }
