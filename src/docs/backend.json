@@ -122,95 +122,51 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": { "$ref": "#/entities/User" },
-          "description": "Stores user profile information."
-        }
-      },
-      {
-        "path": "/competitions/{competitionId}",
-        "definition": {
-          "entityName": "Competition",
-          "schema": { "$ref": "#/entities/Competition" },
-          "description": "Stores competition data."
-        }
-      },
-      {
-        "path": "/teams/{teamId}",
-        "definition": {
-          "entityName": "Team",
-          "schema": { "$ref": "#/entities/Team" },
-          "description": "Stores team data."
-        }
-      },
-       {
-        "path": "/coachCustomizations/{coachId}",
-        "definition": {
-          "entityName": "Coach",
-          "schema": { "$ref": "#/entities/Coach" },
-          "description": "Stores coach custom names."
-        }
-      },
-      {
-        "path": "/matches/{matchId}",
-        "definition": {
-          "entityName": "Match",
-          "schema": { "$ref": "#/entities/Match" },
-          "description": "Stores match data."
-        }
-      },
-      {
-        "path": "/news/{newsId}",
-        "definition": {
-          "entityName": "News",
-          "schema": { "$ref": "#/entities/News" },
-          "description": "Stores news articles."
-        }
-      },
-      {
-        "path": "/admins/{adminId}",
-        "definition": {
-          "entityName": "Admin",
-          "schema": { "$ref": "#/entities/Admin" },
-          "description": "Stores admin user data."
-        }
-      },
-      {
-        "path": "/users/{userId}/favorites/data",
-        "definition": {
-          "entityName": "UserFavorites",
-          "schema": { "$ref": "#/entities/UserFavorites" },
-          "description": "Stores user's favorite teams and competitions."
-        }
-      },
-      {
-        "path": "/predictions/{fixtureId}",
-        "definition": {
-          "entityName": "PredictionMatch",
-          "schema": { "$ref": "#/entities/PredictionMatch" },
-          "description": "Admin-pinned matches available for user predictions. Publicly readable."
-        }
-      },
-      {
-        "path": "/predictions/{fixtureId}/userPredictions/{userId}",
-        "definition": {
-          "entityName": "Prediction",
-          "schema": { "type": "object", "properties": { "homeGoals": { "type": "number" }, "awayGoals": { "type": "number" } } },
-          "description": "Stores an individual user's prediction for a specific match."
-        }
-      },
-      {
-        "path": "/leaderboard/{userId}",
-        "definition": {
-          "entityName": "UserScore",
-          "schema": { "type": "object", "properties": { "score": { "type": "number" }, "displayName": {"type": "string"} } },
-          "description": "Stores the aggregated prediction scores for each user."
-        }
-      }
-    ]
+    "/users/{userId}": {
+        "schema": { "$ref": "#/entities/User" },
+        "description": "Stores user profile information."
+    },
+    "/competitions/{competitionId}": {
+        "schema": { "$ref": "#/entities/Competition" },
+        "description": "Stores competition data."
+    },
+    "/teams/{teamId}": {
+        "schema": { "$ref": "#/entities/Team" },
+        "description": "Stores team data."
+    },
+    "/coachCustomizations/{coachId}": {
+        "schema": { "$ref": "#/entities/Coach" },
+        "description": "Stores coach custom names."
+    },
+    "/matches/{matchId}": {
+        "schema": { "$ref": "#/entities/Match" },
+        "description": "Stores match data."
+    },
+    "/news/{newsId}": {
+        "schema": { "$ref": "#/entities/News" },
+        "description": "Stores news articles."
+    },
+    "/admins/{adminId}": {
+        "schema": { "$ref": "#/entities/Admin" },
+        "description": "Stores admin user data."
+    },
+    "/users/{userId}/favorites/data": {
+        "schema": { "$ref": "#/entities/UserFavorites" },
+        "description": "Stores user's favorite teams and competitions."
+    },
+    "/predictions/{fixtureId}": {
+        "schema": { "$ref": "#/entities/PredictionMatch" },
+        "description": "Admin-pinned matches available for user predictions. Publicly readable."
+    },
+    "/predictions/{fixtureId}/userPredictions/{userId}": {
+        "schema": { "type": "object", "properties": { "homeGoals": { "type": "number" }, "awayGoals": { "type": "number" } } },
+        "description": "Stores an individual user's prediction for a specific match."
+    },
+    "/leaderboard/{userId}": {
+        "schema": { "type": "object", "properties": { "score": { "type": "number" }, "displayName": {"type": "string"} } },
+        "description": "Stores the aggregated prediction scores for each user."
+    }
   }
 }
+
+    
