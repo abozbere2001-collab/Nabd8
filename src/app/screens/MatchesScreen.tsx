@@ -13,7 +13,7 @@ import { Loader2, Search, Star, CalendarClock, Crown, Pencil, TrendingUp } from 
 import { cn } from '@/lib/utils';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsContent } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { SearchSheet } from '@/components/SearchSheet';
 import { ProfileButton } from '../AppContentWrapper';
@@ -289,14 +289,17 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
 
   useEffect(() => {
-    if (!db) return;
+    if (!db || !isAdmin) return;
     const unsub = onSnapshot(collection(db, 'predictions'), (snapshot) => {
         const newPinnedSet = new Set<number>();
         snapshot.forEach(doc => newPinnedSet.add(Number(doc.id)));
         setPinnedPredictionMatches(newPinnedSet);
+    }, (error) => {
+        console.error("Permission error listening to predictions:", error);
+        // Do not emit a global error, as this is an optional feature for admins.
     });
     return () => unsub();
-  }, [db]);
+  }, [db, isAdmin]);
 
 
   const handlePinToggle = useCallback((fixture: FixtureType) => {
@@ -610,5 +613,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    
 
     
