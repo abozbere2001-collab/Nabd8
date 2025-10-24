@@ -42,7 +42,7 @@ import { LogOut, User as UserIcon } from 'lucide-react';
 import { signOut } from '@/lib/firebase-client';
 import { cn } from '@/lib/utils';
 import { ManageTopScorersScreen } from './screens/ManageTopScorersScreen';
-import { KhaltakScreen } from './screens/KhaltakScreen';
+import { KhaltakScreen } from './screens/IraqScreen';
 import { PredictionsScreen } from './screens/PredictionsScreen';
 
 const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
