@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileButton } from '../AppContentWrapper';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { LeagueHeaderItem } from '@/components/LeagueHeaderItem';
+import { POPULAR_LEAGUES } from '@/lib/popular-data';
 
 // --- Persistent Cache Logic ---
 const COMPETITIONS_CACHE_KEY = 'goalstack_competitions_cache';
@@ -133,14 +134,9 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const fetchAllData = useCallback(async (forceRefresh = false) => {
         setLoadingClubData(true);
-        if (!db) {
-            setLoadingClubData(false);
-            setManagedCompetitions([]);
-            return;
-        }
 
         const fetchCustomNames = async () => {
-             if (!db) {
+             if (!db || !isAdmin) { // Only admins can fetch customizations
                 setCustomNames({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
                 return;
             };
@@ -150,7 +146,10 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 getDocs(collection(db, 'countryCustomizations')),
                 getDocs(collection(db, 'continentCustomizations')),
                 getDocs(collection(db, 'teamCustomizations')),
-            ]);
+            ]).catch(() => {
+                toast({ variant: 'destructive', title: "خطأ", description: "فشل في تحميل بيانات التخصيص." });
+                return [null, null, null, null];
+            });
 
             const fetchedCustomNames = {
                 leagues: new Map<number, string>(),
@@ -168,24 +167,31 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         };
 
         const fetchClubData = async () => {
+             if (!db || !isAdmin) {
+                // For regular users, show popular leagues as a fallback.
+                const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
+                    leagueId: l.id,
+                    name: l.name,
+                    logo: l.logo,
+                    countryName: 'World', // A sensible default
+                    countryFlag: null,
+                }));
+                setManagedCompetitions(popularAsManaged);
+                return;
+            }
+
             const cached = getCachedData<CompetitionsCache>(COMPETITIONS_CACHE_KEY);
             let serverLastUpdated = 0;
-            if (db) {
-                try {
-                    const cacheBusterRef = doc(db, 'appConfig', 'cache');
-                    const cacheBusterSnap = await getDoc(cacheBusterRef);
-                    serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
-                } catch (e) { console.warn("Could not check cache-buster."); }
-            }
+            
+            try {
+                const cacheBusterRef = doc(db, 'appConfig', 'cache');
+                const cacheBusterSnap = await getDoc(cacheBusterRef);
+                serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
+            } catch (e) { console.warn("Could not check cache-buster."); }
             
              if (cached?.data?.managedCompetitions && cached.data.managedCompetitions.length > 0 && !forceRefresh && cached.lastFetched > serverLastUpdated) {
                 setManagedCompetitions(cached.data.managedCompetitions);
                 return; 
-            }
-
-            if (!db) {
-                setManagedCompetitions([]);
-                return;
             }
 
             try {
@@ -195,6 +201,10 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 setCachedData(COMPETITIONS_CACHE_KEY, { managedCompetitions: fetchedCompetitions, lastFetched: Date.now() });
             } catch (error) {
                 console.error("Permission error fetching managed competitions for admin:", error);
+                 errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'managedCompetitions',
+                    operation: 'list',
+                }));
             }
         };
 
@@ -205,7 +215,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         
         setLoadingClubData(false);
 
-    }, [db, toast]);
+    }, [db, toast, isAdmin]);
 
 
     useEffect(() => {
@@ -376,7 +386,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 updateData = { [fieldPath]: favData };
             }
             
-            updateDoc(favDocRef, updateData).catch(err => {
+            setDoc(favDocRef, updateData, { merge: true }).catch(err => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favDocRef.path, operation: 'update', requestResourceData: updateData }))
             });
         } else {
@@ -437,6 +447,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     };
     
     const handleAdminRefresh = async () => {
+        if (!isAdmin) return;
         localStorage.removeItem(COMPETITIONS_CACHE_KEY);
         localStorage.removeItem(TEAMS_CACHE_KEY);
         localStorage.removeItem(COUNTRIES_CACHE_KEY);
@@ -645,5 +656,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
+    
 
     
