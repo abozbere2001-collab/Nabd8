@@ -207,7 +207,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     useEffect(() => {
-        if (!db || !isAdmin) {
+        if (!db || !isAdmin) { // Only fetch if user is admin
             setLoadingMatches(false);
             setLoadingUserPredictions(false);
             return;
@@ -234,7 +234,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
 
 
     useEffect(() => {
-        if (!db || !user || !isAdmin) {
+        if (!db || !user || !isAdmin || pinnedMatches.length === 0) {
             setLoadingUserPredictions(false);
             return;
         };
@@ -242,6 +242,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
 
         const fetchAllPredictions = async () => {
             const newPredictions: { [key: string]: Prediction } = {};
+            // For admins, we just need to get their own predictions for the UI
             const predictionPromises = pinnedMatches.map(match => {
                 if (!match.id) return Promise.resolve();
                 const userPredictionRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
@@ -257,11 +258,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             setLoadingUserPredictions(false);
         };
 
-        if (pinnedMatches.length > 0) {
-            fetchAllPredictions();
-        } else {
-            setLoadingUserPredictions(false);
-        }
+        fetchAllPredictions();
     }, [db, user, pinnedMatches, isAdmin]);
     
     const fetchLeaderboard = useCallback(async () => {
