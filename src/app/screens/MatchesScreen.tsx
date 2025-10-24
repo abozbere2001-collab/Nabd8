@@ -23,8 +23,9 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { getLocalFavorites } from '@/lib/local-favorites';
 import { POPULAR_LEAGUES } from '@/lib/popular-data';
 import { useToast } from '@/hooks/use-toast';
-import { LeagueHeaderItem } from '@/components/LeagueHeaderItem';
 import { RenameDialog } from '@/components/RenameDialog';
+import { LeagueHeaderItem } from '@/components/LeagueHeaderItem';
+
 
 interface GroupedFixtures {
     [leagueName: string]: {
@@ -47,10 +48,6 @@ const FixturesList = React.memo((props: {
     navigate: ScreenProps['navigate'],
     pinnedPredictionMatches: Set<number>,
     onPinToggle: (fixture: FixtureType) => void,
-    favorites: Partial<Favorites>,
-    onFavoriteToggle: (league: FixtureType['league']) => void,
-    isAdmin: boolean,
-    onRename: (league: FixtureType['league']) => void,
 }) => {
     
     const { favoriteTeamMatches, otherFixtures } = useMemo(() => {
@@ -146,14 +143,10 @@ const FixturesList = React.memo((props: {
                 const { league, fixtures: leagueFixtures } = groupedOtherFixtures[leagueName];
                 return (
                     <div key={`${league.id}-${league.name}`}>
-                       <LeagueHeaderItem
-                            league={{...league, leagueId: league.id, countryName: '', countryFlag: null}} // Adapt to ManagedCompetitionType
-                            isFavorited={!!props.favorites.leagues?.[league.id]}
-                            onFavoriteToggle={() => props.onFavoriteToggle(league)}
-                            onClick={() => props.navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo })}
-                            isAdmin={props.isAdmin}
-                            onRename={() => props.onRename(league)}
-                        />
+                       <div className="font-semibold text-foreground py-1 px-3 rounded-md bg-card border flex items-center gap-2 text-xs h-6 cursor-pointer" onClick={() => props.navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo })}>
+                           <Avatar className="h-4 w-4"><AvatarImage src={league.logo} alt={league.name} /></Avatar>
+                           <span className="truncate">{league.name}</span>
+                       </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
                             {leagueFixtures.map(f => (
                                 <FixtureItem 
@@ -450,56 +443,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         return () => controller.abort();
     }
   };
-
-  const handleFavoriteToggle = useCallback((league: FixtureType['league']) => {
-    // This is a simplified version. A real implementation would handle this more robustly.
-    console.log("Toggling favorite for league:", league.id);
-  }, []);
-
-  const handleOpenRename = (league: FixtureType['league']) => {
-    if (!isAdmin) return;
-    const currentName = customNamesCache?.leagues.get(league.id) || hardcodedTranslations.leagues[league.id] || league.name;
-    setRenameItem({
-        type: 'league',
-        id: league.id,
-        name: currentName,
-        originalName: league.name
-    });
-  };
-
-  const handleSaveRename = (type: RenameType, id: number, newName: string) => {
-    if (!db || !renameItem) return;
-    const docRef = doc(db, 'leagueCustomizations', String(id));
-
-    const originalName = renameItem.originalName;
-
-    if (newName && newName.trim() !== originalName) {
-        setDoc(docRef, { customName: newName }).then(() => {
-            toast({ title: "نجاح", description: `تم تحديث اسم البطولة.` });
-            setCustomNamesCache(prev => {
-                const newLeagues = new Map(prev?.leagues);
-                newLeagues.set(id, newName);
-                return { ...prev!, leagues: newLeagues };
-            });
-        }).catch(err => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'create', requestResourceData: { customName: newName } }));
-        });
-    } else {
-        deleteDoc(docRef).then(() => {
-            toast({ title: "نجاح", description: `تمت إزالة الاسم المخصص.` });
-             setCustomNamesCache(prev => {
-                const newLeagues = new Map(prev?.leagues);
-                newLeagues.delete(id);
-                return { ...prev!, leagues: newLeagues };
-            });
-        }).catch(err => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
-        });
-    }
-    setRenameItem(null);
-  };
-
-
+  
   const currentFavorites = (user && !user.isAnonymous) ? favorites : getLocalFavorites();
   const favoritedTeamIds = useMemo(() => currentFavorites?.teams ? Object.keys(currentFavorites.teams).map(Number) : [], [currentFavorites.teams]);
   const favoritedLeagueIds = useMemo(() => currentFavorites?.leagues ? Object.keys(currentFavorites.leagues).map(Number) : [], [currentFavorites.leagues]);
@@ -525,14 +469,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
               </div>
             }
         />
-        {renameItem && (
-            <RenameDialog
-                isOpen={!!renameItem}
-                onOpenChange={(isOpen) => !isOpen && setRenameItem(null)}
-                item={{...renameItem, purpose: 'rename' }}
-                onSave={(type, id, name) => handleSaveRename(type as RenameType, Number(id), name)}
-            />
-        )}
+        
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-1 flex-col min-h-0">
             <div className="sticky top-0 z-10 px-1 pt-1 bg-background">
                 <div className="bg-card text-card-foreground rounded-b-lg border-x border-b shadow-md">
@@ -569,10 +506,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     navigate={navigate}
                     pinnedPredictionMatches={pinnedPredictionMatches}
                     onPinToggle={handlePinToggle}
-                    favorites={currentFavorites}
-                    onFavoriteToggle={handleFavoriteToggle}
-                    isAdmin={isAdmin}
-                    onRename={handleOpenRename}
                 />
             </TabsContent>
             
@@ -587,10 +520,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                     navigate={navigate}
                     pinnedPredictionMatches={pinnedPredictionMatches}
                     onPinToggle={handlePinToggle}
-                    favorites={currentFavorites}
-                    onFavoriteToggle={handleFavoriteToggle}
-                    isAdmin={isAdmin}
-                    onRename={handleOpenRename}
                 />
             </TabsContent>
 
@@ -598,3 +527,4 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
