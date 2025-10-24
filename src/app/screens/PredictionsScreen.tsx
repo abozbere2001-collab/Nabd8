@@ -207,7 +207,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     useEffect(() => {
-        if (!db || !isAdmin) {
+        if (!db) {
             setLoadingMatches(false);
             setLoadingUserPredictions(false);
             return;
@@ -222,10 +222,12 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             setPinnedMatches(matches);
             setLoadingMatches(false);
         }, (err) => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: 'predictions',
-                operation: 'list'
-            }));
+            if (isAdmin) {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'predictions',
+                    operation: 'list'
+                }));
+            }
             setLoadingMatches(false);
         });
 
@@ -337,13 +339,14 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             const batch = writeBatch(db);
             const userPointsMap = new Map<string, number>();
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
-
+            
             const usersSnapshot = await getDocs(collection(db, "users"));
             usersSnapshot.forEach(doc => {
                 const userData = doc.data() as UserProfile;
                 userDetailsMap.set(doc.id, { displayName: userData.displayName || 'مستخدم', photoURL: userData.photoURL || '' });
-                userPointsMap.set(doc.id, 0);
+                userPointsMap.set(doc.id, 0); // Initialize all users with 0 points
             });
+
 
             const predictionsSnapshot = await getDocs(collection(db, "predictions"));
             
@@ -428,9 +431,9 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                <TabsContent value="voting" className="flex-1 flex flex-col mt-0 data-[state=inactive]:hidden min-h-0">
                     <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
                     <div className="flex-1 overflow-y-auto p-1 space-y-4 pt-4">
-                        {loadingMatches || loadingUserPredictions ? (
+                        {(loadingMatches || (user && loadingUserPredictions)) ? (
                             <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-                        ) : isAdmin ? (
+                        ) : user ? (
                             <>
                                 {filteredMatches.length > 0 ? (
                                     filteredMatches.map(match => (
@@ -444,13 +447,13 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                                 ) : (
                                     <div className="text-center text-muted-foreground pt-10">
                                         <p>لا توجد مباريات للتوقع في هذا اليوم.</p>
-                                        <p className="text-xs">يمكنك تثبيت مباريات من شاشة المباريات.</p>
+                                        {isAdmin && <p className="text-xs">يمكنك تثبيت مباريات من شاشة المباريات.</p>}
                                     </div>
                                 )}
                             </>
                         ) : (
                              <div className="text-center text-muted-foreground pt-10">
-                                <p>ميزة التوقعات متاحة للمستخدمين المشتركين قريبًا.</p>
+                                <p>ميزة التوقعات متاحة للمستخدمين المشتركين قريبا.</p>
                              </div>
                         )}
                     </div>
@@ -463,7 +466,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                            {isAdmin && (
                                <Button onClick={handleCalculateAllPoints} disabled={isUpdatingPoints} size="sm">
                                    {isUpdatingPoints ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
-                                   <span className="mr-2">تحديث النتائج والنقاط</span>
+                                   <span className="mr-2">تحديث النتائج</span>
                                </Button>
                            )}
                       </CardHeader>
@@ -476,3 +479,6 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         </div>
     );
 };
+
+
+    
