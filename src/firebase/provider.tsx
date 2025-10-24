@@ -16,7 +16,7 @@ import { errorEmitter } from './error-emitter';
 // Add UIDs of permanent admins here. This provides a fallback if the admins collection is not accessible.
 const ADMIN_UIDS = [
     'qptIHofUmhVs5qGCxDiIfIyqBck1', // abozbere2001@gmail.com
-    'SAGRALNAREY_UID_PLACEHOLDER', // sagralnarey@gmail.com - REPLACE WITH ACTUAL UID
+    '1Jby696bGzaqiODURITOHMr6x552', // sagralnarey@gmail.com
 ];
 
 
