@@ -276,10 +276,11 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                 const userScoreRef = doc(db, 'leaderboard', user.uid);
                 const userScoreSnap = await getDoc(userScoreRef);
                 if (userScoreSnap.exists()) {
-                    const higherRankQuery = query(leaderboardRef, where('totalPoints', '>', userScoreSnap.data().totalPoints || 0));
-                    const higherRankSnap = await getDocs(higherRankQuery);
-                    const userRank = higherRankSnap.size + 1;
-                    setCurrentUserScore({ userId: user.uid, ...userScoreSnap.data(), rank: userRank } as UserScore);
+                    const data = userScoreSnap.data();
+                    const userRank = top100Scores.find(s => s.userId === user.uid)?.rank;
+                    // If user is not in top 100, we can't easily calculate rank on client.
+                    // For this simple implementation, we'll only show rank if they are in the top 100.
+                    setCurrentUserScore({ userId: user.uid, ...data, rank: userRank } as UserScore);
                 } else {
                     setCurrentUserScore(null);
                 }
@@ -338,69 +339,48 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             const userPointsMap = new Map<string, number>();
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
 
-            const pinnedMatchesSnapshot = await getDocs(collection(db, "predictions"));
-            const allPinnedMatches = pinnedMatchesSnapshot.docs.map(d => ({ id: d.id, ...d.data() as PredictionMatch }));
+            // 1. Fetch all users once
+            const usersSnapshot = await getDocs(collection(db, "users"));
+            usersSnapshot.forEach(doc => {
+                const userData = doc.data() as UserProfile;
+                userDetailsMap.set(doc.id, { displayName: userData.displayName || 'مستخدم', photoURL: userData.photoURL || '' });
+                userPointsMap.set(doc.id, 0); // Initialize all users with 0 points
+            });
+
+            // 2. Fetch all predictions
+            const predictionsSnapshot = await getDocs(collection(db, "predictions"));
+            const allPinnedMatches = predictionsSnapshot.docs.map(d => ({ id: d.id, ...d.data() as PredictionMatch }));
 
             for (const pinnedMatch of allPinnedMatches) {
                 if (!pinnedMatch?.fixtureData?.fixture) continue;
                 
-                const fixtureIdStr = pinnedMatch.id;
-                let currentFixtureData = pinnedMatch.fixtureData;
+                const fixture = pinnedMatch.fixtureData;
+                const isFinished = ['FT', 'AET', 'PEN'].includes(fixture.fixture.status.short);
 
-                const isFinished = ['FT', 'AET', 'PEN'].includes(currentFixtureData.fixture.status.short);
-                
-                if (!isFinished && new Date(currentFixtureData.fixture.timestamp * 1000) < new Date()) {
-                     try {
-                        const fixtureRes = await fetch(`/api/football/fixtures?id=${currentFixtureData.fixture.id}`);
-                        if (fixtureRes.ok) {
-                            const fixtureApiData = await fixtureRes.json();
-                            if (fixtureApiData.response?.[0]) {
-                                currentFixtureData = fixtureApiData.response[0];
-                                batch.update(doc(db, 'predictions', fixtureIdStr), { fixtureData: currentFixtureData });
-                            }
-                        }
-                    } catch (e) { console.error(`Failed to update fixture ${currentFixtureData.fixture.id}`, e); }
-                }
-
-                if (['FT', 'AET', 'PEN'].includes(currentFixtureData.fixture.status.short)) {
-                    const userPredictionsSnapshot = await getDocs(collection(db, 'predictions', fixtureIdStr, 'userPredictions'));
-                    
-                    for (const userPredDoc of userPredictionsSnapshot.docs) {
+                if (isFinished) {
+                    const userPredictionsSnapshot = await getDocs(collection(db, 'predictions', pinnedMatch.id, 'userPredictions'));
+                    userPredictionsSnapshot.forEach(userPredDoc => {
                         const userPrediction = userPredDoc.data() as Prediction;
                         const userId = userPrediction.userId;
-                        if (!userId) continue;
+                        if (!userId) return;
 
-                        if (!userDetailsMap.has(userId)) {
-                            const userDocSnap = await getDoc(doc(db, 'users', userId));
-                            if (userDocSnap.exists()) {
-                                const userData = userDocSnap.data() as UserProfile;
-                                userDetailsMap.set(userId, { displayName: userData.displayName || 'مستخدم', photoURL: userData.photoURL || '' });
-                            }
-                        }
-
-                        const newPoints = calculatePoints(userPrediction, currentFixtureData);
-                        
-                        if (userPrediction.points !== newPoints) {
-                            batch.update(userPredDoc.ref, { points: newPoints });
-                        }
-                        
-                        userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + newPoints);
-                    }
+                        const points = calculatePoints(userPrediction, fixture);
+                        userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + points);
+                    });
                 }
             }
             
-            const allUsersSnapshot = await getDocs(collection(db, "users"));
-             allUsersSnapshot.forEach(userDoc => {
-                const userId = userDoc.id;
-                const totalPoints = userPointsMap.get(userId) || 0;
-                const userDetails = userDetailsMap.get(userId) || userDoc.data();
-                
-                const leaderboardRef = doc(db, 'leaderboard', userId);
-                batch.set(leaderboardRef, {
-                    totalPoints,
-                    userName: userDetails.displayName,
-                    userPhoto: userDetails.photoURL,
-                }, { merge: true });
+            // 3. Update leaderboard in a batch
+            userPointsMap.forEach((totalPoints, userId) => {
+                const userDetails = userDetailsMap.get(userId);
+                if (userDetails) {
+                    const leaderboardRef = doc(db, 'leaderboard', userId);
+                    batch.set(leaderboardRef, {
+                        totalPoints,
+                        userName: userDetails.displayName,
+                        userPhoto: userDetails.photoURL,
+                    }, { merge: true });
+                }
             });
             
             await batch.commit();
@@ -409,13 +389,8 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
 
         } catch (error) {
             console.error("Error calculating all points:", error);
-            if (error instanceof Error && error.message.includes('permission-denied')) {
-                 errorEmitter.emit('permission-error', new FirestorePermissionError({
-                     path: (error as any).customData?.path || 'unknown',
-                     operation: (error as any).customData?.operation || 'list'
-                 }));
-            } else if (error instanceof Error) {
-                 toast({ variant: 'destructive', title: "خطأ عام", description: error.message || "حدث خطأ أثناء تحديث لوحة الصدارة." });
+            if (error instanceof Error) {
+                 toast({ variant: 'destructive', title: "خطأ", description: error.message || "حدث خطأ أثناء تحديث لوحة الصدارة." });
             }
         } finally {
             setIsUpdatingPoints(false);
@@ -498,4 +473,3 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     );
 };
 
-    
