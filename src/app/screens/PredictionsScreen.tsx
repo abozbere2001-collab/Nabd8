@@ -207,8 +207,9 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     useEffect(() => {
-        if (!db) {
+        if (!db || !isAdmin) {
             setLoadingMatches(false);
+            setLoadingUserPredictions(false);
             return;
         };
 
@@ -229,11 +230,14 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         });
 
         return () => unsub();
-    }, [db]);
+    }, [db, isAdmin]);
 
 
     useEffect(() => {
-        if (!db || !user) return;
+        if (!db || !user || !isAdmin) {
+            setLoadingUserPredictions(false);
+            return;
+        };
         setLoadingUserPredictions(true);
 
         const fetchAllPredictions = async () => {
@@ -258,7 +262,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         } else {
             setLoadingUserPredictions(false);
         }
-    }, [db, user, pinnedMatches]);
+    }, [db, user, pinnedMatches, isAdmin]);
     
     const fetchLeaderboard = useCallback(async () => {
         if (!db) return;
@@ -432,22 +436,30 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                <TabsContent value="voting" className="flex-1 flex flex-col mt-0 data-[state=inactive]:hidden min-h-0">
                     <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
                     <div className="flex-1 overflow-y-auto p-1 space-y-4 pt-4">
-                        {loadingMatches || loadingUserPredictions ? (
-                             <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-                        ) : filteredMatches.length > 0 ? (
-                            filteredMatches.map(match => (
-                                <PredictionCard 
-                                    key={match.id}
-                                    predictionMatch={match}
-                                    userPrediction={allUserPredictions[match.id!]}
-                                    onSave={handleSavePrediction}
-                                />
-                            ))
+                        {isAdmin ? (
+                            <>
+                                {loadingMatches || loadingUserPredictions ? (
+                                    <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                                ) : filteredMatches.length > 0 ? (
+                                    filteredMatches.map(match => (
+                                        <PredictionCard 
+                                            key={match.id}
+                                            predictionMatch={match}
+                                            userPrediction={allUserPredictions[match.id!]}
+                                            onSave={handleSavePrediction}
+                                        />
+                                    ))
+                                ) : (
+                                    <div className="text-center text-muted-foreground pt-10">
+                                        <p>لا توجد مباريات للتوقع في هذا اليوم.</p>
+                                        <p className="text-xs">يمكنك تثبيت مباريات من شاشة المباريات.</p>
+                                    </div>
+                                )}
+                            </>
                         ) : (
-                            <div className="text-center text-muted-foreground pt-10">
-                                <p>لا توجد مباريات للتوقع في هذا اليوم.</p>
-                                <p className="text-xs">سيقوم المدير بإضافتها قريبًا.</p>
-                            </div>
+                             <div className="text-center text-muted-foreground pt-10">
+                                <p>ميزة التوقعات متاحة للمستخدمين المشتركين قريبًا.</p>
+                             </div>
                         )}
                     </div>
                </TabsContent>
@@ -472,4 +484,3 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         </div>
     );
 };
-
