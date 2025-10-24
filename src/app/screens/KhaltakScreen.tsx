@@ -1,269 +1,266 @@
-
-
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import type { ScreenProps } from '@/app/page';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { Card, CardContent } from '@/components/ui/card';
-import { ProfileButton } from '../AppContentWrapper';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { BottomNav } from '@/components/BottomNav';
+import { MatchesScreen } from './screens/MatchesScreen';
+import { CompetitionsScreen } from './screens/CompetitionsScreen';
+import { AllCompetitionsScreen } from './screens/AllCompetitionsScreen';
+import { NewsScreen } from './screens/NewsScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
+import { CompetitionDetailScreen } from './screens/CompetitionDetailScreen';
+import { TeamDetailScreen } from './screens/TeamDetailScreen';
+import { PlayerDetailScreen } from './screens/PlayerDetailScreen';
+import { AdminFavoriteTeamScreen } from './screens/AdminFavoriteTeamScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
+import { SeasonPredictionsScreen } from './screens/SeasonPredictionsScreen';
+import { SeasonTeamSelectionScreen } from './screens/SeasonTeamSelectionScreen';
+import { SeasonPlayerSelectionScreen } from './screens/SeasonPlayerSelectionScreen';
+import { AddEditNewsScreen } from './screens/AddEditNewsScreen';
+import { ManagePinnedMatchScreen } from './screens/ManagePinnedMatchScreen';
+import MatchDetailScreen from './screens/MatchDetailScreen';
+import { NotificationSettingsScreen } from './screens/NotificationSettingsScreen';
+import { GeneralSettingsScreen } from './screens/GeneralSettingsScreen';
+import PrivacyPolicyScreen from './privacy-policy/page';
+import TermsOfServiceScreen from './terms-of-service/page';
+import { GoProScreen } from './screens/GoProScreen';
+import type { ScreenKey } from './page';
+
+import { useAd, SplashScreenAd, BannerAd } from '@/components/AdProvider';
+import { useAuth } from '@/firebase';
 import { Button } from '@/components/ui/button';
-import { Crown, Search, X, Loader2 } from 'lucide-react';
-import { SearchSheet } from '@/components/SearchSheet';
-import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
-import type { CrownedTeam, Favorites, Fixture } from '@/lib/types';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { onSnapshot, doc, updateDoc, deleteField } from 'firebase/firestore';
-import { FirestorePermissionError } from '@/firebase/errors';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { useToast } from '@/hooks/use-toast';
-import { FixtureItem } from '@/components/FixtureItem';
-import { isMatchLive } from '@/lib/matchStatus';
-import { CURRENT_SEASON } from '@/lib/constants';
+import { LogOut, User as UserIcon } from 'lucide-react';
+import { signOut } from '@/lib/firebase-client';
+import { cn } from '@/lib/utils';
+import { ManageTopScorersScreen } from './screens/ManageTopScorersScreen';
+import { KhaltakScreen } from './screens/IraqScreen';
+import { PredictionsScreen } from './screens/PredictionsScreen';
 
-const CrownedTeamScroller = ({
-  crownedTeams,
-  onSelectTeam,
-  onRemove,
-  selectedTeamId,
-  navigate,
-}: {
-  crownedTeams: CrownedTeam[];
-  onSelectTeam: (teamId: number) => void;
-  onRemove: (teamId: number) => void;
-  selectedTeamId: number | null;
-  navigate: ScreenProps['navigate'];
-}) => {
-  if (crownedTeams.length === 0) {
-    return (
-      <div className="text-center text-muted-foreground py-4 px-4">
-        <p className="mb-4">
-          قم بتتويج فريقك المفضل بالضغط على أيقونة التاج 👑 في صفحة تفاصيل الفريق لتبقى على اطلاع دائم بآخر أخباره ومبارياته هنا.
-        </p>
-        <Button onClick={() => navigate('AllCompetitions')}>استكشف</Button>
-      </div>
-    );
-  }
-
-  return (
-    <ScrollArea className="w-full whitespace-nowrap">
-      <div className="flex w-max space-x-4 px-4 flex-row-reverse">
-        {crownedTeams.map(team => (
-          <div
-            key={team.teamId}
-            className="relative flex flex-col items-center gap-1 w-20 text-center cursor-pointer group"
-            onClick={() => onSelectTeam(team.teamId)}
-          >
-            <Avatar className={`h-12 w-12 border-2 ${selectedTeamId === team.teamId ? 'border-primary' : 'border-yellow-400'}`}>
-              <AvatarImage src={team.logo} />
-              <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <span className="text-[11px] font-medium truncate w-full">{team.name}</span>
-            <p className="text-[10px] text-muted-foreground truncate w-full">{team.note}</p>
-            <button 
-              onClick={(e) => { e.stopPropagation(); onRemove(team.teamId); }}
-              className="absolute top-0 left-0 h-5 w-5 bg-background/80 rounded-full flex items-center justify-center border border-destructive"
-            >
-              <X className="h-3 w-3 text-destructive"/>
-            </button>
-          </div>
-        ))}
-      </div>
-      <ScrollBar orientation="horizontal" />
-    </ScrollArea>
-  );
+const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
+  Matches: { component: MatchesScreen },
+  Competitions: { component: CompetitionsScreen },
+  AllCompetitions: { component: AllCompetitionsScreen },
+  News: { component: NewsScreen },
+  Settings: { component: SettingsScreen },
+  CompetitionDetails: { component: CompetitionDetailScreen },
+  TeamDetails: { component: TeamDetailScreen },
+  PlayerDetails: { component: PlayerDetailScreen },
+  AdminFavoriteTeamDetails: { component: AdminFavoriteTeamScreen },
+  Profile: { component: ProfileScreen },
+  SeasonPredictions: { component: SeasonPredictionsScreen },
+  SeasonTeamSelection: { component: SeasonTeamSelectionScreen },
+  SeasonPlayerSelection: { component: SeasonPlayerSelectionScreen },
+  AddEditNews: { component: AddEditNewsScreen },
+  ManagePinnedMatch: { component: ManagePinnedMatchScreen },
+  MatchDetails: { component: MatchDetailScreen },
+  NotificationSettings: { component: NotificationSettingsScreen },
+  GeneralSettings: { component: GeneralSettingsScreen },
+  PrivacyPolicy: { component: PrivacyPolicyScreen },
+  TermsOfService: { component: TermsOfServiceScreen },
+  GoPro: { component: GoProScreen },
+  ManageTopScorers: { component: ManageTopScorersScreen },
+  MyCountry: { component: KhaltakScreen },
+  Predictions: { component: PredictionsScreen },
 };
 
-const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: ScreenProps['navigate'] }) => {
-    const [allFixtures, setAllFixtures] = useState<Fixture[]>([]);
-    const [loading, setLoading] = useState(true);
-    const { toast } = useToast();
-    const listRef = useRef<HTMLDivElement>(null);
-    const firstUpcomingMatchRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const fetchFixtures = async () => {
-            if (!teamId) return;
-            setLoading(true);
-            try {
-                const url = `/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
-                const res = await fetch(url);
-                if (!res.ok) throw new Error(`API fetch failed with status: ${res.status}`);
-                
-                const data = await res.json();
-                const fixtures: Fixture[] = data.response || [];
-                fixtures.sort((a, b) => a.fixture.timestamp - b.fixture.timestamp);
-                setAllFixtures(fixtures);
-            } catch (error) {
-                console.error("Error fetching fixtures:", error);
-                toast({
-                    variant: "destructive",
-                    title: "خطأ في الشبكة",
-                    description: "فشل في جلب المباريات. يرجى التحقق من اتصالك بالإنترنت.",
-                });
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchFixtures();
-    }, [teamId, toast]);
+const mainTabs: ScreenKey[] = ['Matches', 'MyCountry', 'Predictions', 'Competitions', 'News', 'Settings'];
 
-    useEffect(() => {
-        if (!loading && allFixtures.length > 0 && listRef.current) {
-            const firstUpcomingIndex = allFixtures.findIndex(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
-            if (firstUpcomingIndex !== -1 && firstUpcomingMatchRef.current) {
-                setTimeout(() => {
-                    if (firstUpcomingMatchRef.current && listRef.current) {
-                        const listTop = listRef.current.offsetTop;
-                        const itemTop = firstUpcomingMatchRef.current.offsetTop;
-                        listRef.current.scrollTop = itemTop - listTop;
-                    }
-                }, 100);
-            }
+type StackItem = {
+  key: string;
+  screen: ScreenKey;
+  props?: Record<string, any>;
+};
+
+export const ProfileButton = () => {
+    const { user } = useAuth();
+
+    const handleSignOut = async () => {
+        await signOut();
+    };
+    
+    const navigateToProfile = () => {
+        if ((window as any).appNavigate) {
+            (window as any).appNavigate('Profile');
         }
-    }, [loading, allFixtures]);
-
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      );
+    };
+    
+    const navigateToLogin = () => {
+         if ((window as any).appNavigate) {
+            (window as any).appNavigate('Welcome');
+        }
     }
 
-    if (allFixtures.length === 0) {
-      return (
-        <Card className="mt-4">
-            <CardContent className="p-6">
-                <p className="text-center text-muted-foreground">لا توجد مباريات متاحة لهذا الفريق.</p>
-            </CardContent>
-        </Card>
-      );
+
+    if (!user) {
+        return (
+            <Button variant="ghost" size="sm" onClick={navigateToLogin}>
+                تسجيل الدخول
+            </Button>
+        );
     }
 
     return (
-        <div ref={listRef} className="space-y-2">
-            {allFixtures.map((fixture, index) => {
-                 const isUpcomingOrLive = isMatchLive(fixture.fixture.status) || new Date(fixture.fixture.timestamp * 1000) > new Date();
-                 const isFirstUpcoming = isUpcomingOrLive && !allFixtures.slice(0, index).some(f => isMatchLive(f.fixture.status) || new Date(f.fixture.timestamp * 1000) > new Date());
-                
-                return (
-                    <div key={fixture.fixture.id} ref={isFirstUpcoming ? firstUpcomingMatchRef : null}>
-                        <FixtureItem fixture={fixture} navigate={navigate} />
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-7 w-7 rounded-full">
+                    <Avatar className="h-7 w-7">
+                        <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
+                        <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                            {user.email}
+                        </p>
                     </div>
-                );
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={navigateToProfile}>
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    <span>الملف الشخصي</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>تسجيل الخروج</span>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+};
+
+
+export function AppContentWrapper() {
+  const [navigationState, setNavigationState] = useState<{ activeTab: ScreenKey, stacks: Record<string, StackItem[]> }>({
+    activeTab: 'Matches',
+    stacks: {
+        'Matches': [{ key: 'Matches-0', screen: 'Matches' }],
+        'Competitions': [{ key: 'Competitions-0', screen: 'Competitions' }],
+        'News': [{ key: 'News-0', screen: 'News' }],
+        'MyCountry': [{ key: 'MyCountry-0', screen: 'MyCountry' }],
+        'Predictions': [{ key: 'Predictions-0', screen: 'Predictions' }],
+        'Settings': [{ key: 'Settings-0', screen: 'Settings' }],
+    },
+  });
+
+  const { showSplashAd, showBannerAd } = useAd();
+  const keyCounter = useRef(1);
+  
+  const goBack = useCallback(() => {
+    setNavigationState(prevState => {
+        const currentStack = prevState.stacks[prevState.activeTab];
+        if (currentStack.length > 1) {
+            return {
+                ...prevState,
+                stacks: {
+                    ...prevState.stacks,
+                    [prevState.activeTab]: currentStack.slice(0, -1),
+                }
+            };
+        }
+        // If not a main tab and stack is 1, go back to Matches.
+        if (!mainTabs.includes(prevState.activeTab)) {
+            return { ...prevState, activeTab: 'Matches' };
+        }
+        return prevState;
+    });
+  }, []);
+
+  const navigate = useCallback((screen: ScreenKey, props?: Record<string, any>) => {
+      const newKey = `${screen}-${keyCounter.current++}`;
+      const newItem = { key: newKey, screen, props };
+
+      setNavigationState(prevState => {
+          if (mainTabs.includes(screen)) {
+              // If it's a main tab, just switch to it. Don't reset its stack.
+              return {
+                  ...prevState,
+                  activeTab: screen,
+              };
+          }
+          
+          const currentStack = prevState.stacks[prevState.activeTab] || [];
+          return {
+              ...prevState,
+              stacks: {
+                  ...prevState.stacks,
+                  [prevState.activeTab]: [...currentStack, newItem]
+              }
+          };
+      });
+  }, []);
+  
+  useEffect(() => {
+      if (typeof window !== 'undefined') {
+          (window as any).appNavigate = navigate;
+      }
+  }, [navigate]);
+
+  if (showSplashAd) {
+    return <SplashScreenAd />;
+  }
+  
+  const activeStack = navigationState.stacks[navigationState.activeTab] || [];
+
+  return (
+        <main className="h-screen w-screen bg-background flex flex-col">
+        <div className="relative flex-1 flex flex-col overflow-hidden">
+            {Object.entries(navigationState.stacks).map(([tabKey, stack]) => {
+                if (stack.length === 0) return null;
+                const isActiveTab = navigationState.activeTab === tabKey;
+            
+                return (
+                    <div 
+                        key={tabKey} 
+                        className="absolute inset-0 flex flex-col"
+                        style={{ display: isActiveTab ? 'flex' : 'none' }}
+                    >
+                        {stack.map((stackItem, index) => {
+                            const isVisible = index === stack.length - 1;
+                            const Component = screenConfig[stackItem.screen]?.component;
+                            if (!Component) return null;
+                            
+                            const screenProps = {
+                                ...stackItem.props,
+                                navigate,
+                                goBack,
+                                canGoBack: stack.length > 1,
+                                isVisible,
+                            };
+
+                            return (
+                                <div 
+                                    key={stackItem.key} 
+                                    className="absolute inset-0 flex flex-col"
+                                    style={{ 
+                                        display: isVisible ? 'flex' : 'none',
+                                        zIndex: isVisible ? 10 : 0
+                                    }}
+                                >
+                                    <Component {...screenProps} />
+                                </div>
+                            )
+                        })}
+                    </div>
+                )
             })}
         </div>
-    );
-};
-
-
-export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
-  const { user } = useAuth();
-  const { db } = useAdmin();
-  const [favorites, setFavorites] = useState<Partial<Favorites>>({});
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!user || !db) return;
-    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    const unsubscribe = onSnapshot(favRef, 
-      (doc) => {
-        setFavorites(doc.exists() ? doc.data() as Favorites : {});
-      },
-      (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'get' }));
-      }
-    );
-    return () => unsubscribe();
-  }, [user, db]);
-
-  const crownedTeams = useMemo(() => {
-    if (!favorites.crownedTeams) return [];
-    return Object.values(favorites.crownedTeams);
-  }, [favorites.crownedTeams]);
-  
-  useEffect(() => {
-    if(crownedTeams.length > 0 && !selectedTeamId) {
-      setSelectedTeamId(crownedTeams[0].teamId);
-    }
-    if (crownedTeams.length === 0) {
-      setSelectedTeamId(null);
-    }
-  }, [crownedTeams, selectedTeamId]);
-
-
-  const handleRemoveCrowned = (teamId: number) => {
-    if (!user || !db) return;
-    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
-    const fieldPath = `crownedTeams.${teamId}`;
-    
-    updateDoc(favRef, { [fieldPath]: deleteField() })
-      .catch(err => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: favRef.path, operation: 'update', requestResourceData: { [fieldPath]: 'DELETED' } }));
-      });
-  };
-  
-  const handleSelectTeam = (teamId: number) => {
-    setSelectedTeamId(teamId);
-  }
-  
-  if (!user) {
-    return (
-       <div className="flex h-full flex-col bg-background">
-          <ScreenHeader title="ملعبي" onBack={goBack} canGoBack={canGoBack} />
-           <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-              <Crown className="h-16 w-16 text-muted-foreground mb-4"/>
-              <h2 className="text-xl font-bold">ميزة حصرية للمستخدمين المسجلين</h2>
-              <p className="text-muted-foreground mb-6">
-                قم بتسجيل الدخول لتتويج فرقك وبطولاتك المفضلة.
-              </p>
-              <Button onClick={() => navigate('Welcome')}>تسجيل الدخول</Button>
-           </div>
-       </div>
-    )
-  }
-
-  return (
-    <div className="flex h-full flex-col bg-background">
-      <ScreenHeader
-        title="ملعبي"
-        onBack={goBack}
-        canGoBack={canGoBack}
-        actions={
-          <div className="flex items-center gap-1">
-              <SearchSheet navigate={navigate}>
-                  <Button variant="ghost" size="icon">
-                      <Search className="h-5 w-5" />
-                  </Button>
-              </SearchSheet>
-              <ProfileButton />
-          </div>
-        }
-      />
-      <div className="flex-1 flex flex-col min-h-0">
-          <div className="py-4 border-b">
-            <CrownedTeamScroller 
-              crownedTeams={crownedTeams} 
-              onSelectTeam={handleSelectTeam}
-              onRemove={handleRemoveCrowned} 
-              selectedTeamId={selectedTeamId}
-              navigate={navigate}
-            />
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {selectedTeamId ? (
-              <TeamFixturesDisplay teamId={selectedTeamId} navigate={navigate} />
-            ) : (
-              crownedTeams.length > 0 && (
-                 <div className="flex items-center justify-center h-full text-muted-foreground text-center p-4">
-                  <p>اختر فريقًا من الأعلى لعرض مبارياته.</p>
-                </div>
-              )
-            )}
-          </div>
-      </div>
-    </div>
+        
+        {showBannerAd && <BannerAd />}
+        {mainTabs.includes(activeStack[activeStack.length - 1]?.screen) && <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => navigate(screen)} />}
+        </main>
   );
 }
