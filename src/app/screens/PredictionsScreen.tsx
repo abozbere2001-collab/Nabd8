@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -207,7 +208,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     useEffect(() => {
-        if (!db) {
+        if (!db || !isAdmin) { // Only fetch if admin
             setLoadingMatches(false);
             setLoadingUserPredictions(false);
             return;
@@ -222,12 +223,10 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             setPinnedMatches(matches);
             setLoadingMatches(false);
         }, (err) => {
-            if (isAdmin) {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: 'predictions',
-                    operation: 'list'
-                }));
-            }
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'predictions',
+                operation: 'list'
+            }));
             setLoadingMatches(false);
         });
 
@@ -338,15 +337,11 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         try {
             const batch = writeBatch(db);
             const userPointsMap = new Map<string, number>();
-            const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
-            
+
             const usersSnapshot = await getDocs(collection(db, "users"));
             usersSnapshot.forEach(doc => {
-                const userData = doc.data() as UserProfile;
-                userDetailsMap.set(doc.id, { displayName: userData.displayName || 'مستخدم', photoURL: userData.photoURL || '' });
-                userPointsMap.set(doc.id, 0); // Initialize all users with 0 points
+                userPointsMap.set(doc.id, 0);
             });
-
 
             const predictionsSnapshot = await getDocs(collection(db, "predictions"));
             
@@ -370,17 +365,19 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                 }
             }
             
-            userPointsMap.forEach((totalPoints, userId) => {
-                const userDetails = userDetailsMap.get(userId);
-                if (userDetails) {
+            for (const [userId, totalPoints] of userPointsMap.entries()) {
+                const userDocRef = doc(db, 'users', userId);
+                const userDoc = await getDoc(userDocRef);
+                if (userDoc.exists()) {
+                    const userData = userDoc.data() as UserProfile;
                     const leaderboardRef = doc(db, 'leaderboard', userId);
                     batch.set(leaderboardRef, {
                         totalPoints,
-                        userName: userDetails.displayName,
-                        userPhoto: userDetails.photoURL,
+                        userName: userData.displayName || 'مستخدم',
+                        userPhoto: userData.photoURL || '',
                     }, { merge: true });
                 }
-            });
+            }
             
             await batch.commit();
             toast({ title: "نجاح!", description: `تم تحديث لوحة الصدارة بنجاح.` });
@@ -431,30 +428,27 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                <TabsContent value="voting" className="flex-1 flex flex-col mt-0 data-[state=inactive]:hidden min-h-0">
                     <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
                     <div className="flex-1 overflow-y-auto p-1 space-y-4 pt-4">
-                        {(loadingMatches || (user && loadingUserPredictions)) ? (
+                        {loadingMatches ? (
                             <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-                        ) : user ? (
-                            <>
-                                {filteredMatches.length > 0 ? (
-                                    filteredMatches.map(match => (
-                                        <PredictionCard 
-                                            key={match.id}
-                                            predictionMatch={match}
-                                            userPrediction={allUserPredictions[match.id!]}
-                                            onSave={handleSavePrediction}
-                                        />
-                                    ))
-                                ) : (
-                                    <div className="text-center text-muted-foreground pt-10">
-                                        <p>لا توجد مباريات للتوقع في هذا اليوم.</p>
-                                        {isAdmin && <p className="text-xs">يمكنك تثبيت مباريات من شاشة المباريات.</p>}
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                             <div className="text-center text-muted-foreground pt-10">
-                                <p>ميزة التوقعات متاحة للمستخدمين المشتركين قريبا.</p>
+                        ) : !user ? (
+                            <div className="text-center text-muted-foreground pt-10">
+                                <p>ميزة التوقعات متاحة للمستخدمين المسجلين.</p>
+                                <Button onClick={() => navigate('Welcome')} className="mt-4">تسجيل الدخول</Button>
                              </div>
+                        ) : filteredMatches.length > 0 ? (
+                            filteredMatches.map(match => (
+                                <PredictionCard 
+                                    key={match.id}
+                                    predictionMatch={match}
+                                    userPrediction={allUserPredictions[match.id!]}
+                                    onSave={handleSavePrediction}
+                                />
+                            ))
+                        ) : (
+                            <div className="text-center text-muted-foreground pt-10">
+                                <p>لا توجد مباريات للتوقع في هذا اليوم.</p>
+                                {isAdmin && <p className="text-xs">يمكنك تثبيت مباريات من شاشة المباريات.</p>}
+                            </div>
                         )}
                     </div>
                </TabsContent>

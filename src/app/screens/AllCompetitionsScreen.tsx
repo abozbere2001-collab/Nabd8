@@ -167,16 +167,21 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         };
 
         const fetchClubData = async () => {
-             if (!isAdmin) {
-                // For regular users, show popular leagues as a fallback.
-                const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
-                    leagueId: l.id,
-                    name: l.name,
-                    logo: l.logo,
-                    countryName: 'World', // A sensible default
-                    countryFlag: null,
-                }));
-                setManagedCompetitions(popularAsManaged);
+             if (!isAdmin && db) {
+                // For regular users, use onSnapshot for managedCompetitions
+                 onSnapshot(collection(db, 'managedCompetitions'), (snapshot) => {
+                    const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetitionType);
+                    setManagedCompetitions(fetchedCompetitions);
+                }, (error) => {
+                     const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
+                        leagueId: l.id,
+                        name: l.name,
+                        logo: l.logo,
+                        countryName: 'World', // A sensible default
+                        countryFlag: null,
+                    }));
+                    setManagedCompetitions(popularAsManaged);
+                });
                 return;
             }
 
