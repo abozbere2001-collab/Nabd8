@@ -332,26 +332,23 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         if (!db || !isAdmin) return;
         setIsUpdatingPoints(true);
         toast({ title: "بدء تحديث النقاط...", description: "جاري حساب النقاط لجميع المستخدمين." });
-    
+
         try {
             const batch = writeBatch(db);
             const userPointsMap = new Map<string, number>();
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
-    
-            // 1. Fetch all pinned matches
+
             const pinnedMatchesSnapshot = await getDocs(collection(db, "predictions"));
             const allPinnedMatches = pinnedMatchesSnapshot.docs.map(d => ({ id: d.id, ...d.data() as PredictionMatch }));
-    
-            // 2. Iterate through matches, update if necessary, and process predictions
+
             for (const pinnedMatch of allPinnedMatches) {
                 if (!pinnedMatch?.fixtureData?.fixture) continue;
                 
                 const fixtureIdStr = pinnedMatch.id;
                 let currentFixtureData = pinnedMatch.fixtureData;
-    
+
                 const isFinished = ['FT', 'AET', 'PEN'].includes(currentFixtureData.fixture.status.short);
                 
-                // If match is not finished but its time has passed, try to fetch latest status
                 if (!isFinished && new Date(currentFixtureData.fixture.timestamp * 1000) < new Date()) {
                      try {
                         const fixtureRes = await fetch(`/api/football/fixtures?id=${currentFixtureData.fixture.id}`);
@@ -359,34 +356,20 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                             const fixtureApiData = await fixtureRes.json();
                             if (fixtureApiData.response?.[0]) {
                                 currentFixtureData = fixtureApiData.response[0];
-                                // Add fixture update to the batch
                                 batch.update(doc(db, 'predictions', fixtureIdStr), { fixtureData: currentFixtureData });
                             }
                         }
                     } catch (e) { console.error(`Failed to update fixture ${currentFixtureData.fixture.id}`, e); }
                 }
-    
-                // 3. If match is finished, process its predictions
+
                 if (['FT', 'AET', 'PEN'].includes(currentFixtureData.fixture.status.short)) {
                     const userPredictionsSnapshot = await getDocs(collection(db, 'predictions', fixtureIdStr, 'userPredictions'));
-                    if (userPredictionsSnapshot.empty) continue;
                     
                     for (const userPredDoc of userPredictionsSnapshot.docs) {
                         const userPrediction = userPredDoc.data() as Prediction;
                         const userId = userPrediction.userId;
                         if (!userId) continue;
-    
-                        const newPoints = calculatePoints(userPrediction, currentFixtureData);
-                        
-                        // Only batch update if points changed
-                        if (userPrediction.points !== newPoints) {
-                            batch.update(userPredDoc.ref, { points: newPoints });
-                        }
-                        
-                        // Aggregate points for the user
-                        userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + newPoints);
-                        
-                        // Fetch user details if not already cached
+
                         if (!userDetailsMap.has(userId)) {
                             const userDocSnap = await getDoc(doc(db, 'users', userId));
                             if (userDocSnap.exists()) {
@@ -394,32 +377,43 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                                 userDetailsMap.set(userId, { displayName: userData.displayName || 'مستخدم', photoURL: userData.photoURL || '' });
                             }
                         }
+
+                        const newPoints = calculatePoints(userPrediction, currentFixtureData);
+                        
+                        if (userPrediction.points !== newPoints) {
+                            batch.update(userPredDoc.ref, { points: newPoints });
+                        }
+                        
+                        userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + newPoints);
                     }
                 }
             }
             
-            // 4. Update leaderboard in the same batch
-            for (const [userId, totalPoints] of userPointsMap.entries()) {
-                const userDetails = userDetailsMap.get(userId);
-                if (userDetails) {
-                    const leaderboardRef = doc(db, 'leaderboard', userId);
-                    batch.set(leaderboardRef, {
-                        totalPoints,
-                        userName: userDetails.displayName,
-                        userPhoto: userDetails.photoURL,
-                    }, { merge: true });
-                }
-            }
-    
-            // 5. Commit all changes at once
+            const allUsersSnapshot = await getDocs(collection(db, "users"));
+             allUsersSnapshot.forEach(userDoc => {
+                const userId = userDoc.id;
+                const totalPoints = userPointsMap.get(userId) || 0;
+                const userDetails = userDetailsMap.get(userId) || userDoc.data();
+                
+                const leaderboardRef = doc(db, 'leaderboard', userId);
+                batch.set(leaderboardRef, {
+                    totalPoints,
+                    userName: userDetails.displayName,
+                    userPhoto: userDetails.photoURL,
+                }, { merge: true });
+            });
+            
             await batch.commit();
             toast({ title: "نجاح!", description: `تم تحديث لوحة الصدارة بنجاح.` });
             fetchLeaderboard();
-    
+
         } catch (error) {
             console.error("Error calculating all points:", error);
-            if (error instanceof FirestorePermissionError) {
-                 errorEmitter.emit('permission-error', error);
+            if (error instanceof Error && error.message.includes('permission-denied')) {
+                 errorEmitter.emit('permission-error', new FirestorePermissionError({
+                     path: (error as any).customData?.path || 'unknown',
+                     operation: (error as any).customData?.operation || 'list'
+                 }));
             } else if (error instanceof Error) {
                  toast({ variant: 'destructive', title: "خطأ عام", description: error.message || "حدث خطأ أثناء تحديث لوحة الصدارة." });
             }
@@ -503,3 +497,5 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         </div>
     );
 };
+
+    
