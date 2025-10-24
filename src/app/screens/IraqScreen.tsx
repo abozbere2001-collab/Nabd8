@@ -166,7 +166,7 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
     );
 };
 
-export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
   const { user } = useAuth();
   const { isAdmin, db } = useAdmin();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
@@ -274,3 +274,5 @@ export function KhaltakScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
