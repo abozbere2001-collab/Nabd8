@@ -37,21 +37,7 @@ const popularLeagueIds = new Set(POPULAR_LEAGUES.slice(0, 15).map(l => l.id));
 
 
 // Fixtures List Component
-const FixturesList = React.memo(({ 
-    fixtures, 
-    loading,
-    activeTab, 
-    hasAnyFavorites,
-    favoritedLeagueIds,
-    favoritedTeamIds,
-    navigate,
-    pinnedPredictionMatches,
-    onPinToggle,
-    favorites,
-    onFavoriteToggle,
-    isAdmin,
-    onRename
-}: { 
+const FixturesList = React.memo((props: { 
     fixtures: FixtureType[], 
     loading: boolean,
     activeTab: string, 
@@ -71,22 +57,22 @@ const FixturesList = React.memo(({
         let favoriteTeamMatches: FixtureType[] = [];
         let otherFixtures: FixtureType[] = [];
 
-        if (activeTab === 'my-results') {
-             fixtures.forEach(f => {
-                if (favoritedTeamIds.includes(f.teams.home.id) || favoritedTeamIds.includes(f.teams.away.id)) {
+        if (props.activeTab === 'my-results') {
+             props.fixtures.forEach(f => {
+                if (props.favoritedTeamIds.includes(f.teams.home.id) || props.favoritedTeamIds.includes(f.teams.away.id)) {
                     favoriteTeamMatches.push(f);
-                } else if (favoritedLeagueIds.includes(f.league.id)) {
+                } else if (props.favoritedLeagueIds.includes(f.league.id)) {
                     otherFixtures.push(f);
                 }
             });
         } else {
             // For 'all-matches' tab
-            otherFixtures = fixtures;
+            otherFixtures = props.fixtures;
         }
 
         return { favoriteTeamMatches, otherFixtures };
 
-    }, [fixtures, activeTab, favoritedTeamIds, favoritedLeagueIds]);
+    }, [props.fixtures, props.activeTab, props.favoritedTeamIds, props.favoritedLeagueIds]);
 
 
     const groupedOtherFixtures = useMemo(() => {
@@ -101,7 +87,7 @@ const FixturesList = React.memo(({
     }, [otherFixtures]);
 
 
-    if (loading) {
+    if (props.loading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -109,20 +95,20 @@ const FixturesList = React.memo(({
         );
     }
     
-    if (activeTab === 'my-results' && !hasAnyFavorites) {
+    if (props.activeTab === 'my-results' && !props.hasAnyFavorites) {
         return (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-64 p-4">
                 <p className="font-bold text-lg">لم تقم بإضافة أي مفضلات</p>
                 <p className="text-sm">أضف فرقًا أو بطولات لترى مبارياتها هنا.</p>
-                 <Button className="mt-4" onClick={() => navigate('AllCompetitions')}>استكشف البطولات</Button>
+                 <Button className="mt-4" onClick={() => props.navigate('AllCompetitions')}>استكشف البطولات</Button>
             </div>
         );
     }
     
-    const noMatches = fixtures.length === 0;
+    const noMatches = props.fixtures.length === 0;
 
     if (noMatches) {
-        const message = activeTab === 'my-results'
+        const message = props.activeTab === 'my-results'
             ? "لا توجد مباريات لمفضلاتك هذا اليوم."
             : "لا توجد مباريات مباشرة حاليًا.";
         return (
@@ -136,7 +122,7 @@ const FixturesList = React.memo(({
 
     return (
         <div className="space-y-4">
-            {activeTab === 'my-results' && favoriteTeamMatches.length > 0 && (
+            {props.activeTab === 'my-results' && favoriteTeamMatches.length > 0 && (
                  <div>
                     <div className="font-semibold text-foreground py-1 px-3 rounded-md bg-card border flex items-center gap-2 text-xs h-6">
                         <Star className="h-4 w-4 text-yellow-400" />
@@ -147,9 +133,9 @@ const FixturesList = React.memo(({
                             <FixtureItem 
                                 key={f.fixture.id} 
                                 fixture={f} 
-                                navigate={navigate}
-                                isPinnedForPrediction={pinnedPredictionMatches.has(f.fixture.id)}
-                                onPinToggle={onPinToggle}
+                                navigate={props.navigate}
+                                isPinnedForPrediction={props.pinnedPredictionMatches.has(f.fixture.id)}
+                                onPinToggle={props.onPinToggle}
                             />
                         ))}
                     </div>
@@ -162,20 +148,20 @@ const FixturesList = React.memo(({
                     <div key={`${league.id}-${league.name}`}>
                        <LeagueHeaderItem
                             league={{...league, leagueId: league.id, countryName: '', countryFlag: null}} // Adapt to ManagedCompetitionType
-                            isFavorited={!!favorites.leagues?.[league.id]}
-                            onFavoriteToggle={() => onFavoriteToggle(league)}
-                            onClick={() => navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo })}
-                            isAdmin={isAdmin}
-                            onRename={() => onRename(league)}
+                            isFavorited={!!props.favorites.leagues?.[league.id]}
+                            onFavoriteToggle={() => props.onFavoriteToggle(league)}
+                            onClick={() => props.navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo })}
+                            isAdmin={props.isAdmin}
+                            onRename={() => props.onRename(league)}
                         />
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
                             {leagueFixtures.map(f => (
                                 <FixtureItem 
                                     key={f.fixture.id} 
                                     fixture={f} 
-                                    navigate={navigate}
-                                    isPinnedForPrediction={pinnedPredictionMatches.has(f.fixture.id)}
-                                    onPinToggle={onPinToggle}
+                                    navigate={props.navigate}
+                                    isPinnedForPrediction={props.pinnedPredictionMatches.has(f.fixture.id)}
+                                    onPinToggle={props.onPinToggle}
                                 />
                             ))}
                         </div>
@@ -296,7 +282,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         setPinnedPredictionMatches(newPinnedSet);
     }, (error) => {
         console.error("Permission error listening to predictions:", error);
-        // Do not emit a global error, as this is an optional feature for admins.
     });
     return () => unsub();
   }, [db, isAdmin]);
@@ -613,7 +598,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-
-    
-
-    
