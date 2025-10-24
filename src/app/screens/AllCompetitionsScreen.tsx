@@ -208,10 +208,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
         };
 
-        await Promise.all([
-            fetchCustomNames(),
-            fetchClubData()
-        ]);
+        if (isAdmin) {
+            await Promise.all([fetchCustomNames(), fetchClubData()]);
+        } else {
+            await fetchClubData();
+        }
         
         setLoadingClubData(false);
 
@@ -656,7 +657,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
-
-    
-
-    
