@@ -207,14 +207,12 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     useEffect(() => {
-        if (!db) return;
-        
-        if (!isAdmin) {
+        if (!db || !isAdmin) {
             setLoadingMatches(false);
             setLoadingUserPredictions(false);
             return;
-        };
-
+        }
+        
         const q = query(collection(db, 'predictions'));
         const unsub = onSnapshot(q, (snapshot) => {
             const matches = snapshot.docs.map(doc => ({
@@ -478,5 +476,3 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         </div>
     );
 };
-
-    
