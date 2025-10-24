@@ -136,7 +136,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         setLoadingClubData(true);
 
         const fetchCustomNames = async () => {
-             if (!db || !isAdmin) { // Only admins can fetch customizations
+             if (!db) { 
                 setCustomNames({ leagues: new Map(), teams: new Map(), countries: new Map(), continents: new Map() });
                 return;
             };
@@ -167,7 +167,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         };
 
         const fetchClubData = async () => {
-             if (!db || !isAdmin) {
+             if (!isAdmin) {
                 // For regular users, show popular leagues as a fallback.
                 const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
                     leagueId: l.id,
@@ -183,11 +183,13 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             const cached = getCachedData<CompetitionsCache>(COMPETITIONS_CACHE_KEY);
             let serverLastUpdated = 0;
             
-            try {
-                const cacheBusterRef = doc(db, 'appConfig', 'cache');
-                const cacheBusterSnap = await getDoc(cacheBusterRef);
-                serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
-            } catch (e) { console.warn("Could not check cache-buster."); }
+            if (db) {
+                try {
+                    const cacheBusterRef = doc(db, 'appConfig', 'cache');
+                    const cacheBusterSnap = await getDoc(cacheBusterRef);
+                    serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
+                } catch (e) { console.warn("Could not check cache-buster."); }
+            }
             
              if (cached?.data?.managedCompetitions && cached.data.managedCompetitions.length > 0 && !forceRefresh && cached.lastFetched > serverLastUpdated) {
                 setManagedCompetitions(cached.data.managedCompetitions);
@@ -195,12 +197,12 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
 
             try {
+                if (!db) return;
                 const compsSnapshot = await getDocs(collection(db, 'managedCompetitions'));
                 const fetchedCompetitions = compsSnapshot.docs.map(d => d.data() as ManagedCompetitionType);
                 setManagedCompetitions(fetchedCompetitions);
                 setCachedData(COMPETITIONS_CACHE_KEY, { managedCompetitions: fetchedCompetitions, lastFetched: Date.now() });
             } catch (error) {
-                console.error("Permission error fetching managed competitions for admin:", error);
                  errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: 'managedCompetitions',
                     operation: 'list',
@@ -208,11 +210,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
         };
 
-        if (isAdmin) {
-            await Promise.all([fetchCustomNames(), fetchClubData()]);
-        } else {
-            await fetchClubData();
-        }
+        await fetchCustomNames();
+        await fetchClubData();
         
         setLoadingClubData(false);
 
