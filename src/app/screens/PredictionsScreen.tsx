@@ -207,7 +207,9 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     useEffect(() => {
-        if (!db || !isAdmin) { // Only fetch if user is admin
+        if (!db) return;
+        
+        if (!isAdmin) {
             setLoadingMatches(false);
             setLoadingUserPredictions(false);
             return;
@@ -234,7 +236,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
 
 
     useEffect(() => {
-        if (!db || !user || !isAdmin || pinnedMatches.length === 0) {
+        if (!db || !user || pinnedMatches.length === 0) {
             setLoadingUserPredictions(false);
             return;
         };
@@ -242,7 +244,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
 
         const fetchAllPredictions = async () => {
             const newPredictions: { [key: string]: Prediction } = {};
-            // For admins, we just need to get their own predictions for the UI
+            
             const predictionPromises = pinnedMatches.map(match => {
                 if (!match.id) return Promise.resolve();
                 const userPredictionRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
@@ -259,7 +261,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         };
 
         fetchAllPredictions();
-    }, [db, user, pinnedMatches, isAdmin]);
+    }, [db, user, pinnedMatches]);
     
     const fetchLeaderboard = useCallback(async () => {
         if (!db) return;
@@ -279,8 +281,6 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                 if (userScoreSnap.exists()) {
                     const data = userScoreSnap.data();
                     const userRank = top100Scores.find(s => s.userId === user.uid)?.rank;
-                    // If user is not in top 100, we can't easily calculate rank on client.
-                    // For this simple implementation, we'll only show rank if they are in the top 100.
                     setCurrentUserScore({ userId: user.uid, ...data, rank: userRank } as UserScore);
                 } else {
                     setCurrentUserScore(null);
@@ -340,19 +340,17 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             const userPointsMap = new Map<string, number>();
             const userDetailsMap = new Map<string, Pick<UserProfile, 'displayName' | 'photoURL'>>();
 
-            // 1. Fetch all users once
             const usersSnapshot = await getDocs(collection(db, "users"));
             usersSnapshot.forEach(doc => {
                 const userData = doc.data() as UserProfile;
                 userDetailsMap.set(doc.id, { displayName: userData.displayName || 'مستخدم', photoURL: userData.photoURL || '' });
-                userPointsMap.set(doc.id, 0); // Initialize all users with 0 points
+                userPointsMap.set(doc.id, 0);
             });
 
-            // 2. Fetch all predictions
             const predictionsSnapshot = await getDocs(collection(db, "predictions"));
-            const allPinnedMatches = predictionsSnapshot.docs.map(d => ({ id: d.id, ...d.data() as PredictionMatch }));
-
-            for (const pinnedMatch of allPinnedMatches) {
+            
+            for (const pinnedMatchDoc of predictionsSnapshot.docs) {
+                const pinnedMatch = { id: pinnedMatchDoc.id, ...pinnedMatchDoc.data() as PredictionMatch };
                 if (!pinnedMatch?.fixtureData?.fixture) continue;
                 
                 const fixture = pinnedMatch.fixtureData;
@@ -371,7 +369,6 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                 }
             }
             
-            // 3. Update leaderboard in a batch
             userPointsMap.forEach((totalPoints, userId) => {
                 const userDetails = userDetailsMap.get(userId);
                 if (userDetails) {
@@ -433,11 +430,11 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                <TabsContent value="voting" className="flex-1 flex flex-col mt-0 data-[state=inactive]:hidden min-h-0">
                     <DateScroller selectedDateKey={selectedDateKey} onDateSelect={setSelectedDateKey} />
                     <div className="flex-1 overflow-y-auto p-1 space-y-4 pt-4">
-                        {isAdmin ? (
+                        {loadingMatches || loadingUserPredictions ? (
+                            <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                        ) : isAdmin ? (
                             <>
-                                {loadingMatches || loadingUserPredictions ? (
-                                    <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-                                ) : filteredMatches.length > 0 ? (
+                                {filteredMatches.length > 0 ? (
                                     filteredMatches.map(match => (
                                         <PredictionCard 
                                             key={match.id}
@@ -481,3 +478,5 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         </div>
     );
 };
+
+    
