@@ -1,12 +1,25 @@
 {
   "name": "نبض الملاعب",
   "short_name": "نبض",
-  "description": "تطبيق نبض الملاعب لعرض نتائج المباريات والتوقعات لحظة بلحظة.",
+  "description": "عالم كرة القدم بين يديك",
   "start_url": "/Nabd8/",
   "scope": "/Nabd8/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#004aad",
+  "display_override": [
+    "standalone",
+    "window-controls-overlay"
+  ],
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#1c1c1e",
+  "lang": "ar",
+  "dir": "rtl",
+  "id": "com.nabd8.app",
+  "prefer_related_applications": false,
+  "categories": [
+    "news",
+    "sports"
+  ],
   "icons": [
     {
       "src": "icons/icon-192x192.png",
