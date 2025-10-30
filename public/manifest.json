@@ -1,19 +1,20 @@
 {
-  "name": "Nabd AlKorah",
-  "short_name": "NabdKorah",
-  "description": "تطبيق نبض الكره لمتابعة نتائج المباريات والتوقعات في الوقت الفعلي.",
-  "start_url": "/",
+  "name": "نبض الملاعب",
+  "short_name": "نبض",
+  "description": "تطبيق نبض الملاعب لعرض نتائج المباريات والتوقعات لحظة بلحظة.",
+  "start_url": "/Nabd8/",
+  "scope": "/Nabd8/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#004aad",
   "icons": [
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "/Nabd8/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "/Nabd8/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
