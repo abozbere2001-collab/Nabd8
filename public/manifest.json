@@ -1,33 +1,19 @@
 {
   "name": "نبض الملاعب",
   "short_name": "نبض",
-  "description": "عالم كرة القدم بين يديك",
-  "start_url": "/Nabd8/",
-  "scope": "/Nabd8/",
+  "description": "تطبيق رياضي يعرض تشكيلات الملاعب ومحتوى كروي بصري",
+  "start_url": "./index.html",
   "display": "standalone",
-  "display_override": [
-    "window-controls-overlay",
-    "standalone"
-  ],
-  "orientation": "portrait",
-  "background_color": "#000000",
+  "background_color": "#1c1c1e",
   "theme_color": "#1c1c1e",
-  "lang": "ar",
-  "dir": "rtl",
-  "id": "com.nabd8.app",
-  "prefer_related_applications": false,
-  "categories": [
-    "news",
-    "sports"
-  ],
   "icons": [
     {
-      "src": "public/icons/icon-192x192.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "public/icons/icon-512x512.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
