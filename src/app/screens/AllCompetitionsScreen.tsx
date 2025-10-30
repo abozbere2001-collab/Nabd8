@@ -167,52 +167,63 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         };
 
         const fetchClubData = async () => {
-             if (!isAdmin && db) {
-                // For regular users, use onSnapshot for managedCompetitions
-                 onSnapshot(collection(db, 'managedCompetitions'), (snapshot) => {
-                    const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetitionType);
-                    setManagedCompetitions(fetchedCompetitions);
-                }, (error) => {
-                     const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
-                        leagueId: l.id,
-                        name: l.name,
-                        logo: l.logo,
-                        countryName: 'World', // A sensible default
-                        countryFlag: null,
-                    }));
-                    setManagedCompetitions(popularAsManaged);
-                });
+             if (db) {
+                 if (isAdmin) {
+                     const cached = getCachedData<CompetitionsCache>(COMPETITIONS_CACHE_KEY);
+                    let serverLastUpdated = 0;
+                    
+                    try {
+                        const cacheBusterRef = doc(db, 'appConfig', 'cache');
+                        const cacheBusterSnap = await getDoc(cacheBusterRef);
+                        serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
+                    } catch (e) { console.warn("Could not check cache-buster."); }
+                    
+                     if (cached?.data?.managedCompetitions && cached.data.managedCompetitions.length > 0 && !forceRefresh && cached.lastFetched > serverLastUpdated) {
+                        setManagedCompetitions(cached.data.managedCompetitions);
+                        return; 
+                    }
+                    try {
+                        const compsSnapshot = await getDocs(collection(db, 'managedCompetitions'));
+                        const fetchedCompetitions = compsSnapshot.docs.map(d => d.data() as Managed-CompetitionType);
+                        setManagedCompetitions(fetchedCompetitions);
+                        setCachedData(COMPETITIONS_CACHE_KEY, { managedCompetitions: fetchedCompetitions, lastFetched: Date.now() });
+                    } catch (error) {
+                         errorEmitter.emit('permission-error', new FirestorePermissionError({
+                            path: 'managedCompetitions',
+                            operation: 'list',
+                        }));
+                    }
+                 } else {
+                    // For regular users, use onSnapshot for real-time updates.
+                    onSnapshot(collection(db, 'managedCompetitions'), (snapshot) => {
+                        const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetitionType);
+                        setManagedCompetitions(fetchedCompetitions);
+                    }, (error) => {
+                         console.error("Firestore 'managedCompetitions' error:", error);
+                         toast({ variant: 'destructive', title: "خطأ", description: "فشل في تحميل البطولات." });
+                         // Fallback to popular leagues if there's an error (e.g., permissions)
+                         const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
+                            leagueId: l.id,
+                            name: l.name,
+                            logo: l.logo,
+                            countryName: 'World', // A sensible default
+                            countryFlag: null,
+                        }));
+                        setManagedCompetitions(popularAsManaged);
+                    });
+                 }
                 return;
             }
 
-            const cached = getCachedData<CompetitionsCache>(COMPETITIONS_CACHE_KEY);
-            let serverLastUpdated = 0;
-            
-            if (db) {
-                try {
-                    const cacheBusterRef = doc(db, 'appConfig', 'cache');
-                    const cacheBusterSnap = await getDoc(cacheBusterRef);
-                    serverLastUpdated = cacheBusterSnap.exists() ? cacheBusterSnap.data().competitionsLastUpdated?.toMillis() : 0;
-                } catch (e) { console.warn("Could not check cache-buster."); }
-            }
-            
-             if (cached?.data?.managedCompetitions && cached.data.managedCompetitions.length > 0 && !forceRefresh && cached.lastFetched > serverLastUpdated) {
-                setManagedCompetitions(cached.data.managedCompetitions);
-                return; 
-            }
-
-            try {
-                if (!db) return;
-                const compsSnapshot = await getDocs(collection(db, 'managedCompetitions'));
-                const fetchedCompetitions = compsSnapshot.docs.map(d => d.data() as ManagedCompetitionType);
-                setManagedCompetitions(fetchedCompetitions);
-                setCachedData(COMPETITIONS_CACHE_KEY, { managedCompetitions: fetchedCompetitions, lastFetched: Date.now() });
-            } catch (error) {
-                 errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: 'managedCompetitions',
-                    operation: 'list',
-                }));
-            }
+            // Fallback for when db is not available.
+            const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
+                leagueId: l.id,
+                name: l.name,
+                logo: l.logo,
+                countryName: 'World',
+                countryFlag: null,
+            }));
+            setManagedCompetitions(popularAsManaged);
         };
 
         await fetchCustomNames();
@@ -661,3 +672,5 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
+    
