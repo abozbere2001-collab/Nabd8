@@ -1,3 +1,4 @@
+
 "use client"; // Error components must be Client Components
 
 import { useEffect } from "react";
@@ -15,6 +16,14 @@ export default function Error({
   useEffect(() => {
     // Log the error to an error reporting service
     console.error(error);
+    
+    // Check if the error is a chunk loading error
+    if (error.message.includes("Failed to fetch") || error.message.includes("Failed to load chunk")) {
+      // This is a common issue after a new deployment.
+      // Reloading the page fetches the latest assets and resolves the error.
+      window.location.reload();
+    }
+
   }, [error]);
 
   return (
