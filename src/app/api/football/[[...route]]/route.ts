@@ -1,5 +1,6 @@
-
 import { NextResponse, type NextRequest } from 'next/server';
+
+export const dynamic = 'force-dynamic'; // ⬅️ هذا السطر يمنع الخطأ في next export
 
 const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
 const API_FOOTBALL_KEY = '75f36f22d689a0a61e777d92bbda1c08';
@@ -22,12 +23,8 @@ export async function GET(
     );
   }
 
-  // Smart Caching Strategy:
-  // - Fixtures by ID are volatile (results update), so always fetch fresh data (no-store).
-  // - Other data (teams, leagues) is more static and can be cached longer.
   const isFixtureById = routePath === 'fixtures' && searchParams.has('id');
   const isVolatileRequest = isFixtureById || routePath.includes('odds') || routePath.includes('players/squads');
-  // Disable caching for fixture lists by date, as they can be very large.
   const isLargeRequest = (routePath === 'fixtures' && searchParams.has('date')) || routePath.includes('players/squads');
   
   const cacheOptions = isFixtureById 
@@ -35,7 +32,6 @@ export async function GET(
     : isLargeRequest 
       ? { cache: 'no-store' as RequestCache }
       : { next: { revalidate: isVolatileRequest ? 60 : 3600 } };
-  
 
   try {
     const apiResponse = await fetch(apiURL, {
