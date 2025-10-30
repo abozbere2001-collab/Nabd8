@@ -31,7 +31,7 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Build with Next.js
-        run: npx next build
+        run: npx next build && npx next export
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
