@@ -9,5 +9,13 @@
   </head>
   <body>
     <h1>مرحبا بك في نبض الملاعب</h1>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(() => console.log('Service Worker registered'))
+          .catch(error => console.error('Service Worker registration failed:', error));
+      }
+    </script>
   </body>
 </html>
