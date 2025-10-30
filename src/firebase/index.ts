@@ -14,7 +14,9 @@ if (!getApps().length) {
   firebaseApp = getApp();
 }
 
-const auth = getAuth(firebaseApp);
+const auth = getAuth(firebaseApp, {
+  authDomain: firebaseConfig.authDomain,
+});
 const firestore = getFirestore(firebaseApp);
 const database = getDatabase(firebaseApp);
 
