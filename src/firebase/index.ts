@@ -8,12 +8,13 @@ import { getDatabase } from 'firebase/database';
 
 // Consolidating config here to ensure the correct values are always used.
 const firebaseConfig = {
-  apiKey: "AIzaSyBFn_bSUTb3e_2nPSj2ODPOgT4V2mTE8vI",
+  apiKey: "AIzaSyDKQK4mfCGlSCwJS7oOdMhJa0SIJAv3nXM",
   authDomain: "nabd-d71ab.firebaseapp.com",
   projectId: "nabd-d71ab",
   storageBucket: "nabd-d71ab.appspot.com",
-  messagingSenderId: "1098402517133",
-  appId: "1:1098402517133:web:961817c76f9c9b7754f152"
+  messagingSenderId: "529236633123",
+  appId: "1:529236633123:web:7d4945daae4d51038e3396",
+  measurementId: "G-X5SY2K798F"
 };
 
 let firebaseApp: FirebaseApp;
