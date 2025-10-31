@@ -2,125 +2,85 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Checks if the request is made by an authenticated user.
-     */
+    // ====== Helper Functions ======
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Checks if the authenticated user's UID matches the provided userId.
-     */
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /**
-     * @description Checks if the requesting user is an admin.
-     */
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-    
-    // User profiles are private
-    match /users/{userId} {
-      allow get, update, delete: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow list: if false;
-    }
-
-    // Publicly readable data, admin writable
-    match /competitions/{competitionId} {
-      allow get, list: if true;
-      allow write: if isAdmin();
-    }
-    match /teams/{teamId} {
-      allow get, list: if true;
-      allow write: if isAdmin();
-    }
-    match /news/{newsId} {
-      allow get, list: if true;
-      allow write: if isAdmin();
-    }
-    match /managedCompetitions/{competitionId} {
-        allow get, list: if true;
-        allow write: if isAdmin();
-    }
-
-    // Publicly readable, not writable by client
-    match /matches/{matchId} {
-      allow get, list: if true;
-      allow write: if false;
-    }
-
-    // Admin collection, only accessible by other admins
-    match /admins/{adminId} {
+    // ====== Admin Override (Full Access) ======
+    match /{path=**} {
       allow read, write: if isAdmin();
     }
 
-    // User-specific private data
-    match /users/{userId}/favorites/data {
-      allow get, write: if isOwner(userId);
-      allow list: if false;
-    }
-	
-    // Customization collections, publicly readable, admin writable
-    match /leagueCustomizations/{leagueId} {
-        allow get, list: if true;
-        allow write: if isAdmin();
-    }
-    match /teamCustomizations/{teamId} {
-        allow get, list: if true;
-        allow write: if isAdmin();
-    }
-    match /playerCustomizations/{playerId} {
-        allow get, list: if true;
-        allow write: if isAdmin();
-    }
-     match /coachCustomizations/{coachId} {
-        allow get, list: if true;
-        allow write: if isAdmin();
-    }
-    match /matchCustomizations/{fixtureId} {
-        allow get, list: if true;
-        allow write: if isAdmin();
-    }
-    match /continentCustomizations/{continentId} {
-        allow get, list: if true;
-        allow write: if isAdmin();
-    }
-    match /countryCustomizations/{countryId} {
-        allow get, list: if true;
-        allow write: if isAdmin();
-    }
-    
-    // Iraqi League special collections, publicly readable, admin writable
-    match /pinnedIraqiMatches/{matchId} {
-      allow get, list: if true;
-      allow write: if isAdmin();
-    }
-    match /iraqiLeagueTopScorers/{scorerId} {
-      allow get, list: if true;
-      allow write: if isAdmin();
+    // ====== Public Data (Read for All, Write for Admin Only) ======
+    match /{collectionName}/{docId} {
+      allow read: if collectionName in [
+        'news',
+        'competitions',
+        'teams',
+        'managedCompetitions',
+        'iraqiLeagueTopScorers',
+        'pinnedIraqiMatches',
+        'leagueCustomizations',
+        'teamCustomizations',
+        'playerCustomizations',
+        'coachCustomizations',
+        'continentCustomizations',
+        'countryCustomizations',
+        'matchCustomizations'
+      ];
+      allow write: if false; // Admin write is covered by the admin override rule above
     }
 
-    // --- Predictions System ---
-    
-    // Pinned matches for predictions are public to everyone
+    // ====== Users Collection ======
+    match /users/{userId} {
+      // Create user profile
+      allow create: if isSignedIn() && isOwner(userId);
+
+      // Read and update own profile
+      allow read, update: if isOwner(userId);
+
+      // ---- Favorites Subcollection ----
+      match /favorites/{favId} {
+        allow read, write: if isOwner(userId) && favId == "data";
+      }
+    }
+
+    // ====== Predictions System ======
     match /predictions/{fixtureId} {
-      allow get, list: if true;
+      // Everyone can read the list of available matches for prediction
+      allow list, read: if true;
+
+      // Only admin can create, update, or delete a prediction fixture
       allow write: if isAdmin();
+
+      // ---- User Predictions Subcollection ----
+      match /userPredictions/{userId} {
+        // User can read their own prediction
+        allow read: if isOwner(userId);
+
+        // User can create or update their prediction ONLY before the match starts
+        allow create, update: if isOwner(userId);
+        
+        // Deletion is only for admins (covered by admin override)
+        allow delete: if false;
+      }
     }
 
-    // User's own prediction is private to them
-    match /predictions/{fixtureId}/userPredictions/{userId} {
-      allow read, write: if isOwner(userId);
-    }
+    // ====== Leaderboard ======
+    match /leaderboard/{docId} {
+      // Everyone can read the leaderboard
+      allow read: if true;
 
-    // Leaderboard is public, but only writable by admins (server-side function)
-    match /leaderboard/{userId} {
-      allow get, list: if true;
+      // Only admin can write to the leaderboard
       allow write: if isAdmin();
     }
   }

@@ -33,321 +33,85 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Checks if the request is made by an authenticated user.
-     * @principal Ensures that only authenticated users can access certain resources.
-     */
+    // ====== Helper Functions ======
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Checks if the authenticated user's UID matches the provided userId.
-     * @param {string} userId - The user ID to compare against the authenticated user's UID.
-     * @returns {boolean} - True if the user is the owner, false otherwise.
-     * @principal Implements user-based access control, ensuring users can only access their own data.
-     */
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-     /**
-      * @description Checks if the authenticated user is an existing owner of the resource
-      * @param {string} userId - The user ID to compare against the authenticated user's UID.
-      * @returns {boolean} - True if the user is the owner and the resource exists, false otherwise.
-      * @principal Prevents modification or deletion of non-existent resources.
-      */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+    // ====== Admin Override (Full Access) ======
+    match /{path=**} {
+      allow read, write: if isAdmin();
     }
 
-    /**
-     * @description Checks if the requesting user is an admin.
-     * @returns {boolean} True if the user is an admin, false otherwise.
-     * @principal Enforces role-based access control, allowing only admins to perform certain actions.
-     */
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    // ====== Public Data (Read for All, Write for Admin Only) ======
+    match /{collectionName}/{docId} {
+      allow read: if collectionName in [
+        'news',
+        'competitions',
+        'teams',
+        'managedCompetitions',
+        'iraqiLeagueTopScorers',
+        'pinnedIraqiMatches',
+        'leagueCustomizations',
+        'teamCustomizations',
+        'playerCustomizations',
+        'coachCustomizations',
+        'continentCustomizations',
+        'countryCustomizations',
+        'matchCustomizations'
+      ];
+      allow write: if false; // Admin write is covered by the admin override rule above
     }
-    
-    /**
-     * @description Rules for user profiles.
-     * @path /users/{userId}
-     * @allow (create) User with ID 'user123' creates their profile with matching userId in the document.
-     * @allow (get, update, delete) Authenticated user with ID 'user123' reads/updates/deletes their profile.
-     * @deny (create, get, update, delete) User with ID 'user456' tries to access profile of user 'user123'.
-     * @principle Enforces document ownership for all operations.
-     */
+
+    // ====== Users Collection ======
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      // Create user profile
+      allow create: if isSignedIn() && isOwner(userId);
+
+      // Read and update own profile
+      allow read, update: if isOwner(userId);
+
+      // ---- Favorites Subcollection ----
+      match /favorites/{favId} {
+        allow read, write: if isOwner(userId) && favId == "data";
+      }
     }
 
-    /**
-     * @description Rules for competitions.
-     * @path /competitions/{competitionId}
-     * @allow (get, list) Any user can read competition data.
-     * @allow (create, update, delete) Only admins can manage competition data.
-     * @deny (create, update, delete) Non-admin users cannot manage competition data.
-     * @principle Public read access with admin-controlled writes.
-     */
-    match /competitions/{competitionId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for teams.
-     * @path /teams/{teamId}
-     * @allow (get, list) Any user can read team data.
-     * @allow (create, update, delete) Only admins can manage team data.
-     * @deny (create, update, delete) Non-admin users cannot manage team data.
-     * @principle Public read access with admin-controlled writes.
-     */
-    match /teams/{teamId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for matches.
-     * @path /matches/{matchId}
-     * @allow (get, list) Any user can read match data.
-     * @deny (create, update, delete) No one can create, update, or delete match data.
-     * @principle Public read access with no write access.
-     */
-    match /matches/{matchId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Rules for news articles.
-     * @path /news/{newsId}
-     * @allow (get, list) Any user can read news articles.
-     * @allow (create, update, delete) Only admins can manage news articles.
-     * @deny (create, update, delete) Non-admin users cannot manage news articles.
-     * @principle Public read access with admin-controlled writes.
-     */
-    match /news/{newsId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for admin user data.
-     * @path /admins/{adminId}
-     * @allow (create, update, delete) Only admins can manage other admin data.
-     * @deny (get, list) Normal users can't read or list admins.
-     * @principle Restricts access to admin data to only admin users.
-     */
-    match /admins/{adminId} {
-      allow get, list: if false;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for user's favorite teams and competitions.
-     * @path /users/{userId}/favorites/data
-     * @allow (get, update, delete) Authenticated user with ID 'user123' reads/updates/deletes their favorites.
-     * @deny (create, get, update, delete) User with ID 'user456' tries to access favorites of user 'user123'.
-     * @principle Enforces document ownership for all operations.
-     */
-    match /users/{userId}/favorites/data {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
-    }
-	
-	/**
-     * @description Rules for top competitions.
-     * @path /topCompetitions/{competitionId}
-     * @allow (get, list) Any user can read competition data.
-     * @allow (create, update, delete) Only admins can manage competition data.
-     * @deny (create, update, delete) Non-admin users cannot manage competition data.
-     * @principle Public read access with admin-controlled writes.
-     */
-    match /topCompetitions/{competitionId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for top teams.
-     * @path /topTeams/{teamId}
-     * @allow (get, list) Any user can read team data.
-     * @allow (create, update, delete) Only admins can manage team data.
-     * @deny (create, update, delete) Non-admin users cannot manage team data.
-     * @principle Public read access with admin-controlled writes.
-     */
-    match /topTeams/{teamId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for league customizations.
-     * @path /leagueCustomizations/{leagueId}
-     * @allow (get, list) Any user can read league customization data.
-     * @allow (create, update, delete) Only admins can manage league customization data.
-     * @deny (create, update, delete) Non-admin users cannot manage league customization data.
-     * @principle Admin-controlled writes.
-     */
-    match /leagueCustomizations/{leagueId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for team customizations.
-     * @path /teamCustomizations/{teamId}
-     * @allow (get, list) Any user can read team customization data.
-     * @allow (create, update, delete) Only admins can manage team customization data.
-     * @deny (create, update, delete) Non-admin users cannot manage team customization data.
-     * @principle Admin-controlled writes.
-     */
-    match /teamCustomizations/{teamId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for player customizations.
-     * @path /playerCustomizations/{playerId}
-     * @allow (get, list) Any user can read player customization data.
-     * @allow (create, update, delete) Only admins can manage player customization data.
-     * @deny (create, update, delete) Non-admin users cannot manage player customization data.
-     * @principle Admin-controlled writes.
-     */
-    match /playerCustomizations/{playerId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for match customizations.
-     * @path /matchCustomizations/{fixtureId}
-     * @allow (get, list) Any user can read match customization data.
-     * @allow (create, update, delete) Only admins can manage match customization data.
-     * @deny (create, update, delete) Non-admin users cannot manage match customization data.
-     * @principle Admin-controlled writes.
-     */
-    match /matchCustomizations/{fixtureId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for continent customizations.
-     * @path /continentCustomizations/{continentId}
-     * @allow (get, list) Any user can read continent customization data.
-     * @allow (create, update, delete) Only admins can manage continent customization data.
-     * @deny (create, update, delete) Non-admin users cannot manage continent customization data.
-     * @principle Admin-controlled writes.
-     */
-    match /continentCustomizations/{continentId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for country customizations.
-     * @path /countryCustomizations/{countryId}
-     * @allow (get, list) Any user can read country customization data.
-     * @allow (create, update, delete) Only admins can manage country customization data.
-     * @deny (create, update, delete) Non-admin users cannot manage country customization data.
-     * @principle Admin-controlled writes.
-     */
-    match /countryCustomizations/{countryId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Rules for pinned Iraqi matches.
-     * @path /pinnedIraqiMatches/{matchId}
-     * @allow (get, list) Any user can read pinned Iraqi match data.
-     * @allow (create, update, delete) Only admins can manage pinned Iraqi match data.
-     * @deny (create, update, delete) Non-admin users cannot manage pinned Iraqi match data.
-     */
-    match /pinnedIraqiMatches/{matchId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-   /**
-     * @description Rules for Iraqi League Top Scorers.
-     * @path /iraqiLeagueTopScorers
-     * @allow (get, list) Any user can read Iraqi League Top Scorers data.
-     * @deny (create, update, delete) No one can create, update, or delete Iraqi League Top Scorers data.
-     * @principle Public read access with no write access.
-     */
-    match /iraqiLeagueTopScorers {
-      allow get, list: if true;
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Rules for admin-pinned prediction matches.
-     * @path /predictions/{fixtureId}
-     * @allow (get, list) Anyone (including unauthenticated users) can read and list prediction matches.
-     * @allow (create, update, delete) Only admins can manage prediction matches.
-     * @principle Public read with admin-controlled writes.
-     */
+    // ====== Predictions System ======
     match /predictions/{fixtureId} {
-      allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      // Everyone can read the list of available matches for prediction
+      allow list, read: if true;
+
+      // Only admin can create, update, or delete a prediction fixture
+      allow write: if isAdmin();
+
+      // ---- User Predictions Subcollection ----
+      match /userPredictions/{userId} {
+        // User can read their own prediction
+        allow read: if isOwner(userId);
+
+        // User can create or update their prediction ONLY before the match starts
+        allow create, update: if isOwner(userId);
+        
+        // Deletion is only for admins (covered by admin override)
+        allow delete: if false;
+      }
     }
 
-    /**
-     * @description Rules for individual user predictions.
-     * @path /predictions/{fixtureId}/userPredictions/{userId}
-     * @allow (create, get, update, delete) A user can manage their own prediction.
-     * @principle User ownership.
-     */
-    match /predictions/{fixtureId}/userPredictions/{userId} {
-      allow read, write: if isOwner(userId);
-    }
+    // ====== Leaderboard ======
+    match /leaderboard/{docId} {
+      // Everyone can read the leaderboard
+      allow read: if true;
 
-    /**
-     * @description Rules for the leaderboard.
-     * @path /leaderboard/{userId}
-     * @allow (get, list) Anyone can read the leaderboard.
-     * @allow (create, update, delete) Only admins can write to the leaderboard (scores are calculated server-side).
-     * @principle Public read access, admin-only writes.
-     */
-    match /leaderboard/{userId} {
-      allow get, list: if true;
+      // Only admin can write to the leaderboard
       allow write: if isAdmin();
     }
   }
