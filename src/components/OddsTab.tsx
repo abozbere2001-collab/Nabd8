@@ -183,3 +183,5 @@ export function OddsTab({ fixtureId }: { fixtureId: number }) {
         </Card>
     );
 }
+
+    

@@ -274,3 +274,5 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
     </div>
   );
 }
+
+    

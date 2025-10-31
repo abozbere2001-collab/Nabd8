@@ -234,5 +234,3 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
 }
 
     
-
-    

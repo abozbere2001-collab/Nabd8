@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -185,3 +184,5 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
 };
 
 export default PredictionCard;
+
+    
