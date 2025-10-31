@@ -1,11 +1,7 @@
 {
-  "short_name": "نبض",
   "name": "نبض الملاعب",
-  "description": "تطبيق رياضي يعرض تشكيلات الملاعب ومحتوى كروي بصري",
-  "start_url": "/",
-  "display": "standalone",
-  "theme_color": "#1c1c1e",
-  "background_color": "#ffffff",
+  "short_name": "نبض الملاعب",
+  "description": "عالم كرة القدم بين يديك. تابع المباريات والأخبار والتوقعات.",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -17,5 +13,10 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "theme_color": "#0d0d0d",
+  "background_color": "#0d0d0d",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait"
 }
