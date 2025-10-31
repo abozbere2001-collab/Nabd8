@@ -36,6 +36,9 @@ interface GroupedFixtures {
 
 const popularLeagueIds = new Set(POPULAR_LEAGUES.slice(0, 15).map(l => l.id));
 
+const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
+// The key has been removed from here to avoid conflicts. It's now only in the server-side proxy which is not used in the static build.
+
 
 // Fixtures List Component
 const FixturesList = React.memo((props: { 
@@ -344,9 +347,18 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             return defaultName;
         };
 
-        const url = activeTab === 'all-matches' ? '/api/football/fixtures?live=all' : `/api/football/fixtures?date=${dateKey}`;
-        const response = await fetch(url, { signal: abortSignal });
-        if (!response.ok) throw new Error(`Failed to fetch fixtures`);
+        const endpoint = activeTab === 'all-matches' ? `https://${API_FOOTBALL_HOST}/fixtures?live=all` : `https://${API_FOOTBALL_HOST}/fixtures?date=${dateKey}`;
+        const response = await fetch(endpoint, { 
+          signal: abortSignal,
+          headers: {
+            'x-rapidapi-host': API_FOOTBALL_HOST,
+            'x-rapidapi-key': '75f36f22d689a0a61e777d92bbda1c08',
+          },
+        });
+        if (!response.ok) {
+            console.error('API fetch error:', response.status, await response.text());
+            throw new Error(`Failed to fetch fixtures`);
+        }
         
         const data = await response.json();
         if (abortSignal.aborted) return;
@@ -382,7 +394,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
       } catch (error) {
           if ((error as Error).name !== 'AbortError') {
-            console.error("Failed to fetch and process data:", error);
+            toast({
+                variant: "destructive",
+                title: "خطأ في الشبكة",
+                description: "فشل في تحميل المباريات. يرجى التحقق من اتصالك بالإنترنت.",
+            });
             setMatchesCache(prev => new Map(prev).set(dateKey, []));
           }
       } finally {
@@ -390,7 +406,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             setLoading(false);
           }
       }
-  }, [db, activeTab, user, favorites, customNamesCache, fetchAllCustomNames]);
+  }, [db, activeTab, user, favorites, customNamesCache, fetchAllCustomNames, toast]);
 
 
   useEffect(() => {
@@ -528,3 +544,4 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   );
 }
 
+    

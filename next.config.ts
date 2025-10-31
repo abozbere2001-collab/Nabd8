@@ -1,3 +1,4 @@
+
 import type { NextConfig } from 'next';
 import withPWA from 'next-pwa';
 
@@ -23,7 +24,7 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
       {
-        protocol: 'https',
+        protocol: 'https'
         hostname: 'picsum.photos',
         pathname: '/**',
       },
@@ -48,3 +49,5 @@ const config =
     : nextConfig;
 
 export default config;
+
+    
