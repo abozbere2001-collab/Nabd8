@@ -48,7 +48,6 @@ const pwaConfig = {
   dest: 'public',
   register: true,
   skipWaiting: true,
-  buildExcludes: [/app-build-manifest\.json$/],
 };
 
 const withPWAConfig = withPWA(pwaConfig);
