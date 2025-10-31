@@ -26,7 +26,7 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { isMatchLive } from '@/lib/matchStatus';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
-const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
 
 // --- Caching Logic ---
 const CACHE_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -720,7 +720,3 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
-
-    
-
-    
