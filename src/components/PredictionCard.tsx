@@ -15,6 +15,7 @@ import { ar } from 'date-fns/locale';
 import { PredictionOdds } from './PredictionOdds';
 import { LiveMatchStatus } from './LiveMatchStatus';
 import { Loader2 } from 'lucide-react';
+import { isMatchLive } from '@/lib/matchStatus';
 
 const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
 const API_HOST = "v3.football.api-sports.io";
@@ -29,8 +30,8 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
     const debouncedHome = useDebounce(homeValue, 500);
     const debouncedAway = useDebounce(awayValue, 500);
 
-    const isMatchLiveOrFinished = useMemo(() => ['LIVE', '1H', 'HT', '2H', 'ET', 'BT', 'P', 'FT', 'AET', 'PEN'].includes(liveFixture.fixture.status.short), [liveFixture]);
-    const isMatchFinished = useMemo(() => ['FT', 'AET', 'PEN'].includes(liveFixture.fixture.status.short), [liveFixture]);
+    const isMatchLiveOrFinished = useMemo(() => isMatchLive(liveFixture.fixture.status) || ['FT', 'AET', 'PEN'].includes(liveFixture.fixture.status.short), [liveFixture.fixture.status]);
+    const isMatchFinished = useMemo(() => ['FT', 'AET', 'PEN'].includes(liveFixture.fixture.status.short), [liveFixture.fixture.status]);
     const isPredictionDisabled = useMemo(() => new Date(liveFixture.fixture.timestamp * 1000) < new Date(), [liveFixture]);
 
     // Fetch live data for the match
@@ -40,7 +41,7 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
         const fetchLiveFixture = async () => {
             setIsUpdating(true);
             try {
-                const res = await fetch(`https://${API_HOST}/fixtures?id=${liveFixture.fixture.id}`, {
+                const res = await fetch(`https://v3.football.api-sports.io/fixtures?id=${liveFixture.fixture.id}`, {
                     headers: { 'x-rapidapi-key': API_KEY }
                 });
                 const data = await res.json();
@@ -54,13 +55,14 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
             }
         };
 
-        if (isMatchLiveOrFinished && !isMatchFinished) {
-            fetchLiveFixture(); 
-            intervalId = setInterval(fetchLiveFixture, 60000);
-        } else {
-             if (['NS', 'TBD'].includes(predictionMatch.fixtureData.fixture.status.short) && new Date(predictionMatch.fixtureData.fixture.timestamp * 1000) < new Date()) {
-                fetchLiveFixture();
-             }
+        const shouldPoll = isMatchLive(liveFixture.fixture.status);
+        
+        if (shouldPoll) {
+            fetchLiveFixture(); // Fetch immediately
+            intervalId = setInterval(fetchLiveFixture, 60000); // Then poll every 60 seconds
+        } else if (new Date(liveFixture.fixture.timestamp * 1000) < new Date() && !isMatchFinished) {
+            // If the match should have started but status is not live, check once.
+            fetchLiveFixture();
         }
 
         return () => {
@@ -68,11 +70,11 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
                 clearInterval(intervalId);
             }
         };
-    }, [liveFixture.fixture.id, isMatchLiveOrFinished, isMatchFinished, predictionMatch.fixtureData.fixture.status.short, predictionMatch.fixtureData.fixture.timestamp]);
+    }, [liveFixture.fixture.id, liveFixture.fixture.status, isMatchFinished, liveFixture.fixture.timestamp]);
 
 
     const getPredictionStatusColors = useCallback(() => {
-        if (!isMatchLiveOrFinished || !userPrediction) {
+        if (!isMatchFinished || !userPrediction) {
             return "bg-card text-foreground";
         }
 
@@ -95,7 +97,7 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
         }
 
         return "bg-destructive/80 text-white";
-    }, [isMatchLiveOrFinished, userPrediction, liveFixture.goals]);
+    }, [isMatchFinished, userPrediction, liveFixture.goals]);
     
     const getPointsColor = useCallback(() => {
         if (!isMatchFinished || userPrediction?.points === undefined) return 'text-primary';
