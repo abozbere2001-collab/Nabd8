@@ -55,30 +55,19 @@ const FixturesList = React.memo((props: {
     onPinToggle: (fixture: FixtureType) => void,
 }) => {
     
-    const { favoriteTeamMatches, otherFixtures } = useMemo(() => {
-        let favoriteTeamMatches: FixtureType[] = [];
-        let otherFixtures: FixtureType[] = [];
-
-        if (props.activeTab === 'my-results') {
-             props.fixtures.forEach(f => {
-                if (props.favoritedTeamIds.includes(f.teams.home.id) || props.favoritedTeamIds.includes(f.teams.away.id)) {
-                    favoriteTeamMatches.push(f);
-                } else if (props.favoritedLeagueIds.includes(f.league.id)) {
-                    otherFixtures.push(f);
-                }
-            });
-        } else {
-            // For 'all-matches' tab, show all fixtures
-            otherFixtures = props.fixtures;
-        }
-
-        return { favoriteTeamMatches, otherFixtures };
-
+    const favoriteFixtures = useMemo(() => {
+        if (props.activeTab !== 'my-results') return [];
+        return props.fixtures.filter(f => 
+            props.favoritedTeamIds.includes(f.teams.home.id) ||
+            props.favoritedTeamIds.includes(f.teams.away.id) ||
+            props.favoritedLeagueIds.includes(f.league.id)
+        );
     }, [props.fixtures, props.activeTab, props.favoritedTeamIds, props.favoritedLeagueIds]);
 
+    const fixturesToDisplay = props.activeTab === 'my-results' ? favoriteFixtures : props.fixtures;
 
-    const groupedOtherFixtures = useMemo(() => {
-        return otherFixtures.reduce((acc, fixture) => {
+    const groupedFixtures = useMemo(() => {
+        return fixturesToDisplay.reduce((acc, fixture) => {
             const leagueName = fixture.league.name;
             if (!acc[leagueName]) {
                 acc[leagueName] = { league: fixture.league, fixtures: [] };
@@ -86,7 +75,7 @@ const FixturesList = React.memo((props: {
             acc[leagueName].fixtures.push(fixture);
             return acc;
         }, {} as GroupedFixtures);
-    }, [otherFixtures]);
+    }, [fixturesToDisplay]);
 
 
     if (props.loading) {
@@ -107,7 +96,7 @@ const FixturesList = React.memo((props: {
         );
     }
     
-    const noMatches = props.fixtures.length === 0 || (props.activeTab === 'my-results' && favoriteTeamMatches.length === 0 && otherFixtures.length === 0);
+    const noMatches = fixturesToDisplay.length === 0;
 
     if (noMatches) {
         const message = props.activeTab === 'my-results'
@@ -120,32 +109,12 @@ const FixturesList = React.memo((props: {
         );
     }
     
-    const sortedLeagues = Object.keys(groupedOtherFixtures).sort((a,b) => a.localeCompare(b));
+    const sortedLeagues = Object.keys(groupedFixtures).sort((a,b) => a.localeCompare(b));
 
     return (
         <div className="space-y-4">
-            {props.activeTab === 'my-results' && favoriteTeamMatches.length > 0 && (
-                 <div>
-                    <div className="font-semibold text-foreground py-1 px-3 rounded-md bg-card border flex items-center gap-2 text-xs h-6">
-                        <Star className="h-4 w-4 text-yellow-400" />
-                        <span className="truncate">مباريات فرقك المفضلة</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1">
-                        {favoriteTeamMatches.map(f => (
-                            <FixtureItem 
-                                key={f.fixture.id} 
-                                fixture={f} 
-                                navigate={props.navigate}
-                                isPinnedForPrediction={props.pinnedPredictionMatches.has(f.fixture.id)}
-                                onPinToggle={props.onPinToggle}
-                            />
-                        ))}
-                    </div>
-                </div>
-            )}
-
             {sortedLeagues.map(leagueName => {
-                const { league, fixtures: leagueFixtures } = groupedOtherFixtures[leagueName];
+                const { league, fixtures: leagueFixtures } = groupedFixtures[leagueName];
                 return (
                     <div key={`${league.id}-${league.name}`}>
                        <div className="font-semibold text-foreground py-1 px-3 rounded-md bg-card border flex items-center gap-2 text-xs h-6 cursor-pointer" onClick={() => props.navigate('CompetitionDetails', { leagueId: league.id, title: league.name, logo: league.logo })}>
@@ -546,5 +515,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     
 
     
+
 
 
