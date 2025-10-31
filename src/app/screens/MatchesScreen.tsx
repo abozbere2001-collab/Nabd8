@@ -38,7 +38,7 @@ interface GroupedFixtures {
 const popularLeagueIds = new Set(POPULAR_LEAGUES.slice(0, 15).map(l => l.id));
 
 const API_HOST = 'v3.football.api-sports.io';
-const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+const API_KEY = "e931ffb3ccda478e60b74c6e36913c90";
 
 
 // Fixtures List Component
@@ -273,7 +273,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   useEffect(() => {
     if (!db || !isAdmin) return;
-    const unsub = onSnapshot(collection(db, 'predictions'), (snapshot) => {
+    const unsub = onSnapshot(collection(db, 'predictionFixtures'), (snapshot) => {
         const newPinnedSet = new Set<number>();
         snapshot.forEach(doc => newPinnedSet.add(Number(doc.id)));
         setPinnedPredictionMatches(newPinnedSet);
@@ -288,7 +288,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     if (!db) return;
     const fixtureId = fixture.fixture.id;
     const isPinned = pinnedPredictionMatches.has(fixtureId);
-    const docRef = doc(db, 'predictions', String(fixtureId));
+    const docRef = doc(db, 'predictionFixtures', String(fixtureId));
 
     if (isPinned) {
         deleteDoc(docRef).then(() => {
@@ -544,3 +544,6 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+
+    

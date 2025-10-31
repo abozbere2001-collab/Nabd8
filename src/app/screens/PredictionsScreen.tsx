@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -215,7 +214,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         }
         
         setLoadingMatches(true);
-        const q = query(collection(db, 'predictions'));
+        const q = query(collection(db, 'predictionFixtures'));
         const unsub = onSnapshot(q, (snapshot) => {
             const matches = snapshot.docs.map(doc => ({
                 id: doc.id,
@@ -225,7 +224,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             setLoadingMatches(false);
         }, (err) => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: 'predictions',
+                path: 'predictionFixtures',
                 operation: 'list'
             }));
             setLoadingMatches(false);
@@ -247,7 +246,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             
             const predictionPromises = pinnedMatches.map(match => {
                 if (!match.id) return Promise.resolve();
-                const userPredictionRef = doc(db, 'predictions', match.id, 'userPredictions', user.uid);
+                const userPredictionRef = doc(db, 'predictionFixtures', match.id, 'userPredictions', user.uid);
                 return getDoc(userPredictionRef).then(predDoc => {
                     if (predDoc.exists()) {
                         newPredictions[match.id] = predDoc.data() as Prediction;
@@ -307,7 +306,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         const awayGoals = parseInt(awayGoalsStr, 10);
         if (isNaN(homeGoals) || isNaN(awayGoals)) return;
     
-        const predictionRef = doc(db, 'predictions', String(fixtureId), 'userPredictions', user.uid);
+        const predictionRef = doc(db, 'predictionFixtures', String(fixtureId), 'userPredictions', user.uid);
         
         const predictionData: Prediction = {
             userId: user.uid,
@@ -340,7 +339,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             const userPointsMap = new Map<string, number>();
 
             // Get all predictions from all pinned matches
-            const predictionsSnapshot = await getDocs(collection(db, "predictions"));
+            const predictionsSnapshot = await getDocs(collection(db, "predictionFixtures"));
             
             for (const pinnedMatchDoc of predictionsSnapshot.docs) {
                 const pinnedMatch = { id: pinnedMatchDoc.id, ...pinnedMatchDoc.data() as PredictionMatch };
@@ -350,7 +349,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                 const isFinished = ['FT', 'AET', 'PEN'].includes(fixture.fixture.status.short);
 
                 if (isFinished) {
-                    const userPredictionsSnapshot = await getDocs(collection(db, 'predictions', pinnedMatch.id, 'userPredictions'));
+                    const userPredictionsSnapshot = await getDocs(collection(db, 'predictionFixtures', pinnedMatch.id, 'userPredictions'));
                     userPredictionsSnapshot.forEach(userPredDoc => {
                         const userPrediction = userPredDoc.data() as Prediction;
                         const userId = userPrediction.userId;
@@ -477,3 +476,6 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     );
 };
 
+
+
+    
