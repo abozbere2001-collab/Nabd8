@@ -273,7 +273,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
   useEffect(() => {
     if (!db || !isAdmin) return;
-    const unsub = onSnapshot(collection(db, 'predictionFixtures'), (snapshot) => {
+    const unsub = onSnapshot(collection(db, 'predictions'), (snapshot) => {
         const newPinnedSet = new Set<number>();
         snapshot.forEach(doc => newPinnedSet.add(Number(doc.id)));
         setPinnedPredictionMatches(newPinnedSet);
@@ -288,7 +288,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     if (!db) return;
     const fixtureId = fixture.fixture.id;
     const isPinned = pinnedPredictionMatches.has(fixtureId);
-    const docRef = doc(db, 'predictionFixtures', String(fixtureId));
+    const docRef = doc(db, 'predictions', String(fixtureId));
 
     if (isPinned) {
         deleteDoc(docRef).then(() => {
@@ -539,6 +539,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    
 
     
 
