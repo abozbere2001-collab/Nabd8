@@ -37,7 +37,7 @@ interface GroupedFixtures {
 
 const popularLeagueIds = new Set(POPULAR_LEAGUES.slice(0, 15).map(l => l.id));
 
-const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
+const API_HOST = 'v3.football.api-sports.io';
 const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
 
 
@@ -348,11 +348,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             return defaultName;
         };
 
-        const endpoint = activeTab === 'all-matches' ? `https://${API_FOOTBALL_HOST}/fixtures?live=all` : `https://${API_FOOTBALL_HOST}/fixtures?date=${dateKey}`;
+        const endpoint = activeTab === 'all-matches' ? `https://${API_HOST}/fixtures?live=all` : `https://${API_HOST}/fixtures?date=${dateKey}`;
         const response = await fetch(endpoint, { 
           signal: abortSignal,
           headers: {
-            'x-rapidapi-host': API_FOOTBALL_HOST,
+            'x-rapidapi-host': API_HOST,
             'x-rapidapi-key': API_KEY,
           },
         });
@@ -544,5 +544,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-
-    

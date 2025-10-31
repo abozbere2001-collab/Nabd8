@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -28,6 +29,9 @@ import PredictionCard from '@/components/PredictionCard';
 import { FootballIcon } from '@/components/icons/FootballIcon';
 import { cn } from '@/lib/utils';
 import {Skeleton} from "@/components/ui/skeleton";
+
+const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+const API_HOST = "v3.football.api-sports.io";
 
 
 const CrownedTeamScroller = ({
@@ -95,8 +99,8 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
             if (!teamId) return;
             setLoading(true);
             try {
-                const url = `/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
-                const res = await fetch(url);
+                const url = `https://${API_HOST}/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
+                const res = await fetch(url, { headers: { 'x-rapidapi-key': API_KEY }});
                 if (!res.ok) throw new Error(`API fetch failed with status: ${res.status}`);
                 
                 const data = await res.json();
@@ -274,5 +278,3 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    

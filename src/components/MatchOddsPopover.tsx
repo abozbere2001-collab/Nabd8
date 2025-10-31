@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -53,6 +54,10 @@ interface ProcessedOdds {
     awayTeamLogo: string;
 }
 
+const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+const API_HOST = "v3.football.api-sports.io";
+
+
 export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
     const [odds, setOdds] = useState<ProcessedOdds | null>(null);
     const [loading, setLoading] = useState(false);
@@ -63,8 +68,8 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
 
         setLoading(true);
         Promise.all([
-            fetch(`/api/football/odds?fixture=${fixtureId}&bookmaker=8`), // Bet365
-            fetch(`/api/football/fixtures?id=${fixtureId}`)
+            fetch(`https://${API_HOST}/odds?fixture=${fixtureId}&bookmaker=8`, { headers: { 'x-rapidapi-key': API_KEY } }),
+            fetch(`https://${API_HOST}/fixtures?id=${fixtureId}`, { headers: { 'x-rapidapi-key': API_KEY } })
         ])
         .then(async ([oddsRes, fixtureRes]) => {
             if (!oddsRes.ok || !fixtureRes.ok) {

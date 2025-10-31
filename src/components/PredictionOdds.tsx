@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -39,6 +40,10 @@ interface ProcessedOdds {
     away: number;
 }
 
+const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+const API_HOST = "v3.football.api-sports.io";
+
+
 export function PredictionOdds({ fixtureId }: { fixtureId: number }) {
     const [odds, setOdds] = useState<ProcessedOdds | null>(null);
     const [loading, setLoading] = useState(true);
@@ -47,7 +52,9 @@ export function PredictionOdds({ fixtureId }: { fixtureId: number }) {
         let isMounted = true;
         setLoading(true);
 
-        fetch(`/api/football/odds?fixture=${fixtureId}&bookmaker=8`)
+        fetch(`https://${API_HOST}/odds?fixture=${fixtureId}&bookmaker=8`, {
+             headers: { 'x-rapidapi-key': API_KEY }
+        })
             .then(res => {
                 if (!res.ok) throw new Error('Failed to fetch odds');
                 return res.json();
