@@ -9,7 +9,7 @@ import { FirebaseClientProvider } from '@/firebase';
 export const metadata: Metadata = {
   title: 'نبض الملاعب',
   description: 'عالم كرة القدم بين يديك',
-  manifest: '/manifest.json',
+  manifest: '/manifest.json', // Explicitly setting the manifest path
 };
 
 const cairo = Cairo({
@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
         <head>
-          <link rel="manifest" href="/manifest.json" />
+          {/* The manifest link is now handled by the Metadata object, this is another way to ensure it's included */}
         </head>
         <body className={`${cairo.variable} font-body antialiased`}>
             <ThemeProvider

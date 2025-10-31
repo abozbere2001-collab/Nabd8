@@ -41,6 +41,7 @@ const pwaConfig = {
   dest: 'public',
   register: true,
   skipWaiting: true,
+  // The manifest path is automatically resolved by next-pwa to /manifest.json, so no need to specify it here.
 };
 
 const config =
@@ -49,5 +50,3 @@ const config =
     : nextConfig;
 
 export default config;
-
-    
