@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { NabdAlMalaebLogo } from '@/components/icons/NabdAlMalaebLogo';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
-import { GoogleAuthProvider, signInWithPopup, signInAnonymously } from "firebase/auth";
+import { GoogleAuthProvider, signInWithRedirect, signInAnonymously, getRedirectResult } from "firebase/auth";
 import { auth, useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -13,35 +13,46 @@ import { handleNewUser } from '@/lib/firebase-client';
 export function WelcomeScreen() {
   const { toast } = useToast();
   const { db } = useFirestore();
+  const [isLoading, setIsLoading] = useState(true); // Start with loading true to handle redirect result
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGuestLoading, setIsGuestLoading] = useState(false);
   
+  useEffect(() => {
+    const checkRedirect = async () => {
+      if (!db) return;
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          await handleNewUser(result.user, db);
+          // Auth state change will handle navigation
+        }
+      } catch (error: any) {
+        console.error("Google redirect login error:", error);
+        toast({
+          variant: 'destructive',
+          title: 'خطأ في تسجيل الدخول',
+          description: 'حدث خطأ أثناء محاولة تسجيل الدخول باستخدام جوجل.',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    checkRedirect();
+  }, [db, toast]);
+  
+
   const handleGoogleLogin = async () => {
     if (!db) return;
     setIsGoogleLoading(true);
+    setIsLoading(true);
     const provider = new GoogleAuthProvider();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      if (result.user) {
-        await handleNewUser(result.user, db);
-      }
-      // onAuthStateChanged will handle navigation to the main app
-    } catch (error: any) {
-      console.error("Google login error:", error);
-      toast({
-        variant: 'destructive',
-        title: 'خطأ في تسجيل الدخول',
-        description: error.code === 'auth/popup-closed-by-user' 
-          ? 'تم إغلاق نافذة تسجيل الدخول.'
-          : 'حدث خطأ أثناء محاولة تسجيل الدخول باستخدام جوجل.',
-      });
-    } finally {
-      setIsGoogleLoading(false);
-    }
+    // Instead of signInWithPopup, we use signInWithRedirect
+    await signInWithRedirect(auth, provider);
   };
 
   const handleGuestLogin = async () => {
     setIsGuestLoading(true);
+    setIsLoading(true);
     try {
         await signInAnonymously(auth);
         // onAuthStateChanged will handle the rest.
@@ -53,10 +64,20 @@ export function WelcomeScreen() {
             description: 'فشل تسجيل الدخول كزائر. يرجى المحاولة مرة أخرى.',
         });
         setIsGuestLoading(false);
+        setIsLoading(false);
     }
   }
 
-  const isLoading = isGoogleLoading || isGuestLoading;
+  const anyLoading = isLoading || isGoogleLoading || isGuestLoading;
+
+  if(isLoading && !isGuestLoading && !isGoogleLoading) {
+      return (
+           <div className="flex h-full flex-col items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="mt-4 text-muted-foreground">جاري التحقق من تسجيل الدخول...</p>
+           </div>
+      )
+  }
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -70,7 +91,7 @@ export function WelcomeScreen() {
               onClick={handleGoogleLogin} 
               className="w-full" 
               size="lg"
-              disabled={isLoading}
+              disabled={anyLoading}
             >
               {isGoogleLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -85,7 +106,7 @@ export function WelcomeScreen() {
                 variant="ghost"
                 onClick={handleGuestLogin}
                 className="w-full"
-                disabled={isLoading}
+                disabled={anyLoading}
             >
                {isGuestLoading ? <Loader2 className="h-5 w-5 animate-spin"/> : 'تصفح كزائر'}
             </Button>
