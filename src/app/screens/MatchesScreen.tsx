@@ -320,7 +320,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         let url;
         if (activeTab === 'all-matches') {
             const leagueIds = Array.from(popularLeagueIds).join('-');
-            url = `https://v3.football.api-sports.io/fixtures?live=${leagueIds}`;
+            url = `https://v3.football.api-sports.io/fixtures?live=all`;
         } else {
             url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}`;
         }
@@ -397,8 +397,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   
   useEffect(() => {
-      if (isVisible && selectedDateKey) {
-          const cacheKey = activeTab === 'all-matches' ? 'live' : selectedDateKey;
+      if (isVisible && (selectedDateKey || activeTab === 'all-matches')) {
+          const cacheKey = activeTab === 'all-matches' ? 'live' : selectedDateKey!;
           
           if (matchesCache.has(cacheKey)) {
              setLoading(false);
@@ -406,7 +406,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
           }
 
           const controller = new AbortController();
-          fetchAndProcessData(selectedDateKey, controller.signal);
+          fetchAndProcessData(selectedDateKey || formatDateKey(new Date()), controller.signal);
           return () => controller.abort();
       }
   }, [activeTab, isVisible, selectedDateKey, fetchAndProcessData, matchesCache]);
@@ -509,3 +509,4 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
