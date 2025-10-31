@@ -11,6 +11,8 @@ import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 
 const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
+const API_HOST = "v3.football.api-sports.io";
+
 
 // --- TYPE DEFINITIONS ---
 interface OddValue {
@@ -62,8 +64,8 @@ export function OddsTab({ fixtureId }: { fixtureId: number }) {
         setLoading(true);
 
         Promise.all([
-            fetch(`/api/football/odds?fixture=${fixtureId}`, { headers: { 'x-rapidapi-key': API_KEY } }),
-            fetch(`/api/football/fixtures?id=${fixtureId}`, { headers: { 'x-rapidapi-key': API_KEY } })
+            fetch(`https://${API_HOST}/odds?fixture=${fixtureId}`, { headers: { 'x-rapidapi-key': API_KEY } }),
+            fetch(`https://${API_HOST}/fixtures?id=${fixtureId}`, { headers: { 'x-rapidapi-key': API_KEY } })
         ])
         .then(async ([oddsRes, fixtureRes]) => {
             if (!oddsRes.ok || !fixtureRes.ok) {
@@ -182,3 +184,5 @@ export function OddsTab({ fixtureId }: { fixtureId: number }) {
         </Card>
     );
 }
+
+    

@@ -7,14 +7,8 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/football/:path*',
-        destination: 'https://v3.football.api-sports.io/:path*',
-      },
-    ];
-  },
 };
 
 export default nextConfig;
+
+    

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from '@/components/ui/button';
-import { Search, Star, Pencil, Loader2 } from 'lucide-react';
+import { Search, Star, Pencil, Loader2, Crown } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { ScreenProps } from '@/app/page';
@@ -19,13 +20,17 @@ import { useAdmin, useAuth, useFirestore } from '@/firebase/provider';
 import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, writeBatch, deleteField, onSnapshot, updateDoc } from 'firebase/firestore';
 import { RenameDialog } from '@/components/RenameDialog';
 import { cn } from '@/lib/utils';
-import type { Favorites, AdminFavorite, ManagedCompetition, Team } from '@/lib/types';
+import type { Favorites, AdminFavorite, ManagedCompetition, Team, CrownedTeam } from '@/lib/types';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { useToast } from '@/hooks/use-toast';
 import { POPULAR_TEAMS, POPULAR_LEAGUES } from '@/lib/popular-data';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
+
+const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
+const API_HOST = "v3.football.api-sports.io";
+
 
 // --- Types ---
 interface TeamResult {
@@ -38,7 +43,7 @@ interface LeagueResult {
 type Item = TeamResult['team'] | LeagueResult['league'];
 type ItemType = 'teams' | 'leagues';
 type SearchResult = (TeamResult & { type: 'team' }) | (LeagueResult & { type: 'league' });
-type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status';
+type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coach' | 'status' | 'crown';
 
 interface SearchableItem {
     id: number;
@@ -82,7 +87,7 @@ const normalizeArabic = (text: string) => {
 };
 
 
-const ItemRow = ({ item, itemType, isFavorited, onFavoriteToggle, onResultClick, onRename, isAdmin }: { item: Item, itemType: ItemType, isFavorited: boolean, onFavoriteToggle: (item: Item) => void, onResultClick: () => void, onRename: () => void, isAdmin: boolean }) => {
+const ItemRow = ({ item, itemType, isFavorited, isCrowned, onFavoriteToggle, onCrownToggle, onResultClick, onRename, isAdmin }: { item: Item, itemType: ItemType, isFavorited: boolean, isCrowned: boolean, onFavoriteToggle: (item: Item, itemType: ItemType) => void, onCrownToggle: (item: Item) => void, onResultClick: () => void, onRename: () => void, isAdmin: boolean }) => {
   return (
     <div className="flex items-center gap-2 p-1.5 border-b last:border-b-0 hover:bg-accent/50 rounded-md">
        <div className="flex-1 flex items-center gap-2 cursor-pointer" onClick={onResultClick}>
@@ -92,14 +97,21 @@ const ItemRow = ({ item, itemType, isFavorited, onFavoriteToggle, onResultClick,
             </Avatar>
             <div className="flex-1 font-semibold truncate text-sm">{item.name}</div>
         </div>
-      {isAdmin && (
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onRename}>
-            <Pencil className="h-4 w-4 text-muted-foreground" />
-        </Button>
-      )}
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onFavoriteToggle(item)}>
-        <Star className={cn("h-5 w-5 text-muted-foreground/60", isFavorited && "fill-current text-yellow-400")} />
-      </Button>
+        <div className="flex items-center">
+            {isAdmin && (
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onRename(); }}>
+                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                </Button>
+            )}
+            {itemType === 'teams' && (
+                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onCrownToggle(item); }}>
+                    <Crown className={cn("h-5 w-5 text-muted-foreground/60", isCrowned && "fill-current text-yellow-400")} />
+                </Button>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onFavoriteToggle(item, itemType); }}>
+                <Star className={cn("h-5 w-5 text-muted-foreground/60", isFavorited && "fill-current text-yellow-400")} />
+            </Button>
+        </div>
     </div>
   );
 }
@@ -120,7 +132,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   const { toast } = useToast();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   
-  const [renameItem, setRenameItem] = useState<{ id: string | number; name: string; note?: string; type: RenameType; purpose: 'rename' | 'note'; originalData?: any; } | null>(null);
+  const [renameItem, setRenameItem] = useState<{ id: string | number; name: string; note?: string; type: RenameType; purpose: 'rename' | 'note' | 'crown'; originalData?: any; } | null>(null);
 
   const [localSearchIndex, setLocalSearchIndex] = useState<SearchableItem[]>([]);
   
@@ -134,16 +146,12 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     let customLeagueNames = new Map<number, string>();
 
     if(db) {
-        try {
-            const [teamsSnap, leaguesSnap] = await Promise.all([
-                getDocs(collection(db, 'teamCustomizations')),
-                getDocs(collection(db, 'leagueCustomizations'))
-            ]);
-            teamsSnap.forEach(doc => customTeamNames.set(Number(doc.id), doc.data().customName));
-            leaguesSnap.forEach(doc => customLeagueNames.set(Number(doc.id), doc.data().customName));
-        } catch (e) {
-            console.warn("Could not fetch custom names for index.");
-        }
+        const [teamsSnap, leaguesSnap] = await Promise.all([
+            getDocs(collection(db, 'teamCustomizations')).catch(()=>null),
+            getDocs(collection(db, 'leagueCustomizations')).catch(()=>null)
+        ]);
+        teamsSnap?.forEach(doc => customTeamNames.set(Number(doc.id), doc.data().customName));
+        leaguesSnap?.forEach(doc => customLeagueNames.set(Number(doc.id), doc.data().customName));
     }
 
     const getName = (type: 'team' | 'league', id: number, defaultName: string) => {
@@ -189,9 +197,12 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
         buildLocalIndex();
         
         let unsubscribe: (() => void) | null = null;
-        if (user) {
-            if (!db) return;
-            const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
+        const handleLocalFavoritesChange = () => {
+            setFavorites(getLocalFavorites());
+        };
+
+        if (user && db && !user.isAnonymous) {
+             const favoritesRef = doc(db, 'users', user.uid, 'favorites', 'data');
             unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
             }, (error) => {
@@ -201,12 +212,15 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
                 });
                 errorEmitter.emit('permission-error', permissionError);
             });
+            window.removeEventListener('localFavoritesChanged', handleLocalFavoritesChange);
         } else {
-            setFavorites(getLocalFavorites());
+             setFavorites(getLocalFavorites());
+             window.addEventListener('localFavoritesChanged', handleLocalFavoritesChange);
         }
 
         return () => {
             if (unsubscribe) unsubscribe();
+            window.removeEventListener('localFavoritesChanged', handleLocalFavoritesChange);
         }
     }
   }, [isOpen, user, db, buildLocalIndex]);
@@ -238,8 +252,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     );
 
     const apiSearchPromises = [
-      fetch(`/api/football/teams?search=${query}`).then(res => res.ok ? res.json() : { response: [] }),
-      fetch(`/api/football/leagues?search=${query}`).then(res => res.ok ? res.json() : { response: [] })
+      fetch(`https://${API_HOST}/teams?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY } }).then(res => res.ok ? res.json() : { response: [] }),
+      fetch(`https://${API_HOST}/leagues?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY } }).then(res => res.ok ? res.json() : { response: [] })
     ];
     
     try {
@@ -295,13 +309,12 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 }, [localSearchIndex]);
 
 
-    const handleFavorite = useCallback((item: Item) => {
-        const isLeague = !('national' in item);
+    const handleFavorite = useCallback((item: Item, itemType: ItemType) => {
         const itemId = item.id;
+        const isLeague = itemType === 'leagues';
 
-        if (user && db) {
+        if (user && db && !user.isAnonymous) {
             const favDocRef = doc(db, 'users', user.uid, 'favorites', 'data');
-            const itemType = isLeague ? 'leagues' : 'teams';
             const isCurrentlyFavorited = !!favorites[itemType]?.[itemId];
             const fieldPath = `${itemType}.${itemId}`;
             
@@ -320,22 +333,50 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
 
         } else { // Guest user
             const currentFavorites = getLocalFavorites();
-            const newFavorites = JSON.parse(JSON.stringify(currentFavorites));
-            const itemType: 'leagues' | 'teams' = isLeague ? 'leagues' : 'teams';
-            if (!newFavorites[itemType]) newFavorites[itemType] = {};
+            if (!currentFavorites[itemType]) {
+                currentFavorites[itemType] = {};
+            }
             
-            if (newFavorites[itemType]?.[itemId]) {
-                delete newFavorites[itemType]![itemId];
+            if (currentFavorites[itemType]?.[itemId]) {
+                delete currentFavorites[itemType]![itemId];
             } else {
                 const favData = isLeague 
                     ? { name: item.name, leagueId: itemId, logo: item.logo }
                     : { name: item.name, teamId: itemId, logo: item.logo, type: (item as Team).national ? 'National' : 'Club' };
-                newFavorites[itemType]![itemId] = favData;
+                currentFavorites[itemType]![itemId] = favData as any;
             }
-            setLocalFavorites(newFavorites);
-            setFavorites(newFavorites);
+            setLocalFavorites(currentFavorites);
         }
     }, [user, db, favorites]);
+
+  const handleCrownToggle = (item: Item) => {
+    const team = item as Team;
+    if (!user || user.isAnonymous) {
+        toast({title: 'مستخدم زائر', description: 'يرجى تسجيل الدخول لاستخدام هذه الميزة.'});
+        return;
+    }
+    if (!db) return;
+    const favRef = doc(db, 'users', user.uid, 'favorites', 'data');
+    const fieldPath = `crownedTeams.${team.id}`;
+    const isCrowned = !!favorites.crownedTeams?.[team.id];
+
+    let updateData;
+    if (isCrowned) {
+        updateData = { [fieldPath]: deleteField() };
+    } else {
+        const crownedTeamData: CrownedTeam = {
+            teamId: team.id,
+            name: team.name,
+            logo: team.logo,
+            note: '',
+        };
+        updateData = { [fieldPath]: crownedTeamData };
+    }
+    
+    updateDoc(favRef, updateData).catch(err => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({path: favRef.path, operation: 'update', requestResourceData: updateData}));
+    });
+  }
 
 
   const handleResultClick = (result: SearchableItem) => {
@@ -398,9 +439,21 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
             {!debouncedSearchTerm && <h3 className="font-bold text-md text-center text-muted-foreground">{itemType === 'teams' ? 'الفرق الأكثر شعبية' : 'البطولات الأكثر شعبية'}</h3>}
             {itemsToRender.map(result => {
                 const isFavorited = !!favorites[result.type]?.[result.id];
+                const isCrowned = result.type === 'teams' && !!favorites.crownedTeams?.[result.id];
                 const displayName = getDisplayName(result.type.slice(0, -1) as 'team'|'league', result.id, result.name);
 
-                return <ItemRow key={`${result.type}-${result.id}`} item={{...result.originalItem, name: displayName}} itemType={result.type} isFavorited={isFavorited} onFavoriteToggle={handleFavorite} onResultClick={() => handleResultClick(result)} isAdmin={isAdmin} onRename={() => handleOpenRename(result.type as RenameType, result.id, result.originalItem)} />;
+                return <ItemRow 
+                            key={`${result.type}-${result.id}`} 
+                            item={{...result.originalItem, name: displayName}} 
+                            itemType={result.type} 
+                            isFavorited={isFavorited} 
+                            isCrowned={isCrowned}
+                            onFavoriteToggle={handleFavorite} 
+                            onCrownToggle={handleCrownToggle}
+                            onResultClick={() => handleResultClick(result)} 
+                            isAdmin={isAdmin} 
+                            onRename={() => handleOpenRename(result.type as RenameType, result.id, result.originalItem)} 
+                        />;
             })}
         </div>
     )
@@ -445,4 +498,5 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   );
 }
 
+    
     

@@ -39,6 +39,7 @@ interface GroupedFixtures {
 const popularLeagueIds = new Set(POPULAR_LEAGUES.slice(0, 15).map(l => l.id));
 
 const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
+const API_HOST = "v3.football.api-sports.io";
 
 
 // Fixtures List Component
@@ -319,9 +320,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         
         let url;
         if (activeTab === 'all-matches') {
-            url = `/api/football/fixtures?live=all`;
+            url = `https://${API_HOST}/fixtures?live=all`;
         } else {
-            url = `/api/football/fixtures?date=${dateKey}`;
+            url = `https://${API_HOST}/fixtures?date=${dateKey}`;
         }
         
         const response = await fetch(url, { 
@@ -508,3 +509,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    
