@@ -34,8 +34,8 @@ service cloud.firestore {
     // --------------------------
     // المفضلات (Favorites)
     // --------------------------
-    match /favorites/{favoriteId} {
-      allow read, write: if request.auth.uid == favoriteId;
+    match /users/{userId}/favorites/data {
+      allow read, write: if request.auth.uid == userId;
     }
 
     // --------------------------
@@ -67,12 +67,25 @@ service cloud.firestore {
      match /coachCustomizations/{coachId} {
         allow read: if request.auth != null;
     }
+     match /matchCustomizations/{fixtureId} {
+        allow read: if request.auth != null;
+     }
 
     // --------------------------
-    // بيانات المباريات
+    // بيانات المباريات والتوقعات
     // --------------------------
     match /matches/{matchId} {
         allow read: if true;
+    }
+     match /predictions/{fixtureId} {
+      allow list, read: if true;
+    }
+    match /predictions/{fixtureId}/userPredictions/{userId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+     match /leaderboard/{userId} {
+      allow read: if true;
+      allow write: if request.auth.uid == userId;
     }
   }
 }

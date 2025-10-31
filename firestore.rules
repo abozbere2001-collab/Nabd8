@@ -12,13 +12,13 @@
  * - /users/{userId}/favorites/data: User's favorite teams and competitions. Only the user can read/write their own favorites.
  * - /predictions/{fixtureId}: Matches pinned by admins for user prediction; publicly readable.
  * - /predictions/{fixtureId}/userPredictions/{userId}: Individual user predictions for a match. Only the user can read/write their own predictions.
- * - /leaderboard/{userId}: Aggregated prediction scores for each user. Only the user can read/write their own score.
+ * - /leaderboard/{userId}: Aggregated prediction scores for each user. Publicly readable.
  *
  * Key Security Decisions:
- * - Public read access is granted to /competitions, /teams, /matches and /news.
+ * - Public read access is granted to /competitions, /teams, /matches, /news, and /predictions.
  * - Users can only access their own data under the /users/{userId} collection.
  * - Predictions are stored under /predictions/{fixtureId}/userPredictions/{userId} and only accessible by the user making the prediction.
- * - Admin access is not currently enforced.
+ * - Admin access is not currently enforced in this simplified ruleset, but the structure allows for it.
  *
  * Denormalization for Authorization:
  *  - The current rules do not require denormalization. If access control becomes more complex (e.g., shared access to predictions), consider denormalizing access control data (e.g., list of authorized user IDs) onto the relevant documents.
@@ -161,23 +161,18 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows a user to read and write their own leaderboard score.
+     * @description Allows anyone to read leaderboard scores. Only users can write their own score.
      * @path /leaderboard/{userId}
-     * @allow (create) - User with UID 'user123' can create their leaderboard score if request.auth.uid == 'user123'.
-     * @allow (get, update, delete) - User with UID 'user123' can read/update/delete their leaderboard score if request.auth.uid == 'user123'.
-     * @deny (create) - User with UID 'user456' cannot create a leaderboard score with userId 'user123'.
-     * @deny (get, update, delete) - User with UID 'user456' cannot read/update/delete the leaderboard score with userId 'user123'.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, list) - Any user can read the data.
+     * @allow (create, update, delete) - User can manage their own score.
+     * @principle Public read access, with per-user write control.
      */
     match /leaderboard/{userId} {
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow get, list: if true;
+      allow create, update, delete: if isOwner(userId);
     }
   }
 }

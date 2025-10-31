@@ -23,7 +23,7 @@
  *
  * @key_security_decisions
  * - User data is strictly private, accessible only to the authenticated user.
- * - Public data (competitions, teams, matches, news) is publicly readable but admin-managed.
+ * - Public data (competitions, teams, matches, news, predictions) is publicly readable but admin-managed where appropriate.
  * - Admin privileges are determined by the existence of a document in `/admins/{adminId}`.
  * - List operations are allowed only where explicitly permitted.
  *
@@ -315,6 +315,40 @@ service cloud.firestore {
     match /iraqiLeagueTopScorers {
       allow get, list: if true;
       allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Rules for admin-pinned prediction matches.
+     * @path /predictions/{fixtureId}
+     * @allow (get, list) Any signed-in user can read and list prediction matches.
+     * @allow (create, update, delete) Only admins can manage prediction matches.
+     * @principle Public read with admin-controlled writes.
+     */
+    match /predictions/{fixtureId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Rules for individual user predictions.
+     * @path /predictions/{fixtureId}/userPredictions/{userId}
+     * @allow (create, get, update, delete) A user can manage their own prediction.
+     * @principle User ownership.
+     */
+    match /predictions/{fixtureId}/userPredictions/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    /**
+     * @description Rules for the leaderboard.
+     * @path /leaderboard/{userId}
+     * @allow (get, list) Anyone can read the leaderboard.
+     * @allow (create, update, delete) Only admins can write to the leaderboard (scores are calculated server-side).
+     * @principle Public read access, admin-only writes.
+     */
+    match /leaderboard/{userId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
     }
   }
 }
