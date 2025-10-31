@@ -39,7 +39,7 @@ export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActio
         {title ? (
             <h1 className="text-md font-bold truncate">{title}</h1>
         ) : (
-            <NabdAlMalaebLogo className="h-8" />
+            <h1 className="text-md font-bold truncate">نبض الملاعب</h1>
         )}
       </div>
 

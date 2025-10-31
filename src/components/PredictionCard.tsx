@@ -186,5 +186,3 @@ const PredictionCard = ({ predictionMatch, userPrediction, onSave }: { predictio
 };
 
 export default PredictionCard;
-
-    
