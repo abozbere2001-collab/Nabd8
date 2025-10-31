@@ -2,12 +2,10 @@
 import type { NextConfig } from 'next';
 import withPWA from 'next-pwa';
 
-// Determine if the environment is GitHub Pages
-const isGithubActions = process.env.GITHUB_ACTIONS || false;
-const repo = 'Nabd8'; // Your repository name
-
-const assetPrefix = isGithubActions ? `/${repo}/` : '';
-const basePath = isGithubActions ? `/${repo}` : '';
+// Since the app is deployed to GitHub Pages, the repo name is needed for the path.
+const repo = 'Nabd8';
+const assetPrefix = `/${repo}/`;
+const basePath = `/${repo}`;
 
 const nextConfig: NextConfig = {
   output: 'export',
@@ -50,12 +48,12 @@ const pwaConfig = {
   dest: 'public',
   register: true,
   skipWaiting: true,
+  buildExcludes: [/app-build-manifest\.json$/],
 };
 
-// Apply PWA settings only in production
-const config =
-  process.env.NODE_ENV === 'production'
-    ? withPWA(pwaConfig)(nextConfig)
-    : nextConfig;
+const withPWAConfig = withPWA(pwaConfig);
+
+// Apply PWA settings
+const config = withPWAConfig(nextConfig);
 
 export default config;

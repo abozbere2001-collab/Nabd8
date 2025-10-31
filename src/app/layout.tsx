@@ -6,10 +6,13 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Cairo } from 'next/font/google';
 import { FirebaseClientProvider } from '@/firebase';
 
+const APP_URL = "https://abozbere2001-collab.github.io/Nabd8";
+
 export const metadata: Metadata = {
   title: 'نبض الملاعب',
   description: 'عالم كرة القدم بين يديك',
-  manifest: '/manifest.json', // Explicitly setting the manifest path
+  manifest: `${APP_URL}/manifest.json`,
+  metadataBase: new URL(APP_URL),
 };
 
 const cairo = Cairo({
@@ -26,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
         <head>
-          {/* The manifest link is now handled by the Metadata object, this is another way to ensure it's included */}
+          {/* The manifest link is now handled by the Metadata object */}
         </head>
         <body className={`${cairo.variable} font-body antialiased`}>
             <ThemeProvider
