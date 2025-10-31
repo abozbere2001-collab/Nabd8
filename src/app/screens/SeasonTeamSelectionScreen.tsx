@@ -19,6 +19,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FixedSizeList as List } from 'react-window';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
+const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+
 interface SeasonTeamSelectionScreenProps extends ScreenProps {
     leagueId: number;
     leagueName: string;
@@ -69,7 +71,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
         setLoading(true);
         const fetchTeams = async () => {
             try {
-                const res = await fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`);
+                const res = await fetch(`https://v3.football.api-sports.io/teams?league=${leagueId}&season=${CURRENT_SEASON}`, { headers: { 'x-rapidapi-key': API_KEY } });
                 const data = await res.json();
                 const rawTeams = data.response || [];
                 const translatedTeams = rawTeams.map((teamData: { team: Team }) => ({
@@ -230,5 +232,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
         </div>
     );
 }
+
+    
 
     

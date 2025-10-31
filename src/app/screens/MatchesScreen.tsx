@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -37,7 +38,7 @@ interface GroupedFixtures {
 const popularLeagueIds = new Set(POPULAR_LEAGUES.slice(0, 15).map(l => l.id));
 
 const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
-// The key has been removed from here to avoid conflicts. It's now only in the server-side proxy which is not used in the static build.
+const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
 
 
 // Fixtures List Component
@@ -352,7 +353,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
           signal: abortSignal,
           headers: {
             'x-rapidapi-host': API_FOOTBALL_HOST,
-            'x-rapidapi-key': '75f36f22d689a0a61e777d92bbda1c08',
+            'x-rapidapi-key': API_KEY,
           },
         });
         if (!response.ok) {

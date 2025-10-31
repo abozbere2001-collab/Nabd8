@@ -24,6 +24,8 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { LeagueHeaderItem } from '@/components/LeagueHeaderItem';
 import { POPULAR_LEAGUES } from '@/lib/popular-data';
 
+const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+
 // --- Persistent Cache Logic ---
 const COMPETITIONS_CACHE_KEY = 'goalstack_competitions_cache';
 const COUNTRIES_CACHE_KEY = 'goalstack_countries_cache';
@@ -184,7 +186,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     }
                     try {
                         const compsSnapshot = await getDocs(collection(db, 'managedCompetitions'));
-                        const fetchedCompetitions = compsSnapshot.docs.map(d => d.data() as Managed-CompetitionType);
+                        const fetchedCompetitions = compsSnapshot.docs.map(d => d.data() as ManagedCompetitionType);
                         setManagedCompetitions(fetchedCompetitions);
                         setCachedData(COMPETITIONS_CACHE_KEY, { managedCompetitions: fetchedCompetitions, lastFetched: Date.now() });
                     } catch (error) {
@@ -347,7 +349,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             if (cachedCountries?.data) {
                 countries = cachedCountries.data;
             } else {
-                const countriesRes = await fetch('/api/football/countries');
+                const countriesRes = await fetch('https://v3.football.api-sports.io/countries', { headers: { 'x-rapidapi-key': API_KEY }});
                 if (!countriesRes.ok) throw new Error('Failed to fetch countries');
                 const countriesData = await countriesRes.json();
                 countries = countriesData.response || [];
@@ -355,7 +357,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
 
             const teamPromises = countries.map(country => 
-                fetch(`/api/football/teams?country=${country.name}`)
+                fetch(`https://v3.football.api-sports.io/teams?country=${country.name}`, { headers: { 'x-rapidapi-key': API_KEY }})
                     .then(res => res.ok ? res.json() : { response: [] })
                     .then(data => (data.response || []).filter((r: { team: Team }) => r.team.national).map((r: { team: Team}) => r.team))
                     .catch(() => []) // return empty array on error for a specific country
@@ -672,5 +674,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
+    
 
     
