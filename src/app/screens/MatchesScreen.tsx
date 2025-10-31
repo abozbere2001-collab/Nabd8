@@ -47,26 +47,13 @@ const FixturesList = React.memo((props: {
     loading: boolean,
     activeTab: string, 
     hasAnyFavorites: boolean,
-    favoritedLeagueIds: number[],
-    favoritedTeamIds: number[],
     navigate: ScreenProps['navigate'],
     pinnedPredictionMatches: Set<number>,
     onPinToggle: (fixture: FixtureType) => void,
 }) => {
     
-    const favoriteFixtures = useMemo(() => {
-        if (props.activeTab !== 'my-results') return [];
-        return props.fixtures.filter(f => 
-            props.favoritedTeamIds.includes(f.teams.home.id) ||
-            props.favoritedTeamIds.includes(f.teams.away.id) ||
-            props.favoritedLeagueIds.includes(f.league.id)
-        );
-    }, [props.fixtures, props.activeTab, props.favoritedTeamIds, props.favoritedLeagueIds]);
-
-    const fixturesToDisplay = props.activeTab === 'my-results' ? favoriteFixtures : props.fixtures;
-
     const groupedFixtures = useMemo(() => {
-        return fixturesToDisplay.reduce((acc, fixture) => {
+        return props.fixtures.reduce((acc, fixture) => {
             const leagueName = fixture.league.name;
             if (!acc[leagueName]) {
                 acc[leagueName] = { league: fixture.league, fixtures: [] };
@@ -74,7 +61,7 @@ const FixturesList = React.memo((props: {
             acc[leagueName].fixtures.push(fixture);
             return acc;
         }, {} as GroupedFixtures);
-    }, [fixturesToDisplay]);
+    }, [props.fixtures]);
 
 
     if (props.loading) {
@@ -95,7 +82,7 @@ const FixturesList = React.memo((props: {
         );
     }
     
-    const noMatches = fixturesToDisplay.length === 0;
+    const noMatches = props.fixtures.length === 0;
 
     if (noMatches) {
         const message = props.activeTab === 'my-results'
@@ -222,17 +209,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const { toast } = useToast();
   const [favorites, setFavorites] = useState<Partial<Favorites>>({});
   const [activeTab, setActiveTab] = useState<TabName>('my-results');
-  const [renameItem, setRenameItem] = useState<{ type: RenameType, id: number, name: string, originalName?: string } | null>(null);
-
   
-  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  const [selectedDateKey, setSelectedDateKey] = useState<string>(formatDateKey(new Date()));
   
-  useEffect(() => {
-    if (!selectedDateKey && typeof window !== 'undefined') {
-      setSelectedDateKey(formatDateKey(new Date()));
-    }
-  }, [selectedDateKey]);
-
   const [matchesCache, setMatchesCache] = useState<Map<string, FixtureType[]>>(new Map());
   const [loading, setLoading] = useState(true);
     
@@ -319,10 +298,21 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         
         let url;
         if (activeTab === 'all-matches') {
-            const leagueIds = Array.from(popularLeagueIds).join('-');
             url = `https://v3.football.api-sports.io/fixtures?live=all`;
         } else {
-            url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}`;
+             const { teams, leagues } = getLocalFavorites();
+             const teamIds = Object.keys(teams || {});
+             const leagueIds = Object.keys(leagues || {});
+
+             // If user has favorites, fetch by their favorites.
+             if (teamIds.length > 0 || leagueIds.length > 0) {
+                 const leagueQuery = `league=${leagueIds.join('-')}`;
+                 url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${leagueQuery}`;
+             } else {
+                // If no favorites, fetch by all popular leagues to provide some data
+                 const popularLeaguesQuery = `league=${Array.from(popularLeagueIds).join('-')}`;
+                 url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${popularLeaguesQuery}`;
+             }
         }
         
         const response = await fetch(url, { 
@@ -372,7 +362,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             setLoading(false);
           }
       }
-  }, [db, activeTab, user, customNamesCache, fetchAllCustomNames, toast]);
+  }, [activeTab, customNamesCache, fetchAllCustomNames, toast]);
 
 
   useEffect(() => {
@@ -391,14 +381,19 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         });
         return () => unsubscribe();
     } else {
+        const handleLocalFavoritesChange = () => {
+            setFavorites(getLocalFavorites());
+        };
         setFavorites(getLocalFavorites());
+        window.addEventListener('localFavoritesChanged', handleLocalFavoritesChange);
+        return () => window.removeEventListener('localFavoritesChanged', handleLocalFavoritesChange);
     }
   }, [user, db]);
   
   
   useEffect(() => {
       if (isVisible && (selectedDateKey || activeTab === 'all-matches')) {
-          const cacheKey = activeTab === 'all-matches' ? 'live' : selectedDateKey!;
+          const cacheKey = activeTab === 'all-matches' ? 'live' : selectedDateKey;
           
           if (matchesCache.has(cacheKey)) {
              setLoading(false);
@@ -406,7 +401,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
           }
 
           const controller = new AbortController();
-          fetchAndProcessData(selectedDateKey || formatDateKey(new Date()), controller.signal);
+          fetchAndProcessData(selectedDateKey, controller.signal);
           return () => controller.abort();
       }
   }, [activeTab, isVisible, selectedDateKey, fetchAndProcessData, matchesCache]);
@@ -420,16 +415,19 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     const tabValue = value as TabName;
     setActiveTab(tabValue);
     
-    // Reset date to today when switching to 'live' tab
-    if (tabValue === 'all-matches') {
-        setSelectedDateKey(formatDateKey(new Date()));
+    // Reset date to today and invalidate live cache when switching
+    if (tabValue === 'my-results') {
+        setMatchesCache(prev => {
+            const newCache = new Map(prev);
+            newCache.delete('live');
+            return newCache;
+        })
     }
+    
   };
   
-  const currentFavorites = (user && !user.isAnonymous) ? favorites : getLocalFavorites();
-  const favoritedTeamIds = useMemo(() => currentFavorites?.teams ? Object.keys(currentFavorites.teams).map(Number) : [], [currentFavorites.teams]);
-  const favoritedLeagueIds = useMemo(() => currentFavorites?.leagues ? Object.keys(currentFavorites.leagues).map(Number) : [], [currentFavorites.leagues]);
-  const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
+  const currentFavorites = favorites;
+  const hasAnyFavorites = (Object.keys(currentFavorites.teams || {}).length > 0 || Object.keys(currentFavorites.leagues || {}).length > 0);
   
   const cacheKey = activeTab === 'all-matches' ? 'live' : selectedDateKey || '';
   const currentFixtures = matchesCache.get(cacheKey) || [];
@@ -461,7 +459,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                         ))}
                     </TabsList>
                 </div>
-                 {selectedDateKey && activeTab === 'my-results' && (
+                 {activeTab === 'my-results' && (
                      <div className="relative bg-card py-2 border-x border-b rounded-b-lg shadow-md -mt-1">
                         <DateScroller selectedDateKey={selectedDateKey} onDateSelect={handleDateChange} />
                         <Button 
@@ -477,36 +475,19 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                  )}
             </div>
             
-            <TabsContent value="my-results" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0" hidden={activeTab !== 'my-results'}>
-                <FixturesList 
-                    fixtures={currentFixtures}
-                    loading={loading}
-                    activeTab={activeTab}
-                    favoritedLeagueIds={favoritedLeagueIds}
-                    favoritedTeamIds={favoritedTeamIds}
-                    hasAnyFavorites={hasAnyFavorites}
-                    navigate={navigate}
-                    pinnedPredictionMatches={pinnedPredictionMatches}
-                    onPinToggle={handlePinToggle}
-                />
-            </TabsContent>
-            
-            <TabsContent value="all-matches" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0" hidden={activeTab !== 'all-matches'}>
+            <div className="flex-1 overflow-y-auto p-1 space-y-4 mt-4">
                  <FixturesList 
                     fixtures={currentFixtures}
                     loading={loading}
                     activeTab={activeTab}
-                    favoritedLeagueIds={favoritedLeagueIds}
-                    favoritedTeamIds={favoritedTeamIds}
                     hasAnyFavorites={hasAnyFavorites}
                     navigate={navigate}
                     pinnedPredictionMatches={pinnedPredictionMatches}
                     onPinToggle={handlePinToggle}
                 />
-            </TabsContent>
+            </div>
 
         </Tabs>
     </div>
   );
 }
-
