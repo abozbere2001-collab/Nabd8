@@ -172,6 +172,39 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
         const fetchClubData = async () => {
              if (db) {
+                 const handleSnapshot = (snapshot: any) => {
+                    const fetchedCompetitions = snapshot.docs.map((doc: any) => doc.data() as ManagedCompetitionType);
+                    if (fetchedCompetitions.length > 0) {
+                        setManagedCompetitions(fetchedCompetitions);
+                        if (isAdmin) {
+                            setCachedData(COMPETITIONS_CACHE_KEY, { managedCompetitions: fetchedCompetitions, lastFetched: Date.now() });
+                        }
+                    } else {
+                        // Fallback to popular leagues if firestore collection is empty
+                        const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
+                            leagueId: l.id,
+                            name: l.name,
+                            logo: l.logo,
+                            countryName: 'World', // A sensible default
+                            countryFlag: null,
+                        }));
+                        setManagedCompetitions(popularAsManaged);
+                    }
+                };
+
+                const handleError = (error: any) => {
+                    console.error("Firestore 'managedCompetitions' error:", error);
+                    toast({ variant: 'destructive', title: "خطأ", description: "فشل في تحميل البطولات." });
+                    const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
+                        leagueId: l.id,
+                        name: l.name,
+                        logo: l.logo,
+                        countryName: 'World',
+                        countryFlag: null,
+                    }));
+                    setManagedCompetitions(popularAsManaged);
+                };
+
                  if (isAdmin) {
                      const cached = getCachedData<CompetitionsCache>(COMPETITIONS_CACHE_KEY);
                     let serverLastUpdated = 0;
@@ -188,33 +221,16 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     }
                     try {
                         const compsSnapshot = await getDocs(collection(db, 'managedCompetitions'));
-                        const fetchedCompetitions = compsSnapshot.docs.map(d => d.data() as ManagedCompetitionType);
-                        setManagedCompetitions(fetchedCompetitions);
-                        setCachedData(COMPETITIONS_CACHE_KEY, { managedCompetitions: fetchedCompetitions, lastFetched: Date.now() });
+                        handleSnapshot(compsSnapshot);
                     } catch (error) {
                          errorEmitter.emit('permission-error', new FirestorePermissionError({
                             path: 'managedCompetitions',
                             operation: 'list',
                         }));
+                        handleError(error);
                     }
                  } else {
-                    // For regular users, use onSnapshot for real-time updates.
-                    onSnapshot(collection(db, 'managedCompetitions'), (snapshot) => {
-                        const fetchedCompetitions = snapshot.docs.map(doc => doc.data() as ManagedCompetitionType);
-                        setManagedCompetitions(fetchedCompetitions);
-                    }, (error) => {
-                         console.error("Firestore 'managedCompetitions' error:", error);
-                         toast({ variant: 'destructive', title: "خطأ", description: "فشل في تحميل البطولات." });
-                         // Fallback to popular leagues if there's an error (e.g., permissions)
-                         const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
-                            leagueId: l.id,
-                            name: l.name,
-                            logo: l.logo,
-                            countryName: 'World', // A sensible default
-                            countryFlag: null,
-                        }));
-                        setManagedCompetitions(popularAsManaged);
-                    });
+                    onSnapshot(collection(db, 'managedCompetitions'), handleSnapshot, handleError);
                  }
                 return;
             }
@@ -676,6 +692,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
-
-    
-    
