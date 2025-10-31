@@ -40,7 +40,7 @@ interface ProcessedOdds {
     away: number;
 }
 
-const API_KEY = process.env.API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
 
 
 
@@ -52,7 +52,7 @@ export function PredictionOdds({ fixtureId }: { fixtureId: number }) {
         let isMounted = true;
         setLoading(true);
 
-        fetch(`/api/football/odds?fixture=${fixtureId}&bookmaker=8`, {
+        fetch(`https://v3.football.api-sports.io/odds?fixture=${fixtureId}&bookmaker=8`, {
              headers: { 'x-rapidapi-key': API_KEY! }
         })
             .then(res => {

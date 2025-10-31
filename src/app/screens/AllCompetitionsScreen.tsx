@@ -24,7 +24,7 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { LeagueHeaderItem } from '@/components/LeagueHeaderItem';
 import { POPULAR_LEAGUES } from '@/lib/popular-data';
 
-const API_KEY = process.env.API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
 
 
 // --- Persistent Cache Logic ---
@@ -369,7 +369,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             if (cachedCountries?.data) {
                 countries = cachedCountries.data;
             } else {
-                const countriesRes = await fetch(`/api/football/countries`, { headers: { 'x-rapidapi-key': API_KEY! }});
+                const countriesRes = await fetch(`https://v3.football.api-sports.io/countries`, { headers: { 'x-rapidapi-key': API_KEY! }});
                 if (!countriesRes.ok) throw new Error('Failed to fetch countries');
                 const countriesData = await countriesRes.json();
                 countries = countriesData.response || [];
@@ -377,7 +377,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
 
             const teamPromises = countries.map(country => 
-                fetch(`/api/football/teams?country=${country.name}`, { headers: { 'x-rapidapi-key': API_KEY! }})
+                fetch(`https://v3.football.api-sports.io/teams?country=${country.name}`, { headers: { 'x-rapidapi-key': API_KEY! }})
                     .then(res => res.ok ? res.json() : { response: [] })
                     .then(data => (data.response || []).filter((r: { team: Team }) => r.team.national).map((r: { team: Team}) => r.team))
                     .catch(() => []) // return empty array on error for a specific country
