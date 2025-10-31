@@ -26,6 +26,7 @@ import { POPULAR_LEAGUES } from '@/lib/popular-data';
 import { useToast } from '@/hooks/use-toast';
 import { RenameDialog } from '@/components/RenameDialog';
 import { LeagueHeaderItem } from '@/components/LeagueHeaderItem';
+import { CURRENT_SEASON } from '@/lib/constants';
 
 
 interface GroupedFixtures {
@@ -38,7 +39,7 @@ interface GroupedFixtures {
 const popularLeagueIds = new Set(POPULAR_LEAGUES.slice(0, 15).map(l => l.id));
 
 const API_HOST = 'v3.football.api-sports.io';
-const API_KEY = "e931ffb3ccda478e60b74c6e36913c90";
+const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
 
 
 // Fixtures List Component
@@ -330,9 +331,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   }, [customNamesCache, db]);
 
 
-  const fetchAndProcessData = useCallback(async (dateKey: string, abortSignal: AbortSignal) => {
+  const fetchAndProcessData = useCallback(async (abortSignal: AbortSignal) => {
     setLoading(true);
-      
+    
     try {
         await fetchAllCustomNames(abortSignal);
 
@@ -347,33 +348,47 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
             return defaultName;
         };
-
-        const endpoint = activeTab === 'all-matches' ? `https://${API_HOST}/fixtures?live=all` : `https://${API_HOST}/fixtures?date=${dateKey}`;
-        const response = await fetch(endpoint, { 
-          signal: abortSignal,
-          headers: {
-            'x-rapidapi-host': API_HOST,
-            'x-rapidapi-key': API_KEY,
-          },
-        });
-        if (!response.ok) {
-            console.error('API fetch error:', response.status, await response.text());
-            throw new Error(`Failed to fetch fixtures`);
-        }
         
-        const data = await response.json();
-        if (abortSignal.aborted) return;
-
-        let rawFixtures: FixtureType[] = data.response || [];
-
         const currentFavorites = user && !user.isAnonymous ? favorites : getLocalFavorites();
-        const hasFavs = (currentFavorites?.teams && Object.keys(currentFavorites.teams).length > 0) || (currentFavorites?.leagues && Object.keys(currentFavorites.leagues).length > 0);
-        
-        if (activeTab === 'my-results' && !hasFavs) {
-            rawFixtures = rawFixtures.filter(f => popularLeagueIds.has(f.league.id));
+        const favTeams = currentFavorites?.teams ? Object.keys(currentFavorites.teams) : [];
+        const favLeagues = currentFavorites?.leagues ? Object.keys(currentFavorites.leagues) : [];
+
+        let allFixtures: FixtureType[] = [];
+
+        if (activeTab === 'all-matches') {
+            const response = await fetch(`https://${API_HOST}/fixtures?live=all`, { 
+              signal: abortSignal,
+              headers: { 'x-rapidapi-key': API_KEY }
+            });
+            if (!response.ok) throw new Error('Failed to fetch live fixtures');
+            const data = await response.json();
+            if (abortSignal.aborted) return;
+            allFixtures = data.response || [];
+
+        } else if (activeTab === 'my-results') {
+            const teamFixturesPromises = favTeams.map(teamId => 
+                fetch(`https://${API_HOST}/fixtures?team=${teamId}&season=${CURRENT_SEASON}`, { headers: { 'x-rapidapi-key': API_KEY } })
+                    .then(res => res.json())
+                    .then(data => data.response || [])
+            );
+            const leagueFixturesPromises = favLeagues.map(leagueId =>
+                 fetch(`https://${API_HOST}/fixtures?league=${leagueId}&season=${CURRENT_SEASON}`, { headers: { 'x-rapidapi-key': API_KEY } })
+                    .then(res => res.json())
+                    .then(data => data.response || [])
+            );
+
+            const fixturesArrays = await Promise.all([...teamFixturesPromises, ...leagueFixturesPromises]);
+            if (abortSignal.aborted) return;
+            
+            const uniqueFixtures = new Map<number, FixtureType>();
+            fixturesArrays.flat().forEach((fixture: FixtureType) => {
+                uniqueFixtures.set(fixture.fixture.id, fixture);
+            });
+            allFixtures = Array.from(uniqueFixtures.values());
         }
 
-        const processedFixtures = rawFixtures.map(fixture => ({
+
+        const processedFixtures = allFixtures.map(fixture => ({
             ...fixture,
             league: {
                 ...fixture.league,
@@ -391,7 +406,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             }
         }));
         
-        setMatchesCache(prev => new Map(prev).set(dateKey, processedFixtures));
+        const cacheKey = activeTab === 'my-results' ? 'my-results-all' : 'live';
+        setMatchesCache(prev => new Map(prev).set(cacheKey, processedFixtures));
 
       } catch (error) {
           if ((error as Error).name !== 'AbortError') {
@@ -400,7 +416,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                 title: "خطأ في الشبكة",
                 description: "فشل في تحميل المباريات. يرجى التحقق من اتصالك بالإنترنت.",
             });
-            setMatchesCache(prev => new Map(prev).set(dateKey, []));
+            const cacheKey = activeTab === 'my-results' ? 'my-results-all' : 'live';
+            setMatchesCache(prev => new Map(prev).set(cacheKey, []));
           }
       } finally {
           if (!abortSignal.aborted) {
@@ -432,17 +449,20 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   
   
   useEffect(() => {
-      if (isVisible && selectedDateKey) {
-          const cacheKey = activeTab === 'all-matches' ? 'live' : selectedDateKey;
-          if (matchesCache.has(cacheKey)) {
-              setLoading(false);
-              return;
+      if (isVisible) {
+          const cacheKey = activeTab === 'my-results' ? 'my-results-all' : 'live';
+          
+          // Re-fetch only if cache for 'my-results' is empty
+          if (activeTab === 'my-results' && matchesCache.get(cacheKey)?.length) {
+             setLoading(false);
+             return;
           }
+
           const controller = new AbortController();
-          fetchAndProcessData(cacheKey, controller.signal);
+          fetchAndProcessData(controller.signal);
           return () => controller.abort();
       }
-  }, [selectedDateKey, activeTab, isVisible, fetchAndProcessData, matchesCache]);
+  }, [activeTab, isVisible, fetchAndProcessData, matchesCache]);
 
 
   const handleDateChange = (dateKey: string) => {
@@ -452,11 +472,12 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const handleTabChange = (value: string) => {
     const tabValue = value as TabName;
     setActiveTab(tabValue);
-    const cacheKey = tabValue === 'all-matches' ? 'live' : selectedDateKey;
+    
+    const cacheKey = tabValue === 'my-results' ? 'my-results-all' : 'live';
 
-    if (cacheKey && !matchesCache.has(cacheKey)) {
+    if (!matchesCache.has(cacheKey)) {
         const controller = new AbortController();
-        fetchAndProcessData(cacheKey, controller.signal);
+        fetchAndProcessData(controller.signal);
         return () => controller.abort();
     }
   };
@@ -466,8 +487,18 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const favoritedLeagueIds = useMemo(() => currentFavorites?.leagues ? Object.keys(currentFavorites.leagues).map(Number) : [], [currentFavorites.leagues]);
   const hasAnyFavorites = favoritedLeagueIds.length > 0 || favoritedTeamIds.length > 0;
   
-  const cacheKey = activeTab === 'all-matches' ? 'live' : selectedDateKey || '';
-  const currentFixtures = matchesCache.get(cacheKey) || [];
+  const allFixturesForTab = matchesCache.get(activeTab === 'my-results' ? 'my-results-all' : 'live') || [];
+  
+  const filteredFixturesByDate = useMemo(() => {
+    if (activeTab === 'all-matches') {
+        return allFixturesForTab;
+    }
+    if (!selectedDateKey) return [];
+    return allFixturesForTab.filter(fixture => {
+        const matchDateKey = format(new Date(fixture.fixture.timestamp * 1000), 'yyyy-MM-dd');
+        return matchDateKey === selectedDateKey;
+    });
+  }, [allFixturesForTab, selectedDateKey, activeTab]);
     
   return (
     <div className="flex h-full flex-col bg-background">
@@ -514,7 +545,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             
             <TabsContent value="my-results" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0" hidden={activeTab !== 'my-results'}>
                 <FixturesList 
-                    fixtures={currentFixtures}
+                    fixtures={filteredFixturesByDate}
                     loading={loading}
                     activeTab={activeTab}
                     favoritedLeagueIds={favoritedLeagueIds}
@@ -528,7 +559,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             
             <TabsContent value="all-matches" className="flex-1 overflow-y-auto p-1 space-y-4 mt-0" hidden={activeTab !== 'all-matches'}>
                  <FixturesList 
-                    fixtures={currentFixtures}
+                    fixtures={filteredFixturesByDate}
                     loading={loading}
                     activeTab={activeTab}
                     favoritedLeagueIds={favoritedLeagueIds}
@@ -544,6 +575,3 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
-
-
-    
