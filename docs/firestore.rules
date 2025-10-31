@@ -159,14 +159,14 @@ service cloud.firestore {
 
     /**
      * @description Rules for user's favorite teams and competitions.
-     * @path /users/{userId}/favorites
+     * @path /users/{userId}/favorites/data
      * @allow (get, update, delete) Authenticated user with ID 'user123' reads/updates/deletes their favorites.
      * @deny (create, get, update, delete) User with ID 'user456' tries to access favorites of user 'user123'.
      * @principle Enforces document ownership for all operations.
      */
-    match /users/{userId}/favorites {
+    match /users/{userId}/favorites/data {
       allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
+      allow list: if false;
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
       allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwner(userId);
@@ -320,7 +320,7 @@ service cloud.firestore {
     /**
      * @description Rules for admin-pinned prediction matches.
      * @path /predictions/{fixtureId}
-     * @allow (get, list) Any signed-in user can read and list prediction matches.
+     * @allow (get, list) Anyone (including unauthenticated users) can read and list prediction matches.
      * @allow (create, update, delete) Only admins can manage prediction matches.
      * @principle Public read with admin-controlled writes.
      */

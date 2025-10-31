@@ -129,15 +129,16 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows anyone to read the matches pinned for predictions. Write operations are disallowed.
+     * @description Allows anyone to read the matches pinned for predictions. Write operations are disallowed for non-admins.
      * @path /predictions/{fixtureId}
      * @allow (get, list) - Any user can read the data.
-     * @deny (create, update, delete) - No one can create, update, or delete the data.
+     * @deny (create, update, delete) - No one can create, update, or delete the data, unless they are an admin (see more specific rules).
      * @principle Grants public read access while restricting write access.
      */
     match /predictions/{fixtureId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      // Admin writes are handled by a more specific rule, so this can be restrictive.
+      allow write: if false; 
     }
 
     /**
@@ -161,18 +162,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows anyone to read leaderboard scores. Only users can write their own score.
+     * @description Allows anyone to read leaderboard scores. Only admins can write scores.
      * @path /leaderboard/{userId}
      * @allow (get, list) - Any user can read the data.
-     * @allow (create, update, delete) - User can manage their own score.
-     * @principle Public read access, with per-user write control.
+     * @deny (write) - Write access is restricted to admins.
+     * @principle Public read access, with admin-only writes.
      */
     match /leaderboard/{userId} {
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
       allow get, list: if true;
-      allow create, update, delete: if isOwner(userId);
+      allow write: if false; // Admin writes are handled by more specific rules.
     }
   }
 }
