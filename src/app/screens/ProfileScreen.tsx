@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth, useFirestore } from '@/firebase/provider';
 import { updateUserDisplayName } from '@/lib/firebase-client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Copy } from 'lucide-react';
+import { Loader2, Copy, Link } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,6 +26,8 @@ export function ProfileScreen({ navigate, goBack, canGoBack, headerActions }: Sc
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const pwaUrl = "https://abozbere2001-collab.github.io/Nabd8/";
 
   useEffect(() => {
     if (!user || !db) {
@@ -76,11 +78,11 @@ export function ProfileScreen({ navigate, goBack, canGoBack, headerActions }: Sc
     }
   };
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, message: string) => {
     navigator.clipboard.writeText(text);
     toast({
         title: 'تم النسخ',
-        description: 'تم نسخ معرّف المستخدم بنجاح.',
+        description: message,
     });
   }
   
@@ -136,30 +138,48 @@ export function ProfileScreen({ navigate, goBack, canGoBack, headerActions }: Sc
               </CardContent>
             </Card>
 
-            {user && (
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>معلومات فنية</CardTitle>
-                        <CardDescription>
-                            يمكنك استخدام هذا المعرف للبحث عن بياناتك في قاعدة البيانات.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Label>معرّف المستخدم (User ID)</Label>
+             <Card>
+                <CardHeader>
+                    <CardTitle>أدوات المطورين</CardTitle>
+                    <CardDescription>
+                        روابط ومعرفات مفيدة لتطوير واختبار التطبيق.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="pwa-url">رابط التطبيق (PWA)</Label>
                         <div className="flex items-center gap-2">
                             <Input 
+                                id="pwa-url"
                                 readOnly 
-                                value={user.uid} 
+                                value={pwaUrl} 
                                 className="text-xs text-muted-foreground"
                                 dir="ltr"
                             />
-                            <Button variant="outline" size="icon" onClick={() => copyToClipboard(user.uid)}>
-                                <Copy className="h-4 w-4" />
+                            <Button variant="outline" size="icon" onClick={() => copyToClipboard(pwaUrl, 'تم نسخ رابط التطبيق بنجاح.')}>
+                                <Link className="h-4 w-4" />
                             </Button>
                         </div>
-                    </CardContent>
-                </Card>
-            )}
+                    </div>
+                    {user && (
+                        <div className="space-y-2">
+                            <Label htmlFor="user-id">معرّف المستخدم (User ID)</Label>
+                            <div className="flex items-center gap-2">
+                                <Input 
+                                    id="user-id"
+                                    readOnly 
+                                    value={user.uid} 
+                                    className="text-xs text-muted-foreground"
+                                    dir="ltr"
+                                />
+                                <Button variant="outline" size="icon" onClick={() => copyToClipboard(user.uid, 'تم نسخ معرّف المستخدم بنجاح.')}>
+                                    <Copy className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
           </>
         ) : (
             <p className="text-center text-muted-foreground pt-8">لم يتم العثور على ملفك الشخصي.</p>
