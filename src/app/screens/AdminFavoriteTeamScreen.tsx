@@ -13,7 +13,7 @@ import { CURRENT_SEASON } from '@/lib/constants';
 import { isMatchLive } from '@/lib/matchStatus';
 import { Card, CardContent } from '@/components/ui/card';
 
-const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
 
 // --- Main Screen Component ---
 export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, teamName }: ScreenProps & { teamId: number; teamName: string; }) {

@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 
-const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
 const API_HOST = "v3.football.api-sports.io";
 
 

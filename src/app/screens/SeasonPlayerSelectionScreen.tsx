@@ -20,7 +20,7 @@ import { FootballIcon } from '@/components/icons/FootballIcon';
 import { FixedSizeList as List } from 'react-window';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
-const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
 
 interface SeasonPlayerSelectionScreenProps extends ScreenProps {
     leagueId: number;

@@ -40,7 +40,7 @@ interface ProcessedOdds {
     away: number;
 }
 
-const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
 const API_HOST = "v3.football.api-sports.io";
 
 

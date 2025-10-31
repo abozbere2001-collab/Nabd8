@@ -24,7 +24,7 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { LeagueHeaderItem } from '@/components/LeagueHeaderItem';
 import { POPULAR_LEAGUES } from '@/lib/popular-data';
 
-const API_KEY = "75f36f22d689a0a61e777d92bbda1c08";
+const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
 
 // --- Persistent Cache Logic ---
 const COMPETITIONS_CACHE_KEY = 'goalstack_competitions_cache';

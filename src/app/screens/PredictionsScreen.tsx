@@ -343,13 +343,15 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             const usersSnapshot = await getDocs(collection(db, "users"));
             const userProfiles = new Map<string, UserProfile>();
             usersSnapshot.forEach(userDoc => {
-                userProfiles.set(userDoc.id, userDoc.data() as UserProfile);
-                // Initialize all users in leaderboard to 0, this clears old scores
+                const userData = userDoc.data() as UserProfile
+                userProfiles.set(userDoc.id, userData);
+                
+                // Initialize user in leaderboard to 0, this clears old scores for all users
                 const leaderboardRef = doc(db, 'leaderboard', userDoc.id);
                 batch.set(leaderboardRef, {
                     totalPoints: 0,
-                    userName: (userDoc.data() as UserProfile).displayName || 'مستخدم',
-                    userPhoto: (userDoc.data() as UserProfile).photoURL || '',
+                    userName: userData.displayName || 'مستخدم',
+                    userPhoto: userData.photoURL || '',
                 }, { merge: true });
             });
 
@@ -381,11 +383,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                 const userData = userProfiles.get(userId);
                 if (userData) {
                     const leaderboardRef = doc(db, 'leaderboard', userId);
-                    batch.set(leaderboardRef, {
-                        totalPoints,
-                        userName: userData.displayName || 'مستخدم',
-                        userPhoto: userData.photoURL || '',
-                    }, { merge: true });
+                    batch.update(leaderboardRef, { totalPoints });
                 }
             }
             
