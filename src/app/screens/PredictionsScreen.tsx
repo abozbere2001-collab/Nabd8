@@ -208,10 +208,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     const [isUpdatingPoints, setIsUpdatingPoints] = useState(false);
 
     useEffect(() => {
-        // Wait until we know if the user is an admin or not.
-        if (isCheckingAdmin) return;
-        
-        if (!db || !isAdmin) {
+        if (!db) {
             setLoadingMatches(false);
             setPinnedMatches([]);
             return;
@@ -235,7 +232,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         });
 
         return () => unsub();
-    }, [db, isAdmin, isCheckingAdmin]);
+    }, [db]);
 
 
     useEffect(() => {
@@ -479,3 +476,4 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         </div>
     );
 };
+
