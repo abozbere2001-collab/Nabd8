@@ -31,7 +31,7 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
             };
             setLoading(true);
             try {
-                const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
+                const url = `/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
                 const res = await fetch(url, { headers: { 'x-rapidapi-key': API_KEY } });
                 if (!res.ok) throw new Error(`API fetch failed with status: ${res.status}`);
                 
