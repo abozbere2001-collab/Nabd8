@@ -14,41 +14,34 @@ interface ScreenHeaderProps {
 }
 
 export function ScreenHeader({ title, canGoBack, onBack, actions, secondaryActions }: ScreenHeaderProps) {
-  
-  const screensWithoutCentralTitle = [
-    "المزيد", "الملف الشخصي", "كل البطولات", "إشعارات", 
-    "الإعدادات العامة", "سياسة الخصوصية", "شروط الخدمة", "النسخة الاحترافية"
-  ];
-
-  const showCentralTitle = !screensWithoutCentralTitle.includes(title);
 
   return (
     <header data-id={`screen-header-${title.replace(/\s+/g, '-').toLowerCase()}`} 
     className={cn(
-        "relative flex h-8 flex-shrink-0 items-center justify-between p-1 z-30",
+        "relative flex h-14 flex-shrink-0 items-center justify-between p-2 z-30",
         "bg-card text-card-foreground rounded-b-lg mb-1 mx-1 shadow-md border-x border-b"
     )}>
       <div className="flex items-center gap-1">
-         <NabdAlMalaebLogo className="h-6" />
          {canGoBack && (
             <Button
             variant="ghost"
             size="icon"
             onClick={onBack}
             aria-label="Go back"
-            className="h-7 w-7"
+            className="h-8 w-8"
             >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-5 w-5" />
             </Button>
         )}
-         {(title && !showCentralTitle) && <div className='font-bold text-md px-2'>{title}</div>}
       </div>
 
-      {showCentralTitle && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-          <span className="font-bold text-sm font-headline text-primary">نبض الملاعب</span>
-        </div>
-      )}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none text-center">
+        {title ? (
+            <h1 className="text-md font-bold truncate">{title}</h1>
+        ) : (
+            <NabdAlMalaebLogo className="h-8" />
+        )}
+      </div>
 
       <div data-id="screen-header-actions" className="flex items-center gap-1">
         {actions}
