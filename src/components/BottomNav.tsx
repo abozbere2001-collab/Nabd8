@@ -1,5 +1,4 @@
 
-
 "use client";
 import { Star, Newspaper, MoreHorizontal, Shield, UserCircle2, Flag, Home, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,7 +16,7 @@ interface BottomNavProps {
 export function BottomNav({ activeScreen, onNavigate }: BottomNavProps) {
   
   const navItems: { key: ScreenKey; label: string; icon: React.ElementType }[] = [
-    { key: 'Matches', label: "المباريات", icon: Shield },
+    { key: 'Matches', label: "المباريات", icon: FootballIcon },
     { key: 'MyCountry', label: "ملعبي", icon: Home },
     { key: 'Predictions', label: "التوقعات", icon: Trophy },
     { key: 'Competitions', label: "اختياراتي", icon: Star },
