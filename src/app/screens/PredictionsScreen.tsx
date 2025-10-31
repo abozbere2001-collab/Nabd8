@@ -342,14 +342,14 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             // Get all user profiles to update leaderboard with names/photos
             const usersSnapshot = await getDocs(collection(db, "users"));
             const userProfiles = new Map<string, UserProfile>();
-            usersSnapshot.forEach(doc => {
-                userProfiles.set(doc.id, doc.data() as UserProfile);
+            usersSnapshot.forEach(userDoc => {
+                userProfiles.set(userDoc.id, userDoc.data() as UserProfile);
                 // Initialize all users in leaderboard to 0, this clears old scores
-                const leaderboardRef = doc(db, 'leaderboard', doc.id);
+                const leaderboardRef = doc(db, 'leaderboard', userDoc.id);
                 batch.set(leaderboardRef, {
                     totalPoints: 0,
-                    userName: (doc.data() as UserProfile).displayName || 'مستخدم',
-                    userPhoto: (doc.data() as UserProfile).photoURL || '',
+                    userName: (userDoc.data() as UserProfile).displayName || 'مستخدم',
+                    userPhoto: (userDoc.data() as UserProfile).photoURL || '',
                 }, { merge: true });
             });
 
@@ -483,5 +483,3 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         </div>
     );
 };
-
-    
