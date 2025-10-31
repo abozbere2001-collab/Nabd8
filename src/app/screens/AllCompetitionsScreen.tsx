@@ -181,28 +181,14 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                         }
                     } else {
                         // Fallback to popular leagues if firestore collection is empty
-                        const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
-                            leagueId: l.id,
-                            name: l.name,
-                            logo: l.logo,
-                            countryName: 'World', // A sensible default
-                            countryFlag: null,
-                        }));
-                        setManagedCompetitions(popularAsManaged);
+                        setManagedCompetitions([]);
                     }
                 };
 
                 const handleError = (error: any) => {
                     console.error("Firestore 'managedCompetitions' error:", error);
                     toast({ variant: 'destructive', title: "خطأ", description: "فشل في تحميل البطولات." });
-                    const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
-                        leagueId: l.id,
-                        name: l.name,
-                        logo: l.logo,
-                        countryName: 'World',
-                        countryFlag: null,
-                    }));
-                    setManagedCompetitions(popularAsManaged);
+                    setManagedCompetitions([]);
                 };
 
                  if (isAdmin) {
@@ -234,16 +220,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                  }
                 return;
             }
-
             // Fallback for when db is not available.
-            const popularAsManaged: ManagedCompetitionType[] = POPULAR_LEAGUES.map(l => ({
-                leagueId: l.id,
-                name: l.name,
-                logo: l.logo,
-                countryName: 'World',
-                countryFlag: null,
-            }));
-            setManagedCompetitions(popularAsManaged);
+            setManagedCompetitions([]);
         };
 
         await fetchCustomNames();
@@ -285,8 +263,25 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     const sortedGroupedCompetitions = useMemo(() => {
-        if (!managedCompetitions) return null;
-        const processedCompetitions = managedCompetitions.map(comp => ({ ...comp, name: getName('league', comp.leagueId, comp.name) }));
+        if (managedCompetitions === null) return null;
+
+        const allCompetitions = [...managedCompetitions];
+        
+        // Add popular leagues that are not already in managedCompetitions
+        const managedLeagueIds = new Set(managedCompetitions.map(c => c.leagueId));
+        POPULAR_LEAGUES.forEach(popularLeague => {
+            if (!managedLeagueIds.has(popularLeague.id)) {
+                 allCompetitions.push({
+                    leagueId: popularLeague.id,
+                    name: popularLeague.name,
+                    logo: popularLeague.logo,
+                    countryName: popularLeague.country, // Add country from popular data
+                    countryFlag: popularLeague.country_flag, // Add flag
+                });
+            }
+        });
+        
+        const processedCompetitions = allCompetitions.map(comp => ({ ...comp, name: getName('league', comp.leagueId, comp.name) }));
 
         const grouped: GroupedClubCompetitions = {};
         processedCompetitions.forEach(comp => {

@@ -36,7 +36,7 @@ interface GroupedFixtures {
     }
 }
 
-const popularLeagueIds = new Set(POPULAR_LEAGUES.slice(0, 15).map(l => l.id));
+const popularLeagueIds = new Set(POPULAR_LEAGUES.map(l => l.id));
 
 const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
 const API_HOST = "v3.football.api-sports.io";
@@ -320,7 +320,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         
         let url;
         if (activeTab === 'all-matches') {
-            url = `https://${API_HOST}/fixtures?live=all`;
+            const leagueIds = Array.from(popularLeagueIds).join('-');
+            url = `https://${API_HOST}/fixtures?live=${leagueIds}`;
         } else {
             url = `https://${API_HOST}/fixtures?date=${dateKey}`;
         }
@@ -437,7 +438,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   return (
     <div className="flex h-full flex-col bg-background">
         <ScreenHeader 
-            title="" 
+            title="نبض الملاعب" 
             canGoBack={false}
             onBack={() => {}} 
             actions={
