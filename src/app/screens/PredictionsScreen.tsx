@@ -339,6 +339,20 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
             const batch = writeBatch(db);
             const userPointsMap = new Map<string, number>();
 
+            // Get all user profiles to update leaderboard with names/photos
+            const usersSnapshot = await getDocs(collection(db, "users"));
+            const userProfiles = new Map<string, UserProfile>();
+            usersSnapshot.forEach(doc => {
+                userProfiles.set(doc.id, doc.data() as UserProfile);
+                // Initialize all users in leaderboard to 0, this clears old scores
+                const leaderboardRef = doc(db, 'leaderboard', doc.id);
+                batch.set(leaderboardRef, {
+                    totalPoints: 0,
+                    userName: (doc.data() as UserProfile).displayName || 'مستخدم',
+                    userPhoto: (doc.data() as UserProfile).photoURL || '',
+                }, { merge: true });
+            });
+
             // Get all predictions from all pinned matches
             const predictionsSnapshot = await getDocs(collection(db, "predictions"));
             
@@ -362,14 +376,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                 }
             }
             
-            // Get all user profiles to update leaderboard with names/photos
-            const usersSnapshot = await getDocs(collection(db, "users"));
-            const userProfiles = new Map<string, UserProfile>();
-            usersSnapshot.forEach(doc => {
-                userProfiles.set(doc.id, doc.data() as UserProfile);
-            });
-
-            // Prepare batch write for leaderboard
+            // Prepare batch write for leaderboard with new scores
             for (const [userId, totalPoints] of userPointsMap.entries()) {
                 const userData = userProfiles.get(userId);
                 if (userData) {
