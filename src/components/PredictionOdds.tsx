@@ -40,8 +40,7 @@ interface ProcessedOdds {
     away: number;
 }
 
-const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
-const API_HOST = "v3.football.api-sports.io";
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 
@@ -53,8 +52,8 @@ export function PredictionOdds({ fixtureId }: { fixtureId: number }) {
         let isMounted = true;
         setLoading(true);
 
-        fetch(`https://${API_HOST}/odds?fixture=${fixtureId}&bookmaker=8`, {
-             headers: { 'x-rapidapi-key': API_KEY }
+        fetch(`/api/football/odds?fixture=${fixtureId}&bookmaker=8`, {
+             headers: { 'x-rapidapi-key': API_KEY! }
         })
             .then(res => {
                 if (!res.ok) throw new Error('Failed to fetch odds');
@@ -153,5 +152,3 @@ export function PredictionOdds({ fixtureId }: { fixtureId: number }) {
         </TooltipProvider>
     );
 }
-
-    

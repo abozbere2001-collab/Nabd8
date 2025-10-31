@@ -24,8 +24,7 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { LeagueHeaderItem } from '@/components/LeagueHeaderItem';
 import { POPULAR_LEAGUES } from '@/lib/popular-data';
 
-const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
-const API_HOST = "v3.football.api-sports.io";
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 // --- Persistent Cache Logic ---
@@ -174,14 +173,24 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
              if (db) {
                  const handleSnapshot = (snapshot: any) => {
                     const fetchedCompetitions = snapshot.docs.map((doc: any) => doc.data() as ManagedCompetitionType);
-                    if (fetchedCompetitions.length > 0) {
-                        setManagedCompetitions(fetchedCompetitions);
-                        if (isAdmin) {
-                            setCachedData(COMPETITIONS_CACHE_KEY, { managedCompetitions: fetchedCompetitions, lastFetched: Date.now() });
+                    
+                    const allCompetitions = [...fetchedCompetitions];
+                    const managedLeagueIds = new Set(fetchedCompetitions.map(c => c.leagueId));
+                    POPULAR_LEAGUES.forEach(popularLeague => {
+                        if (!managedLeagueIds.has(popularLeague.id)) {
+                             allCompetitions.push({
+                                leagueId: popularLeague.id,
+                                name: popularLeague.name,
+                                logo: popularLeague.logo,
+                                countryName: popularLeague.country,
+                                countryFlag: popularLeague.country_flag,
+                            });
                         }
-                    } else {
-                        // Fallback to popular leagues if firestore collection is empty
-                        setManagedCompetitions([]);
+                    });
+
+                    setManagedCompetitions(allCompetitions);
+                    if (isAdmin && fetchedCompetitions.length > 0) {
+                        setCachedData(COMPETITIONS_CACHE_KEY, { managedCompetitions: fetchedCompetitions, lastFetched: Date.now() });
                     }
                 };
 
@@ -202,7 +211,20 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                     } catch (e) { console.warn("Could not check cache-buster."); }
                     
                      if (cached?.data?.managedCompetitions && cached.data.managedCompetitions.length > 0 && !forceRefresh && cached.lastFetched > serverLastUpdated) {
-                        setManagedCompetitions(cached.data.managedCompetitions);
+                        const allCompetitions = [...cached.data.managedCompetitions];
+                        const managedLeagueIds = new Set(cached.data.managedCompetitions.map(c => c.leagueId));
+                        POPULAR_LEAGUES.forEach(popularLeague => {
+                            if (!managedLeagueIds.has(popularLeague.id)) {
+                                 allCompetitions.push({
+                                    leagueId: popularLeague.id,
+                                    name: popularLeague.name,
+                                    logo: popularLeague.logo,
+                                    countryName: popularLeague.country,
+                                    countryFlag: popularLeague.country_flag,
+                                });
+                            }
+                        });
+                        setManagedCompetitions(allCompetitions);
                         return; 
                     }
                     try {
@@ -221,7 +243,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                 return;
             }
             // Fallback for when db is not available.
-            setManagedCompetitions([]);
+            const allCompetitions = [...POPULAR_LEAGUES.map(l => ({ leagueId: l.id, name: l.name, logo: l.logo, countryName: l.country, countryFlag: l.country_flag }))];
+            setManagedCompetitions(allCompetitions);
         };
 
         await fetchCustomNames();
@@ -264,24 +287,8 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
     const sortedGroupedCompetitions = useMemo(() => {
         if (managedCompetitions === null) return null;
-
-        const allCompetitions = [...managedCompetitions];
         
-        // Add popular leagues that are not already in managedCompetitions
-        const managedLeagueIds = new Set(managedCompetitions.map(c => c.leagueId));
-        POPULAR_LEAGUES.forEach(popularLeague => {
-            if (!managedLeagueIds.has(popularLeague.id)) {
-                 allCompetitions.push({
-                    leagueId: popularLeague.id,
-                    name: popularLeague.name,
-                    logo: popularLeague.logo,
-                    countryName: popularLeague.country, // Add country from popular data
-                    countryFlag: popularLeague.country_flag, // Add flag
-                });
-            }
-        });
-        
-        const processedCompetitions = allCompetitions.map(comp => ({ ...comp, name: getName('league', comp.leagueId, comp.name) }));
+        const processedCompetitions = managedCompetitions.map(comp => ({ ...comp, name: getName('league', comp.leagueId, comp.name) }));
 
         const grouped: GroupedClubCompetitions = {};
         processedCompetitions.forEach(comp => {
@@ -362,7 +369,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             if (cachedCountries?.data) {
                 countries = cachedCountries.data;
             } else {
-                const countriesRes = await fetch(`https://${API_HOST}/countries`, { headers: { 'x-rapidapi-key': API_KEY }});
+                const countriesRes = await fetch(`/api/football/countries`, { headers: { 'x-rapidapi-key': API_KEY! }});
                 if (!countriesRes.ok) throw new Error('Failed to fetch countries');
                 const countriesData = await countriesRes.json();
                 countries = countriesData.response || [];
@@ -370,7 +377,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
 
             const teamPromises = countries.map(country => 
-                fetch(`https://${API_HOST}/teams?country=${country.name}`, { headers: { 'x-rapidapi-key': API_KEY }})
+                fetch(`/api/football/teams?country=${country.name}`, { headers: { 'x-rapidapi-key': API_KEY! }})
                     .then(res => res.ok ? res.json() : { response: [] })
                     .then(data => (data.response || []).filter((r: { team: Team }) => r.team.national).map((r: { team: Team}) => r.team))
                     .catch(() => []) // return empty array on error for a specific country

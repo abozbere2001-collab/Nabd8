@@ -13,8 +13,7 @@ import { CURRENT_SEASON } from '@/lib/constants';
 import { isMatchLive } from '@/lib/matchStatus';
 import { Card, CardContent } from '@/components/ui/card';
 
-const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
-const API_HOST = "v3.football.api-sports.io";
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 // --- Main Screen Component ---
@@ -33,8 +32,8 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
             };
             setLoading(true);
             try {
-                const url = `https://${API_HOST}/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
-                const res = await fetch(url, { headers: { 'x-rapidapi-key': API_KEY } });
+                const url = `/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
+                const res = await fetch(url, { headers: { 'x-rapidapi-key': API_KEY! } });
                 if (!res.ok) throw new Error(`API fetch failed with status: ${res.status}`);
                 
                 const data = await res.json();
@@ -103,6 +102,3 @@ export function AdminFavoriteTeamScreen({ navigate, goBack, canGoBack, teamId, t
         </div>
     );
 }
-
-    
-    

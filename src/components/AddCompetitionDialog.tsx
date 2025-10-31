@@ -22,8 +22,7 @@ import { Loader2 } from 'lucide-react';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
-const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
-const API_HOST = "v3.football.api-sports.io";
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 interface AddCompetitionDialogProps {
@@ -45,7 +44,7 @@ export function AddCompetitionDialog({ isOpen, onOpenChange }: AddCompetitionDia
     setLoading(true);
     try {
       // Fetch league details from API to save in our DB
-      const res = await fetch(`https://${API_HOST}/leagues?id=${leagueId}`, { headers: { 'x-rapidapi-key': API_KEY } });
+      const res = await fetch(`/api/football/leagues?id=${leagueId}`, { headers: { 'x-rapidapi-key': API_KEY! } });
       if (!res.ok) throw new Error('Failed to fetch from API');
       const data = await res.json();
       
@@ -114,5 +113,3 @@ export function AddCompetitionDialog({ isOpen, onOpenChange }: AddCompetitionDia
     </Dialog>
   );
 }
-
-    

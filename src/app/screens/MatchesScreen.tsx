@@ -38,8 +38,7 @@ interface GroupedFixtures {
 
 const popularLeagueIds = new Set(POPULAR_LEAGUES.map(l => l.id));
 
-const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
-const API_HOST = "v3.football.api-sports.io";
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 // Fixtures List Component
@@ -321,14 +320,14 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         let url;
         if (activeTab === 'all-matches') {
             const leagueIds = Array.from(popularLeagueIds).join('-');
-            url = `https://${API_HOST}/fixtures?live=${leagueIds}`;
+            url = `/api/football/fixtures?live=${leagueIds}`;
         } else {
-            url = `https://${API_HOST}/fixtures?date=${dateKey}`;
+            url = `/api/football/fixtures?date=${dateKey}`;
         }
         
         const response = await fetch(url, { 
             signal: abortSignal,
-            headers: { 'x-rapidapi-key': API_KEY }
+            headers: { 'x-rapidapi-key': API_KEY! }
         });
         
         if (!response.ok) throw new Error('Failed to fetch fixtures');
@@ -438,7 +437,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   return (
     <div className="flex h-full flex-col bg-background">
         <ScreenHeader 
-            title="نبض الملاعب" 
+            title="نبض الملاعب"
             canGoBack={false}
             onBack={() => {}} 
             actions={

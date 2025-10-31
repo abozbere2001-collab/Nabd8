@@ -28,6 +28,9 @@ import { POPULAR_TEAMS, POPULAR_LEAGUES } from '@/lib/popular-data';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
+const API_KEY = process.env.API_FOOTBALL_KEY;
+
+
 // --- Types ---
 interface TeamResult {
   team: { id: number; name: string; logo: string; national?: boolean; };
@@ -248,8 +251,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     );
 
     const apiSearchPromises = [
-      fetch(`/api/football/teams?search=${query}`).then(res => res.ok ? res.json() : { response: [] }),
-      fetch(`/api/football/leagues?search=${query}`).then(res => res.ok ? res.json() : { response: [] })
+      fetch(`/api/football/teams?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.ok ? res.json() : { response: [] }),
+      fetch(`/api/football/leagues?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.ok ? res.json() : { response: [] })
     ];
     
     try {
@@ -493,5 +496,3 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     </Sheet>
   );
 }
-
-    
