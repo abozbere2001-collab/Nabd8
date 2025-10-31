@@ -68,7 +68,7 @@ const FixturesList = React.memo((props: {
                 }
             });
         } else {
-            // For 'all-matches' tab, show everything
+            // For 'all-matches' tab, show all fixtures
             otherFixtures = props.fixtures;
         }
 
@@ -546,4 +546,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     
 
     
+
 
