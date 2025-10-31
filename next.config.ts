@@ -2,10 +2,11 @@
 import type { NextConfig } from 'next';
 import withPWA from 'next-pwa';
 
-// Since the app is deployed to GitHub Pages, the repo name is needed for the path.
+// Determine asset prefix and base path based on the environment
+const isGithubActions = process.env.GITHUB_ACTIONS === 'true';
 const repo = 'Nabd8';
-const assetPrefix = `/${repo}/`;
-const basePath = `/${repo}`;
+const assetPrefix = isGithubActions ? `/${repo}/` : '';
+const basePath = isGithubActions ? `/${repo}` : '';
 
 const nextConfig: NextConfig = {
   output: 'export',
