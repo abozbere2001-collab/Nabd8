@@ -44,7 +44,7 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { Card, CardContent } from '@/components/ui/card';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
-const API_KEY = process.env.API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
 
 
 // --- Caching Logic ---
@@ -259,7 +259,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     break;
                 }
                 
-                const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${year}`, { headers: { 'x-rapidapi-key': API_KEY! }});
+                const standingsRes = await fetch(`https://v3.football.api-sports.io/standings?league=${leagueId}&season=${year}`, { headers: { 'x-rapidapi-key': API_KEY! }});
                 const standingsData = await standingsRes.json();
 
                 if (standingsData.response?.[0]?.league?.standings?.[0]?.length > 0) {
@@ -295,10 +295,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 }
             } else {
                 const [standingsRes, scorersRes, teamsRes, fixturesRes] = await Promise.all([
-                    fetch(`/api/football/standings?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
-                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
-                    fetch(`/api/football/teams?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
-                    fetch(`/api/football/fixtures?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
+                    fetch(`https://v3.football.api-sports.io/standings?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
+                    fetch(`https://v3.football.api-sports.io/players/topscorers?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
+                    fetch(`https://v3.football.api-sports.io/teams?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
+                    fetch(`https://v3.football.api-sports.io/fixtures?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
                 ]);
 
                 const standingsData = await standingsRes.json();

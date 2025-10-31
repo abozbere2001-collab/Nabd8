@@ -30,7 +30,7 @@ import { FootballIcon } from '@/components/icons/FootballIcon';
 import { cn } from '@/lib/utils';
 import {Skeleton} from "@/components/ui/skeleton";
 
-const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
 const API_HOST = "v3.football.api-sports.io";
 
 
@@ -100,7 +100,7 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
             setLoading(true);
             try {
                 const url = `https://${API_HOST}/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
-                const res = await fetch(url, { headers: { 'x-rapidapi-key': API_KEY }});
+                const res = await fetch(url, { headers: { 'x-rapidapi-key': API_KEY! }});
                 if (!res.ok) throw new Error(`API fetch failed with status: ${res.status}`);
                 
                 const data = await res.json();
