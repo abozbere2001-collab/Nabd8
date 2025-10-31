@@ -25,6 +25,10 @@ import { format, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isMatchLive } from '@/lib/matchStatus';
+
+const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
+const API_HOST = "v3.football.api-sports.io";
 
 
 const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
@@ -199,6 +203,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
     const [currentUserScore, setCurrentUserScore] = useState<UserScore | null>(null);
 
     const [pinnedMatches, setPinnedMatches] = useState<(PredictionMatch & { id: string })[]>([]);
+    const [liveFixtures, setLiveFixtures] = useState<Map<number, Fixture>>(new Map());
     const [loadingMatches, setLoadingMatches] = useState(true);
 
     const [allUserPredictions, setAllUserPredictions] = useState<{ [key: string]: Prediction }>({});
@@ -221,6 +226,11 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                 id: doc.id,
                 ...(doc.data() as PredictionMatch),
             })).filter(m => m && m.fixtureData && m.fixtureData.fixture);
+            
+            const initialFixtures = new Map<number, Fixture>();
+            matches.forEach(m => initialFixtures.set(Number(m.id), m.fixtureData));
+            setLiveFixtures(initialFixtures);
+            
             setPinnedMatches(matches);
             setLoadingMatches(false);
         }, (err) => {
@@ -263,6 +273,37 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         fetchAllPredictions();
     }, [db, user, pinnedMatches]);
     
+    useEffect(() => {
+        const liveMatchIds = Array.from(liveFixtures.values())
+            .filter(f => isMatchLive(f.fixture.status))
+            .map(f => f.fixture.id);
+
+        if (liveMatchIds.length === 0) return;
+
+        const fetchLiveFixtures = async () => {
+             try {
+                const res = await fetch(`https://v3.football.api-sports.io/fixtures?ids=${liveMatchIds.join('-')}`, {
+                    headers: { 'x-rapidapi-key': API_KEY }
+                });
+                const data = await res.json();
+                if (data.response && data.response.length > 0) {
+                    setLiveFixtures(prev => {
+                        const newFixtures = new Map(prev);
+                        data.response.forEach((fixture: Fixture) => {
+                            newFixtures.set(fixture.fixture.id, fixture);
+                        });
+                        return newFixtures;
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to fetch live fixture data:", error);
+            }
+        };
+
+        const intervalId = setInterval(fetchLiveFixtures, 60000);
+        return () => clearInterval(intervalId);
+    }, [liveFixtures]);
+
     const fetchLeaderboard = useCallback(async () => {
         if (!db) return;
         setLoadingLeaderboard(true);
@@ -404,11 +445,17 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
 
     const filteredMatches = useMemo(() => {
         return pinnedMatches.filter(match => {
-            if (!match.fixtureData || !match.fixtureData.fixture) return false;
-            const matchDateKey = format(new Date(match.fixtureData.fixture.timestamp * 1000), 'yyyy-MM-dd');
+            const fixture = liveFixtures.get(Number(match.id));
+            if (!fixture) return false;
+            const matchDateKey = format(new Date(fixture.fixture.timestamp * 1000), 'yyyy-MM-dd');
             return matchDateKey === selectedDateKey;
-        }).sort((a,b) => a.fixtureData.fixture.timestamp - b.fixtureData.fixture.timestamp);
-    }, [pinnedMatches, selectedDateKey]);
+        }).sort((a,b) => {
+             const fixtureA = liveFixtures.get(Number(a.id));
+             const fixtureB = liveFixtures.get(Number(b.id));
+             if (!fixtureA || !fixtureB) return 0;
+             return fixtureA.fixture.timestamp - fixtureB.fixture.timestamp;
+        });
+    }, [pinnedMatches, selectedDateKey, liveFixtures]);
 
     return (
         <div className="flex h-full flex-col bg-background">
@@ -444,14 +491,18 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
                                 <Button onClick={() => navigate('Welcome')} className="mt-4">تسجيل الدخول</Button>
                              </div>
                         ) : filteredMatches.length > 0 ? (
-                            filteredMatches.map(match => (
-                                <PredictionCard 
-                                    key={match.id}
-                                    predictionMatch={match}
-                                    userPrediction={allUserPredictions[match.id!]}
-                                    onSave={handleSavePrediction}
-                                />
-                            ))
+                            filteredMatches.map(match => {
+                                const liveFixture = liveFixtures.get(Number(match.id));
+                                if (!liveFixture) return null;
+                                return (
+                                    <PredictionCard 
+                                        key={match.id}
+                                        fixture={liveFixture}
+                                        userPrediction={allUserPredictions[match.id!]}
+                                        onSave={handleSavePrediction}
+                                    />
+                                )
+                            })
                         ) : (
                             <div className="text-center text-muted-foreground pt-10">
                                 <p>لا توجد مباريات للتوقع في هذا اليوم.</p>
@@ -481,5 +532,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         </div>
     );
 };
+
+    
 
     
