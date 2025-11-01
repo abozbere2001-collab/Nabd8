@@ -21,8 +21,8 @@ import { ManagePinnedMatchScreen } from './screens/ManagePinnedMatchScreen';
 import MatchDetailScreen from './screens/MatchDetailScreen';
 import { NotificationSettingsScreen } from './screens/NotificationSettingsScreen';
 import { GeneralSettingsScreen } from './screens/GeneralSettingsScreen';
-import PrivacyPolicyScreen from './privacy-policy/page';
-import TermsOfServiceScreen from './terms-of-service/page';
+import { PrivacyPolicyContent } from './privacy-policy/page';
+import { TermsOfServiceContent } from './terms-of-service/page';
 import { GoProScreen } from './screens/GoProScreen';
 import type { ScreenKey } from './page';
 
@@ -64,8 +64,8 @@ const screenConfig: Record<string, { component: React.ComponentType<any>; conten
   MatchDetails: { component: MatchDetailScreen },
   NotificationSettings: { component: NotificationSettingsScreen },
   GeneralSettings: { component: GeneralSettingsScreen },
-  PrivacyPolicy: { component: PrivacyPolicyScreen },
-  TermsOfService: { component: TermsOfServiceScreen },
+  PrivacyPolicy: { component: PrivacyPolicyContent },
+  TermsOfService: { component: TermsOfServiceContent },
   GoPro: { component: GoProScreen },
   ManageTopScorers: { component: ManageTopScorersScreen },
   MyCountry: { component: IraqScreen },
@@ -267,7 +267,3 @@ export function AppContentWrapper() {
         </main>
   );
 }
-
-    
-
-    
