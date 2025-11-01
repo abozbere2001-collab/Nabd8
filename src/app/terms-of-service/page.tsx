@@ -4,6 +4,7 @@
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+// This is the actual UI component. It can accept props.
 function TermsOfServiceContent({ goBack, canGoBack }: { goBack?: () => void, canGoBack?: boolean }) {
     const currentYear = new Date().getFullYear();
     
@@ -73,9 +74,10 @@ function TermsOfServiceContent({ goBack, canGoBack }: { goBack?: () => void, can
       );
 }
 
-// Default export for Next.js page routing
+// Default export for Next.js page routing. It CANNOT take props for static export.
 export default function TermsOfServiceScreen(props: { goBack?: () => void, canGoBack?: boolean }) {
-  // This version is used for the main app navigation, which passes props.
-  // It also works for static export, where props will be undefined.
+  // The props are passed from AppContentWrapper for navigation, but the default export must be compatible
+  // with being called with NO props during `next build`.
+  // We pass the props down to the actual content component.
   return <TermsOfServiceContent {...props} />;
 }
