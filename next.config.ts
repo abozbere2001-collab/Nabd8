@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   env: {
-    NEXT_PUBLIC_API_FOOTBALL_KEY: '774c1bb02ceabecd14e199ab73bd9722',
+    NEXT_PUBLIC_API_FOOTBALL_KEY: '75f36f22d689a0a61e777d92bbda1c08',
   },
 };
 
