@@ -27,7 +27,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isMatchLive } from '@/lib/matchStatus';
 
-const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
@@ -281,7 +281,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
 
         const fetchLiveFixtures = async () => {
              try {
-                const res = await fetch(`/api/football/fixtures?ids=${liveMatchIds.join('-')}`, {
+                const res = await fetch(`https://v3.football.api-sports.io/fixtures?ids=${liveMatchIds.join('-')}`, {
                     headers: { 'x-rapidapi-key': API_KEY! }
                 });
                 const data = await res.json();

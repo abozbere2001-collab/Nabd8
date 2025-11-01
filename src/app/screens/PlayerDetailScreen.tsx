@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 
-const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 // --- TYPE DEFINITIONS ---
@@ -185,7 +185,12 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
         setLoading(true);
         try {
             // Fetch main player data for the current season
-            const playerRes = await fetch(`/api/football/players?id=${playerId}&season=${CURRENT_SEASON}`, { headers: { 'x-rapidapi-key': API_KEY! } });
+            const playerRes = await fetch(`https://v3.football.api-sports.io/players?id=${playerId}&season=${CURRENT_SEASON}`, {
+              headers: {
+                'x-rapidapi-key': API_KEY!,
+                'x-rapidapi-host': 'v3.football.api-sports.io',
+              },
+            });
             if (playerRes.ok) {
                 const data = await playerRes.json();
                 if (data.response?.[0]) {
@@ -218,7 +223,12 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
             }
 
             // Fetch transfer data for career history
-            const transferRes = await fetch(`/api/football/transfers?player=${playerId}`, { headers: { 'x-rapidapi-key': API_KEY! } });
+            const transferRes = await fetch(`https://v3.football.api-sports.io/transfers?player=${playerId}`, {
+              headers: {
+                'x-rapidapi-key': API_KEY!,
+                'x-rapidapi-host': 'v3.football.api-sports.io',
+              },
+            });
             if (transferRes.ok) {
                  const data = await transferRes.json();
                  setTransfers(data.response || []);

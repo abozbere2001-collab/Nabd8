@@ -10,7 +10,7 @@ import { Skeleton } from './ui/skeleton';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 
-const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 // --- TYPE DEFINITIONS ---
@@ -63,8 +63,18 @@ export function OddsTab({ fixtureId }: { fixtureId: number }) {
         setLoading(true);
 
         Promise.all([
-            fetch(`/api/football/odds?fixture=${fixtureId}`, { headers: { 'x-rapidapi-key': API_KEY! } }),
-            fetch(`/api/football/fixtures?id=${fixtureId}`, { headers: { 'x-rapidapi-key': API_KEY! } })
+            fetch(`https://v3.football.api-sports.io/odds?fixture=${fixtureId}`, {
+              headers: {
+                'x-rapidapi-key': API_KEY!,
+                'x-rapidapi-host': 'v3.football.api-sports.io',
+              },
+            }),
+            fetch(`https://v3.football.api-sports.io/fixtures?id=${fixtureId}`, {
+              headers: {
+                'x-rapidapi-key': API_KEY!,
+                'x-rapidapi-host': 'v3.football.api-sports.io',
+              },
+            })
         ])
         .then(async ([oddsRes, fixtureRes]) => {
             if (!oddsRes.ok || !fixtureRes.ok) {
