@@ -74,10 +74,8 @@ function TermsOfServiceContent({ goBack, canGoBack }: { goBack?: () => void, can
       );
 }
 
-// Default export for Next.js page routing. It CANNOT take props for static export.
-export default function TermsOfServiceScreen(props: { goBack?: () => void, canGoBack?: boolean }) {
-  // The props are passed from AppContentWrapper for navigation, but the default export must be compatible
-  // with being called with NO props during `next build`.
-  // We pass the props down to the actual content component.
+// Default export for Next.js page routing. It accepts optional props.
+export default function TermsOfServiceScreen(props?: { goBack?: () => void, canGoBack?: boolean }) {
+  // Pass the props down to the actual content component.
   return <TermsOfServiceContent {...props} />;
 }
