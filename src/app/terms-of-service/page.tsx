@@ -4,7 +4,7 @@
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function TermsOfServiceContent({ goBack, canGoBack }: { goBack?: () => void, canGoBack?: boolean }) {
+function TermsOfServiceContent({ goBack, canGoBack }: { goBack?: () => void, canGoBack?: boolean }) {
     const currentYear = new Date().getFullYear();
     
     return (
@@ -74,7 +74,8 @@ export function TermsOfServiceContent({ goBack, canGoBack }: { goBack?: () => vo
 }
 
 // Default export for Next.js page routing
-export default function TermsOfServiceScreen() {
-  // This version is used for static export and doesn't need props.
-  return <TermsOfServiceContent />;
+export default function TermsOfServiceScreen(props: { goBack?: () => void, canGoBack?: boolean }) {
+  // This version is used for the main app navigation, which passes props.
+  // It also works for static export, where props will be undefined.
+  return <TermsOfServiceContent {...props} />;
 }

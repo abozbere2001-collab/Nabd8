@@ -21,8 +21,8 @@ import { ManagePinnedMatchScreen } from './screens/ManagePinnedMatchScreen';
 import MatchDetailScreen from './screens/MatchDetailScreen';
 import { NotificationSettingsScreen } from './screens/NotificationSettingsScreen';
 import { GeneralSettingsScreen } from './screens/GeneralSettingsScreen';
-import PrivacyPolicyScreen, { PrivacyPolicyContent } from './privacy-policy/page';
-import TermsOfServiceScreen, { TermsOfServiceContent } from './terms-of-service/page';
+import PrivacyPolicyScreen from './privacy-policy/page';
+import TermsOfServiceScreen from './terms-of-service/page';
 import { GoProScreen } from './screens/GoProScreen';
 import type { ScreenKey } from './page';
 
@@ -64,8 +64,8 @@ const screenConfig: Record<string, { component: React.ComponentType<any>; conten
   MatchDetails: { component: MatchDetailScreen },
   NotificationSettings: { component: NotificationSettingsScreen },
   GeneralSettings: { component: GeneralSettingsScreen },
-  PrivacyPolicy: { component: PrivacyPolicyScreen, contentComponent: PrivacyPolicyContent },
-  TermsOfService: { component: TermsOfServiceScreen, contentComponent: TermsOfServiceContent },
+  PrivacyPolicy: { component: PrivacyPolicyScreen },
+  TermsOfService: { component: TermsOfServiceScreen },
   GoPro: { component: GoProScreen },
   ManageTopScorers: { component: ManageTopScorersScreen },
   MyCountry: { component: IraqScreen },
@@ -234,7 +234,7 @@ export function AppContentWrapper() {
                             const screenInfo = screenConfig[stackItem.screen];
                             if (!screenInfo) return null;
 
-                            const Component = screenInfo.contentComponent || screenInfo.component;
+                            const Component = screenInfo.component;
                             
                             const screenProps = {
                                 ...stackItem.props,

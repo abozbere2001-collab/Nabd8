@@ -4,7 +4,7 @@
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function PrivacyPolicyContent({ goBack, canGoBack }: { goBack?: () => void, canGoBack?: boolean }) {
+function PrivacyPolicyContent({ goBack, canGoBack }: { goBack?: () => void, canGoBack?: boolean }) {
   const currentYear = new Date().getFullYear();
 
   return (
@@ -83,7 +83,8 @@ export function PrivacyPolicyContent({ goBack, canGoBack }: { goBack?: () => voi
 }
 
 // Default export for Next.js page routing
-export default function PrivacyPolicyScreen() {
-  // This version is used for static export and doesn't need props.
-  return <PrivacyPolicyContent />;
+export default function PrivacyPolicyScreen(props: { goBack?: () => void, canGoBack?: boolean }) {
+  // This version is used for the main app navigation, which passes props.
+  // It also works for static export, where props will be undefined.
+  return <PrivacyPolicyContent {...props} />;
 }
