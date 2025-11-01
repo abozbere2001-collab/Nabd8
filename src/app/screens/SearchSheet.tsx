@@ -29,7 +29,6 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
 const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
-const API_HOST = "v3.football.api-sports.io";
 
 
 // --- Types ---
@@ -252,8 +251,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     );
 
     const apiSearchPromises = [
-      fetch(`https://${API_HOST}/teams?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.ok ? res.json() : { response: [] }),
-      fetch(`https://${API_HOST}/leagues?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.ok ? res.json() : { response: [] })
+      fetch(`/api/football/teams?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.ok ? res.json() : { response: [] }),
+      fetch(`/api/football/leagues?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.ok ? res.json() : { response: [] })
     ];
     
     try {

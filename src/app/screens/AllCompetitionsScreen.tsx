@@ -80,7 +80,6 @@ type RenameType = 'league' | 'team' | 'player' | 'continent' | 'country' | 'coac
 interface RenameState {
   id: string | number;
   name: string;
-  type: RenameType;
   purpose: 'rename' | 'note' | 'crown';
   note?: string;
   originalData?: any;
@@ -369,7 +368,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             if (cachedCountries?.data) {
                 countries = cachedCountries.data;
             } else {
-                const countriesRes = await fetch(`https://v3.football.api-sports.io/countries`, { headers: { 'x-rapidapi-key': API_KEY! }});
+                const countriesRes = await fetch(`/api/football/countries`, { headers: { 'x-rapidapi-key': API_KEY! }});
                 if (!countriesRes.ok) throw new Error('Failed to fetch countries');
                 const countriesData = await countriesRes.json();
                 countries = countriesData.response || [];
@@ -377,7 +376,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
 
             const teamPromises = countries.map(country => 
-                fetch(`https://v3.football.api-sports.io/teams?country=${country.name}`, { headers: { 'x-rapidapi-key': API_KEY! }})
+                fetch(`/api/football/teams?country=${country.name}`, { headers: { 'x-rapidapi-key': API_KEY! }})
                     .then(res => res.ok ? res.json() : { response: [] })
                     .then(data => (data.response || []).filter((r: { team: Team }) => r.team.national).map((r: { team: Team}) => r.team))
                     .catch(() => []) // return empty array on error for a specific country

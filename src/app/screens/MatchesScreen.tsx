@@ -298,7 +298,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         
         let url;
         if (activeTab === 'all-matches') {
-            url = `https://v3.football.api-sports.io/fixtures?live=all`;
+            url = `/api/football/fixtures?live=all`;
         } else {
             const favs = user && !user.isAnonymous ? favorites : getLocalFavorites();
             const teamIds = Object.keys(favs.teams || {});
@@ -306,60 +306,68 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             const hasFavorites = teamIds.length > 0 || leagueIds.length > 0;
             
             if (hasFavorites) {
-                const teamQuery = teamIds.length > 0 ? `team=${teamIds[0]}` : ''; // API limitation, can only query one team for a specific date
-                const leaguesQuery = `ids=${leagueIds.join('-')}`;
+                // The API supports multiple league IDs but only one team ID per request for this endpoint.
+                // A better approach would be multiple requests or a different endpoint if available.
+                // For now, we'll make separate requests if needed, which is inefficient but works.
+                const leagueQuery = leagueIds.length > 0 ? `ids=${leagueIds.join('-')}` : '';
                 
-                // Prioritize fetching by league if available, as it's more efficient.
-                if (leagueIds.length > 0) {
-                     url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${leaguesQuery}`;
-                } else {
-                    // Fallback to team query if only teams are favorited
-                     url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${teamQuery}`;
+                const fetchPromises: Promise<any>[] = [];
+                if (leagueQuery) {
+                    fetchPromises.push(fetch(`/api/football/fixtures?date=${dateKey}&${leagueQuery}`, { signal, headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.json()));
                 }
+                 // Make a request for each favorite team
+                 teamIds.forEach(teamId => {
+                    fetchPromises.push(fetch(`/api/football/fixtures?date=${dateKey}&team=${teamId}`, { signal, headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.json()));
+                 });
+                 const responses = await Promise.all(fetchPromises);
+                 if (abortSignal.aborted) return;
+                 const allFixtures: FixtureType[] = [];
+                 const fixtureIds = new Set<number>();
+                 responses.forEach(data => {
+                     if (data.response) {
+                         data.response.forEach((fixture: FixtureType) => {
+                             if (!fixtureIds.has(fixture.fixture.id)) {
+                                 allFixtures.push(fixture);
+                                 fixtureIds.add(fixture.fixture.id);
+                             }
+                         });
+                     }
+                 });
+                 const processedFixtures = allFixtures.map(fixture => ({
+                    ...fixture,
+                    league: {
+                        ...fixture.league,
+                        name: getDisplayName('league', fixture.league.id, fixture.league.name)
+                    },
+                    teams: {
+                        home: { ...fixture.teams.home, name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name) },
+                        away: { ...fixture.teams.away, name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name) }
+                    }
+                }));
+                setMatchesCache(prev => new Map(prev).set(dateKey, processedFixtures));
+
+
             } else {
                 const popularLeaguesQuery = `ids=${Array.from(popularLeagueIds).join('-')}`;
-                url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${popularLeaguesQuery}`;
+                url = `/api/football/fixtures?date=${dateKey}&${popularLeaguesQuery}`;
+                 const response = await fetch(url, { signal, headers: { 'x-rapidapi-key': API_KEY! }});
+                 if (!response.ok) throw new Error('Failed to fetch fixtures');
+                const data = await response.json();
+                if (abortSignal.aborted) return;
+
+                const allFixtures: FixtureType[] = data.response || [];
+
+                const processedFixtures = allFixtures.map(fixture => ({
+                    ...fixture,
+                    league: { ...fixture.league, name: getDisplayName('league', fixture.league.id, fixture.league.name) },
+                    teams: {
+                        home: { ...fixture.teams.home, name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name) },
+                        away: { ...fixture.teams.away, name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name) }
+                    }
+                }));
+                setMatchesCache(prev => new Map(prev).set(dateKey, processedFixtures));
             }
         }
-        
-        if (!url) {
-            setMatchesCache(prev => new Map(prev).set(dateKey, []));
-            setLoading(false);
-            return;
-        }
-
-        const response = await fetch(url, { 
-            signal: abortSignal,
-            headers: { 'x-rapidapi-key': API_KEY! }
-        });
-        
-        if (!response.ok) throw new Error('Failed to fetch fixtures');
-        const data = await response.json();
-        if (abortSignal.aborted) return;
-
-        const allFixtures: FixtureType[] = data.response || [];
-
-        const processedFixtures = allFixtures.map(fixture => ({
-            ...fixture,
-            league: {
-                ...fixture.league,
-                name: getDisplayName('league', fixture.league.id, fixture.league.name)
-            },
-            teams: {
-                home: {
-                    ...fixture.teams.home,
-                    name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name)
-                },
-                away: {
-                    ...fixture.teams.away,
-                    name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name)
-                }
-            }
-        }));
-        
-        const cacheKey = activeTab === 'all-matches' ? 'live' : dateKey;
-        setMatchesCache(prev => new Map(prev).set(cacheKey, processedFixtures));
-
       } catch (error) {
           if ((error as Error).name !== 'AbortError') {
             toast({
@@ -417,7 +425,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
           fetchAndProcessData(selectedDateKey, controller.signal);
           return () => controller.abort();
       }
-  }, [activeTab, isVisible, selectedDateKey, fetchAndProcessData, matchesCache]);
+  }, [activeTab, isVisible, selectedDateKey, fetchAndProcessData, matchesCache, favorites]);
 
 
   const handleDateChange = (dateKey: string) => {

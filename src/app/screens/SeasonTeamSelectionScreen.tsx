@@ -72,7 +72,7 @@ export function SeasonTeamSelectionScreen({ navigate, goBack, canGoBack, headerA
         setLoading(true);
         const fetchTeams = async () => {
             try {
-                const res = await fetch(`https://v3.football.api-sports.io/teams?league=${leagueId}&season=${CURRENT_SEASON}`, { headers: { 'x-rapidapi-key': API_KEY! } });
+                const res = await fetch(`/api/football/teams?league=${leagueId}&season=${CURRENT_SEASON}`, { headers: { 'x-rapidapi-key': API_KEY! } });
                 const data = await res.json();
                 const rawTeams = data.response || [];
                 const translatedTeams = rawTeams.map((teamData: { team: Team }) => ({

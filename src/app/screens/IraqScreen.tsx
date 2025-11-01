@@ -31,7 +31,6 @@ import { cn } from '@/lib/utils';
 import {Skeleton} from "@/components/ui/skeleton";
 
 const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
-const API_HOST = "v3.football.api-sports.io";
 
 
 const CrownedTeamScroller = ({
@@ -99,7 +98,7 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
             if (!teamId) return;
             setLoading(true);
             try {
-                const url = `https://${API_HOST}/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
+                const url = `/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
                 const res = await fetch(url, { headers: { 'x-rapidapi-key': API_KEY! }});
                 if (!res.ok) throw new Error(`API fetch failed with status: ${res.status}`);
                 

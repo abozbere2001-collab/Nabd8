@@ -259,7 +259,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     break;
                 }
                 
-                const standingsRes = await fetch(`https://v3.football.api-sports.io/standings?league=${leagueId}&season=${year}`, { headers: { 'x-rapidapi-key': API_KEY! }});
+                const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${year}`, { headers: { 'x-rapidapi-key': API_KEY! }});
                 const standingsData = await standingsRes.json();
 
                 if (standingsData.response?.[0]?.league?.standings?.[0]?.length > 0) {
@@ -295,10 +295,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 }
             } else {
                 const [standingsRes, scorersRes, teamsRes, fixturesRes] = await Promise.all([
-                    fetch(`https://v3.football.api-sports.io/standings?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
-                    fetch(`https://v3.football.api-sports.io/players/topscorers?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
-                    fetch(`https://v3.football.api-sports.io/teams?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
-                    fetch(`https://v3.football.api-sports.io/fixtures?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
+                    fetch(`/api/football/standings?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
+                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
+                    fetch(`/api/football/teams?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
+                    fetch(`/api/football/fixtures?league=${leagueId}&season=${seasonToFetch}`, { headers: { 'x-rapidapi-key': API_KEY! }}),
                 ]);
 
                 const standingsData = await standingsRes.json();

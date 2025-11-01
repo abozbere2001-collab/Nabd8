@@ -52,7 +52,7 @@ export function PredictionOdds({ fixtureId }: { fixtureId: number }) {
         let isMounted = true;
         setLoading(true);
 
-        fetch(`https://v3.football.api-sports.io/odds?fixture=${fixtureId}&bookmaker=8`, {
+        fetch(`/api/football/odds?fixture=${fixtureId}&bookmaker=8`, {
              headers: { 'x-rapidapi-key': API_KEY! }
         })
             .then(res => {
