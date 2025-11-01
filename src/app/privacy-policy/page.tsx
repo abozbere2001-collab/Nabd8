@@ -3,13 +3,12 @@
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-// الصفحة نفسها كـ Page export افتراضي
-export default function PrivacyPolicyPage({ goBack, canGoBack }: { goBack?: () => void; canGoBack?: boolean }) {
+function PrivacyPolicyContent() {
   const currentYear = new Date().getFullYear();
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <ScreenHeader title="سياسة الخصوصية" onBack={goBack} canGoBack={!!canGoBack} />
+      <ScreenHeader title="سياسة الخصوصية" />
       <div className="flex-1 overflow-y-auto p-4">
         <Card>
           <CardHeader>
@@ -23,49 +22,46 @@ export default function PrivacyPolicyPage({ goBack, canGoBack }: { goBack?: () =
             </p>
 
             <h3 className="font-bold text-lg text-foreground pt-4">1. المعلومات التي نجمعها</h3>
-            <h4 className="font-semibold text-md text-foreground/90 pt-2">أ. المعلومات التي تقدمها لنا مباشرة:</h4>
             <ul className="list-disc pr-5 space-y-2">
-              <li><b>معلومات الحساب:</b> عند تسجيل الدخول باستخدام حساب جوجل، نحصل على المعلومات الأساسية المرتبطة بحسابك مثل الاسم، البريد الإلكتروني، وصورة الملف الشخصي.</li>
-              <li><b>المحتوى الذي تنشئه:</b> نجمع المحتوى الذي تقوم بإنشائه داخل التطبيق، مثل التعليقات على المباريات، وتوقعاتك للنتائج.</li>
-            </ul>
-
-            <h4 className="font-semibold text-md text-foreground/90 pt-2">ب. المعلومات التي نجمعها تلقائيًا:</h4>
-            <ul className="list-disc pr-5 space-y-2">
-              <li><b>بيانات الاستخدام:</b> معلومات حول كيفية تفاعلك مع التطبيق، مثل الشاشات التي تزورها، والميزات التي تستخدمها.</li>
-              <li><b>بيانات الجهاز:</b> معلومات أساسية عن جهازك مثل نوعه ونظام التشغيل، لأغراض التحليل وتحسين التوافق.</li>
+              <li><b>معلومات الحساب:</b> الاسم، البريد الإلكتروني، وصورة الملف الشخصي عند تسجيل الدخول.</li>
+              <li><b>المحتوى الذي تنشئه:</b> التعليقات وتوقعات النتائج داخل التطبيق.</li>
+              <li><b>بيانات الاستخدام:</b> تتبع التفاعل مع التطبيق والشاشات المفضلة.</li>
+              <li><b>بيانات الجهاز:</b> نوع الجهاز ونظام التشغيل لتحسين الأداء.</li>
             </ul>
 
             <h3 className="font-bold text-lg text-foreground pt-4">2. كيف نستخدم معلوماتك</h3>
             <ul className="list-disc pr-5 space-y-2">
-              <li><b>توفير وتخصيص خدماتنا:</b> إدارة حسابك وعرض المحتوى المناسب لمفضلاتك.</li>
-              <li><b>التواصل معك:</b> إرسال إشعارات حول التفاعلات مع تعليقاتك أو إشعارات أخرى.</li>
-              <li><b>تحسين التطبيق:</b> تحليل بيانات الاستخدام وفهم سلوك المستخدمين لتطوير ميزات جديدة.</li>
-              <li><b>الأمان:</b> حماية أمان حسابك وسلامة خدماتنا.</li>
+              <li><b>توفير وتخصيص خدماتنا:</b> إدارة الحساب وعرض المحتوى المناسب.</li>
+              <li><b>التواصل معك:</b> إشعارات حول التفاعلات والردود.</li>
+              <li><b>تحليل وتحسين التطبيق:</b> تطوير ميزات جديدة وفهم سلوك المستخدمين.</li>
+              <li><b>الأمان:</b> حماية حسابك وسلامة الخدمات.</li>
             </ul>
 
             <h3 className="font-bold text-lg text-foreground pt-4">3. مشاركة المعلومات</h3>
             <ul className="list-disc pr-5 space-y-2">
-              <li><b>مقدمو الخدمات:</b> الاستعانة بخدمات أطراف ثالثة (مثل Firebase) للمساعدة في تشغيل خدماتنا مع الالتزام بسرية معلوماتك.</li>
-              <li><b>لأسباب قانونية:</b> الكشف عن المعلومات إذا كان مطلوبًا بموجب القانون أو استجابة لطلب قانوني صالح.</li>
+              <li><b>مقدمو الخدمات:</b> Firebase وغيرها لتشغيل الخدمات، مع الالتزام بالسرية.</li>
+              <li><b>لأسباب قانونية:</b> الكشف عن المعلومات إذا كان مطلوبًا بموجب القانون.</li>
             </ul>
 
             <h3 className="font-bold text-lg text-foreground pt-4">4. أمان البيانات</h3>
             <p>
-              نتخذ إجراءات أمنية معقولة لحماية معلوماتك الشخصية من الوصول أو الاستخدام أو التغيير أو الكشف غير المصرح به. لكن لا توجد طريقة نقل أو تخزين آمنة بنسبة 100%.
+              نتخذ إجراءات أمنية معقولة لحماية بياناتك، لكن لا يوجد ضمان نقل أو تخزين آمن بنسبة 100%.
             </p>
 
             <h3 className="font-bold text-lg text-foreground pt-4">5. التغييرات على سياسة الخصوصية</h3>
             <p>
-              قد نقوم بتحديث سياسة الخصوصية هذه من وقت لآخر. سنعلمك بأي تغييرات جوهرية من خلال نشر السياسة الجديدة على هذه الصفحة أو إشعار داخل التطبيق.
+              سنعلمك بالتغييرات الجوهرية عن طريق نشر السياسة الجديدة على هذه الصفحة و/أو من خلال إشعار داخل التطبيق.
             </p>
 
             <h3 className="font-bold text-lg text-foreground pt-4">6. اتصل بنا</h3>
-            <p>
-              إذا كان لديك أي أسئلة أو استفسارات حول سياسة الخصوصية، فلا تتردد في التواصل معنا.
-            </p>
+            <p>إذا كان لديك أي أسئلة أو استفسارات حول سياسة الخصوصية هذه، فلا تتردد في التواصل معنا.</p>
           </CardContent>
         </Card>
       </div>
     </div>
   );
+}
+
+export default function PrivacyPolicyPage() {
+  return <PrivacyPolicyContent />;
 }
