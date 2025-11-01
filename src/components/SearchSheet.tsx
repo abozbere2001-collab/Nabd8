@@ -251,8 +251,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     );
 
     const apiSearchPromises = [
-      fetch(`https://v3.football.api-sports.io/teams?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.ok ? res.json() : { response: [] }),
-      fetch(`https://v3.football.api-sports.io/leagues?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.ok ? res.json() : { response: [] })
+      fetch(`/api/football/teams?search=${query}`).then(res => res.ok ? res.json() : { response: [] }),
+      fetch(`/api/football/leagues?search=${query}`).then(res => res.ok ? res.json() : { response: [] })
     ];
     
     try {
