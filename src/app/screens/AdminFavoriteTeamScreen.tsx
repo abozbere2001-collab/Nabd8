@@ -13,7 +13,7 @@ import { CURRENT_SEASON } from '@/lib/constants';
 import { isMatchLive } from '@/lib/matchStatus';
 import { Card, CardContent } from '@/components/ui/card';
 
-const API_KEY = process.env.API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
 
 
 // --- Main Screen Component ---

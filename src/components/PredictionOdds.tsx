@@ -40,7 +40,7 @@ interface ProcessedOdds {
     away: number;
 }
 
-const API_KEY = process.env.API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
 
 
 

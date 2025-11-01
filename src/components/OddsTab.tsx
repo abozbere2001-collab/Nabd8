@@ -10,7 +10,7 @@ import { Skeleton } from './ui/skeleton';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 
-const API_KEY = process.env.API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
 
 
 // --- TYPE DEFINITIONS ---

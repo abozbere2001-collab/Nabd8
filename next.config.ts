@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
     ],
   },
   env: {
-    API_FOOTBALL_KEY: '75f36f22d689a0a61e777d92bbda1c08',
+    NEXT_PUBLIC_API_FOOTBALL_KEY: '75f36f22d689a0a61e777d92bbda1c08',
   },
 };
 
