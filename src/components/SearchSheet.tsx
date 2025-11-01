@@ -28,7 +28,7 @@ import { POPULAR_TEAMS, POPULAR_LEAGUES } from '@/lib/popular-data';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
-const API_KEY = '75f36f22d689a0a61e777d92bbda1c08';
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 // --- Types ---
@@ -251,8 +251,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     );
 
     const apiSearchPromises = [
-      fetch(`https://v3.football.api-sports.io/teams?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }).then(res => res.ok ? res.json() : { response: [] }),
-      fetch(`https://v3.football.api-sports.io/leagues?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }).then(res => res.ok ? res.json() : { response: [] })
+      fetch(`https://v3.football.api-sports.io/teams?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' } }).then(res => res.ok ? res.json() : { response: [] }),
+      fetch(`https://v3.football.api-sports.io/leagues?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' } }).then(res => res.ok ? res.json() : { response: [] })
     ];
     
     try {

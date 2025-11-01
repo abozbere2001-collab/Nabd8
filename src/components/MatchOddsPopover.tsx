@@ -65,11 +65,12 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
 
     useEffect(() => {
         if (!isOpen || odds || loading) return;
+        const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' };
 
         setLoading(true);
         Promise.all([
-            fetch(`/api/football/odds?fixture=${fixtureId}&bookmaker=8`),
-            fetch(`/api/football/fixtures?id=${fixtureId}`)
+            fetch(`https://v3.football.api-sports.io/odds?fixture=${fixtureId}&bookmaker=8`, { headers }),
+            fetch(`https://v3.football.api-sports.io/fixtures?id=${fixtureId}`, { headers })
         ])
         .then(async ([oddsRes, fixtureRes]) => {
             if (!oddsRes.ok || !fixtureRes.ok) {
@@ -157,5 +158,3 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
         </Popover>
     );
 }
-
-    

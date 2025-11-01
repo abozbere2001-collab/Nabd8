@@ -44,7 +44,9 @@ export function AddCompetitionDialog({ isOpen, onOpenChange }: AddCompetitionDia
     setLoading(true);
     try {
       // Fetch league details from API to save in our DB
-      const res = await fetch(`/api/football/leagues?id=${leagueId}`);
+      const res = await fetch(`https://v3.football.api-sports.io/leagues?id=${leagueId}`, {
+        headers: { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' },
+      });
       if (!res.ok) throw new Error('Failed to fetch from API');
       const data = await res.json();
       
@@ -113,5 +115,3 @@ export function AddCompetitionDialog({ isOpen, onOpenChange }: AddCompetitionDia
     </Dialog>
   );
 }
-
-    

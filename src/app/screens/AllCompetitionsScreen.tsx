@@ -365,10 +365,12 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         try {
             let countries: { name: string }[] = [];
             const cachedCountries = getCachedData<{ name: string }[]>(COUNTRIES_CACHE_KEY);
+            const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' };
+            
             if (cachedCountries?.data) {
                 countries = cachedCountries.data;
             } else {
-                const countriesRes = await fetch(`/api/football/countries`);
+                const countriesRes = await fetch(`https://v3.football.api-sports.io/countries`, { headers });
                 if (!countriesRes.ok) throw new Error('Failed to fetch countries');
                 const countriesData = await countriesRes.json();
                 countries = countriesData.response || [];
@@ -376,7 +378,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
 
             const teamPromises = countries.map(country => 
-                fetch(`/api/football/teams?country=${country.name}`)
+                fetch(`https://v3.football.api-sports.io/teams?country=${country.name}`, { headers })
                     .then(res => res.ok ? res.json() : { response: [] })
                     .then(data => (data.response || []).filter((r: { team: Team }) => r.team.national).map((r: { team: Team}) => r.team))
                     .catch(() => []) // return empty array on error for a specific country
@@ -475,12 +477,11 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     const handleOpenRename = (type: RenameType, id: number | string, name: string, originalName?: string) => {
         if (!isAdmin) return;
         setRenameItem({
-            type: type,
             id: id,
             name: name,
             originalName: originalName || name,
             purpose: 'rename',
-        });
+        } as RenameState);
     };
     
     const handleAdminRefresh = async () => {
@@ -693,5 +694,3 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
-
-    
