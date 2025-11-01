@@ -5,7 +5,7 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { type ScreenProps } from "@/app/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function TermsOfServiceScreen(props: Partial<ScreenProps>) {
+export default function TermsOfServiceScreen(props: Partial<ScreenProps> = {}) {
     const { goBack } = props;
     const currentYear = new Date().getFullYear();
     
