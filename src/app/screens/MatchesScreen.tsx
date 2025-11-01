@@ -38,7 +38,8 @@ interface GroupedFixtures {
 
 const popularLeagueIds = new Set(POPULAR_LEAGUES.map(l => l.id));
 
-const API_FOOTBALL_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_HOST = 'v3.football.api-sports.io';
 
 // Fixtures List Component
 const FixturesList = React.memo((props: { 
@@ -271,12 +272,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             return defaultName;
         };
         
-        let url;
         let fixturesToFetch: Promise<any>[] = [];
+        const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
 
         if (activeTab === 'all-matches') {
-            url = `/api/football/fixtures?live=all`;
-            fixturesToFetch.push(fetch(url, { signal: abortSignal }).then(res => res.json()));
+            fixturesToFetch.push(fetch(`https://${API_HOST}/fixtures?live=all`, { headers, signal: abortSignal }).then(res => res.json()));
         } else {
             const currentFavorites = user && !user.isAnonymous ? favorites : getLocalFavorites();
             const teamIds = Object.keys(currentFavorites.teams || {});
@@ -286,15 +286,15 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             if (hasFavorites) {
                 if (leagueIds.length > 0) {
                     const leagueQuery = `ids=${leagueIds.join('-')}`;
-                    fixturesToFetch.push(fetch(`/api/football/fixtures?date=${dateKey}&${leagueQuery}`, { signal: abortSignal }).then(res => res.json()));
+                    fixturesToFetch.push(fetch(`https://${API_HOST}/fixtures?date=${dateKey}&${leagueQuery}`, { headers, signal: abortSignal }).then(res => res.json()));
                 }
                 teamIds.forEach(teamId => {
-                    fixturesToFetch.push(fetch(`/api/football/fixtures?date=${dateKey}&team=${teamId}`, { signal: abortSignal }).then(res => res.json()));
+                    fixturesToFetch.push(fetch(`https://${API_HOST}/fixtures?date=${dateKey}&team=${teamId}`, { headers, signal: abortSignal }).then(res => res.json()));
                 });
             } else {
                 // No favorites, fetch popular leagues
                 const popularLeaguesQuery = `ids=${Array.from(popularLeagueIds).join('-')}`;
-                fixturesToFetch.push(fetch(`/api/football/fixtures?date=${dateKey}&${popularLeaguesQuery}`, { signal: abortSignal }).then(res => res.json()));
+                fixturesToFetch.push(fetch(`https://${API_HOST}/fixtures?date=${dateKey}&${popularLeaguesQuery}`, { headers, signal: abortSignal }).then(res => res.json()));
             }
         }
 

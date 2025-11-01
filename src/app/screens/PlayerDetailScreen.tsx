@@ -17,7 +17,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CURRENT_SEASON } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 
-const API_FOOTBALL_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_HOST = 'v3.football.api-sports.io';
 
 // --- TYPE DEFINITIONS ---
 interface PlayerInfo extends Player {
@@ -182,9 +183,10 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
 
     const getPlayerInfo = async () => {
         setLoading(true);
+        const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
         try {
             // Fetch main player data for the current season
-            const playerRes = await fetch(`/api/football/players?id=${playerId}&season=${CURRENT_SEASON}`);
+            const playerRes = await fetch(`https://${API_HOST}/players?id=${playerId}&season=${CURRENT_SEASON}`, { headers });
             if (playerRes.ok) {
                 const data = await playerRes.json();
                 if (data.response?.[0]) {
@@ -217,7 +219,7 @@ export function PlayerDetailScreen({ navigate, goBack, canGoBack, playerId }: Sc
             }
 
             // Fetch transfer data for career history
-            const transferRes = await fetch(`/api/football/transfers?player=${playerId}`);
+            const transferRes = await fetch(`https://${API_HOST}/transfers?player=${playerId}`, { headers });
             if (transferRes.ok) {
                  const data = await transferRes.json();
                  setTransfers(data.response || []);

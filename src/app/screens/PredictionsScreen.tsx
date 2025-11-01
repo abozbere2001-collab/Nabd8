@@ -27,7 +27,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isMatchLive } from '@/lib/matchStatus';
 
-const API_FOOTBALL_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_HOST = 'v3.football.api-sports.io';
 
 const calculatePoints = (prediction: Prediction, fixture: Fixture): number => {
     // CRITICAL FIX: Ensure fixture.goals exists and scores are not null before calculating.
@@ -280,7 +281,8 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
 
         const fetchLiveFixtures = async () => {
              try {
-                const res = await fetch(`/api/football/fixtures?ids=${liveMatchIds.join('-')}`);
+                const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
+                const res = await fetch(`https://${API_HOST}/fixtures?ids=${liveMatchIds.join('-')}`, { headers });
                 const data = await res.json();
                 if (data.response && data.response.length > 0) {
                     setLiveFixtures(prev => {

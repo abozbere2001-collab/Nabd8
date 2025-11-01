@@ -9,7 +9,6 @@ import { Loader2, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-
 interface OddValue {
     value: string;
     odd: string;
@@ -54,7 +53,8 @@ interface ProcessedOdds {
     awayTeamLogo: string;
 }
 
-const API_FOOTBALL_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_HOST = 'v3.football.api-sports.io';
 
 export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
     const [odds, setOdds] = useState<ProcessedOdds | null>(null);
@@ -65,9 +65,10 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
         if (!isOpen || odds || loading) return;
 
         setLoading(true);
+        const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
         Promise.all([
-            fetch(`/api/football/odds?fixture=${fixtureId}&bookmaker=8`),
-            fetch(`/api/football/fixtures?id=${fixtureId}`)
+            fetch(`https://${API_HOST}/odds?fixture=${fixtureId}&bookmaker=8`, { headers }),
+            fetch(`https://${API_HOST}/fixtures?id=${fixtureId}`, { headers })
         ])
         .then(async ([oddsRes, fixtureRes]) => {
             if (!oddsRes.ok || !fixtureRes.ok) {

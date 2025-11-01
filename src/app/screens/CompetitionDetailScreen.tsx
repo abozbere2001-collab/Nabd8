@@ -44,7 +44,8 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { Card, CardContent } from '@/components/ui/card';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
-const API_FOOTBALL_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_HOST = 'v3.football.api-sports.io';
 
 // --- Caching Logic ---
 const CACHE_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -241,6 +242,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         }
         setLoading(true);
         await fetchAllCustomNames();
+        const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
 
         const seasonsToTry = [CURRENT_SEASON, CURRENT_SEASON + 1, CURRENT_SEASON -1, CURRENT_SEASON + 2, CURRENT_SEASON - 2];
         let activeSeason = CURRENT_SEASON;
@@ -258,7 +260,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     break;
                 }
                 
-                const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${year}`);
+                const standingsRes = await fetch(`https://${API_HOST}/standings?league=${leagueId}&season=${year}`, { headers });
                 const standingsData = await standingsRes.json();
 
                 if (standingsData.response?.[0]?.league?.standings?.[0]?.length > 0) {
@@ -278,6 +280,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
         if (!leagueId) return;
         setLoading(true);
         if (customNames === null) await fetchAllCustomNames();
+        const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
 
         try {
             const cacheKey = `competition_data_${leagueId}_${seasonToFetch}`;
@@ -294,10 +297,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 }
             } else {
                 const [standingsRes, scorersRes, teamsRes, fixturesRes] = await Promise.all([
-                    fetch(`/api/football/standings?league=${leagueId}&season=${seasonToFetch}`),
-                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${seasonToFetch}`),
-                    fetch(`/api/football/teams?league=${leagueId}&season=${seasonToFetch}`),
-                    fetch(`/api/football/fixtures?league=${leagueId}&season=${seasonToFetch}`),
+                    fetch(`https://${API_HOST}/standings?league=${leagueId}&season=${seasonToFetch}`, { headers }),
+                    fetch(`https://${API_HOST}/players/topscorers?league=${leagueId}&season=${seasonToFetch}`, { headers }),
+                    fetch(`https://${API_HOST}/teams?league=${leagueId}&season=${seasonToFetch}`, { headers }),
+                    fetch(`https://${API_HOST}/fixtures?league=${leagueId}&season=${seasonToFetch}`, { headers }),
                 ]);
 
                 const standingsData = await standingsRes.json();

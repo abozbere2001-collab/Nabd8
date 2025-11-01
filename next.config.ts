@@ -2,6 +2,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  output: 'export',
   images: {
     remotePatterns: [
       {
@@ -11,7 +12,7 @@ const nextConfig: NextConfig = {
     ],
   },
   env: {
-    API_FOOTBALL_KEY: 'de25630c819237c126015c743e8b70dc',
+    NEXT_PUBLIC_API_FOOTBALL_KEY: 'de25630c819237c126015c743e8b70dc',
   },
 };
 
