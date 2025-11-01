@@ -5,8 +5,12 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { type ScreenProps } from "@/app/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function PrivacyPolicyScreen({ goBack }: Partial<ScreenProps>) {
+// The component now accepts a 'props' object which can be empty.
+// We extract 'goBack' from it. This satisfies Next.js page requirements.
+export default function PrivacyPolicyScreen(props: Partial<ScreenProps>) {
+  const { goBack } = props;
   const currentYear = new Date().getFullYear();
+  
   return (
     <div className="flex flex-col h-full bg-background">
       <ScreenHeader title="سياسة الخصوصية" onBack={goBack} canGoBack={!!goBack} />
