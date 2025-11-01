@@ -26,7 +26,8 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { isMatchLive } from '@/lib/matchStatus';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
-const API_FOOTBALL_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_HOST = 'v3.football.api-sports.io';
 
 // --- Caching Logic ---
 const CACHE_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -144,7 +145,8 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
             }
 
             try {
-                const res = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`);
+                const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
+                const res = await fetch(`https://${API_HOST}/players?team=${teamId}&season=${CURRENT_SEASON}`, { headers });
                 const data = await res.json();
                 if (data.response) {
                     const fetchedPlayers = data.response.map((p: any) => p.player);
@@ -263,9 +265,10 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
             setLoading(true);
             await fetchAllCustomNames();
             try {
+                const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
                 const [fixturesRes, statsRes] = await Promise.all([
-                    fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`),
-                    fetch(`/api/football/teams/statistics?team=${teamId}&season=${CURRENT_SEASON}`)
+                    fetch(`https://${API_HOST}/fixtures?team=${teamId}&season=${CURRENT_SEASON}`, { headers }),
+                    fetch(`https://${API_HOST}/teams/statistics?team=${teamId}&season=${CURRENT_SEASON}`, { headers })
                 ]);
 
                 const fixturesData = await fixturesRes.json();
@@ -278,7 +281,7 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
                 const leagueId = sortedFixtures[0]?.league?.id || statsData?.response?.league?.id;
 
                 if (leagueId) {
-                    const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`);
+                    const standingsRes = await fetch(`https://${API_HOST}/standings?league=${leagueId}&season=${CURRENT_SEASON}`, { headers });
                     const standingsData = await standingsRes.json();
                     setStandings(standingsData.response?.[0]?.league?.standings?.[0] || []);
                 }
@@ -499,7 +502,8 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     const getTeamInfo = async () => {
         setLoading(true);
         try {
-            const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
+            const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
+            const teamRes = await fetch(`https://${API_HOST}/teams?id=${teamId}`, { headers });
             if (!teamRes.ok) throw new Error("Team API fetch failed");
             
             const data = await teamRes.json();

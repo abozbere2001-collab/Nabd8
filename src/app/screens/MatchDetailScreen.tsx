@@ -28,7 +28,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { Button } from '@/components/ui/button';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 
-const API_FOOTBALL_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_HOST = 'v3.football.api-sports.io';
 
 // This is a temporary fallback. In a real app, you would use a proper i18n library.
 const useTranslation = () => ({ t: (key: string) => key.replace(/_/g, ' ') });
@@ -641,12 +642,13 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
     useEffect(() => {
         const controller = new AbortController();
         const signal = controller.signal;
+        const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
 
         const fetchInitialFixture = async () => {
             if (!fixtureId) return;
             setLoadingFixture(true);
             try {
-                const response = await fetch(`/api/football/fixtures?id=${fixtureId}`, { signal });
+                const response = await fetch(`https://${API_HOST}/fixtures?id=${fixtureId}`, { headers, signal });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
 
@@ -668,6 +670,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
         const controller = new AbortController();
         const signal = controller.signal;
+        const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
         let unsubStatus: (() => void) | undefined;
         
         const fetchAllDetails = async () => {
@@ -682,7 +685,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
 
                     while (currentPage <= totalPages) {
                         try {
-                            const res = await fetch(`/api/football/players?team=${teamId}&season=${season}&page=${currentPage}`, { signal });
+                            const res = await fetch(`https://${API_HOST}/players?team=${teamId}&season=${season}&page=${currentPage}`, { headers, signal });
                             if (signal.aborted) return [];
                             if (res.ok) {
                                 const data = await res.json();
@@ -702,9 +705,9 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
                 };
                 
                 const [lineupsRes, eventsRes, statsRes, homePlayersData, awayPlayersData] = await Promise.all([
-                    fetch(`/api/football/fixtures/lineups?fixture=${fixture.fixture.id}`, { signal }),
-                    fetch(`/api/football/fixtures/events?fixture=${fixture.fixture.id}`, { signal }),
-                    fetch(`/api/football/fixtures/statistics?fixture=${fixture.fixture.id}`, { signal }),
+                    fetch(`https://${API_HOST}/fixtures/lineups?fixture=${fixture.fixture.id}`, { headers, signal }),
+                    fetch(`https://${API_HOST}/fixtures/events?fixture=${fixture.fixture.id}`, { headers, signal }),
+                    fetch(`https://${API_HOST}/fixtures/statistics?fixture=${fixture.fixture.id}`, { headers, signal }),
                     fetchTeamPlayers(fixture.teams.home.id, fixture.league.season),
                     fetchTeamPlayers(fixture.teams.away.id, fixture.league.season),
                 ]);
@@ -741,7 +744,7 @@ export default function MatchDetailScreen({ goBack, canGoBack, fixtureId, naviga
         const fetchStandings = async () => {
             setLoadingStandings(true);
             try {
-                const response = await fetch(`/api/football/standings?league=${fixture.league.id}&season=${fixture.league.season}`, { signal });
+                const response = await fetch(`https://${API_HOST}/standings?league=${fixture.league.id}&season=${fixture.league.season}`, { headers, signal });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 if (signal.aborted) return;
