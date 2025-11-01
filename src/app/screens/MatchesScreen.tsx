@@ -300,21 +300,34 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         if (activeTab === 'all-matches') {
             url = `https://v3.football.api-sports.io/fixtures?live=all`;
         } else {
-             const { teams, leagues } = getLocalFavorites();
-             const teamIds = Object.keys(teams || {});
-             const leagueIds = Object.keys(leagues || {});
-
-             // If user has favorites, fetch by their favorites.
-             if (teamIds.length > 0 || leagueIds.length > 0) {
-                 const leagueQuery = `league=${leagueIds.join('-')}`;
-                 url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${leagueQuery}`;
-             } else {
-                // If no favorites, fetch by all popular leagues to provide some data
-                 const popularLeaguesQuery = `league=${Array.from(popularLeagueIds).join('-')}`;
-                 url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${popularLeaguesQuery}`;
-             }
+            const favs = user && !user.isAnonymous ? favorites : getLocalFavorites();
+            const teamIds = Object.keys(favs.teams || {});
+            const leagueIds = Object.keys(favs.leagues || {});
+            const hasFavorites = teamIds.length > 0 || leagueIds.length > 0;
+            
+            if (hasFavorites) {
+                const teamQuery = teamIds.length > 0 ? `team=${teamIds[0]}` : ''; // API limitation, can only query one team for a specific date
+                const leaguesQuery = `ids=${leagueIds.join('-')}`;
+                
+                // Prioritize fetching by league if available, as it's more efficient.
+                if (leagueIds.length > 0) {
+                     url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${leaguesQuery}`;
+                } else {
+                    // Fallback to team query if only teams are favorited
+                     url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${teamQuery}`;
+                }
+            } else {
+                const popularLeaguesQuery = `ids=${Array.from(popularLeagueIds).join('-')}`;
+                url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${popularLeaguesQuery}`;
+            }
         }
         
+        if (!url) {
+            setMatchesCache(prev => new Map(prev).set(dateKey, []));
+            setLoading(false);
+            return;
+        }
+
         const response = await fetch(url, { 
             signal: abortSignal,
             headers: { 'x-rapidapi-key': API_KEY! }
@@ -362,7 +375,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             setLoading(false);
           }
       }
-  }, [activeTab, customNamesCache, fetchAllCustomNames, toast]);
+  }, [activeTab, customNamesCache, fetchAllCustomNames, toast, user, favorites]);
 
 
   useEffect(() => {
