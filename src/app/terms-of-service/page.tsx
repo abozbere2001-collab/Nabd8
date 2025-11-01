@@ -2,16 +2,14 @@
 "use client";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { type ScreenProps } from "@/app/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-// The default export now correctly handles the case where no props are passed during build time.
-export default function TermsOfServiceScreen({ goBack }: { goBack?: () => void } = {}) {
+export function TermsOfServiceContent({ goBack, canGoBack }: { goBack?: () => void, canGoBack?: boolean }) {
     const currentYear = new Date().getFullYear();
     
     return (
         <div className="flex flex-col h-full bg-background">
-          <ScreenHeader title="شروط الخدمة" onBack={goBack} canGoBack={!!goBack} />
+          <ScreenHeader title="شروط الخدمة" onBack={goBack} canGoBack={!!canGoBack} />
           <div className="flex-1 overflow-y-auto p-4">
             <Card>
               <CardHeader>
@@ -73,4 +71,10 @@ export default function TermsOfServiceScreen({ goBack }: { goBack?: () => void }
           </div>
         </div>
       );
+}
+
+// Default export for Next.js page routing
+export default function TermsOfServiceScreen() {
+  // This version is used for static export and doesn't need props.
+  return <TermsOfServiceContent />;
 }

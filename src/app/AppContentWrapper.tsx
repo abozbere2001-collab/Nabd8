@@ -21,8 +21,8 @@ import { ManagePinnedMatchScreen } from './screens/ManagePinnedMatchScreen';
 import MatchDetailScreen from './screens/MatchDetailScreen';
 import { NotificationSettingsScreen } from './screens/NotificationSettingsScreen';
 import { GeneralSettingsScreen } from './screens/GeneralSettingsScreen';
-import PrivacyPolicyScreen from './privacy-policy/page';
-import TermsOfServiceScreen from './terms-of-service/page';
+import PrivacyPolicyScreen, { PrivacyPolicyContent } from './privacy-policy/page';
+import TermsOfServiceScreen, { TermsOfServiceContent } from './terms-of-service/page';
 import { GoProScreen } from './screens/GoProScreen';
 import type { ScreenKey } from './page';
 
@@ -45,7 +45,7 @@ import { ManageTopScorersScreen } from './screens/ManageTopScorersScreen';
 import { IraqScreen } from './screens/IraqScreen';
 import { PredictionsScreen } from './screens/PredictionsScreen';
 
-const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
+const screenConfig: Record<string, { component: React.ComponentType<any>; contentComponent?: React.ComponentType<any> }> = {
   Matches: { component: MatchesScreen },
   Competitions: { component: CompetitionsScreen },
   AllCompetitions: { component: AllCompetitionsScreen },
@@ -64,8 +64,8 @@ const screenConfig: Record<string, { component: React.ComponentType<any>;}> = {
   MatchDetails: { component: MatchDetailScreen },
   NotificationSettings: { component: NotificationSettingsScreen },
   GeneralSettings: { component: GeneralSettingsScreen },
-  PrivacyPolicy: { component: PrivacyPolicyScreen },
-  TermsOfService: { component: TermsOfServiceScreen },
+  PrivacyPolicy: { component: PrivacyPolicyScreen, contentComponent: PrivacyPolicyContent },
+  TermsOfService: { component: TermsOfServiceScreen, contentComponent: TermsOfServiceContent },
   GoPro: { component: GoProScreen },
   ManageTopScorers: { component: ManageTopScorersScreen },
   MyCountry: { component: IraqScreen },
@@ -231,8 +231,10 @@ export function AppContentWrapper() {
                     >
                         {stack.map((stackItem, index) => {
                             const isVisible = index === stack.length - 1;
-                            const Component = screenConfig[stackItem.screen]?.component;
-                            if (!Component) return null;
+                            const screenInfo = screenConfig[stackItem.screen];
+                            if (!screenInfo) return null;
+
+                            const Component = screenInfo.contentComponent || screenInfo.component;
                             
                             const screenProps = {
                                 ...stackItem.props,
