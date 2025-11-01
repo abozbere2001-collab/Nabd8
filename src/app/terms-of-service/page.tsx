@@ -3,12 +3,13 @@
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-function TermsOfServiceContent() {
+// This is the actual UI component. It can accept props.
+export function TermsOfServiceContent({ goBack, canGoBack }: { goBack?: () => void, canGoBack?: boolean }) {
   const currentYear = new Date().getFullYear();
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <ScreenHeader title="شروط الخدمة" />
+      <ScreenHeader title="شروط الخدمة" onBack={goBack} canGoBack={!!canGoBack} />
       <div className="flex-1 overflow-y-auto p-4">
         <Card>
           <CardHeader>
@@ -54,6 +55,7 @@ function TermsOfServiceContent() {
   );
 }
 
+// Default export for Next.js page routing. It accepts NO props.
 export default function TermsOfServicePage() {
   return <TermsOfServiceContent />;
 }

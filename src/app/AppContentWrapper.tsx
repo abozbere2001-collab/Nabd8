@@ -265,4 +265,4 @@ export function AppContentWrapper() {
         {mainTabs.includes(activeStack[activeStack.length - 1]?.screen) && <BottomNav activeScreen={navigationState.activeTab} onNavigate={(screen) => navigate(screen)} />}
         </main>
   );
-      }
+}

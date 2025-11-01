@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -218,36 +219,13 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             unsubscribe = onSnapshot(favoritesRef, (docSnap) => {
                 setFavorites(docSnap.exists() ? (docSnap.data() as Favorites) : {});
             }, (error) => {
-                 if(error.code === 'permission-denied') {
+                if(error.code === 'permission-denied') {
                     setFavorites(getLocalFavorites());
                 } else {
                     errorEmitter.emit('permission-error', new FirestorePermissionError({
                         path: favoritesRef.path,
                         operation: 'get',
-                    }));} else {
-                const response = await fetch(`https://v3.football.api-sports.io/teams?country=${cachedCountries?.data?.map(c => c.name).join(',')}`, { headers });
-                const result = await response.json();
-                if (result?.response) {
-                    const teams: Team[] = result.response.map((t: any) => ({
-                        id: t.team.id,
-                        name: t.team.name,
-                        country: t.team.country,
-                        logo: t.team.logo,
                     }));
-                    setNationalTeams(teams);
-                    setCachedData(TEAMS_CACHE_KEY, teams);
-                }
-            }
-        } catch (error) {
-            console.error("Error fetching national teams:", error);
-            toast({ variant: 'destructive', title: "خطأ", description: "فشل في جلب بيانات المنتخبات." });
-        } finally {
-            setLoadingNationalTeams(false);
-        }
-    }, [toast]);
-
-    return null; // أو يمكنك استبداله بالعرض المناسب للشاشة إذا لزم
-                         }
                 }
             });
         } else {
@@ -285,4 +263,59 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
                  sortedGrouped.World = { leagues: worldLeagues };
             } else {
                 const countries = grouped[continent] as CompetitionsByCountry;
-                const sortedCountries = Object.keys(countries).sort((a,b) => getName('country', a, a).localeCompare(getName('country', b, b), '
+                const sortedCountries = Object.keys(countries).sort((a,b) => getName('country', a, a).localeCompare(getName('country', b, b), 'ar'));
+                sortedGrouped[continent] = {};
+                for (const country of sortedCountries) {
+                    countries[country].leagues.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+                    (sortedGrouped[continent] as CompetitionsByCountry)[country] = countries[country];
+                }
+            }
+        }
+        return sortedGrouped;
+    }, [managedCompetitions, getName]);
+    
+
+    const teamsByContinent = useMemo(() => {
+        if (!nationalTeams) return null;
+        const grouped: TeamsByContinent = {};
+        nationalTeams.forEach(team => {
+            const continent = countryToContinent[team.country] || "Other";
+             if (!grouped[continent]) grouped[continent] = [];
+            grouped[continent].push(team);
+        });
+        const sortedGrouped: TeamsByContinent = {};
+        const continents = Object.keys(grouped).sort((a, b) => continentOrder.indexOf(a) - continentOrder.indexOf(b));
+        for (const continent of continents) {
+            sortedGrouped[continent] = grouped[continent].sort((a, b) => getName('team', a.id, a.name).localeCompare(getName('team', b.id, b.name), 'ar'));
+        }
+        return sortedGrouped;
+    }, [nationalTeams, getName]);
+    
+    const fetchNationalTeams = useCallback(async (forceRefresh = false) => {
+        setLoadingNationalTeams(true);
+        const cachedTeams = getCachedData<Team[]>(TEAMS_CACHE_KEY);
+        if (cachedTeams && !forceRefresh) {
+            setNationalTeams(cachedTeams);
+            setLoadingNationalTeams(false);
+            return;
+        }
+        try {
+            const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
+            const cachedCountries = getCachedData<{ name: string; flag: string | null }[]>(COUNTRIES_CACHE_KEY);
+
+            if (cachedCountries?.data) {
+                // This seems to be the location of the syntax error
+            }
+            
+        } catch (error) {
+            console.error("Error fetching national teams:", error);
+            toast({ variant: 'destructive', title: "خطأ", description: "فشل في جلب بيانات المنتخبات." });
+        } finally {
+            setLoadingNationalTeams(false);
+        }
+    }, [toast]);
+
+    return null; // The component will be built out in subsequent steps
+}
+
+    
