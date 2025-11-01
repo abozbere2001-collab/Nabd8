@@ -22,7 +22,7 @@ import { Loader2 } from 'lucide-react';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
-const API_KEY = process.env.API_FOOTBALL_KEY;
+const API_KEY = '75f36f22d689a0a61e777d92bbda1c08';
 
 
 interface AddCompetitionDialogProps {

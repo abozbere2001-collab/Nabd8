@@ -38,7 +38,7 @@ interface GroupedFixtures {
 
 const popularLeagueIds = new Set(POPULAR_LEAGUES.map(l => l.id));
 
-const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = '75f36f22d689a0a61e777d92bbda1c08';
 
 
 // Fixtures List Component
@@ -298,7 +298,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         
         let url;
         if (activeTab === 'all-matches') {
-            url = `/api/football/fixtures?live=all`;
+            url = `https://v3.football.api-sports.io/fixtures?live=all`;
         } else {
             const favs = user && !user.isAnonymous ? favorites : getLocalFavorites();
             const teamIds = Object.keys(favs.teams || {});
@@ -313,11 +313,11 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
                 
                 const fetchPromises: Promise<any>[] = [];
                 if (leagueQuery) {
-                    fetchPromises.push(fetch(`/api/football/fixtures?date=${dateKey}&${leagueQuery}`, { signal, headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.json()));
+                    fetchPromises.push(fetch(`https://v3.football.api-sports.io/fixtures?date=${dateKey}&${leagueQuery}`, { signal, headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }).then(res => res.json()));
                 }
                  // Make a request for each favorite team
                  teamIds.forEach(teamId => {
-                    fetchPromises.push(fetch(`/api/football/fixtures?date=${dateKey}&team=${teamId}`, { signal, headers: { 'x-rapidapi-key': API_KEY! } }).then(res => res.json()));
+                    fetchPromises.push(fetch(`https://v3.football.api-sports.io/fixtures?date=${dateKey}&team=${teamId}`, { signal, headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }).then(res => res.json()));
                  });
                  const responses = await Promise.all(fetchPromises);
                  if (abortSignal.aborted) return;
@@ -349,8 +349,8 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
             } else {
                 const popularLeaguesQuery = `ids=${Array.from(popularLeagueIds).join('-')}`;
-                url = `/api/football/fixtures?date=${dateKey}&${popularLeaguesQuery}`;
-                 const response = await fetch(url, { signal, headers: { 'x-rapidapi-key': API_KEY! }});
+                url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${popularLeaguesQuery}`;
+                 const response = await fetch(url, { signal, headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' }});
                  if (!response.ok) throw new Error('Failed to fetch fixtures');
                 const data = await response.json();
                 if (abortSignal.aborted) return;
