@@ -18,11 +18,8 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     
     // This is the crucial fix for multi-tenant auth on different domains like github.io
     // It tells Firebase to trust the domain the app is currently running on.
-    if (auth.tenantId === null) {
-      const authDomain = auth.config.authDomain;
-      if (authDomain) {
-         auth.tenantId = authDomain;
-      }
+    if (auth.tenantId === null && auth.config.authDomain) {
+        auth.tenantId = auth.config.authDomain;
     }
 
   }, []);

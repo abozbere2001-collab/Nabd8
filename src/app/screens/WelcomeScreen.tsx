@@ -19,7 +19,7 @@ export function WelcomeScreen() {
   
   useEffect(() => {
     const checkRedirect = async () => {
-      if (!db) return;
+      if (!db || !auth) return;
       try {
         const result = await getRedirectResult(auth);
         if (result && result.user) {

@@ -6,3 +6,4 @@ export const BUNDESLIGA_ID = 78;
 export const CHAMPIONS_LEAGUE_ID = 2;
 export const CURRENT_SEASON = 2023;
 export const PREVIOUS_SEASON = new Date().getFullYear() - 1;
+
