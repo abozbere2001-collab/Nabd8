@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -301,10 +300,12 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         }
         try {
             const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': API_HOST };
-            const cachedCountries = getCachedData<{ name: string; flag: string | null }[]>(COUNTRIES_CACHE_KEY);
-
-            if (cachedCountries?.data) {
-                // This seems to be the location of the syntax error
+            const response = await fetch(`https://${API_HOST}/teams?country=Iraq`, { headers }); // Example fetch, adjust as needed
+            const result = await response.json();
+            if (result?.response) {
+                const teams: Team[] = result.response.map((item: any) => item.team);
+                setNationalTeams(teams);
+                setCachedData(TEAMS_CACHE_KEY, teams);
             }
             
         } catch (error) {
@@ -316,6 +317,4 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
     }, [toast]);
 
     return null; // The component will be built out in subsequent steps
-}
-
-    
+        }
