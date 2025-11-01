@@ -279,7 +279,7 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
 
         if (activeTab === 'all-matches') {
             url = `https://v3.football.api-sports.io/fixtures?live=all`;
-            fixturesToFetch.push(fetch(url, { headers }).then(res => res.json()));
+            fixturesToFetch.push(fetch(url, { headers, signal }).then(res => res.json()));
         } else {
             const currentFavorites = user && !user.isAnonymous ? favorites : getLocalFavorites();
             const teamIds = Object.keys(currentFavorites.teams || {});
@@ -289,15 +289,15 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
             if (hasFavorites) {
                 if (leagueIds.length > 0) {
                     const leagueQuery = `ids=${leagueIds.join('-')}`;
-                    fixturesToFetch.push(fetch(`https://v3.football.api-sports.io/fixtures?date=${dateKey}&${leagueQuery}`, { headers }).then(res => res.json()));
+                    fixturesToFetch.push(fetch(`https://v3.football.api-sports.io/fixtures?date=${dateKey}&${leagueQuery}`, { headers, signal }).then(res => res.json()));
                 }
                 teamIds.forEach(teamId => {
-                    fixturesToFetch.push(fetch(`https://v3.football.api-sports.io/fixtures?date=${dateKey}&team=${teamId}`, { headers }).then(res => res.json()));
+                    fixturesToFetch.push(fetch(`https://v3.football.api-sports.io/fixtures?date=${dateKey}&team=${teamId}`, { headers, signal }).then(res => res.json()));
                 });
             } else {
                 // No favorites, fetch popular leagues
                 const popularLeaguesQuery = `ids=${Array.from(popularLeagueIds).join('-')}`;
-                fixturesToFetch.push(fetch(`https://v3.football.api-sports.io/fixtures?date=${dateKey}&${popularLeaguesQuery}`, { headers }).then(res => res.json()));
+                fixturesToFetch.push(fetch(`https://v3.football.api-sports.io/fixtures?date=${dateKey}&${popularLeaguesQuery}`, { headers, signal }).then(res => res.json()));
             }
         }
 

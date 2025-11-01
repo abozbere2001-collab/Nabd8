@@ -98,8 +98,8 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
             if (!teamId) return;
             setLoading(true);
             try {
-                const url = `/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
-                const res = await fetch(url);
+                const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
+                const res = await fetch(url, { headers: { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' } });
                 if (!res.ok) throw new Error(`API fetch failed with status: ${res.status}`);
                 
                 const data = await res.json();
@@ -277,5 +277,3 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
-
-    

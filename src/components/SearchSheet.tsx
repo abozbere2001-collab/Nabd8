@@ -239,6 +239,7 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   const handleSearch = useCallback(async (query: string) => {
     setLoading(true);
     const normalizedQuery = normalizeArabic(query);
+    const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' };
 
     if (!normalizedQuery) {
         setSearchResults([]);
@@ -251,8 +252,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     );
 
     const apiSearchPromises = [
-      fetch(`https://v3.football.api-sports.io/teams?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' } }).then(res => res.ok ? res.json() : { response: [] }),
-      fetch(`https://v3.football.api-sports.io/leagues?search=${query}`, { headers: { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' } }).then(res => res.ok ? res.json() : { response: [] })
+      fetch(`https://v3.football.api-sports.io/teams?search=${query}`, { headers }).then(res => res.ok ? res.json() : { response: [] }),
+      fetch(`https://v3.football.api-sports.io/leagues?search=${query}`, { headers }).then(res => res.ok ? res.json() : { response: [] })
     ];
     
     try {
