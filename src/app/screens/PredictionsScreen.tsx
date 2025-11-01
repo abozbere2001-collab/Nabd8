@@ -281,9 +281,7 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
 
         const fetchLiveFixtures = async () => {
              try {
-                const res = await fetch(`https://v3.football.api-sports.io/fixtures?ids=${liveMatchIds.join('-')}`, {
-                    headers: { 'x-rapidapi-key': API_KEY! }
-                });
+                const res = await fetch(`/api/football/fixtures?ids=${liveMatchIds.join('-')}`);
                 const data = await res.json();
                 if (data.response && data.response.length > 0) {
                     setLiveFixtures(prev => {
@@ -531,3 +529,5 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         </div>
     );
 };
+
+    

@@ -54,7 +54,7 @@ interface ProcessedOdds {
     awayTeamLogo: string;
 }
 
-const API_KEY = '75f36f22d689a0a61e777d92bbda1c08';
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 
@@ -68,18 +68,8 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
 
         setLoading(true);
         Promise.all([
-            fetch(`https://v3.football.api-sports.io/odds?fixture=${fixtureId}&bookmaker=8`, {
-              headers: {
-                'x-rapidapi-key': API_KEY,
-                'x-rapidapi-host': 'v3.football.api-sports.io',
-              },
-            }),
-            fetch(`https://v3.football.api-sports.io/fixtures?id=${fixtureId}`, {
-              headers: {
-                'x-rapidapi-key': API_KEY,
-                'x-rapidapi-host': 'v3.football.api-sports.io',
-              },
-            })
+            fetch(`/api/football/odds?fixture=${fixtureId}&bookmaker=8`),
+            fetch(`/api/football/fixtures?id=${fixtureId}`)
         ])
         .then(async ([oddsRes, fixtureRes]) => {
             if (!oddsRes.ok || !fixtureRes.ok) {
@@ -167,3 +157,5 @@ export function MatchOddsPopover({ fixtureId }: { fixtureId: number }) {
         </Popover>
     );
 }
+
+    

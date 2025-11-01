@@ -38,7 +38,8 @@ interface GroupedFixtures {
 
 const popularLeagueIds = new Set(POPULAR_LEAGUES.map(l => l.id));
 
-const API_KEY = '75f36f22d689a0a61e777d92bbda1c08';
+const API_KEY = process.env.API_FOOTBALL_KEY;
+const API_HOST = "v3.football.api-sports.io";
 
 
 // Fixtures List Component
@@ -255,37 +256,13 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   }, [db, pinnedPredictionMatches, toast]);
 
 
-  const fetchAllCustomNames = useCallback(async (abortSignal: AbortSignal) => {
-    if (customNamesCache || !db) return;
-     try {
-        const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
-            getDocs(collection(db, 'leagueCustomizations')),
-            getDocs(collection(db, 'teamCustomizations'))
-        ]);
-        
-        if (abortSignal.aborted) return;
-        
-        const leagueNames = new Map<number, string>();
-        leaguesSnapshot?.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
-        const teamNames = new Map<number, string>();
-        teamsSnapshot?.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
-        
-        setCustomNamesCache({ leagues: leagueNames, teams: teamNames });
-    } catch(e) {
-        console.warn("Could not fetch custom names", e);
-        setCustomNamesCache({ leagues: new Map(), teams: new Map() });
-    }
-  }, [customNamesCache, db]);
-
-
   const fetchAndProcessData = useCallback(async (dateKey: string, abortSignal: AbortSignal) => {
     setLoading(true);
-    
-    try {
-        await fetchAllCustomNames(abortSignal);
 
+    try {
         const getDisplayName = (type: 'team' | 'league', id: number, defaultName: string) => {
-            const firestoreMap = type === 'team' ? customNamesCache?.teams : customNamesCache?.leagues;
+            if (!customNamesCache) return defaultName;
+            const firestoreMap = type === 'team' ? customNamesCache.teams : customNamesCache.leagues;
             const customName = firestoreMap?.get(id);
             if (customName) return customName;
 
@@ -297,119 +274,121 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
         };
         
         let url;
+        let fixturesToFetch: Promise<any>[] = [];
+
         if (activeTab === 'all-matches') {
-            url = `https://v3.football.api-sports.io/fixtures?live=all`;
+            url = `/api/football/fixtures?live=all`;
+            fixturesToFetch.push(fetch(url).then(res => res.json()));
         } else {
-            const favs = user && !user.isAnonymous ? favorites : getLocalFavorites();
+            const favs = favorites; // Use the state which is updated by the useEffect listener
             const teamIds = Object.keys(favs.teams || {});
             const leagueIds = Object.keys(favs.leagues || {});
             const hasFavorites = teamIds.length > 0 || leagueIds.length > 0;
-            
+
             if (hasFavorites) {
-                // The API supports multiple league IDs but only one team ID per request for this endpoint.
-                // A better approach would be multiple requests or a different endpoint if available.
-                // For now, we'll make separate requests if needed, which is inefficient but works.
-                const leagueQuery = leagueIds.length > 0 ? `ids=${leagueIds.join('-')}` : '';
-                
-                const fetchPromises: Promise<any>[] = [];
-                if (leagueQuery) {
-                    fetchPromises.push(fetch(`https://v3.football.api-sports.io/fixtures?date=${dateKey}&${leagueQuery}`, { signal, headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }).then(res => res.json()));
+                if (leagueIds.length > 0) {
+                    const leagueQuery = `ids=${leagueIds.join('-')}`;
+                    fixturesToFetch.push(fetch(`/api/football/fixtures?date=${dateKey}&${leagueQuery}`).then(res => res.json()));
                 }
-                 // Make a request for each favorite team
-                 teamIds.forEach(teamId => {
-                    fetchPromises.push(fetch(`https://v3.football.api-sports.io/fixtures?date=${dateKey}&team=${teamId}`, { signal, headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }).then(res => res.json()));
-                 });
-                 const responses = await Promise.all(fetchPromises);
-                 if (abortSignal.aborted) return;
-                 const allFixtures: FixtureType[] = [];
-                 const fixtureIds = new Set<number>();
-                 responses.forEach(data => {
-                     if (data.response) {
-                         data.response.forEach((fixture: FixtureType) => {
-                             if (!fixtureIds.has(fixture.fixture.id)) {
-                                 allFixtures.push(fixture);
-                                 fixtureIds.add(fixture.fixture.id);
-                             }
-                         });
-                     }
-                 });
-                 const processedFixtures = allFixtures.map(fixture => ({
-                    ...fixture,
-                    league: {
-                        ...fixture.league,
-                        name: getDisplayName('league', fixture.league.id, fixture.league.name)
-                    },
-                    teams: {
-                        home: { ...fixture.teams.home, name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name) },
-                        away: { ...fixture.teams.away, name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name) }
-                    }
-                }));
-                setMatchesCache(prev => new Map(prev).set(dateKey, processedFixtures));
-
-
+                teamIds.forEach(teamId => {
+                    fixturesToFetch.push(fetch(`/api/football/fixtures?date=${dateKey}&team=${teamId}`).then(res => res.json()));
+                });
             } else {
+                // No favorites, fetch popular leagues
                 const popularLeaguesQuery = `ids=${Array.from(popularLeagueIds).join('-')}`;
-                url = `https://v3.football.api-sports.io/fixtures?date=${dateKey}&${popularLeaguesQuery}`;
-                 const response = await fetch(url, { signal, headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' }});
-                 if (!response.ok) throw new Error('Failed to fetch fixtures');
-                const data = await response.json();
-                if (abortSignal.aborted) return;
-
-                const allFixtures: FixtureType[] = data.response || [];
-
-                const processedFixtures = allFixtures.map(fixture => ({
-                    ...fixture,
-                    league: { ...fixture.league, name: getDisplayName('league', fixture.league.id, fixture.league.name) },
-                    teams: {
-                        home: { ...fixture.teams.home, name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name) },
-                        away: { ...fixture.teams.away, name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name) }
-                    }
-                }));
-                setMatchesCache(prev => new Map(prev).set(dateKey, processedFixtures));
+                fixturesToFetch.push(fetch(`/api/football/fixtures?date=${dateKey}&${popularLeaguesQuery}`).then(res => res.json()));
             }
         }
-      } catch (error) {
-          if ((error as Error).name !== 'AbortError') {
+
+        const responses = await Promise.all(fixturesToFetch);
+        if (abortSignal.aborted) return;
+        
+        const allFixtures: FixtureType[] = [];
+        const fixtureIds = new Set<number>();
+        
+        responses.forEach(data => {
+            if (data.response) {
+                data.response.forEach((fixture: FixtureType) => {
+                    if (!fixtureIds.has(fixture.fixture.id)) {
+                        allFixtures.push(fixture);
+                        fixtureIds.add(fixture.fixture.id);
+                    }
+                });
+            }
+        });
+
+        const processedFixtures = allFixtures.map(fixture => ({
+            ...fixture,
+            league: {
+                ...fixture.league,
+                name: getDisplayName('league', fixture.league.id, fixture.league.name)
+            },
+            teams: {
+                home: { ...fixture.teams.home, name: getDisplayName('team', fixture.teams.home.id, fixture.teams.home.name) },
+                away: { ...fixture.teams.away, name: getDisplayName('team', fixture.teams.away.id, fixture.teams.away.name) }
+            }
+        }));
+
+        const cacheKey = activeTab === 'all-matches' ? 'live' : dateKey;
+        setMatchesCache(prev => new Map(prev).set(cacheKey, processedFixtures));
+
+    } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
             toast({
                 variant: "destructive",
                 title: "خطأ في الشبكة",
                 description: "فشل في تحميل المباريات. يرجى التحقق من اتصالك بالإنترنت.",
             });
-             const cacheKey = activeTab === 'all-matches' ? 'live' : dateKey;
+            const cacheKey = activeTab === 'all-matches' ? 'live' : dateKey;
             setMatchesCache(prev => new Map(prev).set(cacheKey, []));
-          }
-      } finally {
-          if (!abortSignal.aborted) {
+        }
+    } finally {
+        if (!abortSignal.aborted) {
             setLoading(false);
-          }
-      }
-  }, [activeTab, customNamesCache, fetchAllCustomNames, toast, user, favorites]);
+        }
+    }
+  }, [activeTab, customNamesCache, toast, favorites]);
 
 
   useEffect(() => {
+    const fetchNames = async () => {
+        if (!customNamesCache && db) {
+            try {
+                const [leaguesSnapshot, teamsSnapshot] = await Promise.all([
+                    getDocs(collection(db, 'leagueCustomizations')),
+                    getDocs(collection(db, 'teamCustomizations'))
+                ]);
+                
+                const leagueNames = new Map<number, string>();
+                leaguesSnapshot?.forEach(doc => leagueNames.set(Number(doc.id), doc.data().customName));
+                const teamNames = new Map<number, string>();
+                teamsSnapshot?.forEach(doc => teamNames.set(Number(doc.id), doc.data().customName));
+                
+                setCustomNamesCache({ leagues: leagueNames, teams: teamNames });
+            } catch(e) {
+                console.warn("Could not fetch custom names", e);
+                setCustomNamesCache({ leagues: new Map(), teams: new Map() });
+            }
+        }
+    };
+    fetchNames();
+
     if (user && db && !user.isAnonymous) {
         const docRef = doc(db, 'users', user.uid, 'favorites', 'data');
         const unsubscribe = onSnapshot(docRef, (doc) => {
             setFavorites(doc.data() as Favorites || { userId: user.uid });
         }, (error) => {
-            if (error.code === 'permission-denied') {
-                console.warn("Permission denied for favorites, user might be new or rules are restrictive.");
-                setFavorites(getLocalFavorites());
-            } else {
-                const permissionError = new FirestorePermissionError({ path: docRef.path, operation: 'get' });
-                errorEmitter.emit('permission-error', permissionError);
-            }
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'get' }));
+            setFavorites(getLocalFavorites()); // Fallback for permission issues
         });
         return () => unsubscribe();
     } else {
-        const handleLocalFavoritesChange = () => {
-            setFavorites(getLocalFavorites());
-        };
+        const handleLocalFavoritesChange = () => setFavorites(getLocalFavorites());
         setFavorites(getLocalFavorites());
         window.addEventListener('localFavoritesChanged', handleLocalFavoritesChange);
         return () => window.removeEventListener('localFavoritesChanged', handleLocalFavoritesChange);
     }
-  }, [user, db]);
+  }, [user, db, customNamesCache]);
   
   
   useEffect(() => {
@@ -435,20 +414,9 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
   const handleTabChange = (value: string) => {
     const tabValue = value as TabName;
     setActiveTab(tabValue);
-    
-    // Reset date to today and invalidate live cache when switching
-    if (tabValue === 'my-results') {
-        setMatchesCache(prev => {
-            const newCache = new Map(prev);
-            newCache.delete('live');
-            return newCache;
-        })
-    }
-    
   };
   
-  const currentFavorites = favorites;
-  const hasAnyFavorites = (Object.keys(currentFavorites.teams || {}).length > 0 || Object.keys(currentFavorites.leagues || {}).length > 0);
+  const hasAnyFavorites = (Object.keys(favorites.teams || {}).length > 0 || Object.keys(favorites.leagues || {}).length > 0);
   
   const cacheKey = activeTab === 'all-matches' ? 'live' : selectedDateKey || '';
   const currentFixtures = matchesCache.get(cacheKey) || [];
@@ -512,3 +480,5 @@ export function MatchesScreen({ navigate, goBack, canGoBack, isVisible }: Screen
     </div>
   );
 }
+
+    

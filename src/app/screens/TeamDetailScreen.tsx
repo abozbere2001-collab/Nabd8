@@ -26,7 +26,7 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { isMatchLive } from '@/lib/matchStatus';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
-const API_KEY = "774c1bb02ceabecd14e199ab73bd9722";
+const API_KEY = process.env.API_FOOTBALL_KEY;
 const API_HOST = "v3.football.api-sports.io";
 
 
@@ -146,7 +146,7 @@ const TeamPlayersTab = ({ teamId, navigate }: { teamId: number, navigate: Screen
             }
 
             try {
-                const res = await fetch(`https://${API_HOST}/players?team=${teamId}&season=${CURRENT_SEASON}`, { headers: { 'x-rapidapi-key': API_KEY } });
+                const res = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}`);
                 const data = await res.json();
                 if (data.response) {
                     const fetchedPlayers = data.response.map((p: any) => p.player);
@@ -266,8 +266,8 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
             await fetchAllCustomNames();
             try {
                 const [fixturesRes, statsRes] = await Promise.all([
-                    fetch(`https://${API_HOST}/fixtures?team=${teamId}&season=${CURRENT_SEASON}`, { headers: { 'x-rapidapi-key': API_KEY } }),
-                    fetch(`https://${API_HOST}/teams/statistics?team=${teamId}&season=${CURRENT_SEASON}`, { headers: { 'x-rapidapi-key': API_KEY } })
+                    fetch(`/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`),
+                    fetch(`/api/football/teams/statistics?team=${teamId}&season=${CURRENT_SEASON}`)
                 ]);
 
                 const fixturesData = await fixturesRes.json();
@@ -280,7 +280,7 @@ const TeamDetailsTabs = ({ teamId, navigate, onPinToggle, pinnedPredictionMatche
                 const leagueId = sortedFixtures[0]?.league?.id || statsData?.response?.league?.id;
 
                 if (leagueId) {
-                    const standingsRes = await fetch(`https://${API_HOST}/standings?league=${leagueId}&season=${CURRENT_SEASON}`, { headers: { 'x-rapidapi-key': API_KEY } });
+                    const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${CURRENT_SEASON}`);
                     const standingsData = await standingsRes.json();
                     setStandings(standingsData.response?.[0]?.league?.standings?.[0] || []);
                 }
@@ -501,7 +501,7 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     const getTeamInfo = async () => {
         setLoading(true);
         try {
-            const teamRes = await fetch(`https://${API_HOST}/teams?id=${teamId}`, { headers: { 'x-rapidapi-key': API_KEY } });
+            const teamRes = await fetch(`/api/football/teams?id=${teamId}`);
             if (!teamRes.ok) throw new Error("Team API fetch failed");
             
             const data = await teamRes.json();
@@ -722,3 +722,5 @@ export function TeamDetailScreen({ navigate, goBack, canGoBack, teamId }: Screen
     </div>
   );
 }
+
+    

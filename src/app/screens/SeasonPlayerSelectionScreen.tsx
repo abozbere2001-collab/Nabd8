@@ -84,12 +84,7 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
 
             try {
                 while (currentPage <= totalPages) {
-                    const res = await fetch(`https://v3.football.api-sports.io/players?team=${teamId}&season=${CURRENT_SEASON}&page=${currentPage}`, {
-                      headers: {
-                        'x-rapidapi-key': API_KEY!,
-                        'x-rapidapi-host': 'v3.football.api-sports.io',
-                      },
-                    });
+                    const res = await fetch(`/api/football/players?team=${teamId}&season=${CURRENT_SEASON}&page=${currentPage}`);
                     const data = await res.json();
                     
                     if (data.response) {
@@ -260,3 +255,5 @@ export function SeasonPlayerSelectionScreen({ navigate, goBack, canGoBack, heade
         </div>
     );
 }
+
+    

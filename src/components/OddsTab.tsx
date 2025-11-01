@@ -63,18 +63,8 @@ export function OddsTab({ fixtureId }: { fixtureId: number }) {
         setLoading(true);
 
         Promise.all([
-            fetch(`https://v3.football.api-sports.io/odds?fixture=${fixtureId}`, {
-              headers: {
-                'x-rapidapi-key': API_KEY!,
-                'x-rapidapi-host': 'v3.football.api-sports.io',
-              },
-            }),
-            fetch(`https://v3.football.api-sports.io/fixtures?id=${fixtureId}`, {
-              headers: {
-                'x-rapidapi-key': API_KEY!,
-                'x-rapidapi-host': 'v3.football.api-sports.io',
-              },
-            })
+            fetch(`/api/football/odds?fixture=${fixtureId}`),
+            fetch(`/api/football/fixtures?id=${fixtureId}`)
         ])
         .then(async ([oddsRes, fixtureRes]) => {
             if (!oddsRes.ok || !fixtureRes.ok) {
@@ -193,3 +183,5 @@ export function OddsTab({ fixtureId }: { fixtureId: number }) {
         </Card>
     );
 }
+
+    

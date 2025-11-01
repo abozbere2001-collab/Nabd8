@@ -24,7 +24,7 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { LeagueHeaderItem } from '@/components/LeagueHeaderItem';
 import { POPULAR_LEAGUES } from '@/lib/popular-data';
 
-const API_KEY = '75f36f22d689a0a61e777d92bbda1c08';
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 // --- Persistent Cache Logic ---
@@ -368,7 +368,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             if (cachedCountries?.data) {
                 countries = cachedCountries.data;
             } else {
-                const countriesRes = await fetch(`https://v3.football.api-sports.io/countries`, { headers: { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' }});
+                const countriesRes = await fetch(`/api/football/countries`);
                 if (!countriesRes.ok) throw new Error('Failed to fetch countries');
                 const countriesData = await countriesRes.json();
                 countries = countriesData.response || [];
@@ -376,7 +376,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
             }
 
             const teamPromises = countries.map(country => 
-                fetch(`https://v3.football.api-sports.io/teams?country=${country.name}`, { headers: { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' }})
+                fetch(`/api/football/teams?country=${country.name}`)
                     .then(res => res.ok ? res.json() : { response: [] })
                     .then(data => (data.response || []).filter((r: { team: Team }) => r.team.national).map((r: { team: Team}) => r.team))
                     .catch(() => []) // return empty array on error for a specific country
@@ -507,7 +507,7 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
 
 
     const renderNationalTeams = () => {
-        if (loadingNationalTeams) return <div class="flex justify-center p-4"><Loader2 class="h-6 w-6 animate-spin"/></div>;
+        if (loadingNationalTeams) return <div className="flex justify-center p-4"><Loader2 className="h-6 w-6 animate-spin"/></div>;
         if (!groupedNationalTeams) return null;
 
         return continentOrder.filter(c => groupedNationalTeams[c]).map(continent => (
@@ -693,3 +693,5 @@ export function AllCompetitionsScreen({ navigate, goBack, canGoBack }: ScreenPro
         </div>
     );
 }
+
+    

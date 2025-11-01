@@ -30,7 +30,7 @@ import { FootballIcon } from '@/components/icons/FootballIcon';
 import { cn } from '@/lib/utils';
 import {Skeleton} from "@/components/ui/skeleton";
 
-const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
+const API_KEY = process.env.API_FOOTBALL_KEY;
 
 
 const CrownedTeamScroller = ({
@@ -99,7 +99,7 @@ const TeamFixturesDisplay = ({ teamId, navigate }: { teamId: number; navigate: S
             setLoading(true);
             try {
                 const url = `/api/football/fixtures?team=${teamId}&season=${CURRENT_SEASON}`;
-                const res = await fetch(url, { headers: { 'x-rapidapi-key': API_KEY! }});
+                const res = await fetch(url);
                 if (!res.ok) throw new Error(`API fetch failed with status: ${res.status}`);
                 
                 const data = await res.json();
@@ -277,3 +277,5 @@ export function IraqScreen({ navigate, goBack, canGoBack }: ScreenProps) {
     </div>
   );
 }
+
+    
