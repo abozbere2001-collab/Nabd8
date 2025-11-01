@@ -2,14 +2,14 @@
 "use client";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { ScreenProps } from "@/app/page";
+import { type ScreenProps } from "@/app/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function TermsOfServiceScreen({ navigate, goBack, canGoBack }: ScreenProps) {
+export default function TermsOfServiceScreen({ goBack }: Partial<ScreenProps>) {
     const currentYear = new Date().getFullYear();
   return (
     <div className="flex flex-col h-full bg-background">
-      <ScreenHeader title="شروط الخدمة" onBack={goBack} canGoBack={true} />
+      <ScreenHeader title="شروط الخدمة" onBack={goBack} canGoBack={!!goBack} />
       <div className="flex-1 overflow-y-auto p-4">
         <Card>
           <CardHeader>
