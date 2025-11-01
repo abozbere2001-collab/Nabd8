@@ -532,7 +532,3 @@ export function PredictionsScreen({ navigate, goBack, canGoBack }: ScreenProps) 
         </div>
     );
 };
-
-    
-
-    
