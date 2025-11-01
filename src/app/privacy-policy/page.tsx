@@ -5,11 +5,11 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { type ScreenProps } from "@/app/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-// The component now accepts a 'props' object which can be empty.
-// We extract 'goBack' from it. This satisfies Next.js page requirements.
-export default function PrivacyPolicyScreen({ goBack }: { goBack?: () => void } = {}) {
+// This component contains the actual UI content.
+// It accepts `goBack` as an optional prop to be used when rendered inside AppContentWrapper.
+function PrivacyPolicyContent({ goBack }: { goBack?: () => void }) {
   const currentYear = new Date().getFullYear();
-  
+
   return (
     <div className="flex flex-col h-full bg-background">
       <ScreenHeader title="سياسة الخصوصية" onBack={goBack} canGoBack={!!goBack} />
@@ -83,4 +83,11 @@ export default function PrivacyPolicyScreen({ goBack }: { goBack?: () => void } 
       </div>
     </div>
   );
+}
+
+// This is the default export for the page route.
+// It renders the content component and can receive props from AppContentWrapper.
+// This structure satisfies Next.js's static build requirements.
+export default function PrivacyPolicyScreen(props: { goBack?: () => void }) {
+  return <PrivacyPolicyContent {...props} />;
 }

@@ -5,7 +5,9 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { type ScreenProps } from "@/app/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function TermsOfServiceScreen({ goBack }: { goBack?: () => void } = {}) {
+// This component contains the actual UI content.
+// It accepts `goBack` as an optional prop to be used when rendered inside AppContentWrapper.
+function TermsOfServiceContent({ goBack }: { goBack?: () => void }) {
     const currentYear = new Date().getFullYear();
     
     return (
@@ -72,4 +74,11 @@ export default function TermsOfServiceScreen({ goBack }: { goBack?: () => void }
           </div>
         </div>
       );
+}
+
+// This is the default export for the page route.
+// It renders the content component and can receive props from AppContentWrapper.
+// This structure satisfies Next.js's static build requirements.
+export default function TermsOfServiceScreen(props: { goBack?: () => void }) {
+    return <TermsOfServiceContent {...props} />;
 }
