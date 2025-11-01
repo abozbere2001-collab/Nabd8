@@ -28,8 +28,7 @@ import { POPULAR_TEAMS, POPULAR_LEAGUES } from '@/lib/popular-data';
 import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
-const API_KEY = process.env.API_FOOTBALL_KEY;
-
+const API_FOOTBALL_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
 
 // --- Types ---
 interface TeamResult {
@@ -239,7 +238,6 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
   const handleSearch = useCallback(async (query: string) => {
     setLoading(true);
     const normalizedQuery = normalizeArabic(query);
-    const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' };
 
     if (!normalizedQuery) {
         setSearchResults([]);
@@ -252,8 +250,8 @@ export function SearchSheet({ children, navigate, initialItemType }: { children:
     );
 
     const apiSearchPromises = [
-      fetch(`https://v3.football.api-sports.io/teams?search=${query}`, { headers }).then(res => res.ok ? res.json() : { response: [] }),
-      fetch(`https://v3.football.api-sports.io/leagues?search=${query}`, { headers }).then(res => res.ok ? res.json() : { response: [] })
+      fetch(`/api/football/teams?search=${query}`).then(res => res.ok ? res.json() : { response: [] }),
+      fetch(`/api/football/leagues?search=${query}`).then(res => res.ok ? res.json() : { response: [] })
     ];
     
     try {

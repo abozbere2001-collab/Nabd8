@@ -40,9 +40,7 @@ interface ProcessedOdds {
     away: number;
 }
 
-const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
-
-
+const API_FOOTBALL_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
 
 export function PredictionOdds({ fixtureId }: { fixtureId: number }) {
     const [odds, setOdds] = useState<ProcessedOdds | null>(null);
@@ -52,9 +50,7 @@ export function PredictionOdds({ fixtureId }: { fixtureId: number }) {
         let isMounted = true;
         setLoading(true);
 
-        fetch(`https://v3.football.api-sports.io/odds?fixture=${fixtureId}&bookmaker=8`, {
-            headers: { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' }
-        })
+        fetch(`/api/football/odds?fixture=${fixtureId}&bookmaker=8`)
             .then(res => {
                 if (!res.ok) throw new Error('Failed to fetch odds');
                 return res.json();

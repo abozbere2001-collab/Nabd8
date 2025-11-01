@@ -44,8 +44,7 @@ import { hardcodedTranslations } from '@/lib/hardcoded-translations';
 import { Card, CardContent } from '@/components/ui/card';
 import { getLocalFavorites, setLocalFavorites } from '@/lib/local-favorites';
 
-const API_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
-
+const API_FOOTBALL_KEY = process.env.NEXT_PUBLIC_API_FOOTBALL_KEY;
 
 // --- Caching Logic ---
 const CACHE_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -259,7 +258,7 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                     break;
                 }
                 
-                const standingsRes = await fetch(`https://v3.football.api-sports.io/standings?league=${leagueId}&season=${year}`, { headers: { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' } });
+                const standingsRes = await fetch(`/api/football/standings?league=${leagueId}&season=${year}`);
                 const standingsData = await standingsRes.json();
 
                 if (standingsData.response?.[0]?.league?.standings?.[0]?.length > 0) {
@@ -284,8 +283,6 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
             const cacheKey = `competition_data_${leagueId}_${seasonToFetch}`;
             const cachedData = getCachedData(cacheKey);
             
-            const headers = { 'x-rapidapi-key': API_KEY!, 'x-rapidapi-host': 'v3.football.api-sports.io' };
-            
             if (cachedData) {
                 setStandings(cachedData.standings || []);
                 setTopScorers(cachedData.topScorers || []);
@@ -297,10 +294,10 @@ export function CompetitionDetailScreen({ navigate, goBack, canGoBack, title: in
                 }
             } else {
                 const [standingsRes, scorersRes, teamsRes, fixturesRes] = await Promise.all([
-                    fetch(`https://v3.football.api-sports.io/standings?league=${leagueId}&season=${seasonToFetch}`, { headers }),
-                    fetch(`https://v3.football.api-sports.io/players/topscorers?league=${leagueId}&season=${seasonToFetch}`, { headers }),
-                    fetch(`https://v3.football.api-sports.io/teams?league=${leagueId}&season=${seasonToFetch}`, { headers }),
-                    fetch(`https://v3.football.api-sports.io/fixtures?league=${leagueId}&season=${seasonToFetch}`, { headers }),
+                    fetch(`/api/football/standings?league=${leagueId}&season=${seasonToFetch}`),
+                    fetch(`/api/football/players/topscorers?league=${leagueId}&season=${seasonToFetch}`),
+                    fetch(`/api/football/teams?league=${leagueId}&season=${seasonToFetch}`),
+                    fetch(`/api/football/fixtures?league=${leagueId}&season=${seasonToFetch}`),
                 ]);
 
                 const standingsData = await standingsRes.json();
