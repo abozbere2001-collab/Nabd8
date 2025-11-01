@@ -1,3 +1,4 @@
+
 "use client";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -87,3 +88,5 @@ export default function PrivacyPolicyScreen(props?: { goBack?: () => void, canGo
   // Pass the props down to the actual content component.
   return <PrivacyPolicyContent {...props} />;
 }
+
+    

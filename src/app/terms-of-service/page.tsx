@@ -1,3 +1,4 @@
+
 "use client";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -78,3 +79,5 @@ export default function TermsOfServiceScreen(props?: { goBack?: () => void, canG
   // Pass the props down to the actual content component.
   return <TermsOfServiceContent {...props} />;
 }
+
+    
